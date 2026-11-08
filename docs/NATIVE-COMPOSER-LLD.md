@@ -1,0 +1,300 @@
+# Native Chat, Composer, and Agent-Parity LLD (V1)
+
+> **Canonical V1 entry:** ordinary Conversation Send must run through a
+> qualified native AgentSession **without** mandatory Task/Coworker creation.
+> Agent selection determines valid native model/effort/commands, not a
+> duplicated LiteCowork-wide model router. The active daemon has a partial
+> OpenCode-only dispatch path, but Send must remain disabled until lifecycle,
+> recovery, concurrency, cancellation and exact route qualification pass.
+> See [final screen contract](V1-UI-SCREEN-CONTRACT.md).
+
+Status: NORMATIVE TARGET, not evidence of implemented Operator endpoints. Owners: E03-S01/S02/S06–S11, E08-S01/S04/S06 and E04-S06. Authority: AGENT-CONTROL, AGENT-FABRIC, TASK-RUNTIME, API, SCHEMAS, STATE-MACHINES, TRUST, EXPERIENCE. This document defines UI/local orchestration algorithms; machine endpoints/events must be promoted atomically to API/OpenAPI/Events/schema/storage and tested before serving.
+
+## Current implementation boundary (source audit reconciled 2026-11-06)
+
+The active Conversation submit route commits USER+OPEN, then starts a detached per-turn
+supervisor task and returns 202 when that supervisor is configured. Only the OpenCode
+Server v2.0.32 provider branch is wired. This is CODE-level integration, not a qualified
+native Send route. The route currently lacks durable dispatch intent/claim and commit-to-
+spawn recovery; exact replay returns the stored 202 receipt without proving the dispatcher
+is alive or re-admitting it. Storage does not enforce the target strict single-flight rule;
+retry moves FAILED to RUNNING before the reservation path that requires OPEN; RUNNING cancel
+settles without observed adapter interruption/quiescence; pre-dispatch supervisor failures
+can leave OPEN turns unsettled; and no daemon-start Conversation recovery sweep is wired.
+Runtime inventory (ONLINE, incarnation READY, Workspace EXECUTOR) is still not native
+SESSION_READY evidence. Keep Send disabled until the complete lifecycle and exact OS,
+provider, auth and owner USER route are qualified.
+
+**Current UI gate mismatch:** the mounted ConversationsPage still enables Send when the draft is non-empty and its local isTurnRunning predicate is false. It does not require a qualified AgentBinding/provider route or Operator readiness; with no Workspace default binding it can still submit and rely on the backend error. The only daemon dispatch branch is OpenCode. This UI does not meet the disabled-until-qualified target gate and must not be described as a qualified Send experience.
+
+The internal AgentSessionStore now exposes typed
+start_conversation_agent_session, list_starting_conversation_agent_sessions, and
+mark_starting_conversation_agent_session_lost operations. Reservation authorizes the
+Principal and active Workspace, verifies the exact OPEN Conversation turn and its unique
+revision-1 conversation.turn.created.v2 authority, and rechecks the event-pinned Binding,
+endpoint offer, Runtime/Workspace EXECUTOR enrollment, and current Runtime incarnation in
+one immediate transaction. It atomically stores the Conversation-scoped STARTING snapshot,
+event, and principal-scoped request receipt. An exact request replay returns its original
+receipt before mutable host eligibility is re-evaluated. Storage exposes keyset-paginated enumeration of Conversation STARTING rows in binary
+`agent_session_id` order, with an exclusive `after_agent_session_id` cursor and a 1–100
+page bound, plus expected-version LOST settlement that does not alter the turn. The
+specified sweep algorithm (advance to last returned ID, repeat until empty, then restart
+from the beginning) is a recovery-coordinator requirement; no active daemon startup caller
+for these Conversation storage operations was found in this audit.
+
+The active source contains a dedicated
+`activate_conversation_agent_session` storage operation. After the native OpenCode session
+is created outside SQLite, the supervisor rechecks the principal/Workspace, pinned turn
+binding, session and turn versions, endpoint offer, current Runtime incarnation, Workspace
+EXECUTOR enrollment, and eligible host. One immediate transaction commits the AgentSession
+ACTIVE state, ConversationTurn RUNNING state, corresponding snapshots/events, and the
+Runtime-local AgentSessionHostBinding. The opaque native handle is skipped by Serde,
+redacted from Debug to a presence boolean, and excluded from committed response, events
+and snapshots. Generic OPEN-to-RUNNING transition remains forbidden.
+
+The active Operator calls an OpenCode-only per-turn supervisor after USER+OPEN admission.
+That branch creates the OpenCode Server v2.0.32 session, activates it, loads/sends bounded
+context, consumes SSE events and calls the atomic SQLite final-response writer. This is
+CODE-level integration, not a qualified native Send route. It does not establish the target
+AgentTurnCoordinator/AgentHostSupervisor ownership split. The commit-to-detached-spawn gap,
+missing startup recovery, missing transactional single-flight guard, retry's RUNNING-versus-
+OPEN reservation mismatch, immediate RUNNING cancellation without native quiescence, and
+pre-dispatch errors that can leave OPEN turns unsettled all remain release blockers.
+
+The SQLite schema represents a Conversation-scoped AgentSession pinned to exactly one
+turn, enforces one active session per turn, and keeps opaque host/session bindings local.
+`resolve_conversation_session_host_for_turn(principal, workspace, conversation, turn)`
+uses the same immutable turn-created authority and current host eligibility. It never
+consults the later Conversation selector or Workspace default. The reservation transaction
+repeats those checks atomically; a read-only host lookup is not readiness evidence.
+
+The canonical context package builder and SQLite turn-prefix reader now exist and are
+consumed by the OpenCode supervisor path. The builder derives its target AgentBinding from
+the immutable turn-created event, reads only the same owner's same-Workspace Conversation
+messages through that turn's user message, and strips native session handles. The active
+supervisor sends the bounded package to OpenCode; Codex transport helpers remain staged and
+are not wired to this route. The active Operator does not emit a complete correlated native
+token-delta stream or usage ingestion. Keep Send disabled until the full lifecycle and exact
+route are qualified.
+
+For an exact idempotent submit replay, the route checks the authenticated principal's
+payload-digest receipt before consulting the current AgentBinding selection. It reuses the
+binding recorded in the committed turn-created event, so a later disable/change cannot
+turn a lost-response retry into `AGENT_UNAVAILABLE`. It returns the original 202 receipt;
+it does not prove that a detached dispatcher is still running or re-admit a missing worker.
+A different payload under the same key remains a conflict. This receipt path is implemented
+but does not solve commit-to-spawn recovery or enable qualified native Send.
+
+Distinct submits with different idempotency keys are append operations, not compare-and-swap
+updates from a client snapshot. The serialized storage transaction assigns each
+`conversation.message.added.v1` event the current next Conversation entity revision.
+Requests prepared from one older read can therefore commit in order without dropping a
+message or surfacing a revision-mismatch error. Same-key exact retries remain receipt
+replays; changed payload under the same key remains a conflict.
+
+## Outcome and non-negotiable invariants
+
+1. Every supported harness keeps its qualified native experience: slash commands, custom commands, @-file/@-agent references, model/provider selection, reasoning/effort/mode, images, files, session operations, approval/permission prompts, diffs, output events, cancellation and resume where upstream exposes them.
+2. The selected AgentBinding owns available models and options. Never synthesize another provider's configuration, claims of auth status, or custom command meanings.
+3. Plain text, resource pins and attachments survive Agent selection changes. Native tokens and options are revalidated transactionally; no silent reinterpretation; invalid turns never dispatch.
+4. Host actions (+ menu, Task/Schedule/Save Routine) and harness-native / commands are separate authority namespaces. Untrusted command metadata is display data, not executable code.
+5. A ConversationTurn is distinct from Task/Attempt. No durable Task emerges from a simple chat without a documented user action/policy; provider calls cannot bypass Task Trust/Effect fences.
+6. Every request is user-scoped, Workspace-scoped, version-fenced and idempotent. Optimistic turn, draft and attachment identities prevent double sends and stale completions.
+7. Exact agent version/adapter capability is qualified by real-harness conformance tests, not a registry entry or a demo. Unsupported native affordances remain explicit and nonfunctional rather than fake.
+8. No direct provider secrets, untrusted execution results or private session handles in frontend/events/logs.
+
+## Component owner tree
+
+~~~text
+ConversationRoute(workspaceId, conversationId?)
+  LeftConversationRail(search, history, new, coworkers, unread/NeedsYou)
+  ConversationViewport
+    CommittedMessageList(virtualized)
+    TransientTurnOverlay(reconnect-safe)
+    ProviderInputRequest/ApprovalCard
+    TaskCard/ArtifactCard/OpenInWorkbench
+  StickyComposer
+    RichPlainTextEditor(text/selection/composition, accessible)
+    AttachmentTray(file, image, folder, resource, screenshot)
+    SemanticNativeTokenOverlays
+    AutocompleteRoot
+      NativeSlashPalette
+      NativeReferencePalette
+      FileResourcePicker
+      AgentMentionPicker
+      HostActionPalette(SEPARATE)
+    ComposerControls(+, agent, model, effort/reasoning, mode, overflow)
+    Send / RunTask / Schedule / Stop / Retry
+    EligibilityAndCompatibilityFeedback
+  ContextualWorkbenchHost (see DESKTOP-SHELL-LLD)
+~~~
+
+Composer and options are shared for ordinary and Coworker-owned conversations; Coworker is not mandatory. UI controller data is transient except explicit draft persistence. Streaming is presentation, not authority.
+
+## State and types (target client contracts)
+
+~~~ts
+type ComposerState = {
+  workspaceId: string; conversationId: string | null;
+  selectedBindingId: string | null; selectionEpoch: number;
+  draftRevision: number; text: string; caret: number; composingIME: boolean;
+  attachments: PinnedAttachment[]; nativeTokens: NativeToken[];
+  optionSelections: Record<string, unknown>; optionDescriptorDigest: string | null;
+  palette: null | {kind:"SLASH"|"REFERENCE"|"HOST"; range:[number,number]; query:string; epoch:number};
+  descriptor: AgentControlDescriptor | null;
+  eligibility: "LOADING"|"ELIGIBLE"|"INVALID_DRAFT"|"NEEDS_INSTALL"|"NEEDS_AUTH"|"STALE"|"OFFLINE"|"BLOCKED";
+  inFlight: null | {clientTurnId:string; requestId:string; draftRevision:number; bindingId:string; status:"SENDING"|"AMBIGUOUS"|"ACCEPTED"};
+};
+type NativeToken = {
+  tokenId:string; kind:"NATIVE_COMMAND"|"NATIVE_REFERENCE"|"NATIVE_AGENT_MENTION"|"HOST_RESOURCE";
+  range:[number,number]; ownerBindingId:string; descriptorDigest:string;
+  nativeId:string; display:string; rawLiteral:string; payload:unknown;
+  validity:"VALID"|"NEEDS_REFRESH"|"INCOMPATIBLE"|"UNSUPPORTED";
+};
+type QualifiedCommand = {
+  id:string; label:string; description?:string; source:"HARNESS_BUILTIN"|"HARNESS_CUSTOM";
+  argsSchema?:unknown; execution:"AGENT_NATIVE"|"SESSION_OPERATION";
+  effectClass:"READ"|"WRITE"|"UNKNOWN"; available:boolean;
+};
+type AgentUiDescriptor = {
+  bindingId:string; digest:string; observedAt:string; expiry:string; harnessVersion:string;
+  supports:{text:boolean;image:boolean;file:boolean;folder:boolean;resources:boolean};
+  commands:QualifiedCommand[]; references:NativeReferenceKindDescriptor[];
+  options:AgentSessionOptionDescriptor[]; nativeSessionActions:SessionActionDescriptor[];
+};
+~~~
+
+Actual schema names normalize existing AgentControlDescriptor/AgentInputSurfaceDescriptor; do not introduce duplicate domain aggregates. Type aliases and projections adapt the canonical machine descriptor when promoted.
+
+## Required pure functions and logic
+
+| Function | Inputs -> outputs | Required edge behavior |
+|---|---|---|
+| resolveActiveBinding | Workspace/Coworker default, explicit selection, Runtime offer -> binding/repair | Never silently switch to a different provider after failure |
+| loadFreshAgentDescriptor | bindingId, Runtime incarnation, digest, abort signal -> descriptor | Refuse expired offer; single-flight cache by exact version; cancel stale refresh |
+| mergeNativeCommands | adapter reports, custom workspace config -> qualified list | Upstream precedence including custom overriding built-in; collisions use actual harness semantics |
+| scanNativeTrigger | text, caret, selection, composingIME, escape/quotes -> trigger/range or null | No palette mid-IME, inside code block/link/path when rule excludes it |
+| filterNativePalette | descriptor entries, query, locale -> virtual rows | Stable id, keyboard rank, sanitized display, no arbitrary executable metadata |
+| resolveReferenceKind | trigger, descriptor, project context -> kinds/source | @subagent and @file are distinct; only provider-supported types |
+| pickNativeToken | palette row, digest, draft -> updated text/semantic token | Replace only marked range; native id survives UI label changes |
+| parseNativeInvocation | token/text, selected binding, descriptor -> provider request or error | Do not turn unknown slash into host action or blindly execute local shell |
+| validateOptionSelections | selected options, descriptor schema -> valid/map/errors | No cross-agent guessed mapping; respect LIVE_SESSION versus NEW_SESSION |
+| compareDraftCompatibility | files/images/resources/tokens, input surface -> field errors | Show retained incompatible input; never drop files silently |
+| reduceAgentSelection | prior state, nextBindingId, descriptor -> atomic state | Increment epoch; retain text/files; invalidate owner-specific tokens; recompute dependent controls |
+| deriveSendEligibility | Runtime, auth, binding, descriptor, draft, turn state -> status | Distinguish known blocked, unknown/stale and confirmed ready |
+| buildTurnRequest | qualified state, context pins, requested options -> canonical immutable request | Validate workspace/version/bytes/permission; idempotency key and hash |
+| reconcileTurnReceipt | requestId, persisted turn/message/readback -> accepted/ambiguous/error | Lost HTTP receipt must not duplicate side effect; query authoritative state |
+| deriveTurnActions | active provider state -> stop/retry/resume/steer capability | Never show success on cancel request without confirmation |
+| chooseSessionTransition | old/new binding, session health -> same/live change/new session/explicit handoff | A different harness never inherits a private provider session |
+| loadConversationContextForTurn | principal/workspace/conversation/turn -> immutable ConversationContextPackage | Resolve target binding from the turn event; snapshot through its user message; reject cross-Workspace, missing-boundary, duplicate, unsupported-role, or over-limit history |
+| restoreComposerDraft | scoped storage key and schema version -> valid draft/conflict | Never read a different Workspace/Coworker; redact sensitive metadata |
+| trackDraftPublication | accepted turn receipt and draftVersion -> clear/not clear | Clear only original committed draft; preserve newer user typing |
+
+## Agent switch algorithm (authoritative UI sequencing)
+
+~~~text
+selectAgent(nextBinding):
+  save existing user text/attachments/selection, increment selectionEpoch
+  close native palette; freeze dependent controls as one group
+  load descriptor for nextBinding with abort token and Runtime-incarnation fence
+  if stale result or Workspace changed: discard result, keep draft
+  retain only option IDs/values validated in next descriptor AND visibly retained
+  for each token from previous binding: mark incompatible until reselected
+  compare draft attachment capabilities; keep incompatible items visibly
+  atomically update binding/model/effort/mode/commands/reference catalog
+  disable send until same digest & Workspace validation has completed
+  do not auto-create session; do not dispatch turn; do not mutate an existing Attempt
+~~~
+
+The user-visible Conversation is the continuity boundary: changing its selected AgentBinding keeps the same Conversation ID, saved transcript, draft, attachments, and pinned Resources. The change applies to the next turn. A turn already admitted remains pinned to its original binding and AgentSession; an agent change never reroutes an active turn.
+
+At admission, the immutable turn-created event pins the selected AgentBinding. Before native startup, host resolution takes the authenticated principal, Workspace, Conversation, and turn IDs, reads the unique turn-created event, and resolves only that exact binding against current endpoint and Runtime-incarnation eligibility. It never rereads the live Conversation selector or Workspace default. If the pinned binding or host is disabled, expired, offline, or otherwise ineligible, the turn fails visibly without fallback; a selector change applies only to later turns. The supervisor loads a ConversationContextPackage through the current user message and supplies that canonical prefix to the selected agent's own adapter. The package includes committed USER, AGENT, and CHANNEL messages with source-binding provenance; it excludes product SYSTEM_NOTICE messages and all provider-private session handles. ResourceRefs are references only and must be reauthorized/materialized through the normal same-Workspace path. Native auth, cookies, session IDs, tool state, and hidden provider history never cross bindings.
+
+The context package is capped at 1,024 messages and 4 MiB. Exceeding either bound returns CONVERSATION_CONTEXT_LIMIT_EXCEEDED; the system must not silently truncate history. If the selected native model has a smaller context window, show a reviewable compaction/context selection that preserves the complete saved transcript and identifies any summary/range used. Count any additional agent call for compaction in the same Conversation usage ledger. A provider may start a new opaque AgentSession internally; this does not create a new user-visible chat.
+
+### Provider wire projection
+
+`ConversationContextPackage` is provider-neutral state, not a provider wire payload. Each adapter must implement a deterministic role/content projection and validate the exact `through_message_id` before dispatch. Preserve the ordered USER, CHANNEL, and prior AGENT messages; label prior agent provenance; treat all transcript text and prior agent answers as untrusted conversation data; never promote it to system/developer policy. Provider-private session/history identifiers, credentials, cookies, and native tool state are never copied across bindings.
+
+The current Codex App Server `turn/start` and OpenCode Server prompt transports accept one text prompt and each enforce a 256 KiB input bound. Their initial cross-agent projection is therefore one JSON-escaped transcript envelope in a single user input. Do not silently omit RESOURCE blocks or references: reauthorize and materialize them through the normal Workspace path first, or fail the turn with a visible resource-preparation error. If the serialized envelope exceeds the adapter/transport limit, refuse dispatch without truncation; a reviewable compaction path must retain the full saved transcript and account any extra inference in the same Conversation usage ledger. A provider's pre-existing native session history is never treated as the cross-agent transcript.
+
+## Slash, @, and editor semantics
+
+- Slash command display derives from live versioned harness descriptor, including custom project/global commands, exact argument schema, native dispatch action and reserved collisions. Never infer native commands from global names. On provider command table changes, refresh and preserve typed literal without dispatch.
+- Support leading and in-text slash only where native syntax permits; distinguish literal slash in URLs, Markdown/code fences, pasted text, escaped slash and shell paths. IME composition must not trigger send, insert or auto-select.
+- For @, qualify agent mentions, files and resources separately. Provider-native files use native path semantics only after permitted Workspace-root resolution. LiteCowork Resource pins stay typed, never silently become host filesystem paths.
+- Enter commits selected palette item when open; Escape closes it; Up/Down/Home/End navigate; Tab accepts only according to explicitly displayed hint; Enter versus Shift+Enter configurable; Ctrl/Cmd+Enter sends when eligible; screen readers get finite live announcement.
+- The entire draft text is not parsed as host instructions. For a native command that expands to prompt text, ask the adapter to resolve per upstream semantics; never run string templating, embedded shell substitution or path expansion in the UI.
+- Compose image/file constraints from selected agent native input, upload policy and Task policy. Folder attachments are manifest/pinned resource selections, not ambient recursive permission.
+- Native command may be disallowed inside existing task or conversation state; provide status and explicit repair, not a silent fallback to chat text.
+
+## Turn admission and stream (target)
+
+~~~text
+onSend:
+  snapshot editor state + selected descriptor digest + Workspace version + draft revision
+  validate native token ownership and eligible Runtime/auth/option scope
+  persist/restore attachment pins with immutable revision and digest
+  create deterministic requestId/clientTurnId; persist pending-send local receipt
+  send request to Operator (not direct provider from WebView)
+  Operator authorizes, dedupes and commits ConversationTurn + input message
+  runtime/session adapter starts native invocation when admitted
+  frontend reads ordered committed stream + transient events from last cursor
+  on accepted commit clear only exactly submitted draft version
+  on ambiguous reply query requestId and pinned state; never resubmit as new turn
+  on reconnect merge by event/message identity and persisted sequence
+  on complete persist semantic answer before optional rich presentation
+~~~
+
+If invocation is a consequential external Effect, effect fencing and approval belong in canonical Core service regardless of native adapter. Provider session events are not themselves proof of external side effects or Task completion. Native turn requests do not carry secret bearer credentials to the WebView.
+
+## Required native parity fixture matrix (E03-S11)
+
+Per exact (OS, harness name, harness version, adapter version, auth mode), run directly native and via LiteCowork: onboarding/install/update/uninstall; auth cancel/expiry/repair; provider/model/effort/mode inventories; native built-in and custom slash collisions; @file/@agent; copy/paste Unicode and IME; files/images size/type; permission prompts; tool invocation; message streaming/reconnect; stop; resume; session history; switching across active runs; context compaction; long output; native extensions/skills/subagents; errors; local paths; interrupted Runtime. Record upstream-supported, bridged, degraded-with-disclosure, unsupported and blocked states. Support claims require no undisclosed regression on mandatory native affordances.
+
+## Implementation file ownership (proposed; inspect current before adding)
+
+- UI: apps/litecowork-ui/src/conversations/Composer.tsx, ComposerController.ts, composer-reducer.ts, native-input.ts, NativePalette.tsx, AgentDependentControls.tsx, conversation-send.ts.
+- UI API: agents/agent-control-client.ts, conversations/conversation-stream.ts; use existing desktop-* bridge conventions and generated OpenAPI types.
+- Tauri: src-tauri/src/conversation_stream_bridge.rs and native agent descriptor bridge only for desktop transport.
+- Daemon: apps/litecoworkd/src/conversation_operator.rs, agents/{codex_app_server,opencode_server}.rs, orchestration adapters.
+- Domain: existing Conversation/AgentSession/Task types in domain crates; storage-sqlite transaction/outbox.
+- Tests: reducer property cases; native descriptor fixtures; two real harness end-to-end suites; crash/replay; accessibility.
+
+These are target file responsibilities, not evidence that these files exist. No unnecessary generic provider layer; adapter remains protocol/harness-specific.
+
+## Upstream documentation to pin at implementation time
+
+- OpenCode commands: https://docs.opencode.ai/docs/commands/
+- OpenCode agents and @ mentions: https://docs.opencode.ai/docs/agents/
+- OpenCode server, sessions and events: https://docs.opencode.ai/docs/server/
+- OpenCode permissions: https://docs.opencode.ai/docs/permissions/
+- OpenCode rules/config: https://docs.opencode.ai/docs/rules/
+- Codex documentation entry: https://developers.openai.com/codex/
+- ACP protocol: https://agentclientprotocol.com/
+Version pin exact upstream API/CLI source snapshots in archive/legacy-implementation-c7e9c05/SOURCES.md for conformance; docs URLs are references, not guarantees across future versions.
+
+## Canonical mutation transport clarification (2026-10-12 audit)
+
+The earlier client pseudocode uses `requestId` as a durable logical submission identifier. The actual Operator transport MUST follow docs/API.md: the stable `Idempotency-Key` header is preserved across retries and maps to the domain RequestId; local IPC `request_id` is only a per-exchange correlation ID. Mutations use `If-Match` for versioned resources and `X-Workspace-ID` for scoped commands. Do not add duplicate routes: canonical ConversationTurn creation/retry/cancel and agent-profile control-descriptor reads already exist in API.md/OpenAPI. Client-side token validation does not replace Operator authorization or qualified native adapter checks.
+
+
+## Implementation status — Conversation agent selection (2026-10-25)
+
+The earlier gap is closed in source. PATCH /v1/conversations/{id}/agent-binding is
+mounted in apps/litecoworkd/src/conversation_operator.rs; storage validates Workspace
+ownership, enabled/lead-eligible binding, expected Conversation version, and
+principal-scoped idempotency before atomically committing the projection, event, and
+receipt in crates/storage-sqlite/src/conversations.rs. The Tauri command and
+Conversation-page selector read and apply the committed record. The route test covers
+set, exact replay, clear, stale-version rejection, and disabled/non-lead/foreign-binding
+rejection.
+
+This selector only stores the binding for future turns and preserves the Conversation
+draft. It does not supply per-harness model/session options, qualify native readiness,
+or enable Send. Native session admission, dispatch, streaming, settlement, cancel/retry,
+and recovery remain blockers in the Chat acceptance journey.
+
+## Intelligent UI, images, and response rendering status (2026-10-25)
+
+The Conversation UI can hydrate an optional validated RichPresentation, but that renderer is static and accepts only text, layout, card, callout, and table blocks. Conversation content currently parses only TEXT and RESOURCE. Native image input/output and generated interactive response documents are not wired to a selected agent route. The stream bridge and reconnecting client have no native turn producer, so they do not constitute live rendering. See [Intelligent UI and Image Content](INTELLIGENT-UI-AND-IMAGE-CONTENT.md) for the target contract and acceptance evidence.

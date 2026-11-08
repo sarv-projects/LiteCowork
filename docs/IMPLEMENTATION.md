@@ -1,0 +1,232 @@
+# Implementation Architecture
+**Status:** architecture and implementation-boundary reference. The active Rust/Tauri source is present under apps/ and crates/. This document describes dependency direction and source ownership; exact current implementation and release evidence is maintained in [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md). Its proposed layouts are boundaries to preserve, not a requirement to create every possible crate or provider.
+
+## Repository shape
+
+```text
+apps/
+  litecoworkd/             # headless Runtime/service executable
+  litecowork-ui/           # Tauri + React desktop UI and native command bridge
+
+crates/
+  domain-workspace/        # Workspace aggregate/services
+  domain-task/             # durable Task creation/service
+  domain/
+    common/
+    conversation/
+    artifact/
+    effect/
+    evidence/
+
+  runtime/
+    supervisor/
+    workspace-service/
+    task-service/
+    planning-coordinator/
+    agent-session-supervisor/
+    agent-host-supervisor/
+    artifact-runtime-supervisor/ # volatile local interactive Artifact runs; OS isolation adapter
+    lifecycle/
+    dependency-planner/
+    scheduler/
+    attempt-runner/
+    completion/
+    reconciliation/
+
+  mesh/
+    identity/
+    presence/
+    replication/
+    leases/
+    handoff/
+    transport/
+
+  agents/
+    core/
+    acp/
+    a2a/
+    cli/
+
+  capabilities/
+    core/
+    gateway/
+    broker/
+    litespm/
+
+  environments/
+    core/
+    local/
+    worktree/
+    container/
+    remote/
+
+  artifacts/
+  trust/
+  verification/
+  routines/
+  automation/
+  channels/
+  events/
+  storage/
+    core/
+    sqlite/
+    postgres/
+    blob-local/
+    blob-s3/
+  operator-api/
+```
+
+Do not create every crate before needed; this is an ownership map. Early implementation
+may combine closely related crates while preserving dependency boundaries.
+`apps/operator-web`, Postgres and S3 adapters are future optional shapes, not V1
+clients/providers. V1 is the complete desktop/local product; cloud continuation and remote
+Runtime are post-V1 releases.
+
+## Dependency direction
+
+```text
+apps/operator UI
+      -> operator-api client
+
+application/runtime services
+      -> domain + ports
+
+ArtifactRuntimeSupervisor
+      -> ArtifactStore/Resource read ports + authenticated local IPC + OS isolation provider
+      -X-> AgentAdapter, TaskPlanner, Effect executor
+
+adapters (ACP, LiteSPM, SQLite, S3, channels)
+      -> ports/domain types
+
+domain
+      -> common primitives only
+```
+
+Forbidden dependencies:
+- domain -> Tauri/React
+- task domain -> ACP/A2A implementation
+- task domain -> LiteSPM implementation
+- any domain -> SQLite/Postgres concrete driver
+- AgentAdapter -> direct Task database mutation
+- capability adapter -> UI
+
+## Delivery order and story execution
+
+Stage measurements include CapabilityHost activation/binding overhead, daemon/task
+startup, and event-to-UI latency. Freeze numeric Stage 1 targets from actual recorded
+hardware/workload baselines; do not guess them.
+
+The contract-level release order is **desktop/local V1 first; cloud continuation and
+remote Runtime post-V1**. The detailed Agile stories, stack qualification, provider research,
+RAG, UI acceptance, real-work tests and release gates are in
+[`archive/legacy-implementation-c7e9c05/README.md`](archive/legacy-implementation-c7e9c05/README.md). The current authority is
+still this document plus `ARCHITECTURE.md` and each domain contract; a backlog summary
+never overrides them.
+
+V1 delivery gates are:
+
+1. Foundation, verified toolchain, contract CI, durable local storage, authenticated API
+   and independent Runtime lifecycle.
+2. Installable local desktop vertical slice: Workspace/Resources, native harness, durable
+   Conversation and Task, attempt-free planning, accepted Steps, Attempts, recovery,
+   mediated capability/effect/evidence and one independently verified Artifact.
+3. Complete finalized local feature surface: workforce/delegation, files/folders/ZIP and
+   RAG, local models, browser/office/research, Coworker/context/Goals/Suggestions,
+   Workbench, accessibility, responsibilities and skills, each qualified with real
+   providers and useful user cases.
+4. Desktop/local production installer, backup/restore, security/performance/real-work
+   qualification and owner release.
+
+Cloud deployment/continuation and remote Runtime have their own post-V1 gates in the Agile
+roadmap; they are not V1 release blockers.
+
+Begin with contract/toolchain and stack spikes, not an assumption that ACP fits every
+native harness. Implement native harness adapters through qualified full-fidelity
+interfaces; an ACP adapter is used only when supported semantics are sufficient. RAG
+parsers/indexes remain provider implementations. A Python sidecar is isolated and
+resource-limited; it never owns Task or Trust state. Do not add Postgres/Kubernetes or
+many small crates before a measured need. Cloud qualification uses a long-lived isolated
+Runtime, not a serverless function as a presumed equivalent.
+
+The roadmap stories split lifecycle/resource, Conversation/Task, Trust/capabilities,
+UI, cloud and remote work into reviewable increments. Each domain owner must implement
+its own API/event/schema/SQL changes even when the cross-contract inventory has an
+architecture guardian. Test fixtures establish deterministic control-plane behavior;
+provider release claims require system tests against the provider and real-user acceptance.
+
+## Documentation and implementation gates
+
+Before a domain is implemented, its canonical schema, legal transitions/owner, command/event contract, authorization rule, failure/recovery behavior, UI projection, and compatibility policy must agree across its owner document and the shared schema/API/event/storage references. LiteSPM package/API/manifest details remain intentionally deferred to the configured LiteSPM service; LiteCowork specifies its internal Broker/Supervisor ports, normalized Runtime-local host/readiness view, scoped activation references, and stable user-facing capability references without inventing LiteSPM's wire contract.
+
+## Definition of done for a domain feature
+
+A feature is done only when:
+1. schema exists
+2. legal state transitions defined
+3. owning service command exists
+4. event(s) defined
+5. authorization rule defined
+6. failure/recovery behavior defined
+7. UI projection/state defined if user-visible
+8. unit + contract/integration tests exist
+9. observability fields/metrics exist where operationally relevant
+
+## Versioning
+
+Version independently:
+- DB schema
+- domain event schemas
+- Operator API
+- Mesh protocol
+- AgentAdapter contract
+- EnvironmentProvider contract
+- Capability Gateway contract
+- LiteSPM client wire/package contract
+
+Upgrade principle: in-progress Tasks remain pinned to immutable spec/plan/capability/artifact revisions; runtime upgrades must not silently mutate their semantics.
+
+
+## Agent module/control implementation map
+
+The target agent configuration lifecycle is specified in AGENT-CONTROL.md and ADR-0025.
+Implementation ownership is intentionally modular:
+
+~~~text
+crates/agent-module-core/          # NEW: shared descriptors/module registry traits
+crates/agent-registry/             # NEW: bounded ACP registry cache/client
+crates/agent-lifecycle/            # NEW: lifecycle service/state/validation
+apps/litecoworkd/src/agents/
+  mod.rs                           # refactor: module registry, not hard-coded inventory fanout
+  codex/                           # target per-agent module
+  opencode/                        # target per-agent module
+  claude/                          # future qualified module
+  ...
+crates/storage-core/               # AgentBinding configuration + operational store ports
+crates/storage-sqlite/             # v16 projections/transactions
+apps/litecoworkd/src/operator.rs   # target routes; thin transport only
+apps/litecowork-ui/src/agents/     # Agent Registry master-detail
+apps/litecowork-ui/src/conversations/
+  composer agent-surface hook      # dependent Agent/Model/options/native input projection
+~~~
+
+Exact package names may be adjusted during implementation, but the **ownership split must
+not** collapse lifecycle logic into operator.rs or brand conditionals into Core/UI.
+
+The current Codex/OpenCode inventory/probe UI is a transitional source slice, not the
+generic target.
+
+
+## 2026-10-10 design inputs
+
+Implementation now has three additional architecture inputs:
+
+- [Reference Implementations](REFERENCE-IMPLEMENTATIONS.md) — exact upstream repos,
+  revisions, file paths, licenses and borrow/do-not-borrow decisions.
+- [Connectors & Workflows](CONNECTORS-WORKFLOWS.md) — ConnectorPackage, local-first OAuth,
+  optional AuthBackends/EventRelay, WorkflowBackendAdapter and functions/edge cases.
+- [Learning](LEARNING.md) — LearningCandidate/policy, memory/instruction/skill/routine/
+  automation separation and review/auto-commit rules.
+
+Promote target records incrementally. Every implementation slice updates domain schema,
+storage migration, API/events where exposed, UI truth, coverage and tests together; target
+prose alone does not make a feature available.

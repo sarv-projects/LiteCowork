@@ -1,0 +1,213 @@
+# Failure and Recovery
+
+## Recovery ladder
+
+Always prefer the smallest safe recovery:
+
+```text
+0 reconcile ambiguous Effect
+1 retry same safe operation with same idempotency identity
+2 restore Task state from a portable checkpoint
+3 replace AgentSession inside the same Runtime incarnation and valid lease
+4 create a new Attempt for the same Step after incarnation/lease loss
+5 ask lead agent for revised PlanRevision
+6 ask user
+```
+
+Restoring a portable checkpoint restores Task inputs and progress; it does not transfer a
+live Attempt or its authority. The same Attempt may continue only when its owning Runtime
+incarnation and lease are still current and the Environment is verified. A daemon restart
+creates a new incarnation: reconcile Effects and the old lease, settle the old Attempt,
+then create a fresh Attempt with a new AgentSession and a higher lease epoch when policy
+allows. Provider-native session or Environment snapshots are optional optimizations and
+cannot override this ownership rule.
+
+Stop when the same failure signature recurs with no meaningful new state/evidence and configured recovery budget is exhausted.
+
+## Failure signature
+
+```text
+FailureSignature = hash(
+  component_kind,
+  error_code,
+  operation,
+  capability/provider,
+  target_class,
+  normalized_root_cause
+)
+```
+
+Do not include volatile timestamps/random IDs.
+
+## Failure matrix
+
+| Component | Failure | Detection | Default response |
+|---|---|---|---|
+| Lead AgentSession | process/session lost | adapter event/stream EOF | replace session from ResumePacket; new Attempt if ownership changed |
+| Child agent | lost/fails | adapter event | retry child independently or let lead revise plan |
+| Runtime | offline | presence + lease expiry | reconcile Effects; eligible failover only |
+| Authenticated Operator startup | endpoint bind/initialization fails after incarnation registration | `OperatorServer::start` error after catalog registration has already marked the incarnation `DEGRADED` | persist `OPERATOR_API_START_FAILED` in private local status, retain the catalog's already-durable `DEGRADED` availability, release the Runtime lock by exiting nonzero, and let the bounded service-manager policy or explicit owner retry start a later incarnation; do not claim readiness or loop indefinitely in-process |
+| Linux service stop deadline | Operator drain or final lifecycle persistence exceeds systemd `TimeoutStopSec` | service manager sends SIGKILL after the 90-second bound | treat the incarnation as unclean; keep the prior local state non-clean where possible; next startup performs ordinary recovery and does not infer Effects or work settled from process exit |
+| Runtime device identity | OS credential store unavailable, identity malformed, or RuntimeId/key mismatch | identity-provider startup error | fail closed before Operator readiness; do not create replacement key or Runtime identity; preserve only a truthful DEGRADED local status if the local store is available |
+| Environment | provisioning fail | provider error | alternate provider/runtime or fail Step |
+| Environment | corrupted/unhealthy | health/test | checkpoint if safe, recreate, new Attempt |
+| MCP/provider | process dies or becomes unhealthy | LiteSPM/process-health result or invocation error | open LiteCowork call circuit; ask LiteSPM/provider owner to recover process under its lifecycle policy; retry reads/idempotent operations only |
+| Async CapabilityInvocation | cancellation acknowledgement without terminal provider state | provider task remains working or unavailable | keep Task PAUSE_REQUESTED/CANCEL_REQUESTED; reconcile provider state; never claim stopped |
+| Async CapabilityInvocation | initial MCP task handle response lost after dispatch | transport timeout before the opaque handle is committed to its encrypted Runtime-local binding | keep Invocation AMBIGUOUS; recover only by provider lookup using a precommitted idempotency identity; never blindly redispatch a potentially effectful `tools/call` |
+| Provider input request | UserRequest expires before response delivery | expiry event while provider task may still be waiting | mark local input binding EXPIRED; cancel/reconcile provider task; keep ConversationTurn WAITING_DEPENDENCY until quiescent, then fail retryably; block only the affected Task Step |
+| LiteSPM | unavailable | client error | existing locked activations continue; new discovery waits/fails clearly |
+| Secret/OAuth | revoked/expired | auth error | WAITING_RESOURCE; re-auth; new SecretLease |
+| BlobStore | unavailable | storage error | pause Artifact publication; retry; never create version referencing missing blob |
+| StateStore | unavailable | storage error | stop authoritative mutations; UI may show cached read-only state |
+| Mesh partition | transport/heartbeat loss | missed authenticated heartbeats or partitioned transport, checked against the Runtime lease/epoch | retain local safe work under policy; no conflicting new cross-runtime lease |
+| Hub unavailable | failed calls | bounded failed hub requests plus failed reachability/health checks | cross-device coordination pauses; local policy governs existing attempts |
+| Event projection | bug/corruption | checksum/invariant | rebuild projection from journal |
+| External effect | timeout after send | missing definitive response | mark AMBIGUOUS; reconcile before retry |
+| Verifier | crash | run timeout | retry verifier or alternate verifier; Task remains VERIFYING |
+| Verification during pause/cancel | run does not settle | bounded run deadline | keep PAUSE_REQUESTED/CANCEL_REQUESTED; settle as INCONCLUSIVE on timeout; late evidence cannot complete a fenced Task |
+| Approval channel | unavailable | delivery error | approval stays PENDING; use another eligible surface |
+| Capability update | incompatible | health/resolve | in-flight lock remains; rollback/choose old version for new activation if available |
+| DelegationProfile | disabled/archived before admission | profile version check | reject new child with typed error; never substitute unless selection mode/policy permits |
+| DelegationProfile | disabled/revised after admission | pinned revision on Attempt | current child keeps its pin; explicit stop uses ordinary safe cancellation |
+| Worker option | model/reasoning override unsupported | adapter schema validation | fail before model invocation; no silent default |
+| Agent harness | normalized native config digest changed | descriptor reprobe | revalidate new admissions; active session finishes only if adapter proves frozen config |
+| Quota | no provider observation | adapter returns UNKNOWN/expiry | show unavailable/unknown; do not estimate remaining quota or claim exhaustion |
+| Prewarm | host/auth/config/environment becomes unavailable | fresh admission probe | discard warm hint and run ordinary admission or show blocker; Task state is unchanged |
+| Worker cost | monetary usage unknown under hard ceiling | BudgetService comparison | reject candidate unless provider/host enforces the cap; never treat unknown as zero |
+| Escalation | quality floor fails after bounded candidates | verifier + policy limit | stop, preserve Attempts/Evidence, return unmet criteria to lead/Needs You |
+| Shared Environment | sharing owner/scope mismatch | EnvironmentManager owner check | reject attachment before session start; do not fall back to broader scope |
+| Browser/computer | another actor owns EnvironmentControlLease | epoch check | reject/queue no input and show current controller; never replay stale commands |
+| RichPresentation compiler | timeout, invalid intent, schema/limit failure | deterministic compiler/validator result | commit/show semantic ConversationMessage; omit enhancement and do not fail/extend the turn |
+| RichPresentation blob | unavailable or digest mismatch | BlobStore verification / Operator digest check | keep semantic message; mark enhancement unavailable/integrity-failed and do not render it |
+| Rich renderer | one block throws or is unsupported | renderer error boundary/schema version | isolate that block and use a safe fallback; preserve other blocks and semantic answer |
+| Rich draft stream | sequence gap, overflow, stale retry/session frame | draft cursor/bounds/fencing check | replay a bounded snapshot if supported; otherwise discard ephemeral rich draft and continue semantic text |
+| HostSkill | manifest/digest mismatch or unsupported delivery | HostSkillRegistry/adapter negotiation | do not load partial content; proceed without guidance and use deterministic host renderers |
+| Artifact bundle | unsafe/duplicate member path or source version unavailable | bundle validation and pinned-version read | reject the bundle before publication; preserve existing Artifacts and show exact blocker |
+| Coworker | paused/archived at admission | Coworker revision/status check | block new proactive/scheduled work; existing Tasks continue by their own policy |
+| Goal/Suggestion source | stale/conflicted or expired | Resource/Goal/Suggestion version check | preserve proposal/history; no acceptance/task creation from stale state |
+| ContextDocument | concurrent ResourceRevision edit | expected Resource head | keep both branches and request explicit rebase/merge; no last-writer-wins |
+| Demonstration | secret detected or capture interrupted | redaction/Environment observation | abort or remove unsafe content under retention policy; no SkillProposal publication |
+| Pinned Skill or Routine dependency | explicit semantic incompatibility | provider preflight or verifier evidence against the pinned revision | set `DRIFTED`, block unsafe replay with `SKILL_DRIFT_DETECTED`, and offer a reviewed repair proposal; never rewrite published Skill/Routine/Automation revisions |
+| Environment sharing change | live Attempt, Invocation, control lease, or unresolved Effect | EnvironmentManager and storage guard | reject while retaining the old scope; suspend and reconcile before an explicit retry |
+
+## Retry classes
+
+### Safe automatic retry
+- read-only operation
+- local deterministic computation
+- failed-before-send confirmed
+- idempotent provider operation with stable idempotency key
+
+### Reconcile first
+- email/message send
+- payment/order mutation
+- publish/deploy
+- delete/move external resource
+- calendar/CRM update if provider acknowledgement uncertain
+
+### Never auto-retry without user/policy
+- destructive operation without idempotency/reconciliation support
+- native unfenced side effect after runtime loss
+- action whose semantic target may have changed since checkpoint
+
+## Recovery budgets
+
+Every Task may define:
+
+```text
+RecoveryBudget {
+  max_same_signature_retries
+  max_step_attempts
+  max_plan_revisions_due_to_failure
+  max_recovery_wall_time
+}
+```
+
+Budget exhaustion produces BLOCKED/NEEDS_USER with failure summary.
+
+## Split-brain defense
+
+- all Core-mediated conflicting mutations validate authenticated Runtime/incarnation,
+  active lease ID/epoch/expiry and the runtime-private fencing credential; only its digest
+  is durable.
+- new lease epoch supersedes all older epochs.
+- stale runtime reconnect cannot mutate using cached authority.
+- Native external effects outside Core are classified `HANDOFF_REQUIRED`/`LOCAL_BOUND`
+  as appropriate and are not falsely fenced by a LiteCowork lease.
+
+## Provider call circuit breaker
+
+Persist a call-admission circuit keyed by provider identity and Runtime. A configurable
+rolling failure window opens the circuit with bounded backoff; only one half-open probe
+may run after `open_until`. Success closes the circuit and clears the failure window;
+failed probes reopen it. While OPEN, reject new invocations and report the reason; existing
+results remain readable. A fallback provider is used only when an explicit
+compatibility/permission decision selects it. Agent model failures use the AgentAdapter's
+own quota/backoff policy and do not share this provider circuit.
+
+This circuit is not a process supervisor and does not issue restart/stop commands. LiteSPM
+owns package/provider launch, sharing, health, restart, and idle-stop lifecycle under its
+future contract. Environment and Channel adapters are supervised by their owning Runtime
+services. LiteCowork may report observed provider health and stop sending calls while the
+circuit is open.
+
+Circuit state is operational runtime health, not Task outcome or a CapabilityGrant. Its
+transition is versioned and emits `provider.circuit.changed.v1` so all projections report
+consistent availability after restart or replication.
+
+## Projection recovery
+
+Durable event journal is source of truth for replayable projections. Projection schema changes may rebuild from event stream plus immutable records/blobs.
+
+## Coworker autonomy and integration repair cases
+
+A Coworker run blocked by expired OAuth, missing connector, disabled Skill, unqualified desktop app, unavailable lead, revoked memory source, desktop lock, sleep, or exhausted quota stores a typed blocker with a repair action. User answers are bound to the original Task/Invocation/Approval and never accidentally restart earlier completed Steps. Multiple connected Coworkers must not lose shared account state if one assignment is revoked. A replayed schedule or webhook yields the same occurrence; a lost externally consequential acknowledgment stays AMBIGUOUS until positive reconciliation. A disconnected background daemon reports observation gaps, not fake No change observations. Quiet-hours suppression affects notifications only, not durable safety records. Archive/pause never discards independent Artifacts or grants new authority.
+
+
+## Agent registry/setup/update recovery cases
+
+| Failure | Recovery owner | Required settlement |
+|---|---|---|
+| ACP registry unavailable | AgentRegistryService | Continue with last valid bounded cache and stale label; installed agents remain unchanged |
+| Install/update process interrupted | AgentLifecycleService | Mark operation UNKNOWN/FAILED, re-probe actual executable/version before retry |
+| Agent updated outside LiteCowork | AgentLifecycleService | Invalidate stale control descriptor; refresh before new session admission |
+| Native auth expired/revoked | AgentLifecycleAdapter | Block new admission with setup-needed; never erase draft/Task |
+| Secure API key rejected | AgentLifecycleAdapter/SecretStore | Keep secret non-observable; report auth ERROR/NEEDS_AUTH, allow explicit replacement |
+| Model/session option removed | AgentBindingService / admission | Reject stale override; preserve draft and offer current options |
+| Native slash/reference token removed | composer/admission | Refresh descriptor and require reselection; never reinterpret as plain text silently |
+| Descriptor expires during active session | AgentSessionSupervisor | Existing session remains pinned; continuation/new session revalidates |
+| LiteSPM capability route disappears | Capability Fabric + AgentCapabilityBridge | Stop new activation/attachment; native unrelated harness functionality continues |
+| AgentModule too old for upstream harness | AgentLifecycleService | Fail closed with adapter-update-required; no generic fallback |
+| Registry agent has no supported module | AgentRegistryService | Display no-adapter/unsupported; never execute arbitrary registry lifecycle logic |
+
+Recovery must distinguish **installation truth**, **authentication truth**, **Workspace
+binding authorization**, and **session readiness**. Repairing one never silently repairs
+or enables the others.
+
+
+## Connector, OAuth, and external-workflow recovery
+
+Connection/auth recovery follows [Connectors & Workflows](CONNECTORS-WORKFLOWS.md).
+
+- Lost OAuth callback/verifier/listener state creates a failed/expired AuthAttempt; never
+  reconstruct secret state from durable digests.
+- Token exchange succeeded but local Connection commit failed: do not expose Connected;
+  revoke/purge newly returned provider credentials best-effort and require safe retry.
+- Refresh invalid_grant/revocation -> REAUTH_REQUIRED; dependent work waits rather than
+  silently switching account.
+- Timeout after connector/workflow mutation -> Effect/Invocation remains ambiguous until
+  provider reconciliation or owner decision.
+- External workflow cancellation acknowledgement is not proof downstream effects stopped.
+- Provider run handle loss falls back to durable LiteCowork Invocation/Effect truth; it
+  cannot be guessed from Task status.
+- EventRelay loss/duplicates/reordering use receipt/idempotency/cursor rules and normal
+  Automation misfire policy rather than fabricating missed provider events.
+
+## V1 detailed design integration — 2026-10-12
+
+See V1-WORKFLOW-EVENT-LLD.md for cross-module retry/ambiguity table and CHROME-BROWSER-LLD.md for manual takeover epoch, form-edit invalidation and browser reconnect. Replaying agent/DOM actions blindly after uncertain external effect is forbidden. UI must retain saved draft and request identity; semantic results reproject without stream duplication.
+
+
+## Desktop Host/update recovery comparison - 2026-10-31
+
+The [Desktop Reference Implementation Audit](DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md) records DeepSeek Harness's admission-lock, bounded drain, post-drain task reinspection and positive Host-shutdown acknowledgement as a reference sequence. Apply the existing recovery rule here: unknown/ambiguous Effects remain unresolved, process exit is not proof of external settlement, and retry is allowed only after owner-specific reconciliation. LiteCowork's Runtime stop still lacks integrated Task/Attempt, Effect, lease and capability-host settlement; this reference does not mark that gap closed or authorize an update API.

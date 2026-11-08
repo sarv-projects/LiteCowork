@@ -1,0 +1,14 @@
+[package]
+name = "sp02-rusqlite-qualification"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+domain-workspace = { path = "../../../../crates/domain-workspace" }
+storage-core = { path = "../../../../crates/storage-core" }
+storage-sqlite = { path = "../../../../crates/storage-sqlite", default-features = false, features = ["sqlite-rusqlite-defaults"] }
+tempfile = "3.20"
+zeroize = "1.8"

@@ -1,0 +1,534 @@
+# Test Architecture
+
+## Test layers
+
+### Unit
+Pure domain invariants, schema validation, state transitions, conflict rules, policy evaluation helpers.
+
+### State-machine/property tests
+Generate legal/illegal sequences for Task, Attempt, Effect, Approval, Lease and AutomationOccurrence. Invariants must hold under arbitrary command ordering.
+
+### Contract tests
+Every AgentAdapter, EnvironmentProvider, Capability/LiteSPM adapter, StateStore, BlobStore and ChannelAdapter implementation runs a common conformance suite.
+
+### Integration
+Task Runtime + storage + one agent adapter + one capability + one environment.
+
+### Fault injection
+Kill processes, sever network, expire leases, corrupt provider responses, duplicate events, reorder event batches, expire secrets, fail blob uploads.
+
+### Post-V1 cross-runtime
+At least local + cloud runtime with real event/artifact replication and lease handoff.
+This is the E11 post-V1 qualification layer; it is not a desktop/local V1 release gate.
+
+### Security
+Permission bypass attempts, stale execution/control fencing tokens, Gateway token replay
+and expiry, spoofed channel events, malicious capability metadata, secret leakage checks,
+prompt-injection scenarios, SSRF/private-IP/DNS-rebinding/redirect probes, MCP App sandbox
+and CSP violations, filesystem symlink/TOCTOU races, archive/decompression bombs, and
+ApprovalUse replay with changed digests. MCP Skill conformance covers origin+URI identity,
+complete manifest, SHA-256 and exact byte-size checks, frontmatter consistency, per-Skill
+limits, manifest-change revocation, nested Skill consent, `allowed-tools` not widening
+grants, and cross-origin resource-read isolation. Also test Skills referenced by exact URI
+but omitted from a partial listing, rejection of unverified scheme-only Skills,
+`resources/directory/read` negotiation, and that directory results never expand an
+approved manifest; dynamic Skills are not activated in v1. MCP App tests distinguish the
+host-computed UI content digest from publisher authenticity and reject undeclared domains.
+
+### Schema and API conformance
+Validate every JSON Schema; validate every current DomainEvent registry entry against its
+typed payload branch; assert an invalid/missing event payload fails; compare the error
+registry with the documented enum; parse OpenAPI with duplicate-key rejection, validate
+it as OpenAPI 3.1, and resolve all local references; verify LiteCowork Gateway names use
+the frozen `litecowork.*` namespace; execute SQLite DDL and inspect foreign keys/indexes.
+
+### E2E
+Real user workflows from BENCHMARKS.md. The production App opens on Recent chats / Conversations by default, and the visible sidebar label for that route is Recent chats. Rendered checks that inspect Home, Work, or another route must navigate there explicitly after mounting and wait for its route marker before asserting screen-specific controls. Mounting a fixture configures data and does not imply a Home route.
+
+### Same-chat agent continuity and usage accounting
+
+The context preparation foundation is now covered by storage-core and SQLite tests:
+cross-binding history and provenance are preserved for the same Conversation. The provider
+wire projection preserves message order and prior-agent attribution, refuses unmaterialized
+Resources and over-limit text without truncation. The Codex JSONL transport test confirms
+the projection appears in `turn/start`; a local fake-server HTTP capture confirms OpenCode's
+`/api/session/{id}/prompt` request carries its message ID and encoded Conversation prefix,
+including cross-agent source binding and the generated Basic-auth header. The immutable
+turn binding selects the target adapter, the snapshot stops at the current turn's user
+message, private native session IDs are omitted, and oversized history is rejected. These
+request-capture tests do not prove that a real native agent receives or executes the package;
+both providers still need qualification through the Conversation route and end to end.
+
+The SQLite turn-host resolver test commits a turn pinned to A, changes the live selector to B,
+and proves that A remains the only target. It also checks owner/Conversation scoping,
+expired endpoint and Runtime offers, offline Runtime rejection, disabled-host no-fallback,
+and integrity failure for malformed or missing turn-creation authority. The Conversation
+STARTING reservation and cursor-page test checks owner, exact turn and host pinning, selector-change
+continuity, duplicate active-session rejection, exact replay after eligibility changes,
+bounded scope-filtered recovery, version-fenced LOST settlement without changing the turn,
+and fail-closed behavior for expired offers/endpoints, offline Runtime, disabled Binding,
+forged host identity, and malformed/missing creation authority. The event and committed
+snapshot contain no native session handle. A litecoworkd route test resolves the committed
+turn against an eligible host, then verifies submission still fails closed because no native
+session supervisor is qualified. These checks do not prove native startup or route delivery.
+
+End-to-end acceptance remains blocked until a qualified session supervisor, dispatch path,
+agent-response writer, stream producer, and Conversation usage ingestion/read route exist.
+When connected, qualify this flow with two different native adapters:
+
+1. Send a request to agent A and persist its committed response in Conversation C.
+2. Change the selected agent to B without creating a new Conversation; assert the ID,
+   transcript, unsent draft, attachments, and pinned ResourceRefs remain unchanged.
+3. After committing a turn pinned to A and before resolving its host, change the
+   Conversation selector to B. Verify host resolution still uses A from the unique
+   turn-created event; if A is unavailable, the turn fails without falling back to B.
+4. Submit a second turn. Verify B receives the canonical committed transcript prefix
+   through that turn's user message, including A's answer and source-binding attribution.
+   Verify A's AgentSession handle, auth, cookies, and private history are absent.
+5. While a turn is running, change the selector; verify that turn remains pinned to A and
+   only the next turn can use B. Reconnect/restart and verify committed history survives.
+6. Exceed the context message/byte limit and verify a visible retryable limit result;
+   never dispatch a silently truncated prefix.
+7. Read the Conversation usage view after both agents report usage. Verify distinct leaf
+   inference costs accumulate across A and B, adapter/gateway duplicates count once only
+   after identity reconciliation, agent attribution remains drillable, currencies stay
+   separate, billed and estimated values stay separate, and opaque/unknown usage is not
+   displayed as zero.
+
+### Rich presentation conformance
+
+The CODE layer validates schemas, canonical digests, closed block variants, source
+authorization, citation locators, size/depth limits, safe rendering, and local-only
+checklist state. The SYSTEM layer uses the desktop Operator and `litecoworkd`, a qualified
+AgentAdapter, authenticated routes, stream reconnect, persistence, and the actual webview.
+The OWNER layer runs a quick prose question, a comparison, a cited folder/ZIP report, and a
+Task that creates exact-version Artifacts and a ZIP; the owner records whether both a
+nontechnical and technical user can find the answer/output without Inspector.
+
+| Case | Expected result |
+|---|---|
+| Short factual question with AUTO | Semantic prose only; no unnecessary HostSkill or rich block |
+| SIMPLE preference | Plain semantic answer; real Artifact/download and host-owned actions remain available |
+| Rich comparison/diagram request | Readable semantic answer commits first; optional enhancement binds to that exact Message |
+| Agent ignores/does not support Host Guidance | Host deterministic rendering still works; agent remains eligible |
+| Forged Approval/Verification/Task status or Artifact ID | Compiler rejects model-authored host state; semantic Message remains |
+| Cross-Workspace, stale, or revoked Resource/Artifact | Binding rejected or reauthorized unavailable; no content leak |
+| Missing/corrupt/unsupported RichPresentation | Semantic Message remains readable/searchable/exportable |
+| Cross-agent Conversation switch | Same chat ID; next adapter gets committed prefix and source-binding provenance; no private session handle crosses |
+| Conversation usage across switches | Distinct inference leaves accumulate across bindings; duplicate telemetry dedupes by verified identity; currency, billed/estimated, and unknown coverage remain explicit |
+| Retry-0 or duplicate/out-of-order rich frame | Stale frame rejected; bounded replay/resync or discard of draft |
+| HTML/script, unsafe URL, remote media, hostile diagram | No execution or implicit fetch; safe fallback or rejection |
+| 1,000 citations/large collection | Bounded document and virtualized UI; no giant binary/data payload |
+| Checklist interaction | Local Operator state only; no Task state or DomainEvent mutation |
+| Artifact updated after ZIP creation | Existing ZIP still contains the exact pinned Artifact versions |
+| Backup restored without optional rich blob | Conversation semantic history restores and renders normally |
+| Reduced motion, keyboard, screen reader, 400% zoom | Equivalent information and reachable controls without motion dependency |
+
+The integrated stress scenario is B89. A mock renderer, synthetic browser snapshot, or
+schema-only pass does not satisfy SYSTEM or OWNER acceptance.
+
+### Performance/soak
+Long Tasks, many events, large artifacts, large file/data corpora, repeated reconnects, hours-long automation/channel operation.
+
+## Mandatory vertical slice gates
+
+### Gate 1 — durable local Task
+Desktop -> local runtime -> external ACP agent -> LiteCowork Gateway -> LiteSPM -> MCP -> Artifact/Effect -> Verifier.
+
+Kill worker mid-Task; replacement must continue from ResumePacket and complete.
+
+### Gate 2 — heterogeneous delegation
+Lead agent delegates bounded child to different external agent; no shared full transcript; child result integrates and verifies.
+
+### Post-V1 Gate 3 — cloud (E11)
+Local Task replicates; explicit handoff creates higher-epoch cloud Attempt; reconnect shows same final state. Kill local runtime mid-effect and prove no duplicate external action.
+
+### Post-V1 Gate 4 — channels (E11)
+Telegram/email creates/steers the same Conversation/Task; a reply to one delivered FORM
+UserRequest resolves only that exact request; sensitive approval and external sign-in stay
+on the stronger Operator surface. Reassign the ChannelBinding between Runtimes during a
+pending prompt and during an inbound claim; verify higher host epoch, no copied reply
+references, stale-owner rejection, ambiguous outbound reconciliation, and Operator inbox
+fallback for replies to old prompts.
+
+Also inject races at the Hub transaction boundary: receipt insertion wins before drain and
+is included in reconciliation; drain wins before insertion and the source neither stores nor
+acknowledges the provider event; proof creation cannot commit while any source-epoch receipt
+is PROCESSING or any accepted RECEIVED receipt is unreplicated/unaccounted for; a durable
+pre-drain RECEIVED row can be claimed by the successor after reassignment; after proof, no
+late source receipt can appear before lease release. The successor replays and deduplicates
+any unacknowledged event, or the owner-confirmed gap is audited.
+
+Cloud continuation, Hub-hosted channel operation, and cross-Runtime handoff belong to the
+post-V1 E11 gate. Local desktop V1 still requires its local Task, security, automation,
+provider, restart, and owner-acceptance evidence; these post-V1 gates do not replace or
+relax the local gates.
+
+### Gate 5 — automation
+Recurring trigger creates ordinary Task and deduplicates duplicate trigger delivery.
+
+## Non-negotiable invariant tests
+
+- worker cannot set Task COMPLETED directly
+- old fence rejected after new epoch
+- Attempt, AgentSession, Environment and ExecutionLease composite ownership keys reject a different Task, selected AgentBinding, Runtime incarnation, or Environment; a daemon restart requires a fresh Attempt and higher lease epoch
+- EnvironmentControlLease cannot control an Environment other than the one pinned by its Attempt, even when both Environments share one Runtime
+- raw fencing credentials never appear in SQLite, events, aggregate blobs, API projections, logs, or backups; only the digest is durable
+- lease acquire/renew/release retries with the same RequestId are idempotent; conflicting request reuse fails, renewal never extends execution past the last provider-confirmed expiry, and issuer-key loss fails closed
+- ArtifactVersion references committed blob digest
+- archived Artifact rejects new content versions and remains readable by immutable version
+- stale concurrent Artifact publication does not overwrite the winning version
+- archive replay does not append a second transition event
+- duplicate external channel event creates no duplicate message/task
+- exact channel reply-to correlation resolves only its one active UserRequest target; an ordinary message in the same thread never selects the latest open request
+- channel response rejects another sender, revoked/low-assurance binding, missing RESPOND action, expired/answered request, duplicate event, ambiguous/missing target, attachments, nested schema, and credential-like content without consuming a valid target
+- channel response records the exact provider event provenance, atomically accepts its receipt and consumes only the matched target; replay cannot answer a sibling request or resolve an Approval
+- channel host assignment is unique per binding; a new Runtime cannot claim/settle receipts or use reply targets at an old epoch, and no new host lease is granted before source settlement or authoritative expiry plus skew margin
+- every committed ACTIVE ChannelHostAssignment has exactly one matching lease; a committed DRAINING assignment retains its source lease; assignment movement commits release, higher target epoch, and one fresh target lease atomically, while no-target Runtime revocation commits release plus explicit unassignment and leaves the ChannelBinding DEGRADED
+- receipt insertion is serialized with ACTIVE→DRAINING and drain-proof creation; DRAINING rejects new source receipt insertion/acknowledgment; quiescent proof requires no source-epoch PROCESSING claims, every accepted RECEIVED row Hub-durable/accounted for in the successor frontier, no unresolved outbound Effects, and no unreplicated receipts
+- RuntimeWorkspaceBinding revocation with no eligible ChannelHost target clears the assignment only after proof or expiry-plus-skew; old source receives no more work, receipt/reply-target history remains, and later assignment requires a fresh current lease
+- migration rejects ACTIVE/no-lease and DRAINING/no-lease ChannelHost rows; host lease IDs are never reused across bindings/epochs, renewal preserves identity, reassignment derives a new credential, and duplicate identity/digest detection fails closed
+- a receipt is durably replicated before cursor/deferred-ack advancement; reclaim after expired/fenced claim increments claim_epoch, preserves origin provenance, and rejects a conflicting digest
+- host restart marks stale cursor incarnation for reconciliation; host move resumes after last Hub-replicated receipt, and a move without replay/transfer requires explicit gap acceptance that remains visible
+- provider-accepted notification timeout remains AMBIGUOUS and cannot create a reply target or retry until reconciliation
+- duplicate automation trigger creates no duplicate occurrence task
+- package update does not alter in-flight CapabilityLock
+- Conversation-scoped AgentSession works without Task/Attempt and has read-only grants
+- A Conversation-scoped UserRequest is linked to one exact turn and originating session; responding to it cannot resume another concurrent/waiting turn, and non-Conversation UserRequests cannot resume a chat turn
+- each settled or user-waiting ConversationTurn closes its AgentSession and releases its host binding; user response continues the same turn in a fresh session with bounded durable context, while every response retains its original session provenance
+- a pending durable CapabilityInvocation continues after its AgentSession closes and keeps its Activation/provider host retained; delivery to a replacement session requires the same ConversationTurn or the same source Attempt, Runtime incarnation, valid current lease, and reconciled checkpoint. A replacement Attempt/Runtime cannot inherit an old MCP task/input key; reconcile or cancel first, then issue newly authorized work with the saved response as context. An unmediated live tool call cannot be detached as if durable
+- a Task-scoped UserRequest answered during `PAUSE_REQUESTED` is rejected without resolving it; answered while `PAUSED`, its immutable response and local outbox stay queued, with no provider `tasks/update` until explicit resume and successful continuation authorization
+- UserRequest resolution is one-way from PENDING; an ANSWERED state must match the immutable response digest, responder, and timestamp, and response rows cannot be updated or deleted
+- EXTERNAL_URL UserRequests require EXTERNAL_AUTHORIZATION, have no form schema/choices, expose no raw URL in projections/events, and accept only an action-only response object; extra content is rejected by storage
+- credential-like MCP form fields and unknown embedded input methods fail closed without persisting a response or dispatching `tasks/update`; normal non-sensitive elicitation form input still follows the immutable response path
+- external handoff requires an authenticated explicit Operator action, returns no-store data, rejects unsafe URL destinations, and never logs or replicates the state-bearing URL
+- the Gateway `litecowork.user.ask` surface cannot create EXTERNAL_AUTHORIZATION requests, resolve Approvals, or turn a free-text response into SecretStore data
+- after pause, a Conversation input can continue only its exact current ConversationTurn; Task-planning input requires a fresh planner on the unchanged lead/TaskSpec; Attempt input requires the same current Attempt, Runtime incarnation, and Environment with a fresh session and a strictly higher lease epoch
+- provider-input delivery requires the originating AgentSession to be `CLOSED` or `LOST`; Task-planning/Attempt continuation uses a distinct active replacement session, and the Conversation turn does not replace its historical session pointer until provider acceptance
+- a Task-planning continuation planner on a different Runtime is eligible only when that Runtime incarnation is current; it never transfers the provider task/input key from its original Runtime
+- a replacement Attempt, Runtime, or Runtime incarnation cannot receive an old provider input key; reconcile/cancel the old Invocation and Effects first, then use the saved answer only as bounded context for newly authorized work
+- a daemon restart changes RuntimeIncarnation and makes old input/task handles reconciliation-only; a synced answer stays queued until the origin Runtime can reconcile or a new invocation is explicitly admitted, and no new incarnation sends the old key
+- an ambiguous provider-input retry requires an authenticated observation of the same outstanding provider key, an adapter contract proving the exact response digest duplicate-safe, and a persisted local proof digest; the retry keeps the same key/digest and increments dispatch count, while missing/stale proof is rejected
+- cancelling before provider-input dispatch atomically withdraws the outbox and later delivery is impossible; cancellation after dispatch cannot rewrite it as withdrawn and waits for provider/effect reconciliation
+- PlanningAssignment is a transient envelope, not persisted state; Task-planning sessions are durable AgentSessions, at most one active per Task, and close when planning waits for user input or the Task pauses/cancels. A later envelope/session pins the current TaskSpec revision
+- Pause/cancel racing with plan acceptance is serialized by Task version: a plan committed first remains valid history; a transition committed first rejects the late proposal and creates no Steps
+- zero live AgentSession bindings permits owned-host idle cleanup after TTL, and the stop transaction rechecks references so it cannot kill a newly acquired session; external/shared processes remain unowned
+- Conversation/planning grant cannot include a SecretRef or invoke a mutation
+- each CapabilityInvocation records the exact grant that authorized it
+- pause and cancel remain distinct; PAUSED requires checkpoint, provider Invocation quiescence, Effect reconciliation, and lease settlement
+- pause/cancel from VERIFYING fences completion; active VerificationRuns settle against pinned inputs and a late result cannot win after the Task transition
+- Task cancellation remains CANCEL_REQUESTED until every Task/Attempt Invocation has terminal provider state; cancel acknowledgement alone is insufficient
+- interrupt a native agent turn while a spawned shell command writes a heartbeat; verify
+  turn completion alone does not admit a replacement, then stop/fence the owned host or
+  Environment and prove the writer is quiescent before replacement
+- crash the Runtime after replacement admission and at each host-start boundary; restart
+  under a fresh RuntimeIncarnation, reconcile old process handles by verified identity, and
+  prove no duplicate Attempt or stale writer is admitted. An unresolved handle keeps the
+  Task blocked; PID or provider turn status alone cannot release it (F80/B76)
+- crash the Runtime after replacement `RUNNING` is durable; recover only after both Runtime
+  and worker identities are proven gone, then reconcile Effects and fence the lease before
+  admitting a higher-epoch Attempt from the pinned checkpoint (F81/B77)
+- loss of provider state from WAITING/INPUT_REQUIRED records AMBIGUOUS and cannot be mistaken for a terminal result
+- no old EnvironmentControlLease epoch command is accepted or replayed after takeover
+- criterion changes require fresh VerificationRun even if criterion ID is reused
+- a ResourceInput digest that differs from its pinned ResourceRevision digest is rejected and cannot produce passing Evidence
+- ArtifactVersion input refs exactly match provenance source/transformation inputs, including linked external content refs, or publication is rejected
+- one-time Approval has at most one matching ApprovalUse
+- MCP task handles resume independently of LiteCowork Task identity
+- loss of the initial MCP `CreateTaskResult` leaves the Invocation ambiguous and never blindly reissues the `tools/call`
+- direct native tool attachment records Invocation before dispatch and enforces grant/effect/fence checks; an unmediated agent tool remains agent-reported
+- notification delivery state never mutates Task state
+- a Task can use an explicitly registered local intranet capability through the on-device broker, while sandbox sockets, arbitrary Agent URLs, unauthorized redirects, cloud Metadata endpoints, and cloud-runtime use of local grants remain blocked
+- Resource search is deterministic, scoped, freshness-aware, and does not consume model usage
+- Indexed Resource search uses only exact-current Workspace revisions and encrypted
+  `RESOURCE_INDEX` snapshots; SQLite contains keyed tokens, not source terms or snippets
+- Current Resource-index code-test sources cover allowlist/container exclusion, Unicode
+  normalization and AND matching, bounded/sanitized snippets, query limits, stable
+  Workspace-scoped HMAC tokens, encrypted snapshot round-trip and Workspace isolation,
+  missing-key fail-closed index preparation, explicit unsupported/oversize/invalid-input
+  reasons, and atomic/retryable v7 DDL migration. The current OS key-provider has no
+  injectable credential-store backend, so orphaned version-1 credential/absent active
+  pointer behavior requires a provider/system qualification case. Before acceptance,
+  add/run conformance cases for retained key-version search, unavailable-key search
+  fail-closed behavior, reindex after rotation, stale-revision exclusion, ContextDocument
+  revocation, snapshot tampering, and exact physical index/blob purge. Source tests are not
+  runtime verification evidence until the matching API integration is built and run.
+- ArtifactVersion/VerificationRun inputs pin exact Resource revisions and produce one rebuildable DependencyEdge per input
+- dependency invalidation links the exact edge to the changed revision, is idempotent, and marks downstream projections stale without mutating immutable records
+- a conflicted Resource revision graph never projects a dependency as current
+- Workspace restore registers a new Runtime and cannot revive old fencing authority
+- resumable upload duplicate chunks are idempotent only for identical bytes/digest
+- native agent reported action never becomes VERIFIED without verifier evidence
+- SQLite databases are never synchronized across runtimes
+
+### Delegation, responsibility, and context invariants
+
+- native harness files/options remain intact; unsupported overrides fail before invocation
+- multiple DelegationProfiles on one AgentBinding have independent immutable revisions and
+  selection constraints
+- a host delegation admission targets only a READY Step in the current accepted
+  PlanRevision under the current parent Attempt session/lease; no runtime-created Step
+- child Attempt grants are freshly evaluated and scoped; parent grants, ApprovalUses,
+  SecretLeases, and native credentials are never inherited
+- profile REQUIRE selection never substitutes; PREFER may substitute only under the
+  request's explicit selection semantics and policy
+- a disabled/revised profile blocks future admission while existing children retain their
+  pinned revision; explicit cancellation follows Effect reconciliation
+- unknown cost/quota/readiness never becomes zero/available/exhausted; unknown native cost
+  cannot satisfy an unenforced hard monetary ceiling
+- prewarm creates no Attempt, AgentSession, model invocation, grant, lease, or lead change
+- every escalation is a new Attempt with bounded recovery and a new VerificationRun
+- DelegateRequest, TaskPacket, and ResultEnvelope reject unpinned Resource/Artifact
+  references, oversized envelopes, extra fields, invalid profile-selection combinations,
+  and fallback lists exceeding their attempt budget
+- Coworker pause blocks proactive/scheduled admission but leaves existing Tasks governed
+  by their own state/policy; archived Coworkers cannot remain Workspace primary
+- Goal progress references accepted Task outcomes/Evidence; worker summaries cannot
+  complete Goals; Suggestions cannot execute or authorize their own proposal
+- Reopening a completed Goal preserves prior status events, Task state, Evidence, and
+  derived progress; an archived Goal remains terminal
+- Suggestion snooze respects version and expiry; mute atomically dismisses open items of
+  the kind, prevents future proposals, and unmute does not revive dismissed items
+- Suggestion dismissal suppresses only the exact dedupe key for 30 days; expiry and
+  acceptance do not create a dismissal cooldown
+- Accepting a TASK Suggestion atomically creates one ordinary READY Task and resolves
+  the Suggestion with its `result_task_id`; exact idempotent replay returns the same Task,
+  and injected failures leave neither aggregate partially committed. Acceptance creates
+  no Plan, AgentSession, Attempt, lease, Environment, Invocation, Effect, or Evidence.
+- ContextDocument kind/owner pairs are validated, Resources are revisioned, and concurrent
+  edits never last-write-wins
+- Environment sharing scope/owner/lifetime constraints reject cross-scope attachments;
+  USER_SHARED does not cross Workspace boundary in v1
+- EnvironmentControlLease admits one input owner/epoch at a time and never substitutes
+  for the Task ExecutionLease
+- deadline preflight runs before Effects; fallback preserves operation semantics/authority;
+  ActionBatch suboperations preserve individual Effect/Evidence identity
+- DemonstrationSession traces are semantic, bounded, secret-redacted, and convert only to
+  a reviewable SkillProposal
+
+## Runtime, Routine and trigger conformance
+
+- Cold boot starts authorized metadata observation and scheduler duties without launching
+  installed agents, capability servers, browser or Office applications.
+- Restart creates a fresh incarnation; PID reuse cannot authorize cleanup or attachment.
+- A RuntimeIncarnation is registered before its presence, offers, or domain events can be
+  accepted; replayed/stale state updates and altered reuse of an incarnation ID are rejected.
+- Replicas retain the compact RuntimeIncarnation record needed by durable references;
+  local OS boot IDs and diagnostics are absent from event state and Workspace backups.
+- Durable AgentSessions expose Runtime/incarnation provenance without any host/process or
+  native-session handle. A local `AgentSessionHostBinding` with the wrong Runtime,
+  incarnation, endpoint, or profile is rejected; takeover on another Runtime creates a new
+  session and cannot reuse the old native handle.
+- AgentEndpoint records contain stable protocol/topology identity only. Reject stale
+  `AgentEndpointBinding` incarnations and deletion while a host is live; verify
+  Operator/event/backup state omits endpoint command paths, sockets, URLs, and auth material.
+- Environment rows contain no provider locator and checkpoint rows contain no provider
+  handle. Local bindings with stale incarnations or a Runtime/provider mismatch are
+  rejected; provider-only checkpoint digests do not qualify as portable state. Portable
+  snapshot BlobRefs must match the checkpoint digest, and their bytes are copied only when
+  both Environment and Workspace policies permit it. Backup/restore omits all local
+  provider bindings and requires fresh provider reattachment.
+- ResourceLocation aggregate state contains only a stable non-secret resolver key; raw
+  paths, connector locators, and browser handles exist only in an incarnation-scoped local
+  binding. Reject a binding with a stale incarnation or a different location key, and
+  verify that backup, replication, and Operator views contain no private locator values.
+- Durable FileIdentity contains Runtime-keyed pseudonyms; raw OS filesystem/volume/file
+  identifiers and the HMAC key remain local. A lost key lowers identity confidence and
+  must not cause cross-Resource deduplication based only on matching content.
+- AgentHost session-use counts are derived from nonterminal sessions joined through local
+  bindings and fall once after CLOSED/LOST settlement; active bindings cannot be deleted.
+- Concurrent `ensure_ready` requests share only a compatible isolated host; an idle-stop
+  race cannot terminate a host whose session reference has just been acquired.
+- Selecting an agent default changes configuration without spawning it. Changing the lead
+  drains planning context while existing execution Attempts retain their binding.
+- Runtime keeps only a lightweight, incarnation-scoped installed-application inventory warm; it launches an app only for a selected dependency, never records unrequested window/document activity, and never closes a pre-existing user process
+- Multiple compatible Activations may share one declared-safe CapabilityHostInstance;
+  LiteCowork's displayed `active_activation_count` is derived from live Activation references and falls
+  exactly once on settlement, pause/deactivation, revocation, or Runtime recovery.
+- CapabilityActivation must persist a valid CONVERSATION/TASK_PLANNING/ATTEMPT_EXECUTION
+  scope. Invocation admission rejects scope, Workspace, Runtime/incarnation, or
+  CapabilityRef disagreement among AgentSession, Grant, Activation, and Invocation.
+- A provider host with mismatched capability/configuration digests or Trust isolation
+  partition is never shared. Invocation grants/fences remain independent on shared hosts.
+- Expired provider health is UNKNOWN and cannot satisfy placement; a re-probe is required.
+- LiteSPM remains authoritative for provider process start/stop and global process counts;
+  LiteCowork releases its own host-use references and never terminates external services.
+- Replicating a durable CapabilityActivation never requires a remote Runtime to possess
+  the source Runtime's HostBinding/provider handle; failover creates a new local Activation
+  and host binding, and Workspace restore re-probes rather than restoring handles.
+- Saving a Routine requires explicit review; cancelling a draft creates no durable job.
+  Routine edits cannot alter an already pinned Task or claimed occurrence.
+- Stable trigger IDs retain cursors across unrelated edits; changed sources require fresh
+  identity. Host reassignment fences old observers, and duplicate delivery creates one run.
+- A Hub schedule with offline local dependencies enters WAITING_DEPENDENCY without worker
+  startup. Wake/reconnect reevaluates authorization and lease authority before execution.
+- Missed slots, DST ambiguity, timezone changes, bounded catch-up and condition observation
+  gaps obey pinned recurrence semantics without duplicate occurrences.
+- Runtime drain preserves unsolved Effects and local dependencies; UI exit alone does not
+  stop background operation. Only owned applications are eligible for automatic cleanup.
+- Persistent Environments reattach with fresh authorization and observation after restart;
+  stale handles and queued actions cannot resume authority.
+- Provision preview and create bind to the same canonical request, principal, Runtime
+  incarnation, pinned Resource revisions, provider offer and policy/quote basis. Any
+  request mismatch, expired preview, changed input head, changed offer or restarted target
+  Runtime is rejected before budget reservation/provider allocation; an idempotent replay
+  returns the original result even after preview expiry.
+- Persistent Environment cost ceilings are labeled provider-enforced only when the provider
+  confirms enforcement. Host-monitored budgets require explicit selection and are never
+  described as hard caps; unavailable estimates cannot be presented as a guaranteed cost.
+- Persistent Environment usage accumulates from provision time without implicit reset. A
+  Task using that Environment is checked against its Task and Environment ceilings through
+  separate reservations; the same observation is not double-counted within either owner.
+  Currency mismatch or an observation gap becomes UNKNOWN, and a reached ceiling stops new
+  admission before safe suspension/reconciliation.
+- V1 exposes no in-place Environment budget update/reset operation. At `LIMIT_REACHED`,
+  affected Steps receive `BUDGET_EXCEEDED` after settlement; a replacement Environment
+  requires its own preview/confirmation. Placement preview candidates are digest-bound;
+  stale digest, changed Runtime incarnation, changed resource revision, or newly exhausted
+  candidate creates no Attempt. A valid explicit candidate creates a new Attempt bound to
+  that Environment without assuming the old provider's private state was cloned.
+- `UsageObservation.confidence=UNKNOWN` requires `quantity=null`; zero is a measured amount,
+  never a placeholder for missing telemetry. Exact/estimated COST observations and cost
+  reservations require an explicit matching currency; unlike currencies are not summed.
+- Needs You item IDs are stable across projection rebuilds and label/status edits, differ
+  across distinct source records, and deduplicate a linked blocker to its Approval or
+  UserRequest. Notification retry/delivery state never creates another inbox item.
+
+These are required conformance cases, not claims that an implementation already passes.
+
+- Stop preview is read-only; POST stop rejects an old incarnation after restart and
+  rechecks work admitted after preview. `CANCEL` does not enter DRAINING.
+- Routine/Automation/Occurrence/Cursor storage rejects references to another Workspace;
+  trigger provenance remains mandatory in occurrence events.
+- Specific-runtime triggers reject missing/null runtime IDs; resource triggers reject
+  both missing targets and ambiguous simultaneous root/resource targets.
+- Occurrence settlement cannot bypass Task cancellation, Effect reconciliation or
+  completion evaluation; a paused Task does not produce a completed run.
+
+- Workspace archive rejects active Conversation turns, scoped Invocations, live persistent
+  Environment workloads and authority leases even when all Tasks are terminal. It stops
+  observation/trigger duties and preserves suspended state without destructive cleanup.
+
+## Coworker desktop V1 integration and adversarial acceptance target
+
+In addition to existing contract validators, qualify: zero-Coworker ordinary chat; Quick Create in two fields; opted Customize with zero integrations; reconnecting existing connectors; scoped MCP/Skill/app discovery with 100+ configured tools and no eager schema flood; safe task-time Connect; Coworker last-active conversation after restart; stale list navigation; no private-memory leaks after chief switch; temporary chats never queued; candidate freshness/dedup/correction and retrieval receipts; enabled standing recurrence, duplicate events, DST and wake catch-up; pause new vs pause all; AMBIGUOUS external Effects; consent/approval under spoofed source and changed account; Workbench draft preservation; correct Task/Evidence-driven completion; inaccessible backend controls disabled with explanations. Every supported platform needs actual background close/lock/sleep/resume/restart evidence. Test owner workflows and native app, not only JS snapshots; never mark a new capability implemented based on a document.
+
+
+## Competitor-benchmark UX acceptance additions — 2026-10-10
+
+- **Workbench:** brand-new chat has no forced right panel; explicit Open in Workbench shows Start or exact object; background completion cannot steal focus; width/maximize/close survive restart without restoring stale authority.
+- **Task-time connection repair:** blocked Task presents Connect, cancellation preserves the Task, successful sign-in revalidates and resumes exactly once, expired account/changed scope remains blocked.
+- **Routine Test run:** test creates a real occurrence/Task, shows side-effect warning, preserves approvals, produces run history, and cannot enable a paused recurring schedule.
+- **Coworker Library:** only canonical authorized Resource/Artifact refs appear; revocation removes future reads; no shared-computer/file assumption leaks across Coworkers.
+- **Root mount modes:** read-only/read-write/no-delete are enforced by provider-level tests where advertised; symlink escape and delete attempts fail closed.
+- **Large capability inventory:** 10k catalog/tool metadata entries remain searchable without eager process launch/schema injection.
+- **Optional technical trace:** nontechnical flow completes without Inspector; technical user can expand exact Task/Attempt/Invocation/Effect evidence without hidden model reasoning.
+
+
+## Agent Registry, lifecycle and native-surface conformance
+
+The AgentModule target adds a dedicated test family owned by E03-S06–S11 and E04-S06.
+
+### CODE
+
+For every AgentModule implementation:
+
+- manifest/registry identity bounds and duplicate/ambiguous-claim rejection;
+- registry metadata schema/size/origin handling;
+- install/update operation idempotency and stale-version rejection;
+- AgentControlDescriptor closed-schema validation and digest determinism;
+- auth-method/credential-slot referential integrity;
+- proof that secret bytes cannot serialize into AgentBinding, DomainEvent, AuditRecord,
+  logs, descriptors, query caches or backup fixtures;
+- native command/reference token sanitization, uniqueness and size limits;
+- session-option semantic hints/mutability and stale-value rejection;
+- Agent switch reducer preserves draft but removes only invalid dependent option state;
+- binding configuration optimistic concurrency/idempotency/event atomicity;
+- active AgentSession provenance remains pinned after a binding edit;
+- AgentCapabilityBridge cannot widen a CapabilityGrant.
+
+### SYSTEM
+
+For every advertised agent/version/OS cell, run the original harness and LiteCowork side
+by side and record exact versions.
+
+Required cases where supported upstream:
+
+1. missing -> install -> observe exact version;
+2. update available -> update -> re-probe;
+3. interrupted install/update -> restart -> observe actual truth before retry;
+4. native sign-in success/cancel/expiry;
+5. secure API-key slot success/rejection/replacement when adapter supports one;
+6. external native configuration change -> descriptor invalidation/refresh;
+7. model/session-option catalog equality with native harness;
+8. slash command and reference/mention behavior equality;
+9. image/file/resource input behavior equality;
+10. native extensions/subagents remain usable/visible under honest ownership labels;
+11. cancel/resume/steer and process quiescence required by durable Task replacement;
+12. agent update changes capability schema -> old new-session admission fails closed;
+13. one LiteSPM-managed capability through each claimed qualified attachment route.
+
+A registry entry, mock adapter or CLI version string cannot satisfy these tests.
+
+### USER
+
+Owner acceptance for every launch-critical agent must demonstrate:
+
+- install/configure/sign-in from Agent Registry;
+- open a normal chat and see correct Agent-dependent Model/options/native controls;
+- use at least one native feature also available in the original harness;
+- switch to another agent without losing draft text/files;
+- trigger setup drift, repair it, and return to the same draft;
+- update the agent and observe refreshed capabilities;
+- if claimed compatible, use one LiteSPM-managed capability without per-agent duplicate
+  package installation.
+
+Store sanitized evidence in the owning story review packet. No secret/API-key value may be
+recorded in test artifacts.
+
+
+## Connector, workflow, learning, and run-continuation qualification matrix
+
+Before product support claims, add executable coverage for:
+
+1. PKCE/state/loopback callback replay, wrong-state, duplicate, cancellation and restart.
+2. Token absence from logs/events/crash/state snapshots and SecretStore lock/rotation.
+3. Refresh serialization, revoked token, scope downgrade and Connection revoke mid-Invocation.
+4. Same Connection assigned to multiple Coworkers with independent access ceilings.
+5. Provider timeout after real write with no blind duplicate retry.
+6. EventRelay duplicate/reorder/delay/signature failure/offline replay and revoked account.
+7. External workflow partial effects, cancellation ambiguity, lost run handle and backend outage.
+8. Activepieces compatibility with safe fixture plus malicious install/dynamic/native dependency cases.
+9. Learning from explicit correction, conflict/supersession, temporary chat exclusion,
+   third-party prompt injection, secret detection, revoke and classifier outage.
+10. Automation Continue duplicate request, same Conversation, no cursor change, warm native
+    resume when qualified and honest cold durable rebuild otherwise.
+11. Code task preset proving the same Conversation/Task/Artifact/Workbench paths as normal chat.
+
+Mocks may validate contracts but cannot close provider/OS acceptance cells.
+
+## V1 detailed design integration — 2026-10-12
+
+Use archive/legacy-implementation-c7e9c05/V1-DESIGN-COVERAGE.md for explicit UAT cases and docs/RENDERING-CONFORMANCE-LLD.md for upstream-native golden corpus. Tests must verify real harness and Chrome OS version qualification, high-DPI browser coordinates, takeover races, idempotent Send, unknown native events, rich fallback, keyboard access and reduced motion. Pure UI snapshot tests are not SYSTEM evidence. Use focused tests per module and full release gates, not full-suite reruns for every CSS tweak.
+
+
+## Host qualification checklist (B-28)
+
+A container, sandbox or CI image is not an operating-system qualification. The cases below
+assert containment or identity behavior whose outcome depends on real ownership, mount layout
+and kernel path resolution; a re-mapped uid or a sandboxed filesystem changes the result. Each
+must be run on the real target OS before that OS's claim is used, with the exact OS build,
+filesystem and user recorded in the platform evidence packet.
+
+| Case | Command | Why a sandboxed run cannot settle it |
+|---|---|---|
+| Bubblewrap containment refusals | `cargo test -p linux-process-scope --locked` | The four `bubblewrap.rs` cases assert refusal of symlinks/hardlinks, reserved mount targets and user-controlled host paths, plus isolation before agent exec — outcomes that follow from real ownership and mount layout, which the audit container re-maps (register A-45). |
+| Workspace-scan identity guarantees | `cargo test -p litecoworkd --bin litecoworkd --locked local_filesystem::tests` | The scanner re-checks entry identity after every read and fails closed on any change; the sandboxed runtime produces that change signal for unchanged files, failing 19 of 28 cases there (register A-49). |
+
+Both suites are red in the audit container on a clean worktree at HEAD, so a red run there is
+not by itself a regression signal; a green run anywhere else is not a substitute for the
+target-OS run.
+
+## External desktop test-corpus reference - 2026-10-31
+
+The [Desktop Reference Implementation Audit](DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md) inventories relevant ZCode conversation/permission regression tests and DeepSeek Harness IPC/preload/Host/update/quit/runtime tests. Use them to discover missing negative, stale-owner, timeout, cancellation and recovery scenarios, then express those scenarios using LiteCowork's canonical records and owners. The upstream suites were not run in this review; their existence is not CODE, SYSTEM, USER or QUALIFIED evidence for LiteCowork.

@@ -1,0 +1,1020 @@
+# Connectors, Authentication, Workflow Backends, and Event Relay
+
+**Status:** accepted target architecture, **not working connector-package support**.
+LiteSPM ARCH/26 excludes first-class V1 connector packages and ARCH/29 is
+a design-only runtime pending an explicit upstream decision. LiteCowork V1
+may qualify concrete app connectors through other compliant providers;
+installation/configuration lifecycle remains LiteSPM's where supported.
+[Interop LLD](LITESPM-LITECOWORK-INTEROP-LLD.md) defines what must be negotiated.
+
+**Status:** accepted target architecture. This document makes concrete the connector,
+local-first OAuth, external workflow, and relay boundaries. It extends
+[Capability Fabric](CAPABILITY-FABRIC.md), [Automation](AUTOMATION.md),
+[Network Security](NETWORK-SECURITY.md), [Trust](TRUST.md), and
+[Reference Implementations](REFERENCE-IMPLEMENTATIONS.md).
+
+## 1. Frozen decisions
+
+1. LiteCowork remains the control plane. A connector, MCP server, workflow engine,
+   OAuth gateway, or integration platform never owns Task/Plan/Attempt/Effect/Evidence truth.
+2. LiteSPM owns package installation/update/provenance. LiteCowork owns Workspace
+   assignment, Connection references, scoped CapabilityGrants, Invocations, Effects,
+   Automation occurrences, and user-visible history.
+3. First-party high-value app connections SHOULD support local-first auth where the
+   provider permits a public desktop client. Tokens stay in the local SecretStore by
+   default; the model never sees them.
+4. There is no mandatory Composio, Nango, Arcade, n8n, Activepieces, or Zapier dependency.
+5. Existing deterministic workflow systems are optional `WorkflowBackendAdapter`
+   providers. Their run is one bounded capability execution inside a LiteCowork Task,
+   not a replacement for the Task Runtime.
+6. Activepieces community Pieces are worth a compatibility spike because their core
+   paths are permissively licensed at the checked revision. Compatibility remains
+   behind LiteSPM qualification; no arbitrary npm package gets trusted because it calls
+   itself a Piece.
+7. n8n is an external/user-owned backend by default because its checked license is not
+   a permissive embedding license.
+8. A Coworker may have a logical durable private home and its Tasks may receive isolated
+   computers/environments. LiteCowork does not allocate one permanent VM per Coworker
+   merely to satisfy a UI metaphor.
+9. A remote event relay may carry minimal signed event metadata. It does not need to hold
+   provider OAuth refresh tokens. Actual provider content is fetched by an authorized
+   connector when an eligible Runtime is available.
+10. Connector assignment is not authority. Installed, connected, assigned, granted,
+    activated, invoked, and effect-settled are distinct states.
+
+## 2. Layering
+
+```text
+User / Coworker
+      |
+      v
+Conversation / Task / Routine / Automation
+      |
+      +-----------------------------+
+      |                             |
+      v                             v
+CapabilityBroker               TriggerCoordinator
+      |                             |
+      v                             v
+ConnectorRuntime                 TriggerProvider
+WorkflowBackendAdapter           EventRelayProvider
+MCP / local app / API            schedule / event / poll
+      |
+      v
+LiteSPM package/runtime boundary
+      |
+      +--> direct first-party connector
+      +--> community ConnectorPackage
+      +--> ActivepiecesPieceProvider
+      +--> MCP provider
+      +--> external n8n / Activepieces / Zapier adapter
+      +--> optional Nango / Arcade / Composio provider
+```
+
+The model sees bounded capability descriptions and selected schemas. It does not receive a
+10,000-tool dump, provider credentials, raw package manifests, or a universal workflow DSL.
+
+## 3. ConnectorPackage contract
+
+A `ConnectorPackage` is a LiteSPM-managed package type. LiteCowork never installs it
+directly.
+
+```text
+ConnectorPackageManifest {
+  package_id: PackageId
+  package_version: SemVer
+  publisher: PublisherIdentity
+  package_digest: Sha256Digest
+  license_spdx?: string
+  source_url?: string
+
+  connector_id: ConnectorId
+  display_name: string
+  category: string
+  icon_ref?: ResourceRef
+
+  auth_recipes: AuthRecipeDescriptor[]
+  actions: ConnectorActionDescriptor[]
+  triggers: ConnectorTriggerDescriptor[]
+  resources: ConnectorResourceDescriptor[]
+
+  runtime_requirements: RuntimeRequirement[]
+  network_policy: NetworkPolicyDeclaration
+  secret_requirements: SecretRequirement[]
+  dependency_manifest: DependencyManifest
+}
+```
+
+Every executable package is signature/provenance checked by LiteSPM. LiteCowork consumes a
+qualified descriptor containing only bounded schemas and normalized capability metadata.
+
+### 3.1 Auth recipes
+
+```text
+AuthRecipeKind =
+  PUBLIC_OAUTH_PKCE_LOOPBACK
+  | PUBLIC_OAUTH_PKCE_CUSTOM_URI
+  | DEVICE_CODE
+  | CONFIDENTIAL_OAUTH
+  | API_KEY
+  | SERVICE_ACCOUNT
+  | NATIVE_SESSION
+  | NO_AUTH
+
+AuthRecipeDescriptor {
+  recipe_id: string
+  kind: AuthRecipeKind
+  authorization_endpoint?: Uri
+  token_endpoint?: Uri
+  device_endpoint?: Uri
+  client_id_source: BUILTIN_PUBLIC_ID | USER_CONFIGURED | DEPLOYMENT_CONFIGURED
+  client_secret_required: bool
+  pkce_required: bool
+  redirect_policy: LOOPBACK_RANDOM_PORT | FIXED_HTTPS | CUSTOM_URI | NONE
+  default_scopes: string[]
+  optional_scopes: string[]
+  scope_risk: READ | WRITE | SENSITIVE | RESTRICTED
+  supports_refresh: bool
+  revoke_endpoint?: Uri
+  provider_constraints: string[]
+}
+```
+
+A recipe describes protocol behavior. It does **not** grant scopes or authority. The user
+chooses an account and requested feature set; Trust and connector policy derive the smallest
+supported scope set.
+
+### 3.2 Actions and triggers
+
+```text
+ConnectorActionDescriptor {
+  action_key: string
+  title: string
+  description: string
+  input_schema: JsonSchema
+  output_schema: JsonSchema
+  operation_class: READ | WRITE | SEND | DELETE | PURCHASE_LIKE | ADMIN
+  idempotency: PROVIDER_KEY | CLIENT_KEY | READ_ONLY | UNKNOWN
+  effect_kind?: EffectKind
+  required_scopes: string[]
+  timeout_class: INTERACTIVE | NORMAL | LONG
+}
+
+ConnectorTriggerDescriptor {
+  trigger_key: string
+  title: string
+  payload_schema: JsonSchema
+  delivery_modes: (PUSH | POLL | CURSOR_POLL)[]
+  required_scopes: string[]
+  stable_delivery_id: bool
+  cursor_support: NONE | OPAQUE | MONOTONIC
+  provider_replay_window?: Duration
+}
+```
+
+A descriptor is untrusted package input until schema bounds, provenance and provider
+qualification pass. A declared `READ` label cannot override Trust's own action
+classification.
+
+## 4. Connection record
+
+The existing `Connection` aggregate is extended; there is no second hidden connector
+database in LiteCowork.
+
+```text
+Connection {
+  connection_id: ConnectionId
+  workspace_id: WorkspaceId
+
+  connector_ref: ConnectorRef
+  connector_revision_digest: Sha256Digest
+  auth_recipe_id: string
+  external_provider_ref: string
+  account_ref?: string
+  account_display_hint?: string
+
+  granted_scopes: string[]
+  scope_set_digest: Sha256Digest
+  secret_refs: SecretRef[]
+  token_expires_at?: Timestamp
+  refresh_capable: bool
+
+  status:
+    CONNECTING
+    | CONNECTED
+    | DEGRADED
+    | REAUTH_REQUIRED
+    | REVOKED
+    | DISCONNECTED
+
+  last_health_at?: Timestamp
+  last_health_reason?: string
+  created_at: Timestamp
+  updated_at: Timestamp
+  version: u64
+}
+```
+
+`account_display_hint` is non-secret display metadata such as a redacted email address.
+It is never treated as authenticated identity; authenticated account identity comes from
+the provider result during setup/refresh.
+
+A Connection contains SecretRefs, never token bytes. Secret placement is deployment
+specific, but desktop defaults to the OS-protected LiteCowork SecretStore.
+
+## 5. Local OAuth and credential boundary
+
+### 5.1 Public desktop OAuth with loopback + PKCE
+
+When a provider supports it:
+
+```text
+Connect
+  -> create random state + PKCE verifier/challenge
+  -> bind one-shot listener to 127.0.0.1 on random high port
+  -> open system browser to provider authorization endpoint
+  -> provider redirects to exact loopback callback
+  -> validate state, issuer and callback ownership
+  -> exchange code using PKCE
+  -> query provider identity
+  -> store refresh/access material in SecretStore
+  -> commit Connection metadata + SecretRefs
+  -> close listener
+```
+
+Security rules:
+
+- bind loopback only, never `0.0.0.0`;
+- random port allocated by the OS;
+- state is cryptographically random, single-use, and expires quickly;
+- PKCE uses a fresh verifier per attempt;
+- reject an unexpected issuer, redirect URI, duplicate callback, wrong state, wrong port,
+  or callback after cancellation;
+- callback response body contains no token;
+- no OAuth token is written to logs, events, crash metadata, clipboard, Conversation, or
+  browser URL history under LiteCowork control;
+- listener closes after first terminal outcome;
+- restart loses the ephemeral auth attempt and requires a new attempt;
+- completed credentials are written before Connection becomes `CONNECTED`;
+- a Connection commit failure destroys newly returned credential material where feasible.
+
+### 5.2 Confidential and hosted OAuth
+
+Some providers/features require a confidential client or stable HTTPS callback. The package
+may declare one of:
+
+1. deployment-owned callback service;
+2. user-configured OAuth app credentials;
+3. optional external AuthBackend such as Nango or Arcade;
+4. provider-specific native app/device flow.
+
+The UI must name which party will hold credentials before authorization. It may not imply
+"local-only" when a hosted auth backend owns refresh tokens.
+
+### 5.3 API keys and service accounts
+
+Credential entry uses a trusted local no-store form owned by the host, never the model.
+The resulting SecretRef can be assigned to a Connection. Re-rendering the form reports
+configured/not configured; it never echoes the original secret.
+
+### 5.4 Provider-specific exceptions
+
+AuthRecipe is deliberately provider-specific. For example, a Slack user-auth desktop flow
+and a Slack bot installation may require different recipes/scopes/redirect constraints.
+LiteCowork must not force both through one "generic OAuth" button.
+
+## 6. ConnectionService
+
+```text
+interface ConnectionService {
+  list(workspace_id, query, cursor?, limit) -> Page<ConnectionSummary>
+  get(connection_id) -> ConnectionView
+
+  begin_auth(
+    connector_ref,
+    recipe_id,
+    requested_features,
+    expected_workspace_version?,
+    request_id
+  ) -> AuthStartReceipt
+
+  complete_auth(
+    auth_attempt_id,
+    ProviderCallback,
+    request_id
+  ) -> ConnectionView
+
+  cancel_auth(auth_attempt_id, request_id) -> AuthAttemptView
+
+  refresh(connection_id, reason, request_id) -> ConnectionView
+  test(connection_id, request_id) -> ConnectionHealthView
+  disconnect(connection_id, expected_version, request_id) -> ConnectionView
+  revoke(connection_id, expected_version, request_id) -> ConnectionView
+
+  resolve_capabilities(connection_id, query) -> CapabilityDescriptorPage
+}
+```
+
+### begin_auth pseudocode
+
+```text
+assert workspace writable
+descriptor = LiteSPM.resolve_connector(connector_ref)
+assert descriptor qualified and digest current
+recipe = descriptor.auth_recipe(recipe_id)
+requested_scopes = derive_minimum_scopes(requested_features, recipe)
+Trust.authorize_connection_setup(principal, workspace, connector, requested_scopes)
+
+attempt = AuthAttempt.create(
+  random_state,
+  fresh_pkce_if_required,
+  exact_recipe_digest,
+  expires_at
+)
+
+if LOOPBACK_RANDOM_PORT:
+  listener = LoopbackAuthHost.bind_127_0_0_1_random()
+  attempt.bind_callback(listener.identity)
+
+persist only non-secret attempt metadata/digests
+return provider_authorization_url + trusted display metadata
+```
+
+### complete_auth pseudocode
+
+```text
+attempt = load_auth_attempt()
+assert ACTIVE and unexpired and callback binding current
+verify state/issuer/origin exactly
+tokens = provider.exchange_code(ephemeral verifier)
+identity = provider.resolve_account_identity(tokens)
+secret_refs = SecretStore.write_atomic(tokens)
+begin transaction:
+  recheck workspace + descriptor digest + attempt version
+  upsert Connection metadata and SecretRefs
+  settle AuthAttempt
+  append events
+commit
+zero ephemeral token buffers best-effort
+return redacted ConnectionView
+```
+
+### refresh pseudocode
+
+```text
+lock per connection
+load Connection + secret lease
+if not refresh_capable -> REAUTH_REQUIRED
+tokens = SecretStore.resolve_for_provider_only()
+result = provider.refresh(tokens)
+if success:
+  rotate SecretRefs atomically
+  update expiry/status/identity if provider confirms
+else if invalid_grant/revoked:
+  mark REAUTH_REQUIRED
+else:
+  mark DEGRADED with bounded reason and retry policy
+release lock
+```
+
+Refresh failures never delete historical Task/Effect provenance and never trigger a
+consequential retry by themselves.
+
+## 7. ConnectorRuntimeAdapter
+
+```text
+interface ConnectorRuntimeAdapter {
+  describe(connector_ref) -> ConnectorDescriptor
+  health(connection_id) -> HealthObservation
+
+  search_actions(connection_id, natural_query, limit) -> ActionDescriptor[]
+  get_action(connection_id, action_key) -> ActionDescriptor
+
+  invoke(
+    connection_id,
+    action_key,
+    normalized_input,
+    invocation_context,
+    idempotency_key?
+  ) -> ProviderInvocationReceipt
+
+  reconcile(provider_receipt) -> ProviderOutcome
+  cancel(provider_receipt) -> CancelObservation
+
+  list_triggers(connection_id) -> TriggerDescriptor[]
+  subscribe(trigger_request) -> TriggerSubscriptionReceipt
+  unsubscribe(subscription_ref) -> ProviderOutcome
+  poll(trigger_request, opaque_cursor?) -> TriggerPollBatch
+}
+```
+
+The adapter never receives more secret material than its exact operation needs. Capability
+Gateway dispatch supplies an expiring SecretLease or provider-side injection, not token
+bytes inside model-generated JSON.
+
+## 8. Google Workspace first-party bundle
+
+The first-party product surface should be one connection family:
+
+```text
+Google Workspace
+  Gmail
+  Calendar
+  Drive
+  Docs
+  Sheets
+```
+
+One account may satisfy multiple services, but requested scopes remain feature-derived.
+A user enabling Calendar read does not silently grant Gmail send. Each action still maps to
+its own capability and Trust classification.
+
+The connector package owns provider API quirks, pagination, incremental sync, stable object
+identity, send-as identities, file export/import limits and trigger support. LiteCowork Core
+owns Connection status, Resource provenance, CapabilityGrant, Invocation, Effect, Automation
+and audit.
+
+The same pattern applies to Microsoft 365. Slack, Notion, GitHub and other first-party
+connectors may expose separate provider-specific recipes.
+
+## 9. Event relay
+
+Credential locality and event reachability are separate problems.
+
+```text
+EventRelayEnvelope {
+  relay_event_id: string
+  workspace_route_ref: OpaqueRouteRef
+  connection_ref_digest: Sha256Digest
+  provider_ref: string
+  provider_event_type: string
+  provider_delivery_id?: string
+  observed_at: Timestamp
+  opaque_cursor_hint?: string
+  payload_digest?: Sha256Digest
+  signature: RelaySignature
+}
+```
+
+The managed relay MUST NOT require the provider OAuth refresh token merely to queue a wake
+hint. Prefer provider webhook signatures or a provider-specific narrow subscription secret.
+The envelope carries no email body, document bytes, chat contents, access token, signed URL,
+or arbitrary unbounded provider payload unless a separately reviewed connector explicitly
+requires it.
+
+Supported hosting modes:
+
+```text
+LOCAL_POLL
+LOCAL_PUSH_WHEN_REACHABLE
+LITECOWORK_RELAY
+USER_SELF_HOSTED_RELAY
+EXTERNAL_WORKFLOW_BACKEND
+```
+
+### Relay intake
+
+```text
+verify relay signature and route
+dedupe relay_event_id / provider_delivery_id
+persist bounded receipt
+if eligible TriggerHost online:
+  wake/re-evaluate ConnectorEventTrigger
+else:
+  retain bounded pending hint according to policy
+do not create Effect or fetch provider content inside relay transaction
+```
+
+When an authorized TriggerHost processes the hint, it resolves the current Connection and
+fetches the actual provider object using its local SecretStore/provider adapter. If the
+Connection is revoked or unavailable, the occurrence waits or is skipped according to the
+Automation policy; the relay hint never revives credentials.
+
+## 9b. Breadth strategy: one qualified provider to thousands — 2026-10-22
+
+OpenAI's dots claims "over 4,000 apps"; Composio claims 1,600+ toolkits; Nango 1,000+ APIs.
+LiteCowork has one unqualified provider path. This section records how breadth is actually
+achieved in the market, what LiteCowork will do, and what it will deliberately not do. It
+changes no frozen decision above.
+
+### Where the breadth actually comes from
+
+The market did not converge on thousands of first-party connectors. It converged on **one
+wire protocol plus an ecosystem**: MCP. As of 2026-10-22 the public Smithery registry lists
+**13,684 servers** (live counter on smithery.ai/servers); the official MCP Registry is
+preview-grade and publishes no total; PulseMCP's listing is paused. A server written once
+runs in Claude, Cursor, Codex and OpenAI's app surface, because both supply and demand
+standardized on the same transports, the same OAuth flow and the same discovery card. That
+network effect — not connector engineering — is the source of the "4,000+" numbers.
+
+### Ranked strategies for a local-first product
+
+1. **MCP-first, with a local custody broker (the spine).** Support stdio subprocesses and
+   Streamable HTTP clients, and act as the OAuth client for remote servers using loopback
+   redirect URIs, which the spec permits. Breadth arrives from the ecosystem. What LiteCowork
+   adds that cloud vendors structurally cannot: refresh tokens in the OS keychain rather
+   than a vendor vault, Core-mediated Effect recording on every tool call, and a consent
+   dialog that shows the exact command before a local MCP server is spawned. The cost of
+   this choice is that the spec's threat model becomes a **requirement**, not guidance:
+   SSRF/private-IP blocking during OAuth discovery, `Origin` validation, sessions never
+   carrying auth, and audience-bound tokens via RFC 8707 resource indicators — including
+   the spec's ban on token passthrough.
+2. **A search-then-execute meta-tool pair over the catalog.** Every serious vendor
+   independently reinvented this: Composio sessions expose search/manage/execute meta-tools,
+   OpenWork Connect exports exactly `search_capabilities` + `execute_capability`, Nango
+   exposes agent sessions, Smithery offers tool search. The reason is context cost: a flat
+   dump of thousands of tool schemas makes every turn expensive and degrades instruction
+   following. LiteCowork already owns this shape — CapabilityBroker progressive discovery
+   (load/search/describe/execute only what is relevant) — so the catalog size never enters
+   the model context by default.
+3. **Observe → adopt → unmanage compatibility (the differentiator).** No connector vendor
+   documents this lifecycle; the closest precedents are Homebrew adopting already-installed
+   formulae into a bundle, `pnpm import` adopting an existing lockfile, and Claude's
+   `disable`-without-uninstall. LiteCowork's LiteSPM contract already requires it, which
+   makes it novel product surface rather than parity: read an existing MCP configuration or
+   installed package **read-only**, gain management only on explicit opt-in, and unmanage
+   while leaving the native installation intact. The honest risk is that these config
+   formats are unofficial and churn.
+4. **A thin client of the official registry, not a marketplace.** Registries and Server
+   Cards are the trust-label layer; building a competing directory is the last place to
+   invest, because a local-first product cannot match cloud review throughput.
+
+### What local-first inverts — and cannot copy
+
+Cloud aggregators' security story is "our infrastructure holds the token, your app never
+sees it." Locally the token is on the user's disk, which inverts the design:
+
+- **Custody.** Composio's documented default is that Composio holds credentials encrypted
+  and injects them server-side; Nango's proxy injects them at the edge. LiteCowork replaces
+  that vault-and-inject model with the OS keychain plus Core mediation. It cannot lean on
+  per-tenant isolation, operator access controls, zero-data-retention switches or KMS
+  deployments, and it must state that boundary plainly.
+- **OAuth app registration.** Every provider's consent screen shows a first-party domain,
+  so "managed apps" are not offerable. Nango documents the exact downside of shared apps:
+  fixed scopes, provider revocation affecting all tenants, and no token export. Local
+  custody solves portability but requires registering an OAuth app per provider, or running
+  per-user dynamic registration.
+- **Catalog mutation.** Nango updates catalog actions centrally and its own docs warn that
+  they "mutate under you"; a local catalog must be pinned, versioned and reviewable, which
+  moves supply-chain surface onto the user's machine.
+- **Sandbox fidelity.** Composio's session sandbox and OpenAI's cloud computer are remote;
+  local containers/Seatbelt have OS-dependent fidelity with no cross-platform equivalence.
+- **Enforcement ceiling.** Revocation, rate governance, spend limits and audit can only be
+  as strong as the local runtime, and tamper-resistance against the device owner is
+  impossible. The honest boundary remains the Core invariant: only operations mediated by
+  LiteCowork carry authorization, Effect and Evidence guarantees.
+- **Verification throughput.** "Verified" badges rely on cloud connector test harnesses.
+  LiteCowork can offer protocol conformance plus receipts, never per-vendor semantic
+  guarantees.
+
+### The upstream reality: there is no installable "connector" kind
+
+Verified against LiteSPM at the pinned 2026-10-22 revision
+(`internal/domain/models.go`, `schemas/listing.schema.json`): upstream marks `connector`
+**deprecated, deferred to v2**, and it is absent from the published kind enum. Only `mcp`,
+`skill` and `plugin` are wired for install, gated on a provenance ladder of
+`discovery_only → metadata_verified → runtime_verified`.
+
+So "adding a connector" in LiteCowork means **adding an MCP-backed capability listing** (or
+a skill), carrying whatever installability level its evidence supports. A listing ingested
+from a directory with no proven manifest can only ever be `discovery_only`, which is
+searchable but never installable. See
+[LiteSPM interop §5b](LITESPM-LITECOWORK-INTEROP-LLD.md) for the observed package model and
+the exact authoring path. A first-class connector kind is an upstream v2 decision that
+LiteCowork does not assume.
+
+### Scope discipline
+
+Breadth does not change the frozen decisions: no mandatory Composio/Nango/Arcade/n8n/
+Activepieces/Zapier dependency; tokens stay in the local SecretStore and the model never
+sees them; assignment is not authority. A connector that cannot be qualified stays visibly
+unavailable rather than appearing in a count.
+
+## 10. WorkflowBackendAdapter
+
+A workflow backend is useful for deterministic or already-built processes. It is not an
+agent planner.
+
+```text
+interface WorkflowBackendAdapter {
+  health(connection_id) -> HealthObservation
+
+  list_workflows(connection_id, query?, cursor?, limit)
+    -> Page<WorkflowDescriptor>
+
+  get_workflow(connection_id, workflow_ref)
+    -> WorkflowDescriptor
+
+  validate_input(connection_id, workflow_ref, input)
+    -> ValidationResult
+
+  invoke(
+    connection_id,
+    workflow_ref,
+    input,
+    mode: TEST | PRODUCTION,
+    idempotency_key?,
+    invocation_context
+  ) -> ExternalWorkflowRunReceipt
+
+  get_run(connection_id, external_run_ref) -> ExternalWorkflowRunView
+  stream_run(connection_id, external_run_ref, cursor?) -> EventStream
+  cancel_run(connection_id, external_run_ref) -> CancelObservation
+  normalize_result(connection_id, external_run_ref) -> WorkflowResultEnvelope
+}
+```
+
+A configured backend is represented by an ordinary Connection plus qualified provider
+metadata. A discovered workflow is projected as a CapabilityRef. External run IDs remain
+Runtime/provider-private where possible:
+
+```text
+WorkflowRunBinding { # Runtime-local
+  invocation_id: CapabilityInvocationId
+  runtime_id: RuntimeId
+  runtime_incarnation: RuntimeIncarnation
+  backend_connection_id: ConnectionId
+  external_run_ref_ciphertext: bytes
+  external_run_ref_digest: Sha256Digest
+  created_at: Timestamp
+}
+```
+
+LiteCowork's `CapabilityInvocation` remains authoritative for requested operation and
+settlement. The external engine's run state is evidence/observation, not a second LiteCowork
+Task state machine.
+
+### Workflow invocation mapping
+
+```text
+Task Step
+  -> CapabilityInvocation
+  -> WorkflowBackendAdapter.invoke
+  -> external workflow run
+  -> normalized progress observations
+  -> provider Effect observations
+  -> WorkflowResultEnvelope
+  -> verifier / parent Step settlement
+```
+
+If the external workflow performs sends/deletes/writes, those operations are not magically
+reversible. The adapter declares expected effect classes and, where possible, returns
+provider receipts. Cancellation means "requested cancellation"; it does not mean rollback.
+
+## 10.1 Visual workflow authoring and agent-edit boundary
+
+The WorkflowBackendAdapter above is deliberately a **target existing-workflow invocation**
+contract. Once implemented and qualified it will list/read provider-owned workflows,
+validate inputs, invoke a selected workflow and observe/cancel/normalize its run. It does
+not promise graph creation, node editing, graph version management or provider publish. A
+recursive 2026-11-06 source scan found no production WorkflowBackendAdapter implementation
+in active apps/ or crates/; this contract is not a served LiteCowork capability today.
+
+### OpenBot source comparison
+
+The pinned OpenBot reference (version 0.62.0 at commit
+`6759fa3ee857f4f4966865e12de99ae84ab6de07`) implements an independent host-owned graph
+runtime and canvas. The graph includes typed nodes/edges, versions, triggers, runs, steps
+and output-delivery records; each run pins its graph snapshot. Agent tools list/read/edit/
+delete/run workflows using bounded operations, and the canvas visualizes the saved changes.
+Its inspected schema has Trigger, Text, Prompt, Asset, LLM, Agent, Image, Condition,
+Approval, Output, Note and Shape node kinds; there is no dedicated Code node. The
+agent-edit operation omits Asset and Image from the kinds it may add.
+
+This is useful design evidence for graph UX, typed operations, immutable run snapshots and
+transparent change visualization. It does not change the frozen LiteCowork boundary. The
+full pinned source analysis, declared license and security caveats are recorded in
+[OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md](OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md).
+
+### LiteCowork V1 decision
+
+- **Manual graph creation/editing** occurs in the connected external workflow provider's
+  own editor. LiteCowork may link to that editor only through a reviewed provider-supplied
+  URL. It does not embed or clone a generic editor.
+- **LiteCowork's Automation/Routine UI** selects an existing external workflow, shows its
+  provider identity/reference, maps Routine inputs, validates, invokes and observes the
+  external run through WorkflowBackendAdapter.
+- **Agent assistance** may help formulate the LiteCowork Routine, map values to an
+  existing workflow's input schema, explain validation errors and summarize run receipts.
+  The current adapter does not let an agent create or change a provider graph.
+- **Future direct LiteCowork-Coworker authoring** requires a separate optional
+  WorkflowAuthoringAdapter or narrowly scoped mediated MCP Connection capability for a
+  specific provider. This is not needed for a user to use that provider's own Assistant/MCP
+  directly in its product. Any LiteCowork-exposed create/draft/update/validate/publish/
+  read-version operations need exact graph digest, expected revision, provider validation,
+  effect summary, separate read/mutate/test/publish/run/delete scopes, owner confirmation,
+  idempotent publish and ambiguous-result recovery before the agent tool is exposed. The
+  external system still owns the graph and runtime; LiteCowork must not add a local graph
+  database or second execution engine.
+
+### Code nodes
+
+n8n documents a Code node with JavaScript and Python support:
+https://docs.n8n.io/code/code-node/. This is an external n8n execution capability, not a
+LiteCowork node. A connected n8n Code node runs under that instance's host configuration,
+credentials, filesystem/network access and isolation. A WorkflowBackendAdapter must
+disclose the external execution boundary and declared effects. LiteCowork Trust does not
+automatically intercept internal actions performed by a third-party workflow engine. If
+the provider cannot describe or reconcile an effect adequately, keep that workflow
+unavailable for consequential production use through LiteCowork.
+
+### Reference security and licensing
+
+OpenBot's pinned README labels it a development preview and documents
+`danger-full-access` / `approvalPolicy: never` behavior. Its package manifest declares
+PolyForm Noncommercial 1.0.0. Study its interaction architecture only; do not treat its
+current permission mode as a security recommendation or assume its implementation can
+be copied into LiteCowork.
+
+## 10.2 Provider-native AI workflow authoring and code steps
+
+Manual graph authoring and AI-assisted authoring already coexist in external workflow products. This is the preferred V1 route for users who want n8n/Activepieces-style nodes without making LiteCowork Core another graph engine.
+
+### n8n
+
+n8n announced its Assistant on 2026-09-09. It is a provider-native AI builder: describe an outcome; the Assistant plans and builds on the n8n canvas; asks for credentials when needed; runs, debugs and iterates; and leaves a normal n8n workflow that the owner can inspect/edit by hand. The provider states credential access and workflow activation require explicit confirmation. Availability is limited: n8n Cloud is on by default for new instances (Enterprise Cloud excluded from that default); self-hosted Docker requires n8n 2.36+ plus user-supplied keys/environment configuration; npm self-hosted is not supported; and the feature remains behind a preview flag. The initial launch is single-instance and does not drive the user's computer/browser. See https://blog.n8n.io/introducing-n8n-assistant/. This is distinct from the separately permissioned instance-level MCP server described below.
+
+n8n's official instance-level MCP server allows external MCP clients to create/edit workflows and data tables, validate, test, generate test data and inspect execution logs inside the connected n8n instance: https://n8n.io/mcp/ and https://docs.n8n.io/connect/connect-to-n8n-mcp-server/. The current docs say workflow build/edit has been available since n8n 2.13.0. MCP is not blanket access: an instance owner/admin enables the server; each workflow is separately made available to MCP; clients receive explicit per-client permissions (for example read-only versus create/run); clients share the set of workflows exposed to MCP rather than receiving per-client workflow subsets; and search_workflows returns previews for workflows the user can view, while full read/edit/run requires explicit workflow exposure. execute_workflow runs the published version by default, with a manual mode for the current unpublished version. This is provider-side graph mutation through n8n's own API/MCP and schema/runtime, not a LiteCowork-owned WorkflowGraph.
+
+The n8n Code node supports JavaScript and Python: https://docs.n8n.io/code/code-node/. It can import external modules in self-hosted deployments when configured; cloud behavior differs. The Security Audit also flags nodes that can fetch or run code on the host: https://docs.n8n.io/hosting/securing/security-audit/.
+
+**Security qualification:** GitHub advisory GHSA-9pq8-m8gp-4p53 (published 2026-05-27) describes a Python Task Runner sandbox escape for a workflow containing a Python Code Node when Python Task Runner is enabled. The published patched versions are 1.123.48, 2.21.8 and 2.22.4: https://github.com/n8n-io/n8n/security/advisories/GHSA-9pq8-m8gp-4p53. An n8n connection that permits graph editing, publishing or running must identify the exact instance version and relevant runner configuration and check current advisories. This is a bounded, condition-specific advisory—not a blanket claim that every n8n Code node is vulnerable or that a patched version proves the whole deployment safe.
+
+### Activepieces
+
+Activepieces documents a visual builder with a “Build by Asking” path. Its built-in MCP server lets external AI clients create/manage flows, inspect structures, validate, test, inspect runs and publish through the connected Activepieces project. Enablement and permissions are meaningful: the MCP server is toggled in Settings; discovery tools are always available and read-only; other categories can be enabled/disabled per project. OAuth authenticates the client, operations are scoped to the authenticated project, credentials are not returned by tools, and the setup-guide tool gives the user UI instructions rather than handling secrets. See https://www.activepieces.com/product/workflow-builder, https://www.activepieces.com/docs/mcp/overview and https://www.activepieces.com/docs/mcp/tools.
+
+The documented tool categories are Discovery (read-only), Flow Management, Flow Building, Router & Branching, Annotations, Tables and Testing & Runs. Exact operations include:
+- ap_build_flow — create a trigger plus sequential steps; validate each as added and return the new flow/editor URL and validation status;
+- ap_add_step / ap_update_step — add or change PIECE, CODE, LOOP_ON_ITEMS and ROUTER steps, including code source and dependencies;
+- ap_validate_step_config / ap_validate_flow — validate step settings or graph structure without publishing;
+- ap_read_step_code — inspect the full CODE step source, package dependencies and input mappings;
+- ap_test_flow / ap_test_step — test a full flow or a step path and return step-level results;
+- ap_lock_and_publish — publish the current draft after checking configured steps;
+- ap_change_flow_status — enable or disable a flow;
+- ap_delete_flow — permanently delete a flow and all versions (documented as irreversible).
+Other tools can modify branches, canvas notes and Activepieces Tables. Tool-category access is per-project; do not assume that an MCP connection automatically grants every operation. Also note ap_run_action is a separate one-shot action and has a published 1-credit/call charge, while flow invocations are billed as normal runs.
+
+Activepieces' Agent documentation distinguishes deterministic Flow steps from an Agent that selects tools/steps at each run, can work inside a flow and can be started from a plain-language brief: https://www.activepieces.com/docs/agents. A Flow and an Agent are not the same runtime contract.
+
+CODE steps accept JavaScript/TypeScript source plus package dependency declarations. Activepieces describes an App, Worker, queue, Engine and sandbox pool responsible for process lifecycle/resource limits: https://www.activepieces.com/docs/install/architecture/overview. Worker/container execution isolation and network policy are configurable concerns, not one blanket guarantee. This is Activepieces' own provider boundary; it is not a LiteCowork Environment or a LiteCowork isolation attestation. A code step can use the provider's connections/permissions and may have effects beyond a normal connector action. These must be disclosed at the provider boundary.
+
+### Node-RED
+
+Node-RED provides a Function node that runs JavaScript against flow messages, alongside declarative Change/Switch/Template and other nodes: https://nodered.org/docs/user-guide/writing-functions. A Function node is a provider-specific code execution surface, not a generic node type that LiteCowork can safely import.
+
+### V1 LiteCowork integration decision
+
+These products prove that the user need not choose between manual and AI-created graphs:
+- **Manual:** use the external provider's visual canvas and edit the provider-owned graph directly.
+- **Provider-native AI:** where enabled by the user's connected provider, describe the desired graph to that provider's own assistant/MCP feature; it builds a normal editable provider graph that the user can inspect/refine and publish in the provider.
+- **LiteCowork-assisted Routine:** LiteCowork Coworkers may help define a Routine and map input values to a selected existing workflow. The current LiteCowork adapter contract in §10 is health/list/get/validate/invoke/get/stream/cancel/result-normalization only; there is no create/update/publish or direct graph-authoring capability in the current source tree.
+- **Future direct LiteCowork agent authoring:** only through a separately qualified provider-specific WorkflowAuthoringAdapter or mediated MCP Connection capability. It must define exact provider/instance version, scopes, tool allowlist, graph mutation and publish operations, draft/revision/digest, validation, external effect summary, user approval, audit receipt, idempotency and ambiguous-result recovery. Agent permission to inspect/list must not imply permission to mutate/publish/run.
+
+Core must not persist an imported copy of external nodes/edges or translate provider steps into LiteCowork Task Steps. The parent Task records one external CapabilityInvocation plus provider reference/run observations, declared effects and independent verification. A provider Code node executes under the provider's own host identity, filesystem/network/secret policy and isolation. LiteCowork Trust can govern only the effect boundary it actually mediates.
+
+## 11. Activepieces compatibility provider
+
+Two distinct modes are allowed.
+
+### Mode A: Piece compatibility
+
+`ActivepiecesPieceProvider` is a LiteSPM provider capable of translating a *qualified*
+community Piece into ConnectorPackage descriptors.
+
+```text
+probe_piece(package):
+  verify package source/digest/license path
+  resolve dependency manifest without executing install scripts
+  parse Piece auth/action/trigger descriptors
+  reject unsupported dynamic code-loading or unsafe dependency hooks
+  map auth -> AuthRecipeDescriptor
+  map actions -> ConnectorActionDescriptor
+  map triggers -> ConnectorTriggerDescriptor
+  run fixture tests in isolated environment
+  publish only qualified descriptor
+```
+
+No Piece can self-register a Trust rule, SecretLease, Automation, Coworker assignment or
+native agent tool. Package updates produce a new digest and requalification.
+
+### Mode B: external Activepieces backend
+
+A user may connect a self-hosted/managed Activepieces instance through
+`WorkflowBackendAdapter`. LiteCowork invokes existing flows and observes runs; it does not
+need to load Piece code locally.
+
+These modes are independent and may ship at different times.
+
+## 12. n8n, Zapier, Nango, Arcade and Composio
+
+- **n8n:** external WorkflowBackend only by default. User supplies/connects an instance
+  supported by the adapter. No bundled n8n database/runtime.
+- **Zapier:** external workflow/action backend when a stable supported API exists. Never
+  screen-scrape the user's Zapier editor as the integration contract.
+- **Nango:** optional `AuthBackendAdapter` for deployments that intentionally centralize
+  OAuth. Default desktop does not require it.
+- **Arcade:** optional authenticated MCP/tool gateway. Treat returned sign-in URLs as
+  provider handoffs and keep Trust around every resulting capability invocation.
+- **Composio:** optional connector/tool provider. It may accelerate breadth but is not
+  required for core Gmail/Calendar/etc.
+
+## 13. AuthBackendAdapter
+
+```text
+interface AuthBackendAdapter {
+  begin(provider, requested_scopes, callback_context) -> AuthBackendStart
+  poll_or_complete(attempt_ref, callback?) -> AuthBackendOutcome
+  get_connection_health(external_connection_ref) -> HealthObservation
+  revoke(external_connection_ref) -> RevokeObservation
+  materialize_provider_credential(
+    external_connection_ref,
+    exact_operation,
+    secret_lease
+  ) -> ProviderCredentialHandle
+}
+```
+
+The last operation must prefer provider-side injection or a narrowly scoped ephemeral
+handle. A hosted AuthBackend must not hand raw refresh tokens to the model.
+
+## 14. UI contract
+
+The ordinary connection path is:
+
+```text
+Connections & Tools
+  -> search app
+  -> choose account / Connect
+  -> trusted browser sign-in or local secret form
+  -> account + requested access summary
+  -> Connected
+```
+
+Advanced details show provider, package source/version/digest, auth owner, granted scopes,
+connection health, last refresh, and capability count.
+
+Do not show a giant per-tool authorization grid during onboarding. `Manage access` may
+restrict eligible resources/actions later, but action-time Trust still applies.
+
+Task-time repair:
+
+```text
+Task blocked: "Google Calendar isn't connected"
+  [Connect Google Calendar]
+  -> auth
+  -> assign Connection to current Coworker/Workspace
+  -> revalidate same Task
+  -> reconcile any ambiguous prior Effect
+  -> resume only unfinished safe work
+```
+
+## 15. Workflow UI
+
+Do **not** add a second visual workflow-builder to LiteCowork merely because n8n/Activepieces
+exist. The default UI is:
+
+```text
+Use existing workflow
+  Backend: n8n
+  Workflow: Publish weekly report
+  Inputs: ...
+  Run mode: Test | Production
+  Approval: ...
+```
+
+Advanced users can open the source workflow system. LiteCowork stores only the stable
+reference, input/output contract, run provenance and normalized outcome.
+
+## 16. Unified product IA: no Cowork | Code split
+
+Coding is a Task intent, not a separate root domain. LiteCowork keeps one Conversation and
+Task architecture.
+
+```text
++ New
+  Chat
+  Code task
+  Research
+  Work with files
+  Automation
+```
+
+A "Code task" is a launch preset that can preselect a project/folder, preferred coding
+AgentBinding, worktree policy and verification defaults. It still creates the same
+Conversation/Task/Plan/Attempt objects.
+
+Switching AgentBinding changes the composer controls according to
+`AgentControlDescriptor`; there is no duplicate Code chat implementation.
+
+## 17. Computer/environment semantics
+
+Product language may say a Coworker has "its own computer" when the Coworker has a durable
+private working scope, browser profile and eligible Environment policy. The implementation is
+logical:
+
+```text
+Coworker
+  private Resources / indexes / memories
+  browser profile policy
+  allowed Workspace roots
+  default Environment preference
+
+Task/Attempt
+  obtains actual Environment
+  obtains browser/terminal/computer leases
+  receives scoped CapabilityGrants/SecretLeases
+  releases or suspends according to policy
+```
+
+Environment kinds can be local native, WSL, container, remote sandbox or future cloud.
+A permanent VM is not required and must not be created just to satisfy the metaphor.
+
+## 18. Failure and edge-case matrix
+
+| Case | Required behavior |
+|---|---|
+| OAuth user cancels | AuthAttempt CANCELLED; no Connection; draft/task preserved |
+| OAuth callback duplicated | First terminal callback wins; later callback rejected |
+| Wrong state/issuer/port | Fail closed; no token exchange/Connection |
+| Token exchange succeeds but DB commit fails | Do not expose Connected; purge/rotate newly returned secrets best-effort |
+| Refresh token revoked | Connection -> REAUTH_REQUIRED; waiting Tasks keep blockers |
+| Scope removed | Re-resolve capabilities; new calls denied; existing ambiguous Effects reconcile |
+| Connector package digest changes | Existing Connection stays bound to pinned qualified revision until explicit migration/compatibility review |
+| Package removed | Connection DEGRADED/unsupported; history remains readable |
+| Account reused across Coworkers | One Connection may be assigned multiple times with independent ceilings; no duplicate OAuth required |
+| Coworker assignment revoked | Future eligibility fenced; shared Connection remains for other assignments |
+| Provider returns 429 | Retry policy bounded; do not call it quota exhaustion unless provider confirms |
+| Provider timeout after write | Mark Effect ambiguous; reconcile before retry |
+| Workflow backend unavailable | Invocation waits/fails by policy; LiteCowork Task truth remains intact |
+| External workflow cancel acknowledged | Continue polling until terminal/unknown; do not claim rollback |
+| Workflow emits partial side effects then fails | Preserve effects/evidence; verifier determines Task recovery |
+| Laptop asleep with local poll trigger | Misfire/reconciliation policy applies; no invented intermediate events |
+| Managed relay receives event while laptop offline | Queue bounded hint; fetch real object only after authorized Runtime returns |
+| Relay duplicate | Dedupe by relay/provider delivery identity |
+| Relay compromised | Signature/route failure drops event; relay cannot mint Connection/Grant |
+| Remote connector payload contains prompt injection | Treat as untrusted Resource content; never changes Trust/learning policy |
+| Secret store locked | Connection not ready; never fall back to plaintext |
+| External auth backend down | Only Connections depending on it degrade; direct local connectors continue |
+| Activepieces Piece has install script/native dependency | Reject compatibility or require isolated qualification; never execute during catalog parse |
+| n8n licensing/config unsupported | Adapter unavailable with explicit reason; never silently embed workaround |
+
+## 19. Tests required before shipping
+
+1. PKCE/state/loopback adversarial callback suite.
+2. Token bytes absent from logs/events/crash dumps/UI state snapshots.
+3. SecretStore locked/unavailable/restart/rotation cases on every desktop OS.
+4. Refresh serialization and revoked-token handling.
+5. Scope downgrade and package-digest migration.
+6. Same Connection assigned to multiple Coworkers with independent revocation.
+7. Capability search bounded with 10k+ action descriptors.
+8. Provider timeout after a real write; no duplicate retry.
+9. Relay duplicate/reorder/delay/signature failure/offline replay.
+10. External workflow partial side effects, cancellation ambiguity and lost polling cursor.
+11. Activepieces compatibility fixture for auth/action/trigger plus malicious package fixtures.
+12. User-owned n8n execution with test vs production intent and normalized run history.
+13. Task-time Connect resumes exactly the blocked Task and not a replacement.
+14. Disconnect during running Invocation fences new calls and reconciles the old one.
+15. Desktop UI never asks the model to collect credentials in chat.
+16. No global Cowork/Code mode divergence; Code preset uses canonical Conversation/Task path.
+
+## 20. Implementation file/module target
+
+Suggested implementation boundaries; exact language placement may be adjusted without
+changing ownership:
+
+```text
+# Logical TARGET layers, not current repository directories:
+# Connection / AuthAttempt / AuthRecipe / SecretRef / ProviderAdapter
+#   -> reconcile with existing crates/storage-core, storage-sqlite,
+#      existing domain/application services and apps/litecoworkd.
+# EventRelay / connector triggers / external workflow receipts
+#   -> reconcile with existing domain-responsibility Automation owners.
+# UI Connections / Discover / Automation
+#   -> reconcile with apps/litecowork-ui/src/ existing routes.
+# DO NOT create a parallel crates/application/ or crates/ports/ tree
+# based solely on this historical illustrative layout.
+# LiteSPM package management is independent; negotiate its local
+# protocol instead of directly accessing its storage.
+```
+
+Core dependencies point inward to ports/domain contracts. Provider SDKs and third-party
+framework code remain in adapter/provider packages, never in Task domain crates.
+
+## 21. Release sequencing
+
+1. canonical Connection schema + AuthAttempt + SecretStore integration;
+2. one direct local-first connector with read-only action;
+3. write action + Effect reconciliation;
+4. trigger subscription/poll path + Automation occurrence;
+5. Google Workspace bundle;
+6. EventRelayProvider spike;
+7. WorkflowBackendAdapter + one user-owned backend;
+8. Activepieces Piece compatibility spike;
+9. optional external auth/tool gateways;
+10. broader connector catalog only after package provenance, update and failure tests pass.
+
+## V1 detailed design integration — 2026-10-12
+
+V1-FUNCTION-FILE-CATALOG.md and DESKTOP-SHELL-LLD.md enumerate connection lifecycle, Settings/Discover state and task-time repair. LiteSPM owns package installation and lifecycle, LiteCowork owns authorized Task-scoped capability; installed/connected/assigned/ready/granted/invoked must display differently. Test one real read/write/trigger provider before broad catalog claims. Existing connection/auth/event relay designs remain normative.
+

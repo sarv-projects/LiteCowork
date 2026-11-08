@@ -1,0 +1,813 @@
+/* ==========================================================================
+   Modern Developer Workbench - Antigravity / Cursor Side Pane Aesthetic
+   ========================================================================== */
+
+.workbench-panel.modern-workbench {
+  display: flex;
+  flex-direction: column;
+  width: var(--workbench-width, 380px);
+  min-width: 300px;
+  max-width: 80vw;
+  height: 100vh;
+  background: #ffffff;
+  border-left: 1px solid #e5e7eb;
+  color: #1e293b;
+  position: relative;
+  z-index: 10;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: width 150ms ease;
+}
+
+.workbench-panel.is-full-view {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+}
+
+/* Top Header Bar */
+.workbench-top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
+  min-height: 48px;
+  flex-shrink: 0;
+}
+
+.workbench-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workbench-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+}
+
+.workbench-header-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.workbench-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 120ms, color 120ms;
+}
+
+.workbench-back-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.workbench-tools-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.workbench-tool-pill {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 120ms;
+}
+
+.workbench-tool-pill:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.workbench-tool-pill.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.workbench-header-window-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.workbench-window-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+
+.workbench-window-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* ==========================================================================
+   Launcher Home View (Screenshot Aesthetic)
+   ========================================================================== */
+
+.workbench-launcher-pane {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+  gap: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Rounded Omnibar */
+.workbench-omnibar-form {
+  width: 100%;
+}
+
+.workbench-omnibar-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 16px;
+  border-radius: 9999px;
+  border: 1.5px solid #60a5fa;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.workbench-omnibar-box:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.workbench-omnibar-search-icon {
+  display: flex;
+  align-items: center;
+  color: #64748b;
+}
+
+.workbench-omnibar-field {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  width: 100%;
+}
+
+.workbench-omnibar-field::placeholder {
+  color: #94a3b8;
+}
+
+/* Launcher Action List */
+.workbench-launcher-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workbench-launcher-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms, color 120ms;
+}
+
+.workbench-launcher-row:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.workbench-launcher-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+}
+
+.workbench-launcher-text {
+  flex: 1;
+}
+
+/* ==========================================================================
+   Tool Views (Files, Terminal, Browser, Diffs)
+   ========================================================================== */
+
+.workbench-tab-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Files / Code Viewer */
+.workbench-code-viewer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.code-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+
+.code-viewer-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.code-viewer-filename {
+  font-size: 13px;
+  font-family: monospace;
+  font-weight: 500;
+  color: #f1f5f9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.workbench-tiny-btn {
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #475569;
+  background: #334155;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.workbench-tiny-btn:hover {
+  background: #475569;
+}
+
+.code-viewer-editor {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.code-gutter {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 10px;
+  background: #1e293b;
+  border-right: 1px solid #334155;
+  color: #64748b;
+  text-align: right;
+  user-select: none;
+}
+
+.line-num {
+  font-size: 12px;
+}
+
+.code-pre {
+  margin: 0;
+  padding: 12px 16px;
+  overflow-x: auto;
+  color: #e2e8f0;
+}
+
+/* File Tree / Search */
+.workbench-file-tree {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 14px;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.file-search-bar {
+  width: 100%;
+}
+
+.file-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.resource-items-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resource-item-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms;
+}
+
+.resource-item-card:hover {
+  background: #f1f5f9;
+}
+
+.resource-name {
+  flex: 1;
+  font-size: 13px;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resource-meta-arrow {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* Badges */
+.file-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ext-blue { background: #dbeafe; color: #1e40af; }
+.ext-orange { background: #ffedd5; color: #9a3412; }
+.ext-amber { background: #fef3c7; color: #92400e; }
+.ext-cyan { background: #cffafe; color: #155e75; }
+.ext-purple { background: #f3e8ff; color: #6b21a8; }
+.ext-slate { background: #f1f5f9; color: #475569; }
+
+/* Integrated Terminal */
+.workbench-terminal-view {
+  background: #0a0e17;
+  color: #e2e8f0;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+}
+
+.terminal-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #111827;
+  border-bottom: 1px solid #1f2937;
+}
+
+.terminal-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal-shell-badge {
+  font-size: 11px;
+  color: #10b981;
+  font-weight: 600;
+}
+
+.terminal-isolation-badge {
+  font-size: 10px;
+  background: #1e293b;
+  color: #94a3b8;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.terminal-scrollback-screen {
+  flex: 1;
+  padding: 12px 14px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.terminal-log-entry {
+  margin-bottom: 10px;
+}
+
+.terminal-cmd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.terminal-timestamp {
+  margin-left: auto;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.terminal-line {
+  color: #cbd5e1;
+}
+
+.terminal-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #111827;
+  border-top: 1px solid #1f2937;
+}
+
+.terminal-input-prompt {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.terminal-command-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #f8fafc;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.terminal-submit-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Browser View */
+.workbench-browser-view {
+  background: #f8fafc;
+}
+
+.browser-chrome-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  gap: 10px;
+}
+
+.browser-url-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.browser-url-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  outline: none;
+}
+
+.browser-go-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.browser-device-toggles {
+  display: flex;
+  gap: 2px;
+}
+
+.device-btn {
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.device-btn.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.browser-viewport-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.browser-live-frame {
+  flex: 1;
+  border: none;
+  background: #ffffff;
+}
+
+.browser-viewport-wrapper.device-tablet .browser-live-frame {
+  max-width: 768px;
+}
+
+.browser-viewport-wrapper.device-mobile .browser-live-frame {
+  max-width: 375px;
+}
+
+/* Review & Diffs */
+.workbench-diffs-view {
+  background: #0f172a;
+  color: #f8fafc;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
+.diff-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+
+.diff-title-label {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.diff-stats-badge {
+  font-size: 11px;
+  color: #10b981;
+}
+
+.diff-file-tag {
+  padding: 8px 14px;
+  background: #111827;
+  border-bottom: 1px solid #1f2937;
+  color: #94a3b8;
+}
+
+.diff-lines-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.diff-line {
+  display: flex;
+  padding: 2px 14px;
+  line-height: 1.5;
+}
+
+.diff-line-gutter {
+  width: 36px;
+  color: #475569;
+  user-select: none;
+}
+
+.diff-line.line-add {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.diff-line.line-del {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.diff-line.line-header {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.diff-line.line-meta {
+  color: #94a3b8;
+}
+
+/* ==========================================================================
+   Unavailable and empty states.
+
+   These classes are used by the panel for states it cannot truthfully fill.
+   They state what is missing instead of rendering sample output, and they were
+   previously referenced without any definition, so they rendered unstyled.
+   ========================================================================== */
+
+.workbench-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px;
+  padding: 16px 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.workbench-unavailable-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.workbench-unavailable-detail,
+.workbench-unavailable-available {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.workbench-unavailable-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.workbench-unavailable-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.workbench-unavailable-available {
+  color: #0f766e;
+}
+
+.workbench-error-state,
+.workbench-warning {
+  margin: 12px 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.workbench-error-state {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.workbench-warning {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.resource-empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.browser-intro-card,
+.browser-error-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 24px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #475569;
+}
+
+.browser-intro-card h3,
+.browser-error-card h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.browser-intro-card p,
+.browser-error-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* Launcher context strip: the Workspace and operator state the panel really has. */
+.workbench-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 18px 12px;
+}
+
+.workbench-context-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 11px;
+  color: #475569;
+}
+
+.workbench-context-chip.is-ready {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.workbench-context-chip.is-offline {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}

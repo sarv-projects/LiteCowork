@@ -1,0 +1,72 @@
+feature_id: "009"
+status: "DRAFT"
+nodes:
+  - id: "ui"
+    owner: Desktop UI
+    kind: component
+  - id: "operator"
+    owner: authenticated Operator
+    kind: service
+  - id: "owner"
+    owner: domain owner service
+    kind: service
+  - id: "storage"
+    owner: Storage
+    kind: store
+edges:
+  - id: "e-ui-op"
+    from: "ui"
+    to: "operator"
+    kind: command
+  - id: "e-op-owner"
+    from: "operator"
+    to: "owner"
+    kind: request
+  - id: "e-owner-storage"
+    from: "owner"
+    to: "storage"
+    kind: transaction
+  - id: "e-storage-ui"
+    from: "storage"
+    to: "ui"
+    kind: projection
+transactions:
+  - id: "tx-coworker"
+    owner: Coworker owner
+    atomic_records: ["coworker_revision"]
+    external_calls_inside: false
+  - id: "tx-memory"
+    owner: Memory owner
+    atomic_records: ["context_document_status"]
+    external_calls_inside: false
+external_boundaries:
+  - id: "outside-sqlite"
+    owner: domain owner
+    input_trust: untrusted
+    timeout: bounded
+    retry: reconcile-before-retry
+recovery:
+  owner: domain owner
+  source_of_truth: durable-owner-records
+  restart_action: reload-last-commit-and-reconcile
+
+# CURRENT SOURCE BOUNDARY (2026-11-06):
+# Coworker CRUD/revision/status/primary selection is served through the authenticated
+# Operator and Responsibility/Coworker SQLite owner. This graph describes the target
+# feature wiring, not a claim that all edges are currently connected.
+#
+# Conversation has no Coworker origin/revision fields; Task alone pins
+# origin_coworker_id/origin_coworker_revision. No Coworker-owned chat path is served.
+#
+# Resource ContextDocument creation currently accepts only USER/PERSONAL_PROFILE and
+# WORKSPACE/WORKSPACE_NOTES. COWORKER_NOTES and GOAL_NOTES are rejected by the
+# domain-workspace owner validator even though the API enum and Settings UI list them.
+#
+# CoworkerContextPolicy is persisted configuration; current retrieval does not enforce
+# its allowed_context_kinds, max_retrieved_items or retain_task_summaries.
+# Workspace/Resource lexical retrieval is not Coworker-scoped.
+#
+# storage-core/coworker_learning.rs provides deterministic candidate/policy gates.
+# Its redaction helper is reused by SkillProposal intake, but LearningCandidate
+# evaluation/classification has no production caller and no LearningService,
+# SQLite learning storage, learning routes/events or Learning Inbox exists.

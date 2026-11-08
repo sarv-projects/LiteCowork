@@ -1,0 +1,262 @@
+# Observability Architecture
+
+Domain events, audit records, debug logs, metrics and traces are separate data classes.
+
+## Structured logs
+
+Every service log entry should include when applicable:
+
+```text
+correlation_id
+causation_id
+workspace_id
+task_id
+step_id
+attempt_id
+runtime_id
+runtime_incarnation_id
+host_instance_id
+routine_id
+automation_id
+trigger_id
+agent_binding_id
+capability_id
+environment_id
+```
+
+Never log raw secrets, tokens, cookies or unredacted provider credentials.
+
+## Metrics
+
+### Task
+- tasks_created_total
+- task_completion_rate
+- task_create_latency
+- task_time_to_first_attempt
+- task_end_to_end_duration
+- tasks_needing_user
+- tasks_failed
+
+### Attempts/agents
+- attempts_started/completed/failed
+- agent_session_loss_total
+- attempt_resume_duration
+- process_crash_recovery_duration
+- delegation_children_total
+- recovery_attempts_total
+- repeated_failure_stop_total
+
+### Capabilities
+- capability_search_latency
+- capability_activation_latency
+- invocation_latency
+- invocation_failure_rate
+- approval_required_rate
+
+### Runtime mesh
+- runtime_online_count
+- heartbeat_lag
+- replication_lag_events
+- replication_lag_bytes
+- lease_conflict_total
+- handoff_duration
+- failover_total
+
+### Effects/verification
+- ambiguous_effect_total
+- reconciliation_duration
+- duplicate_effect_prevented_total
+- verification_pass/fail/inconclusive
+
+### Storage/artifacts
+- blob_transfer_latency
+- blob_digest_failures
+- event_append_latency
+- event_to_projection_latency
+- event_to_operator_update_latency
+- projection_rebuild_time
+- sqlite_writer_commands_outstanding and process-lifetime high-water mark; this counts
+  callers submitting, queued commands, and the active command awaiting its response, not
+  exact bounded-channel occupancy
+- sqlite_writer_command_send_wait_seconds_total and maximum; elapsed time inside bounded
+  channel sends, including local call overhead but excluding response/SQL execution time
+
+### World Index
+- local_resource_search_latency by root-count and indexed-item-count tier
+- index_update_lag after filesystem/provider observation
+- watcher_gap_reconciliation_duration
+- root_scan_duration and bytes inspected
+- stale/unknown-location result rate
+
+### Runtime and automation lifecycle
+- daemon recovery/drain duration and unresolved recovery blockers
+- cold AgentHost start duration, active use refs, idle-stop duration, orphan reconciliation
+- dependency preparation duration and failures by prerequisite kind
+- trigger lag, misfire/coalesced/skipped occurrence count, cursor gaps and host-epoch rejection
+- due occurrences waiting for Runtime/resources and wait duration
+- Routine materialization failures and pinned-revision conflicts
+
+### User-visible responsiveness and presentation
+
+- Conversation submit-to-first-useful-text and submit-to-committed-message latency, split
+  into admission, host startup, agent response, and persistence where observable
+- Task critical-path latency split into admission, preparation, planning, execution,
+  verification, and Artifact publication; report p50/p95 by bounded TaskCategory
+- rich-presentation policy decision and HostSkill delivery mode/outcome
+- rich-presentation compile duration, compile outcome/fallback reason, document bytes, and
+  bounded block-count bucket
+- rich-presentation blob fetch latency/integrity failures and renderer errors by block kind
+- rich-draft queue bytes/depth, coalesced delta count, resync count, and dropped-draft count
+- Artifact bundle build duration/outcome/bytes and digest-verification failures
+- time from committed semantic Message to first paint and optional enhancement to first paint
+
+Measure the LiteCowork control-plane contribution separately from native provider/model
+latency. Use bounded outcome/category labels; never place prompts, message text, Artifact
+names, URLs, raw model IDs, or Resource IDs in metric labels. Rendering failure is an
+optional enhancement failure and must not be counted as Conversation failure.
+
+### Interactive Artifact generation and local runtime
+
+Emit these local metrics with bounded enum labels only:
+
+- `interactive_candidate_validation_total{outcome,reason_class}`
+- `interactive_artifact_publication_total{outcome,reason_class}`
+- `artifact_runtime_admission_total{outcome,profile_class}`
+- `artifact_runtime_start_seconds{profile_class,cold_or_warm}`
+- `artifact_runtime_first_frame_seconds{profile_class}` and `artifact_runtime_interactive_seconds{profile_class}`
+- `artifact_runtime_stop_quiescence_seconds{profile_class,outcome}`
+- `artifact_runtime_crash_total{profile_class,reason_class}`
+- `artifact_runtime_ipc_rejection_total{profile_class,reason_class}`
+- `artifact_runtime_handle_revocation_total{reason_class}`
+- `artifact_save_proposal_total{outcome,reason_class}`
+
+Never label with Artifact name/ID, app code, package path, prompt, URL, Resource ID, or
+raw provider model string. Include Runtime/incarnation and ArtifactVersion references only
+in access-controlled, redacted logs/traces with the normal retention policy. These are
+local operational observations, not DomainEvents or proof of app correctness. A renderer
+report does not become Task progress or verification.
+
+### Delegation, budget, and prewarm
+
+- delegation_admission_total by bounded outcome/error class and selection mode
+- delegation_candidates_count and admission rejection reasons
+- delegated_worker_start_latency and child_attempt_duration by bounded TaskCategory
+- worker_verification_pass/fail/inconclusive and escalation_attempt_count
+- delegation_budget_threshold_total by action; reservation/observed-usage mismatch
+- cost_observation_coverage by source/confidence/currency; cost_per_verified_task only
+  when units are comparable
+- quota_observation_total by NORMAL/LOW/EXHAUSTED/UNKNOWN and observation age bucket
+- host/session/environment prewarm attempts, hit rate, failures, and eviction reason
+- lead_change_total and handoff duration by bounded reason class
+- deadline_preflight_failure_total and actual execution-method fallback counts
+- suggestion proposed/accepted/dismissed/expired and duplicate-suppression counts
+- Coworker-paused admission blocks and ContextDocument conflict resolutions
+
+Use no Task title, objective, prompt, Artifact name, ContextDocument text, profile name,
+worker message, raw provider model string, or arbitrary Resource ID as a metric label.
+Binding/profile IDs belong in access-controlled trace/log fields with bounded retention.
+Worker quality/cost projections must suppress or mark insufficient samples; aggregate
+monetary metrics are partitioned by currency and never combine by implicit FX.
+
+Process existence is measured separately from installed inventory. Provider process
+restart/idle policy remains LiteSPM-owned; LiteCowork observes activation/invocation health.
+Identifiers belong in logs/traces rather than unbounded metric labels.
+
+## Tracing
+
+One Task operation should propagate `correlation_id`; nested calls use trace/span context where available. External provider calls are spans with redacted request metadata and outcome class.
+
+## Audit log
+
+Security/audit records include:
+- approvals
+- grant issue/revoke
+- secret lease
+- runtime pairing/revoke
+- sensitive effect
+- policy denial
+- channel identity/assurance changes
+
+Audit retention may exceed debug-log retention.
+
+## SLO categories
+
+Exact targets may be tuned after profiling, but tests/monitoring must cover:
+- daemon startup
+- local deterministic Resource search by Workspace size tier
+- Task create latency
+- event-to-projection and event-to-UI propagation
+- capability search/activation
+- lease renew latency
+- runtime offline detection
+- explicit handoff duration
+- event replication lag
+- artifact transfer throughput
+- idle CPU/RAM footprint
+- max concurrent Attempts under supported hardware tiers
+- Attempt/process crash recovery and Task continuation duration
+
+Before Stage 1 exits, record a reproducible baseline for daemon startup, idle CPU/RAM,
+Task creation, deterministic Resource search, event-to-UI propagation, local crash
+recovery, and CapabilityHost activation/binding overhead through a deterministic LiteSPM
+adapter fixture. The activation measurement must report LiteCowork control-plane time
+separately from the fixture's provider-start time; it must not be presented as a real
+provider startup result. Freeze numeric Stage 1 targets from those measurements. Stage 3
+adds real LiteSPM/MCP activation and provider recovery measurements, retaining the Stage 1
+control-plane budget and publishing provider-specific latency separately. Cross-Runtime
+recovery receives measured targets when Mesh exists; none are invented in advance.
+
+
+## Agent registry/lifecycle observability
+
+Allowed structured dimensions are bounded IDs/state enums, never secrets, paths or raw
+native output.
+
+Metrics:
+
+```text
+agent_registry_refresh_total{outcome}
+agent_registry_cache_age_seconds
+agent_installation_observation_total{state,module_id}
+agent_lifecycle_operation_total{operation,outcome,module_id}
+agent_lifecycle_operation_duration_seconds{operation,module_id}
+agent_auth_observation_total{state,module_id}
+agent_control_descriptor_refresh_total{outcome,module_id}
+agent_control_descriptor_age_seconds{module_id}
+agent_binding_configuration_total{outcome,module_id}
+agent_setup_drift_total{reason,module_id}
+agent_native_command_admission_total{outcome,module_id}
+agent_capability_bridge_resolution_total{route,module_id,capability_class}
+```
+
+Never label metrics by provider account identifier, model prompt, API-key slot value,
+native config path, full registry URL, command argument, or SecretRef.
+
+Trace spans may include `registry_agent_id`, `module_id`, descriptor digest prefix,
+Runtime/incarnation IDs and lifecycle operation ID. Auth spans record method **kind** and
+outcome only. Install/update traces record verified package identity/version, not
+credentials or private download tokens.
+
+
+## Connector/workflow/learning observability additions
+
+Observability for the accepted target architecture records normalized identifiers,
+durations, statuses and reason codes only.
+
+Never log OAuth codes, PKCE verifiers, access/refresh tokens, API keys, provider signed
+URLs, raw external workflow handles, LearningCandidate payload text, or unredacted source
+content. Safe fields include connector/package digest, AuthAttempt ID/state, Connection ID,
+scope-set digest, Invocation ID, external-run-ref digest, relay receipt ID, candidate ID,
+candidate kind/state and redaction reason code.
+
+Dashboards must distinguish Connected from Assigned/Granted/Invoked, and external workflow
+Started from Verified Task completion. Learning metrics count candidate outcomes without
+exposing candidate content.
+
+## V1 detailed design integration — 2026-10-12
+
+V1 UI events such as panel resize and command palette focus are local presentation events; durable domain events are emitted only on canonical state commits. Record sanitized native event schema version, browser control epoch, provider action receipt, renderer fallback reason and correlated Task/Attempt/Effect. Never log Chrome cookies, private URL query tokens or unsent chat drafts.
+
+## Multi-agent usage, health, and resilience — V1 detailed owner contract
+
+[Cross-Agent Telemetry/Usage/Resilience LLD](V1-TELEMETRY-USAGE-RESILIENCE-LLD.md) owns the V1 proposed measurement, aggregation, dashboard, cache and connection-health projection. Domain Task/Attempt/Effect status remains authoritative here and in STATE-MACHINES; the per-provider request must be a deduplicated leaf with measured/estimated/unknown usage and immutable price snapshot. A native subscription without exposed usage is UNKNOWN rather than $0.00, and total rollups must not count a delegated parent plus child leaves twice. The external OmniRoute patterns are research, not authority for agent-local usage or a second gateway. Adoption requires typed Operator contracts, source evidence and the TLM-001–012 tests in archive/legacy-implementation-c7e9c05/V1-OBSERVABILITY-AGENT-MEMORY-TERMINAL-UAT.md.

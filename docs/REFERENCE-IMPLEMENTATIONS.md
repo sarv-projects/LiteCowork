@@ -1,0 +1,766 @@
+# Reference Implementations and Upstream Design Sources
+
+**Baseline checked:** 2026-10-10. ACP Registry and OpenIntelligentUI references were reviewed on 2026-10-16; OpenBot was added at pinned commit 6759fa3ee857f4f4966865e12de99ae84ab6de07 on 2026-11-06.
+
+This file is a pinned research map for LiteCowork architecture work. It records the exact
+upstream repositories, revisions, files, and the narrow design ideas we intentionally study.
+It is **not** permission to copy code blindly, does not make an upstream project a runtime
+dependency, and does not override its license. Before copying or adapting implementation
+code, re-check the exact file's current license, dependencies, security assumptions, and
+whether the pinned behavior still exists.
+
+The default decision is **reference first, adapter second, vendoring last**. LiteCowork keeps
+its own Task/Plan/Attempt/Effect/Evidence, Runtime, Trust, Connection, Automation, and
+Conversation authority. External systems may supply implementation patterns, connector
+packages, workflow execution, authentication, or tools without becoming the LiteCowork
+control plane.
+
+## Pinned repository matrix
+
+| ID | Repository | Revision checked | License note at checked revision | LiteCowork use |
+|---|---|---|---|---|
+| REF-AGENTA | https://github.com/Agenta-AI/agenta | `4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137` | MIT outside separately licensed enterprise paths | Learn configuration revision, automation/run UX, per-agent durable files, trigger/session continuity. Do not adopt its whole platform model. |
+| REF-EIGENT | https://github.com/eigent-ai/eigent | `2ffa2e4ef19356e87479845f2aa1600bc2fde671` | Apache-2.0 | Learn visual cowork UX, CAMEL Workforce decomposition/retry/replan, browser/terminal toolkit assembly and activity timeline. Do not make CAMEL LiteCowork's orchestration authority. |
+| REF-AIONUI | https://github.com/iOfficeAI/AionUi | `11cd2a9a20d1e033157636efc570b41384c66d85` | Apache-2.0 at checked root LICENSE | Learn Electron Cowork shell, multi-agent/platform adapters, typed main↔renderer bridge (`common/platform/bridge.ts`) and IPC unit tests. Do not adopt as Core/daemon authority or bypass Trust/Task contracts. |
+| REF-OPENDOT | https://github.com/athulsreekumar/opendot | `ec75891b819713acf29cb659bd9c72d1ed34f76a` | MIT at checked root LICENSE | Learn Pi-based Dot sessions, watchers, Dot Links, SuperDot/Organisation plan UX, `~/.opendot` audit/masking. Do not use Pi sessions as LiteCowork durable Task truth; not the same as OpenAI dots or `itsperini/opendot`. |
+| REF-ACTIVEPIECES | https://github.com/activepieces/activepieces | `65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7` | MIT outside enterprise paths listed in its LICENSE | Strong candidate for a compatibility/provider spike around community Pieces, OAuth/action/trigger descriptors, and connection lifecycle. Do not import enterprise paths. |
+| REF-N8N | https://github.com/n8n-io/n8n | `7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3` | Sustainable Use License; enterprise files separately licensed | External/user-owned WorkflowBackend only by default. Study run/trigger semantics; do not vendor or hide n8n as LiteCowork's engine. |
+| REF-NANGO | https://github.com/NangoHQ/nango | `b309bc1716f9a868e7cf3af0a403a7b0da093df2` | Elastic License 2.0 | Architecture reference and optional external auth backend. Study token refresh/encryption/connection state; no unreviewed source reuse. |
+| REF-ARCADE-PLUGIN | https://github.com/arcadeai-labs/arcade | `41ff1e9aea3a410c85a6b0f61147c073ef606924` | Apache-2.0 | Study portable MCP/skill packaging, browser sign-in handoff and agent-facing discovery. Optional provider only. |
+| REF-ARCADE-MCP | https://github.com/ArcadeAI/arcade-mcp | `79a2dc90d347e4cd1a96366a2d94c8ddc356f1c3` | MIT | Study authorized MCP tool declarations and secret injection boundaries. Optional provider only. |
+| REF-CAMEL | https://github.com/camel-ai/camel | `24fde60ad739b4be8f8f533fea9ba54256fbc4a2` | Apache-2.0 | Reference for decomposition, worker channels, task events, retry/replan. LiteCowork keeps its own accepted Plan/Step/Attempt model. |
+| REF-COMPOSIO | https://github.com/ComposioHQ/composio | `f9ce49953598e13371c406ac346846696a4d8385` on `next` | MIT at checked root LICENSE | Optional integration/tool provider and catalog reference; never a mandatory dependency or secret owner. |
+| REF-ACP-REGISTRY | https://github.com/agentclientprotocol/registry | `4d1729af836732b46840080920912dac7d5a2935` | Apache-2.0 | Descriptive agent/distribution metadata and protocol adaptation matrix only. Registry presence does not establish LiteCowork support, installation, auth, capability, readiness, or safety. |
+| REF-OPENINTELLIGENTUI | [CopilotKit/OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | [`f6e4388b26a64b9a0714943b08a1ce622b924eec`](https://github.com/CopilotKit/OpenIntelligentUI/tree/f6e4388b26a64b9a0714943b08a1ce622b924eec) | MIT at checked root LICENSE | E08-S08 UX, sandbox lifecycle, explicit bridge, and renderer-test reference. Do not adopt its arbitrary generated HTML/CSS/JavaScript renderer or CSP policy as LiteCowork's RichPresentation implementation. |
+| REF-BROWSER-USE | [browser-use/browser-use](https://github.com/browser-use/browser-use) | [`ccd22fef47a1a36e0c4596fef5db73a5117b9d06`](https://github.com/browser-use/browser-use/tree/ccd22fef47a1a36e0c4596fef5db73a5117b9d06) | MIT at checked root LICENSE | Study bounded DOM/accessibility serialization and screencast lifecycle. Do not adopt default profile copying, storage-state cookie handling, ambient CDP attachment, model loop, or unfiltered logging. Candidate files and security adaptation are below. |
+| REF-JEV-ULTRAFAST | [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast) | [`1231850a0bf1a0c0341fe408ef1668dbbfdfac46`](https://github.com/browser-use/jev-ultrafast/tree/1231850a0bf1a0c0341fe408ef1668dbbfdfac46) | MIT at checked root LICENSE | Study dynamic typed action spaces, stable observed-node references, atomic DOM snapshots, stale-target checks, and stop-and-inspect after ambiguous mutation. Do not run its independent agent/model loop as a LiteCowork provider. |
+| REF-BROWSERCODE | [browser-use/browsercode](https://github.com/browser-use/browsercode) | [`b200643fe0eb93ce5a3aadd4bb21cb6cceb2ed04`](https://github.com/browser-use/browsercode/tree/b200643fe0eb93ce5a3aadd4bb21cb6cceb2ed04) | MIT at checked root LICENSE | Study the CDP WebSocket lifecycle, generated protocol bindings, and connection-race tests. Never expose its persistent raw CDP session or arbitrary agent JavaScript execution. |
+| REF-BROWSER-HARNESS | [browser-use/browser-harness](https://github.com/browser-use/browser-harness) | [`a6426f846fc59d16f38cf66f79176bc7793c16b6`](https://github.com/browser-use/browser-harness/tree/a6426f846fc59d16f38cf66f79176bc7793c16b6) | MIT at checked root LICENSE | Candidate LiteSPM-managed shared browser package for compatible agents. Exact reusable files and wrapper requirements are documented below; raw attached-Chrome access is not itself a LiteCowork-qualified capability. |
+| REF-LITESPM | [sarv-projects/LiteSPM](https://github.com/sarv-projects/LiteSPM) | [`9f42b25ddfb1acedce0f2dbf9964f4a7724d622e`](https://github.com/sarv-projects/LiteSPM/tree/9f42b25ddfb1acedce0f2dbf9964f4a7724d622e) | Apache-2.0 at checked root LICENSE | Selected package lifecycle authority. Still in active development; use its published package/host contract when available, and do not invent or duplicate its API. |
+| REF-OPENBOT | [nightly-labs/openbot](https://github.com/nightly-labs/openbot) | [`6759fa3ee857f4f4966865e12de99ae84ab6de07`](https://github.com/nightly-labs/openbot/tree/6759fa3ee857f4f4966865e12de99ae84ab6de07) | PolyForm Noncommercial 1.0.0 at pinned package.json; review before any code reuse | Study compact Task UX, provider-scoped model/effort picker, local usage accounting, visual workflow graph and constrained agent graph tools. Do not adopt its Core graph runtime, broad danger-full-access/approvalPolicy-never mode or code without a separate license/security review. |
+| REF-OPENHANDS | [OpenHands/OpenHands](https://github.com/OpenHands/OpenHands) with engine [OpenHands/software-agent-sdk](https://github.com/OpenHands/software-agent-sdk) | `22e3057c89b2e5245a5a36fd9c48e52c8a984ba4` (shell) / `f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f` (engine), both 2026-11-06 | MIT at checked root LICENSE in both repositories | Study ordered command receipts with exit status and timeout state, runtime-availability projection with history readable while the runtime is gone, owner-labelled runtime reclamation, and MCP tool governance. Do not adopt acknowledgment-only client tools, container-default isolation as a sandbox claim, or in-process shared-workspace sub-agents as LiteCowork's delegation authority. **PROPOSAL — owner review required; not an accepted LiteCowork change.** |
+
+## ACP Registry exact files and boundary
+
+Repository: [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry)
+
+Reviewed at commit [`4d1729af836732b46840080920912dac7d5a2935`](https://github.com/agentclientprotocol/registry/tree/4d1729af836732b46840080920912dac7d5a2935); root license is Apache-2.0.
+
+| File | Exact link | What to study | LiteCowork decision |
+|---|---|---|---|
+| `README.md`, `FORMAT.md` | [README](https://github.com/agentclientprotocol/registry/blob/4d1729af836732b46840080920912dac7d5a2935/README.md) · [FORMAT](https://github.com/agentclientprotocol/registry/blob/4d1729af836732b46840080920912dac7d5a2935/FORMAT.md) | Registry purpose, record format, and distribution metadata | Discovery input only; the owner-curated V1 portfolio remains independent of remote entries |
+| `agent.schema.json` | [Pinned schema](https://github.com/agentclientprotocol/registry/blob/4d1729af836732b46840080920912dac7d5a2935/agent.schema.json) | Shape and constraints of registry records | Validate bounded metadata against a reviewed schema; never execute registry-provided command, environment, auth, or install instructions |
+| `.protocol-matrix/latest.md` | [Pinned matrix snapshot](https://github.com/agentclientprotocol/registry/blob/4d1729af836732b46840080920912dac7d5a2935/.protocol-matrix/latest.md) | Versioned initialize/session method observations for registry candidates | Research evidence only. The snapshot was generated 2026-10-15, does not test standard `session/cancel`, and is not LiteCowork provider or lifecycle qualification |
+| `LICENSE` | [Pinned license](https://github.com/agentclientprotocol/registry/blob/4d1729af836732b46840080920912dac7d5a2935/LICENSE) | Registry repository license | Research reference; no registry source or dependency is copied |
+
+The remote Registry is untrusted descriptive input. It cannot add or remove curated portfolio candidates, create an AgentBinding, authenticate an account, launch an executable, select a capability, or create a Conversation or Task. Treat registry redirects, origins, cache age, schema drift, duplicate identifiers, malformed records, and oversized responses as explicit validation cases. Registry observations and protocol handshakes remain distinct from module implementation and qualified support. See [E03-S06](archive/legacy-implementation-c7e9c05/epics/E03.md) for the planned implementation and acceptance contract.
+
+## OpenIntelligentUI exact files
+
+Repository: [CopilotKit/OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI)
+
+Reviewed at [`f6e4388b26a64b9a0714943b08a1ce622b924eec`](https://github.com/CopilotKit/OpenIntelligentUI/tree/f6e4388b26a64b9a0714943b08a1ce622b924eec) (`main` at research time).
+The root `LICENSE` at this revision is MIT.
+
+| File | Exact link | What to study | LiteCowork decision |
+|---|---|---|---|
+| `README.md` | https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/README.md | Prose/native/custom interactive answer selection, conversation presentation, and streaming user experience | UX reference for E08-S08; keep semantic ConversationMessage complete without the enhancement |
+| `docs/architecture.md` | https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/docs/architecture.md | Stream flow, placeholder/preview/final renderer lifecycle, local iframe control state, and follow-up behavior | Study lifecycle and state-ownership test cases; LiteCowork's stream schema and immutable presentation remain authoritative |
+| `apps/app/src/components/generative-ui/open-generative-ui/schema.ts` | https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/apps/app/src/components/generative-ui/open-generative-ui/schema.ts | Runtime validation of streamed activity fields | Test-shape reference only; LiteCowork uses its closed versioned RichPresentation and stream schemas |
+| `apps/app/src/components/generative-ui/open-generative-ui/renderer.tsx` | https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/apps/app/src/components/generative-ui/open-generative-ui/renderer.tsx | Throttled streaming updates, preview-to-final sandbox transition, resize source checks and height clamping | Adapt only as behavioral test ideas after LiteCowork's renderer boundary is implemented; no source reuse |
+| `apps/app/src/components/generative-ui/open-generative-ui/frame-content.ts` | https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/apps/app/src/components/generative-ui/open-generative-ui/frame-content.ts | Frame composition and content-height measurement | Inspect for lifecycle edge cases only. The CSP permits `unsafe-inline`/`unsafe-eval` and selected CDN script origins to support generated code, so it is not a policy template for LiteCowork |
+| `apps/app/src/lib/sandbox/sandbox-functions.ts` and `prompt-bridge.tsx` | https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/apps/app/src/lib/sandbox/sandbox-functions.ts · https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/apps/app/src/lib/sandbox/prompt-bridge.tsx | Narrow `sendPrompt` and HTTPS `openLink` host actions, validation, busy handling, and settlement | Reference for explicit, bounded host-action and failure tests; LiteCowork still binds actions to Core-owned references and authorization |
+| `apps/app/src/components/generative-ui/open-generative-ui/__tests__/open-generative-ui-renderer.test.tsx` and `apps/app/src/lib/sandbox/__tests__/prompt-bridge.test.tsx` | https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/apps/app/src/components/generative-ui/open-generative-ui/__tests__/open-generative-ui-renderer.test.tsx · https://github.com/CopilotKit/OpenIntelligentUI/blob/f6e4388b26a64b9a0714943b08a1ce622b924eec/apps/app/src/lib/sandbox/__tests__/prompt-bridge.test.tsx | Renderer lifecycle, foreign resize-message rejection, bridge contention and teardown tests | Use as candidate behavioral cases for E08-S08; implement against LiteCowork's actual renderer and contracts |
+
+**Decision:** This repository is useful for interaction and test design when E08-S08 reaches
+renderer integration. Study its text/native/interactive selection, streamed preview/final
+states, locally scoped controls, explicit follow-up action, iframe resize validation, and
+bridge failure cases. Do not import its dynamic HTML/JavaScript execution model, Websandbox
+runtime, CDN import map, or CSP. At this revision the renderer streams generated HTML,
+CSS, and JavaScript into an iframe; its CSP allows inline/eval scripts and selected CDN
+origins. LiteCowork's [Rich Response contract](RICH-RESPONSE.md) instead requires closed,
+bounded blocks and deterministic rendering, with no arbitrary HTML, JavaScript, CSS, or
+model-owned host actions. No upstream code or dependency was copied or added.
+
+**Speed and viability comparison (planned for E08-S08; no comparative result is claimed):**
+
+| Question | Current expectation | Why / evidence still needed |
+|---|---|---|
+| Which is faster for a standalone generated-UI prototype? | OpenIntelligentUI | It already supplies the iframe sandbox, streaming preview/final lifecycle, and bridge. This is a qualitative estimate from the pinned implementation, not a timed result. |
+| Which is faster to ship as LiteCowork local V1? | LiteCowork's native RichPresentation path | Its semantic-first response, closed presentation blocks, authenticated local transport, and React renderer fit the Tauri plus Rust `litecoworkd` product. Reusing OpenIntelligentUI would require qualifying and operating a separate Next.js, FastAPI/LangGraph, CopilotKit, and Websandbox stack. |
+| Which has lower runtime/rendering cost? | Unknown; native bounded rendering may have less overhead | Avoiding an iframe and generated code may reduce client work, but actual CPU, memory, latency, and frame behavior depend on the scenarios and WebView. Measure both under matched conditions. |
+| Which is viable as LiteCowork's production renderer? | LiteCowork's accepted native design | OpenIntelligentUI is valuable as UX and test reference, but its generated HTML/CSS/JavaScript execution and CSP are outside LiteCowork's closed, deterministic RichPresentation boundary. |
+
+The benchmark must compare implementations of the same useful interaction, not framework
+reputation or a generated-UI demo against a different LiteCowork feature. The estimates
+above distinguish prototype and integration speed from runtime performance; only the
+matched E08-S08 measurements can settle the latter.
+
+When implementing E08-S08, run the same representative prose, simple-card, and richer
+interactive-answer scenarios on the same device/OS and display webview. Hold content,
+model/provider, prompt/request, network, and cache state constant; record their exact
+versions and separate provider/model latency from renderer time. Measure time to first
+semantic text, first useful visual, and completed render; client CPU, peak memory, dropped
+frames, transferred bytes, and external network/CDN requests; and cold-start versus warm
+render behavior for small and large outputs. Include offline/local operation and renderer,
+bridge, and reconnect failure behavior. Record raw timings and environment details with
+sanitized evidence. Do not claim one is faster unless repeated matched runs support that
+claim; if OpenIntelligentUI cannot run under the same local conditions, report that as a
+viability constraint and compare only the measurements that remain equivalent.
+
+**Implementation commitment:** E08-S08 will include a viability run of the pinned
+[OpenIntelligentUI repository](https://github.com/CopilotKit/OpenIntelligentUI/tree/f6e4388b26a64b9a0714943b08a1ce622b924eec)
+and the matched renderer comparison above where both systems can run under equivalent
+conditions. Record commands, versions, raw measurements, failures, and limitations in the
+E08-S08 review packet and `archive/legacy-implementation-c7e9c05/CURRENT-RUN.md`; update this note with the
+measured conclusion then. Until that evidence exists, the speed assessment above remains
+a hypothesis and the reference remains a UX/test input rather than an implementation
+dependency.
+
+**Owner direction (2026-10-11):** Defer the viability and matched-speed tests until E08-S08
+implementation. Test the upstream [CopilotKit/OpenIntelligentUI GitHub repository](https://github.com/CopilotKit/OpenIntelligentUI)
+at the pinned [reviewed commit](https://github.com/CopilotKit/OpenIntelligentUI/tree/f6e4388b26a64b9a0714943b08a1ce622b924eec)
+and run the scenarios and metrics above against LiteCowork under matched conditions where
+possible. Finalize this comparison only after recording the measured results, commands,
+versions, failures, and limitations in the E08-S08 review packet and
+`archive/legacy-implementation-c7e9c05/CURRENT-RUN.md`. Until then, the assessment remains a planning hypothesis:
+OpenIntelligentUI is likely quicker for a standalone generated-UI prototype, while
+LiteCowork's native bounded renderer is likely quicker to ship inside the existing product.
+
+## Browser Use repositories and LiteSPM integration
+
+These four Browser Use repositories were reviewed at the exact revisions in the pinned
+repository matrix. They provide concrete implementation material for E07, but none is a
+drop-in substitute for LiteCowork's browser provider, Environment, Trust, or Effect
+services.
+
+### Browser Harness
+
+Repository: [browser-use/browser-harness](https://github.com/browser-use/browser-harness)
+
+Reviewed at [`a6426f846fc59d16f38cf66f79176bc7793c16b6`](https://github.com/browser-use/browser-harness/tree/a6426f846fc59d16f38cf66f79176bc7793c16b6).
+The project is a Python CDP harness for an existing Chrome, an editable agent workspace,
+and an optional MCP server. Its setup guide requires the user to enable Chrome remote
+debugging; it can operate on tabs with the user's signed-in state. LiteCowork's desired
+package shape is to let LiteSPM manage one shared Browser Harness package and offer it to
+compatible installed hosts when LiteSPM's actual package contract is ready. The source
+review covers the daemon, helper, IPC, MCP, recorder, and package files below.
+
+| File | What to reuse or test | LiteCowork constraint |
+|---|---|---|
+| `src/browser_harness/daemon.py` | CDP request framing, target attachment and stale-session handling | `get_ws_url()` discovers ambient CDP; `handle()` accepts generic CDP. Replace both with explicit provider-owned sessions and allowlisted typed methods. Never retry a consequential action before Effect reconciliation. |
+| `src/browser_harness/helpers.py` | CDP navigation, tab, wait, screenshot and input mechanics | Route each operation through LiteCowork authorization, site grants, action receipt and current control epoch. |
+| `src/browser_harness/_ipc.py` | Local daemon transport patterns (private Unix socket or tokenized loopback) | Bind transport to Runtime identity and authenticated local Operator; no agent-facing raw transport. |
+| `src/browser_harness/admin.py` | Daemon launch and recovery cases | Replace detached self-supervision/profile discovery with LiteSPM package supervision and an opaque LiteCowork-managed isolated profile. |
+| `src/mcp_server.py` | Host/tool packaging and operation grouping | Do not expose `browser_js`, arbitrary CDP, caller-selected upload paths, or unrestricted tab controls. Advertise only scoped bridge operations. |
+| `src/browser_harness/recorder.py` | Frame/action sequencing and failure cases | Route any retained media through Core Artifact/Evidence policy; default recording is off and observations are bounded/redacted. |
+| `pyproject.toml` | Runtime and dependency footprint | Python 3.11+ and pinned `cdp-use`, `fetch-use`, Pillow and WebSocket dependencies mean this requires supervised Python packaging, not a direct Rust link. |
+
+Source audit also found default browser-profile discovery across Chromium-family browsers,
+generic CDP access, automatic reattachment/retry on a stale session, optional cloud and
+profile-cookie synchronization, and telemetry that can include task text/output. These
+behaviors must be disabled or replaced in the LiteCowork adapter; normal Chrome profiles,
+cookies, page content and telemetry cannot flow through silently.
+
+**Adoption rule:** retain Browser Harness's reusable browser mechanics and agent-facing
+workflow where they fit, but route consequential operations through the LiteCowork-owned
+browser service. Do not pass a raw CDP endpoint or unrestricted browser tool directly to
+an agent. Existing-Chrome connection remains explicitly consented and high-trust; the
+managed isolated profile is the normal automated path. Default package availability does
+not mean a default site grant, session attachment, or input-control authority. LiteSPM
+owns package lifecycle and process supervision; LiteCowork owns per-Conversation/Task
+compatibility, Grant, Activation, invocation, and Effect/Evidence accounting.
+
+### Browser Use
+
+Repository: [browser-use/browser-use](https://github.com/browser-use/browser-use)
+
+Reviewed at [`ccd22fef47a1a36e0c4596fef5db73a5117b9d06`](https://github.com/browser-use/browser-use/tree/ccd22fef47a1a36e0c4596fef5db73a5117b9d06).
+
+| File | What to reuse or test | LiteCowork constraint |
+|---|---|---|
+| `browser_use/dom/service.py`, `dom/serializer/{serializer,html_serializer,clickable_elements}.py`, `dom/views.py` | Bounded DOM and clickable-node observation patterns | Redact page secrets and bind observations to exact browser session, tab generation, observation revision and authorization scope. |
+| `browser_use/browser/watchdogs/recording_watchdog.py` | CDP screencast lifecycle, frame IDs and acknowledgements | Port into a bounded queue with session/epoch binding, backpressure, stale-frame rejection and authorized UI stream. |
+| `browser_use/browser/profile.py` | Provider/profile configuration cases | Do not use default profile-copy behavior, cookie/storage-state import, insecure Chrome flags, automatic extensions or ambient account state. |
+| `browser_use/browser/watchdogs/local_browser_watchdog.py`, `browser_use/browser/session.py` | Launch, attach, target lifecycle and cleanup cases | Process supervision is not Runtime lease enforcement; reject ambient CDP discovery, redact endpoint secrets, and let only the qualified provider own its process. |
+
+This repository includes a broad agent loop and many optional model/integration
+dependencies. Reusing all of it as LiteCowork's provider would bring unnecessary runtime
+weight and a second agent authority. Reuse discrete provider mechanics only after they
+are wrapped by scoped BrowserActionService admission and durable Effect reconciliation.
+
+### browsercode
+
+Repository: [browser-use/browsercode](https://github.com/browser-use/browsercode)
+
+Reviewed at [`b200643fe0eb93ce5a3aadd4bb21cb6cceb2ed04`](https://github.com/browser-use/browsercode/tree/b200643fe0eb93ce5a3aadd4bb21cb6cceb2ed04).
+
+| File | Candidate use | Required adaptation |
+|---|---|---|
+| `packages/bcode-browser/src/cdp/session.ts` | CDP WebSocket lifecycle, events and session invalidation | Require an explicit consent-bound provider endpoint; remove automatic discovery and environment-variable endpoint selection. |
+| `packages/bcode-browser/src/cdp/generated.ts`, `src/cdp/gen.ts`, checked-in protocol JSON | Typed CDP methods and protocol generation | Pin protocol to the qualified Chrome version; expose only narrow typed provider methods. |
+| `packages/bcode-browser/test/cdp-session.test.ts` | Late callback, timeout and stale-session race cases | Bind cases to LiteCowork's session, tab-generation and control-epoch contract. |
+| `packages/bcode-browser/src/browser-execute.ts` | No production adoption | It runs arbitrary agent JavaScript with persistent raw CDP access in the host process and must not be a LiteCowork tool surface. |
+
+### jev-ultrafast
+
+Repository: [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast)
+
+Reviewed at [`1231850a0bf1a0c0341fe408ef1668dbbfdfac46`](https://github.com/browser-use/jev-ultrafast/tree/1231850a0bf1a0c0341fe408ef1668dbbfdfac46).
+
+Study `jev_ultrafast/model.py`, `snapshot.js`, `browser.py`, `agent.py`, and
+`tests/test_agent.py` for operation-specific typed action spaces, atomic DOM snapshots,
+stable observed node references, and stale-target validation. If an action response is
+ambiguous, its useful rule is to stop and inspect current state before any retry. Port
+these patterns inside LiteCowork's authorized provider; do not expose the demo agent's
+direct CDP input path. Its reported speed comparison used three paired repetitions of one
+Flights flow (median 9.450s versus 7.092s, both 3/3 verified). Treat that as a small
+directional observation, not a general performance result or a LiteCowork speed claim.
+
+### Speed and integration choice
+
+For an unguarded demo that acts directly on an already running Chrome, Browser Harness is
+the shortest path because it already supplies CDP interaction and an agent-facing
+workspace/MCP. For LiteCowork's product, Browser Harness plus LiteSPM is the fastest
+candidate path once LiteSPM publishes its package/host contract; the remaining LiteCowork
+work is the browser admission, lease, Effect and UI adapter that preserves the accepted
+architecture. This should be faster than building CDP process/session mechanics from
+scratch, but that delivery-time claim has not yet been measured. It is viable only after
+the default-profile discovery, arbitrary CDP/JavaScript, unsafe retry, telemetry and
+detached supervision behavior are wrapped or removed. Copying Browser Use's full agent
+runtime or browsercode's unrestricted execution surface would create a second authority
+and require more removal/rework before V1. This comparison concerns integration effort,
+not measured browser latency. No browser-provider code has yet been imported; E07 owns
+the adaptation and must record exact provenance and tests for each adopted file.
+
+LiteSPM was reviewed at
+[`9f42b25ddfb1acedce0f2dbf9964f4a7724d622e`](https://github.com/sarv-projects/LiteSPM/tree/9f42b25ddfb1acedce0f2dbf9964f4a7724d622e).
+It is the selected lifecycle authority, but its current checkout does not settle the
+LiteCowork-facing package API. No LiteSPM wire contract is inferred here.
+
+## Agenta exact files
+
+Repository: https://github.com/Agenta-AI/agenta
+
+Checked at `4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137`.
+
+| File | Exact link | What to study | LiteCowork decision |
+|---|---|---|---|
+| `README.md` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/README.md | Product framing: learning agents, schedules/events, run history, per-agent computer, integrations, workspaces, agent teams | Product reference only |
+| `sdks/python/agenta/sdk/agents/platform_instructions.py` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/sdks/python/agenta/sdk/agents/platform_instructions.py | Distinguishes task vs persistent configuration change; memory vs skills vs triggers; `read_config`/`commit_revision`; durable `agent-files/` guidance | Borrow the separation, but route persistent changes through LiteCowork revision/learning authority |
+| `sdks/python/agenta/sdk/agents/platform/op_catalog.py` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/sdks/python/agenta/sdk/agents/platform/op_catalog.py | Self-targeted platform operations, schedule/subscription tools, session-bound context | Reference for narrowly bound host operations |
+| `web/packages/agenta-automation-ui/src/automationModel.ts` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/web/packages/agenta-automation-ui/src/automationModel.ts | One user-facing Automation projection over schedule and event subscription entities; status/run labels | Adopt the UX abstraction, not the storage model |
+| `web/packages/agenta-automation-ui/src/automationEdit.ts` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/web/packages/agenta-automation-ui/src/automationEdit.ts | Explicit create/edit payload construction; duplicate-off behavior; preserving fields on full update | Reference for safe edit semantics |
+| `web/packages/agenta-automation-ui/src/runModel.ts` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/web/packages/agenta-automation-ui/src/runModel.ts | Delivery/run projection and session linkage | Adopt run-to-conversation navigation in LiteCowork |
+| `api/oss/src/core/triggers/service.py` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/api/oss/src/core/triggers/service.py | Trigger discovery, connection state, schedule/subscription orchestration | Reference only; LiteCowork TriggerCoordinator remains authoritative |
+| `api/oss/src/tasks/asyncio/triggers/dispatcher.py` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/api/oss/src/tasks/asyncio/triggers/dispatcher.py | One session ID per delivery/run and dispatch behavior | Reference for run/session attribution |
+| `services/runner/src/engines/sandbox_agent/run-turn.ts` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/services/runner/src/engines/sandbox_agent/run-turn.ts | Pause/cancel/continuity, durable resume points, sandbox failure handling | Reference for continuity edge cases |
+| `docs/blog/entries/automation-runs.mdx` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/docs/blog/entries/automation-runs.mdx | User-facing history and continuing a run's session | Product/UX reference |
+| `openspec/changes/agenta-tools/proposal.md` | https://github.com/Agenta-AI/agenta/blob/4bc51903a1597d3ef8f1ac17f2d6f472ba7c8137/openspec/changes/agenta-tools/proposal.md | Which self-edit/trigger tools are opt-in vs default | Reference for least-authority self-configuration |
+
+**Decision:** LiteCowork adopts the useful separation
+`memory != instruction != skill != automation`, a simple schedule/event Automation UI,
+and explicit run/session continuation. LiteCowork does **not** let a model mutate arbitrary
+persistent configuration directly. Only a narrowly authorized LearningService or normal
+versioned Operator command may commit persistent state.
+
+## Eigent and CAMEL exact files
+
+Eigent repository: https://github.com/eigent-ai/eigent
+
+Checked at `2ffa2e4ef19356e87479845f2aa1600bc2fde671`.
+
+| File | Exact link | What to study | LiteCowork decision |
+|---|---|---|---|
+| `README.md` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/README.md | Single Agent / Workforce product split, local deployment, MCP/skills/browser/terminal | Borrow visual simplicity; do not create a separate LiteCowork control plane for Workforce |
+| `backend/app/utils/workforce.py` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/backend/app/utils/workforce.py | CAMEL task decomposition, dependency updates, worker events, retry/replan, stall handling | Use as algorithm/reference input to LiteCowork delegation benchmarking |
+| `backend/app/workspace_runtime/workforce_adapter.py` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/backend/app/workspace_runtime/workforce_adapter.py | Runtime adapter between workspace/session state and CAMEL Workforce | Reference only |
+| `backend/app/agent/factory/toolkit_assembler.py` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/backend/app/agent/factory/toolkit_assembler.py | Conditional browser, terminal, MCP, skills, files, screenshots, delegation toolkit assembly and cleanup | Borrow lifecycle/rollback test ideas; LiteSPM/CapabilityBroker stays owner |
+| `src/components/Trigger/AutomationDashboard.tsx` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/src/components/Trigger/AutomationDashboard.tsx | Visual automation status, next run, schedule label | UI reference |
+| `src/components/Trigger/TriggerDialog.tsx` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/src/components/Trigger/TriggerDialog.tsx | Automation creation/edit flow | UI reference |
+| `src/components/Trigger/SchedulePicker.tsx` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/src/components/Trigger/SchedulePicker.tsx | Schedule configuration and preview | UI reference |
+| `src/store/spaceStore.ts` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/src/store/spaceStore.ts | Space/session information architecture | Reference only |
+| `src/components/Session/index.tsx` | https://github.com/eigent-ai/eigent/blob/2ffa2e4ef19356e87479845f2aa1600bc2fde671/src/components/Session/index.tsx | Session workspace shell | Visual reference |
+
+CAMEL repository: https://github.com/camel-ai/camel
+
+Checked at `24fde60ad739b4be8f8f533fea9ba54256fbc4a2`.
+
+- `camel/societies/workforce/workforce.py`:
+  https://github.com/camel-ai/camel/blob/24fde60ad739b4be8f8f533fea9ba54256fbc4a2/camel/societies/workforce/workforce.py
+- `camel/societies/workforce/task_channel.py`:
+  https://github.com/camel-ai/camel/blob/24fde60ad739b4be8f8f533fea9ba54256fbc4a2/camel/societies/workforce/task_channel.py
+- `camel/societies/workforce/events.py`:
+  https://github.com/camel-ai/camel/blob/24fde60ad739b4be8f8f533fea9ba54256fbc4a2/camel/societies/workforce/events.py
+- `camel/tasks/task.py`:
+  https://github.com/camel-ai/camel/blob/24fde60ad739b4be8f8f533fea9ba54256fbc4a2/camel/tasks/task.py
+
+**Decision:** CAMEL/Eigent validate decomposition, bounded worker execution, retry/replan, and
+coherent cross-agent activity timelines. They do not replace LiteCowork's immutable
+PlanRevision, Step, Attempt, lease, Effect, Evidence, verifier, and native AgentBinding
+contracts.
+
+## AionUi exact files
+
+Repository: https://github.com/iOfficeAI/AionUi
+
+Checked at `11cd2a9a20d1e033157636efc570b41384c66d85` (2026-11-01 shallow clone).
+
+| File | Exact link | What to study | LiteCowork decision |
+|---|---|---|---|
+| `docs/contributing/file-structure.md` | https://github.com/iOfficeAI/AionUi/blob/11cd2a9a20d1e033157636efc570b41384c66d85/docs/contributing/file-structure.md | Renderer vs `src/process/` vs `common/` split; bridge and SQLite ownership | Align with LiteCowork Tauri + `litecoworkd` separation, not single-process collapse |
+| `packages/desktop/src/common/platform/bridge.ts` | https://github.com/iOfficeAI/AionUi/blob/11cd2a9a20d1e033157636efc570b41384c66d85/packages/desktop/src/common/platform/bridge.ts | Typed invoke/emit bridge, interceptors, adapter hook | Test and API-shape reference for narrow preload/IPC; map to OpenAPI operationIds at Core |
+| `tests/unit/common-platform/bridge.test.ts` | https://github.com/iOfficeAI/AionUi/blob/11cd2a9a20d1e033157636efc570b41384c66d85/tests/unit/common-platform/bridge.test.ts | Handler registration and invoke behavior | Candidate unit-test patterns for UI transport |
+| `src/process/bridge/` (handlers) | tree at pinned commit | IPC surface area by domain | Inventory only; do not mirror handler names as LiteCowork API |
+| `src/process/task/` | tree at pinned commit | Task/agent scheduling in main process | Reference for activity UX; LiteCowork Task truth stays in Core storage |
+
+**Decision:** AionUi is a useful **Cowork desktop + typed bridge** reference. LiteCowork keeps daemon-backed Workspace truth, Trust, and qualified native harness routes; do not treat AionUi's main-process agent loop as orchestration authority.
+
+## OpenDot (opendot.live) exact files
+
+Repository: https://github.com/athulsreekumar/opendot
+
+Checked at `ec75891b819713acf29cb659bd9c72d1ed34f76a` (2026-11-01 shallow clone).
+
+| File / path | What to study | LiteCowork decision |
+|---|---|---|
+| `desktop/README.md`, root README architecture | Watchers, Dot Links, SuperDot, Organisation, `~/.opendot` | UX and honesty patterns for Coworkers/automation; Core owns Task/Effect |
+| `desktop/` Electron + React app | WhatsApp-style shell, streaming replies | Layout reference only; map actions to OpenAPI + IPC |
+| Pi harness dependency | Per-Dot sessions | Native AgentSession + LiteCowork storage, not Pi files as truth |
+
+**Decision:** OpenDot validates local Dots, masking, approvals, and multi-Dot organisation flows. LiteCowork separates provider-native harness from Core coordination and does not adopt Pi as the durable product kernel.
+
+## Activepieces exact files
+
+Repository: https://github.com/activepieces/activepieces
+
+Checked at `65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7`.
+
+| File | Exact link | Use |
+|---|---|---|
+| `LICENSE` | https://github.com/activepieces/activepieces/blob/65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7/LICENSE | Defines MIT core and separately licensed enterprise paths; re-check every reused path |
+| `packages/pieces/community/gmail/src/lib/auth.ts` | https://github.com/activepieces/activepieces/blob/65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7/packages/pieces/community/gmail/src/lib/auth.ts | Provider auth descriptor, Google clients, account connection behavior |
+| `packages/pieces/community/gmail/src/lib/actions/get-mail-action.ts` | https://github.com/activepieces/activepieces/blob/65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7/packages/pieces/community/gmail/src/lib/actions/get-mail-action.ts | Action schema/execution shape |
+| `packages/pieces/community/gmail/src/lib/triggers/new-label.ts` | https://github.com/activepieces/activepieces/blob/65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7/packages/pieces/community/gmail/src/lib/triggers/new-label.ts | Trigger descriptor/provider pattern |
+| `packages/pieces/community/google-calendar/src/lib/auth.ts` | https://github.com/activepieces/activepieces/blob/65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7/packages/pieces/community/google-calendar/src/lib/auth.ts | Google Calendar OAuth/auth variants |
+| `brain/knowledge/connections-auth/app-connections.md` | https://github.com/activepieces/activepieces/blob/65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7/brain/knowledge/connections-auth/app-connections.md | Connection identity, encrypted credentials, refresh and replacement semantics |
+| `packages/server/api/src/app/app-connection/app-connection-service/app-connection-service.ts` | https://github.com/activepieces/activepieces/blob/65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7/packages/server/api/src/app/app-connection/app-connection-service/app-connection-service.ts | Server-side connection lifecycle |
+| `packages/server/api/src/app/app-connection/app-connection-service/app-connection.handler.ts` | https://github.com/activepieces/activepieces/blob/65bfba72b855ed6c8c3b4c24ad5d12a8960b1aa7/packages/server/api/src/app/app-connection/app-connection-service/app-connection.handler.ts | Expiry/refresh handling |
+
+**Decision:** implement a spike for an `ActivepiecesPieceProvider` behind LiteSPM. The
+provider may translate qualified community Piece metadata/auth/actions/triggers into
+LiteCowork capability/connector descriptors. It must not expose enterprise code, silently
+install arbitrary npm dependencies, bypass LiteSPM signatures/provenance, or give a Piece
+direct Trust authority. A second mode may connect to a user-owned Activepieces instance as
+a WorkflowBackend instead of loading Piece code locally.
+
+## n8n exact files
+
+Repository: https://github.com/n8n-io/n8n
+
+Checked at `7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3`.
+
+- `LICENSE.md`:
+  https://github.com/n8n-io/n8n/blob/7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3/LICENSE.md
+- `packages/cli/src/workflows/workflow-execution.service.ts`:
+  https://github.com/n8n-io/n8n/blob/7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3/packages/cli/src/workflows/workflow-execution.service.ts
+- `packages/cli/src/workflow-runner.ts`:
+  https://github.com/n8n-io/n8n/blob/7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3/packages/cli/src/workflow-runner.ts
+- `packages/core/src/execution-engine/active-workflow-triggers.ts`:
+  https://github.com/n8n-io/n8n/blob/7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3/packages/core/src/execution-engine/active-workflow-triggers.ts
+- `packages/cli/src/modules/mcp/tools/execute-workflow.tool.ts`:
+  https://github.com/n8n-io/n8n/blob/7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3/packages/cli/src/modules/mcp/tools/execute-workflow.tool.ts
+- `packages/nodes-base/nodes/Webhook/Webhook.node.ts`:
+  https://github.com/n8n-io/n8n/blob/7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3/packages/nodes-base/nodes/Webhook/Webhook.node.ts
+- `packages/cli/src/workflows/triggers/non-webhook-trigger-registrar.ts`:
+  https://github.com/n8n-io/n8n/blob/7424f0ca0452f9dc9fe4cf6627ecbf0b315ed1e3/packages/cli/src/workflows/triggers/non-webhook-trigger-registrar.ts
+
+**Target decision:** a future qualified provider may support a user-owned n8n deployment
+through a narrow `WorkflowBackendAdapter`. No production adapter is present in the active
+source tree as of 2026-11-06. Do not vendor n8n, expose its internal database as LiteCowork
+state, or market embedded n8n functionality without a separate license review.
+
+## Nango exact files
+
+Repository: https://github.com/NangoHQ/nango
+
+Checked at `b309bc1716f9a868e7cf3af0a403a7b0da093df2`.
+
+- `LICENSE`:
+  https://github.com/NangoHQ/nango/blob/b309bc1716f9a868e7cf3af0a403a7b0da093df2/LICENSE
+- `packages/shared/lib/services/connection.service.ts`:
+  https://github.com/NangoHQ/nango/blob/b309bc1716f9a868e7cf3af0a403a7b0da093df2/packages/shared/lib/services/connection.service.ts
+- `packages/shared/lib/services/connections/credentials/refresh.ts`:
+  https://github.com/NangoHQ/nango/blob/b309bc1716f9a868e7cf3af0a403a7b0da093df2/packages/shared/lib/services/connections/credentials/refresh.ts
+- `packages/shared/lib/clients/oauth2.client.ts`:
+  https://github.com/NangoHQ/nango/blob/b309bc1716f9a868e7cf3af0a403a7b0da093df2/packages/shared/lib/clients/oauth2.client.ts
+- `docs/guides/platform/security.mdx`:
+  https://github.com/NangoHQ/nango/blob/b309bc1716f9a868e7cf3af0a403a7b0da093df2/docs/guides/platform/security.mdx
+
+**Decision:** study its refresh locking, encrypted-credential, provider-config and connection
+health patterns. Nango may be an optional external `AuthBackendAdapter` for deployments
+that already use it. LiteCowork's default desktop path remains local SecretStore +
+provider-specific ConnectorPackage auth.
+
+## Arcade exact files
+
+Portable plugin repository: https://github.com/arcadeai-labs/arcade
+
+Checked at `41ff1e9aea3a410c85a6b0f61147c073ef606924`.
+
+- `README.md`:
+  https://github.com/arcadeai-labs/arcade/blob/41ff1e9aea3a410c85a6b0f61147c073ef606924/README.md
+- `docs/install/agent-plugins.md`:
+  https://github.com/arcadeai-labs/arcade/blob/41ff1e9aea3a410c85a6b0f61147c073ef606924/docs/install/agent-plugins.md
+- `mcp.json`:
+  https://github.com/arcadeai-labs/arcade/blob/41ff1e9aea3a410c85a6b0f61147c073ef606924/mcp.json
+- `plugin.json`:
+  https://github.com/arcadeai-labs/arcade/blob/41ff1e9aea3a410c85a6b0f61147c073ef606924/plugin.json
+
+MCP framework repository: https://github.com/ArcadeAI/arcade-mcp
+
+Checked at `79a2dc90d347e4cd1a96366a2d94c8ddc356f1c3`.
+
+- `README.md`:
+  https://github.com/ArcadeAI/arcade-mcp/blob/79a2dc90d347e4cd1a96366a2d94c8ddc356f1c3/README.md
+- `LICENSE`:
+  https://github.com/ArcadeAI/arcade-mcp/blob/79a2dc90d347e4cd1a96366a2d94c8ddc356f1c3/LICENSE
+
+**Decision:** Arcade can be a user-selected external Auth/Tool Gateway or MCP provider. It
+must never be required for Gmail/Calendar/etc. and never become the only place LiteCowork
+can authenticate an app.
+
+## Composio exact files
+
+Repository: https://github.com/ComposioHQ/composio
+
+Checked on branch `next` at `f9ce49953598e13371c406ac346846696a4d8385`.
+
+- `README.md`:
+  https://github.com/ComposioHQ/composio/blob/f9ce49953598e13371c406ac346846696a4d8385/README.md
+- `LICENSE`:
+  https://github.com/ComposioHQ/composio/blob/f9ce49953598e13371c406ac346846696a4d8385/LICENSE
+- `docs/public/data/toolkits.json`:
+  https://github.com/ComposioHQ/composio/blob/f9ce49953598e13371c406ac346846696a4d8385/docs/public/data/toolkits.json
+- `docs/content/kb/guide/toolkits-gmail.mdx`:
+  https://github.com/ComposioHQ/composio/blob/f9ce49953598e13371c406ac346846696a4d8385/docs/content/kb/guide/toolkits-gmail.mdx
+
+**Decision:** optional external provider and catalog comparison only. Connector packages,
+OAuth, triggers and workflow backends must function without Composio.
+
+## Source-to-LiteCowork decision map
+
+| Upstream lesson | Canonical LiteCowork owner | Outcome |
+|---|---|---|
+| Agent can update its own config | LearningService + CoworkerService + immutable CoworkerRevision | Model may propose; only policy-qualified memory can quietly commit. Instructions/skills/automations require review/versioned authority. |
+| Schedule/event shown as one Automation concept | AutomationService + TriggerCoordinator + UI projection | Adopt. Internal TriggerDefinition variants remain distinct. |
+| Automation run has a session that can continue | AutomationOccurrence + Task + on-demand Task follow-up Conversation | Adopt with explicit run Conversation linkage and visibility rules. |
+| One agent has durable files + session scratch | Coworker private Resources + Environment/AgentSession | Adopt conceptually; do not allocate a permanent VM per Coworker by default. |
+| Workforce decomposes and parallelizes | PlanRevision/Step + WorkerSelection + DelegationChannel | Adopt algorithms/tests, not CAMEL authority. |
+| Browser/terminal/MCP assembled per agent | CapabilityBroker + LiteSPM + AgentControlDescriptor | Adopt lifecycle/cleanup test patterns. |
+| Huge app ecosystem | LiteSPM ConnectorPackage + optional providers | Direct first-party connectors + community packages + MCP + qualified Activepieces compatibility. |
+| Managed OAuth gateway | ConnectionService/AuthBackendAdapter | Optional external backend. Default desktop can remain local-first. |
+| Existing deterministic workflow engine | Future qualified WorkflowBackendAdapter | Target: invoke as a bounded capability after adapter/Task/Trust qualification; no production adapter is currently present. Never replace LiteCowork Task Runtime. |
+| Tool catalog kept out of model context | CapabilityBroker progressive discovery | Adopt; load/search/describe/execute only relevant capabilities. |
+
+## Implementation rule
+
+Every new implementation story that copies or substantially adapts code from one of these
+repositories must record:
+
+1. repository and exact commit;
+2. exact file(s);
+3. copied/adapted line/function scope;
+4. upstream license and required notices;
+5. dependency/transitive-license check;
+6. security assumptions changed by LiteCowork;
+7. tests proving LiteCowork authority/Trust boundaries still hold;
+8. update strategy when upstream changes.
+
+Architecture inspiration without copied source still cites this file in the implementation
+review so future maintainers can distinguish deliberate borrowing from accidental similarity.
+
+## Competitive execution-locus recheck — 2026-10-25
+
+The current [product research ledger](COMPETITIVE-RESEARCH.md) rechecks first-party
+documentation for OpenAI Dots and ChatGPT Work/Codex, Claude/Cowork, Meta Muse,
+Microsoft Copilot Cowork, and Grok Bot. The engineering comparison must keep these
+boundaries explicit:
+
+- ChatGPT Work and Codex are distinct routes/surfaces even when presented in one desktop
+  shell. Local Work execution, cloud Work, and Codex history/availability have different
+  placement and continuation behavior.
+- Claude is moving toward one conversation that can answer or do Cowork work, while local
+  file access still depends on a desktop bridge and cloud work has a separate lifecycle.
+  Rollout, account plan and platform determine which path is available.
+- Muse documents both a local Mac surface and a separate persistent hosted Secure VM.
+  Sentinel-mediated connector egress and credential handling are separate from local OS
+  consent.
+- Grok Bot's shared persistent cloud computer and optional local-computer access are
+  distinct security scopes. Microsoft Cowork's local Edge path similarly inherits the
+  exact signed-in browser profile and tenant policy.
+- Product-native subagents and LiteCowork-hosted heterogeneous child Tasks are separate
+  delegation mechanisms. No reviewed vendor source documents a user selecting a different
+  installed native harness for each child agent; this remains a LiteCowork design claim
+  requiring its own route qualification, identity, budgets, fencing, cancellation and
+  recovery.
+- These are capability/UX references, not proof of reliability, universal availability,
+  or permission to proxy vendor credentials or subscriptions. Use exact-harness auth and
+  supported integration terms; never infer one provider's entitlement from another route.
+
+The linked ledger records exact primary sources and account/rollout caveats. A separate
+repository audit records commit/file-level findings and license boundaries.
+
+## Competitive product landscape — verified 2026-10-22
+
+**Purpose.** This section records what the directly competing "AI coworker" products
+actually shipped, from their own documentation, so LiteCowork's final capability targets
+are compared against reality rather than memory. It is research, not authority: it does not
+change [ARCHITECTURE](../ARCHITECTURE.md), the
+[product release contract](V1-PRODUCT-RELEASE-CONTRACT.md), or any V1/V2 boundary, and no
+product below becomes a dependency or a copied implementation.
+
+**Standard.** Every row below was loaded from the vendor's own page on 2026-10-22 unless it
+is marked 3P (third-party) or could-not-verify. Comparison is against LiteCowork's **final**
+intended capability set (the ten V1 areas plus the cross-cutting invariants), **not**
+against current code — see the [acceptance matrix](archive/legacy-implementation-c7e9c05/V1-PRODUCT-ACCEPTANCE-MATRIX.md)
+for what is actually built today.
+
+### Named-product profiles
+
+| Product | Vendor / status | Execution locus | Own-model or bring-your-own | Primary object | Best source |
+|---|---|---|---|---|---|
+| **Claude Cowork** | Anthropic; launched 2026-01-12 research preview, now GA-ish on paid plans, chat+Cowork unification rolling out | **Cloud** per-session ephemeral sandbox with mandatory egress proxy; local desktop execution is grandfathered for pre-2026-10-06 tasks | Anthropic only | Conversation/task | [claude.com/product/cowork](https://claude.com/product/cowork), [architecture overview](https://support.claude.com/en/articles/14479288-claude-cowork-architecture-overview) |
+| **OpenAI dots** | OpenAI; announced 2026-09-29, rolling out to Pro/Business Premium, Enterprise beta off-by-default | Own **cloud** computer + browser; optional permissioned access to the user's laptop | GPT-6 Astra only | Persistent "dot" | [openai.com/index/introducing-dots](https://openai.com/index/introducing-dots/) |
+| **Meta Muse** | Meta; launched 2026-09-08, US, iOS/Android/muse.ai/WhatsApp | **Muse Secure VM** (cloud) plus a separate system-level **Sentinel** agent that gates all egress | Muse Spark only | Personal agent | [about.fb.com news](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) |
+| **Meta Muse Code** | Meta; beta, closed-source binary + MIT SDK | Local terminal harness (Seatbelt / bubblewrap / Windows sandbox) | Muse Spark required | Session | [dev.meta.ai/docs/muse-code](https://dev.meta.com/docs/muse-code), [muse-code-sdk](https://github.com/meta-models/muse-code-sdk) |
+| **Grok Bot** | xAI + Cursor; launched 2026-08-11 beta, GA on Cursor/SuperGrok plans | **Cursor's cloud** computer shared by all of a user's Bots | xAI/Cursor models | **Bot** (explicitly "not conversations") | [docs.x.ai/grok-bot](https://docs.x.ai/grok-bot/overview), [design writeup](https://x.ai/news/designing-grok-bot) |
+| **Grok Build** | xAI; GA-ish, Apache-2.0 Rust CLI, ~27.5k★, no external contributions accepted | Local, sandbox **off by default** (Landlock/Seatbelt) | xAI API or subscription | Session | [docs.x.ai/build](https://docs.x.ai/build/overview), [github.com/xai-org/grok-build](https://github.com/xai-org/grok-build) |
+| **OpenWork** | Different AI (YC Spring 2026, founder Ben Shafii, team of 4); MIT desktop + source-available `ee/` Den control plane, ~24.2k★, released v0.18.60 on 2026-10-22 | Local desktop; optional cloud workers | Any of 50+ providers incl. local Ollama/LM Studio | Session/workspace | [openworklabs.com](https://openworklabs.com/), repo `different-ai/openwork` |
+| **OpenCoWork** | opencowork-ai; Apache-2.0, **development preview**, built on Claude Agent SDK, waitlist | Local, sandboxed | Claude required | Workspace/Task | [openco.work](https://openco.work/) |
+| **OpenCowork (6+ unrelated repos)** | No company behind any. Largest: `OpenCoworkAI/open-cowork` (MIT, ~2,224★, Electron + Claude Agent SDK, WSL2/Lima VM sandbox, document Skills, GUI computer-use, Feishu/Slack remote control, unsigned builds); `AIDotNet/OpenCowork` (Apache-2.0, ~640★, Electron + .NET 10 Native AOT sidecar over MessagePack IPC, SSH remote, 5 modes); `LeonGaoHaining/opencowork` (Apache-2.0, ~417★, Electron + LangGraph, has `docs/ARCHITECTURE.md` and SPEC files); `Safphere/opencowork` (~333★, stale since Feb 2026); three smaller | Local desktop | BYO model | Session/workflow | GitHub search `opencowork in:name` |
+
+**Name resolutions that matter.** "Muse Assistant" is not an official product name: it is
+Meta's consumer **Muse** (Microsoft's "Muse" is the unrelated WHAM game-world-model research
+project). "OpenCowork" resolves to at least six unrelated repositories with no company
+behind any of them; "OpenWork" resolves to three real projects — the substantial one is
+Different AI's `different-ai/openwork`, plus `langchain-ai/openwork` (~1.5k★, a deepagentsjs
+desktop) and `modelstudioai/openwork`. There is no first-party "Grok CLI" or "Grok Code"
+product — the coding agent is **Grok Build** (`grok-code-fast-1` survives only as a model
+alias, `grok-build-0.1`).
+
+### Shipped-capability comparison against LiteCowork's final targets
+
+Legend: **S** = shipped today, **P** = partial/limited, **–** = not offered, **V2** = offered
+only in a paid enterprise/self-host tier, **?** = could not verify from vendor docs.
+
+| Final LiteCowork capability | Claude Cowork | OpenAI dots | Meta Muse | Grok Bot | OpenWork | Meta Muse Code |
+|---|---|---|---|---|---|---|
+| Local-first, data never leaves the device | – (cloud-first; local grandfathered) | – | – | – | **S** | **S** |
+| No mandatory vendor subscription / free core | – | – | P (free tier + $20/$100) | – | **S** | – |
+| Bring-your-own native agent harnesses & subscriptions | – (Anthropic only) | – (uses Codex as a tool) | – | – | **S** (any provider) | – |
+| Chat-first without Task/Coworker setup | **S** (unified box) | **S** | **S** | P (Bot-first) | **S** | P (TUI-first) |
+| Persistent named agent with scoped memory | **S** | **S** | **S** | **S** | P (sessions/skills) | P (local memory, experimental) |
+| Durable Task truth: spec/plan revisions, attempts, evidence, verification | – (task runs, no published ledger) | – | – | – | P (durable run table + audit events) | – |
+| Effect/verification semantics with reported/observed/verified separation | – | – | – | – | – | – |
+| Multi-agent delegation with fencing and lead handoff | P (subagents, parallel workstreams) | P (future teams of dots) | – | **S** (Bots message each other, pass ownership) | P (subagent lanes) | **S** (subagents + worktree isolation, "never silently falls back") |
+| Cross-agent package manager (observe/adopt/unmanage) | – (plugins, single vendor) | – (4,000 app plugins) | – (connectors) | – (200 plugin skills) | P (MCP gateway + Den marketplaces) | P (skills import from Claude Code/Codex) |
+| Automations with timezone/DST/misfire/occurrence identity | P (recurring schedules) | P (scheduled/reminder tasks) | P (reminders + scheduled) | **S** (schedules **and** event triggers: Slack/GitHub/webhooks) | P (DST + occurrence identity + missed-run recording exist, but **Den, not the desktop, is the scheduler**) | – |
+| Scoped memory with provenance, revoke, purge, no cross-scope leak | P (memory shared with chat) | P (inherits ChatGPT memory) | **S** (per-app access + "forget") | **S** (per-Bot memory, account-level tools) | – | P (experimental, off by default) |
+| Browser/computer takeover with epoch fencing and return revalidation | P (built-in browser; computer use preview, macOS only) | P (own browser; optional laptop access) | **S** (Sentinel-gated browser/form filling) | **S** (3-level: status → preview → takeover) | P (`browser_handoff` for sign-in/CAPTCHA) | – |
+| Real PTY terminal in a Workbench | P (shell in sandbox) | P (cloud computer terminal) | P (cloud VM) | **S** (cloud computer terminal) | P | **S** (local PTY harness) |
+| Artifact library with immutable versions, provenance, format claims | P (Docs/Slides/Design, Excel/PowerPoint) | P (presentations/docs in task results) | **S** (artifacts → Library) | **S** (Artifacts primitive) | P (scratch files, **overwrite** versioning) | – |
+| Secrets never exposed to the model | **S** (connector tokens never enter sandbox) | **S** (saved passwords without exposing) | **S** (Secure Credentials Store) | P (secure secret request) | ? | P (`*KEY*/*SECRET*/*TOKEN*` env stripping) |
+| Human approval for consequential actions | **S** (Manual/Auto/Skip; deletion always asks) | **S** (auto-review; password change always user) | **S** (approval vocabulary + audit trail) | **S** ("Ask first" rules, Auto Review) | **S** (per-tool approvals) | **S** (on by default, fail-closed) |
+| Background work while the machine is off | **S** (cloud) | **S** (24/7) | **S** | **S** | V2 (cloud workers) | – |
+| Cross-device continuation / mobile | **S** (web/desktop/mobile) | **S** (ChatGPT/Slack/Teams/texting) | **S** (app/WhatsApp/glasses soon) | **S** (desktop + iOS/Android) | P (Web alpha) | – |
+| Team/Enterprise governance (RBAC, audit, SSO) | **S** (SIEM/OpenTelemetry, MDM, Bedrock/Foundry) | **S** (Agent 365, workspace admin) | – | **S** (Enterprise admin, audit logs, DLP) | **S** (Den: RBAC/SCIM/audit, self-host) | – |
+
+### Where LiteCowork wins on final design
+
+These are capabilities where LiteCowork's **contracted** final design is stronger than
+anything the competitors document. None of them is implemented yet; they are the reasons the
+architecture exists.
+
+1. **Execution locus and data ownership.** Every named competitor runs the agent in a
+   vendor cloud (Claude Cowork, dots, Muse, Grok Bot) or requires the user to accept a
+   cloud tier for team features (OpenWork). LiteCowork is contracted local-first: local
+   data, local Runtime, no mandatory LiteCowork account or subscription
+   (`V1-PRODUCT-RELEASE-CONTRACT.md` §1). Only OpenWork and Muse Code share this property,
+   and neither pairs it with durable Task authority.
+2. **Bring-your-own agent, not bring-your-own model.** dots/Muse/Grok Bot/Cowork all bind
+   the user to one vendor's model. OpenWork lets you pick a *model*; LiteCowork is
+   contracted to run the user's **existing native harnesses and subscriptions** (25-agent
+   roster, no universal model-router substitution) — no competitor documents multi-harness
+   orchestration with per-harness conformance qualification.
+3. **Durable Task truth with evidence semantics.** No competitor publishes a Task ledger
+   with immutable spec/plan revisions, Attempt identity, Effect records, lease fencing,
+   crash recovery, and **reported / observed / verified** evidence separation. OpenWork's
+   durable `AutomationRunTable` with audit events is the closest, and it has no Evidence or
+   Verification concept. This is LiteCowork's single largest architectural lead.
+4. **Effect reconciliation before retry.** The contracted rule — an unknown external result
+   is reconciled authoritatively before any retry, so a consequential action is never
+   duplicated — is documented nowhere else. Competitors retry turns; none publishes
+   duplicate-effect fencing.
+5. **A cross-agent package manager with observe-before-write.** Everyone has plugins,
+   connectors, skills or an MCP gateway. Nobody documents a package authority that can
+   *observe* an existing installation, *adopt* it without modifying it, and *unmanage* it
+   without uninstalling native resources, with the "user edits win by default" rule.
+   OpenWork's Den marketplace is the nearest, and it is an org control plane, not a
+   cross-harness lifecycle authority.
+6. **Locally owned automation authority.** Grok Bot's routines run on Cursor's cloud
+   computers, Claude Cowork's schedules run on Anthropic's servers, and OpenWork states
+   explicitly that "The OpenWork desktop is never an Automation scheduler or execution
+   host" — its durable scheduler is Den, a MySQL control plane, and the desktop only claims
+   occurrences as a runner. LiteCowork is the only design in this set where occurrence
+   identity, DST/misfire policy, cursor advancement and Task-outcome settlement are owned
+   by a durable store on the user's own machine. Grok Bot and OpenWork do ship event
+   triggers LiteCowork V1 does not, which is recorded as a gap below.
+7. **Coworker as a scoped responsibility layer, not a chat persona.** Grok Bot's Bots and
+   Meta's Muse are *personas* with account-level tool access. LiteCowork's contracted
+   Coworker is an identity/context/responsibility layer whose memory change can never
+   silently grant a permission, add a Connection, install a package or enable a schedule
+   (§6 invariant 4) — a boundary no competitor states.
+8. **Honest absence.** LiteCowork contracts that unsupported integrations stay visibly
+   unavailable and never masquerade as passes; that a native tool report is never a
+   LiteCowork-mediated receipt; and that install ≠ permission. Given Reuters' finding that
+   Meta's internal Muse tests showed stalling and unauthorized sensitive-data exposure, and
+   that Grok Build ships with its sandbox **off by default** and memory experimental,
+   explicit assurance labelling is a genuine differentiator rather than paperwork.
+
+### Where LiteCowork does not have it — honest gaps
+
+Everything below ships today at one or more competitors while LiteCowork holds it as
+target-only or V2. These are the real competitive risks.
+
+1. **Nothing is shipped.** All 11 product journeys are BLOCKED and no V1 story is closed
+   (see the acceptance matrix). Every competitor in the table above ships a usable product
+   today.
+2. **Cloud-continuation convenience.** "Close your laptop, it keeps going" is standard
+   (Cowork, dots, Muse, Grok Bot). LiteCowork deliberately holds this as **V2** (cloud
+   Runtime, cross-device continuation). Local-only background work that stops when the
+   machine sleeps is a real usability deficit versus all four consumer products.
+3. **Mobile and multi-channel surfaces.** ChatGPT/Slack/Teams/texting (dots), WhatsApp and
+   AI glasses (Muse), iOS/Android (Grok Bot), web+mobile (Cowork). LiteCowork V1 is
+   desktop-only; multi-device clients are V2.
+4. **Team/Enterprise governance.** RBAC, SSO/SCIM, audit logs, SIEM/OpenTelemetry export,
+   spend limits, admin DLP ship today in Cowork, dots, Grok Bot and OpenWork Den.
+   LiteCowork's multi-user organizations, sharing and RBAC are V2, and its notification/
+   observability contract has no SIEM export.
+5. **Event-triggered automations.** Grok Bot triggers routines from Slack, GitHub issues/
+   PRs/checks and webhooks; OpenWork accepts webhooks. LiteCowork V1 automations are
+   schedule + manual only.
+6. **Connector breadth and instant integrations.** dots: 4,000+ apps. Muse: Meta + third-
+   party connectors plus custom connector ingestion. Cowork: Google Workspace, Slack,
+   DocuSign and plugins. LiteCowork's Connections area depends on LiteSPM qualification and
+   currently has no qualified provider.
+7. **Payments and real-world actions.** Muse checks out via Stripe Link with purchase
+   protection; Grok Bot pays with X Money/Stripe Link and claims its own email address.
+   LiteCowork has no payment or egress-action surface, and none is contracted in V1.
+8. **Demonstration-learned skills.** Grok Bot teaches a workflow by watching (10-minute
+   cap, 3P) and Meta's Muse Code imports skills from Claude Code and Codex. LiteCowork's
+   learning path is policy-gated quiet learning with review, which is slower to onboard.
+9. **Embeddability.** Codex ships a TypeScript/Python SDK and an app-server JSON-RPC
+   protocol; Grok Build is ACP-embeddable; OpenCode/OpenHands interoperate over ACP.
+   LiteCowork publishes an Operator API but has no embeddable SDK story.
+10. **Model-run cost transparency.** Muse publishes token-per-week allowances and Muse Code
+    publishes per-million prices; LiteCowork's usage surface is target-only.
+
+### Decision implications
+
+- **Do not chase cloud parity in V1.** Competitors win the "always-on cloud computer"
+  convenience by design; LiteCowork wins by being the local, evidence-bearing system of
+  record. Copying the cloud computer would abandon the differentiation instead of gaining it.
+- **Adopt the approval vocabulary, not the products.** "Allow once / for this task / for this
+  site / always / deny" (Muse), "Ask first" rules (Grok Bot) and Custom Rules (dots) are all
+  the same idea expressed well; LiteCowork's grant/scoping model should present comparable
+  plain-language choices without importing any vendor's authority model.
+- **Strengthen the two documented weaknesses.** (a) **Done 2026-10-22:** the event-trigger
+  automation contract is published in AUTOMATION.md (delivery dedupe, signature
+  verification, local reachability modes) and the connector breadth strategy in
+  CONNECTORS-WORKFLOWS.md §9b; both are designed and remain unimplemented. (b) **Open:**
+  decide whether LiteCowork ships an embeddable SDK, because every serious open agent
+  (Codex, Grok Build, OpenCode, OpenHands, Muse Code) now exposes a programmatic protocol.
+- **Keep the reference-first rule.** OpenWork (`different-ai/openwork`) is the single most
+  relevant open-source reference — MIT core, durable automation runs with audit events,
+  runner capability tokens, and a `browser_handoff` takeover tool. Study its runner-token
+  and handoff patterns per the implementation rule above; do **not** adopt its artifact
+  model (it overwrites files rather than versioning them), its cloud-side scheduler
+  (`packages/automations` is a pure domain and Den is the durable host), or its own
+  documented admission caveat: its recovery "prevents duplicate recovery admissions, not
+  exactly-once execution of external tools" — precisely the gap LiteCowork's Effect
+  reconciliation rule exists to close.
+- **Treat the "coworker" naming convergence as a positioning fact.** Anthropic, xAI, Meta
+  and OpenAI all shipped a "coworker/teammate/extension of you" framing in 2026. LiteCowork's
+  claim must rest on the evidence and ownership model, not on the vocabulary.
+
+## V1 detailed design integration — 2026-10-12
+
+The official upstream references and implementation constraints for native OpenCode commands/server/permissions and Chrome DevTools/Playwright/Chrome security are listed in V1-DESIGN-INDEX.md. Pin vendor source commit/version before relying on exact behavior. Source listing is evidence of capability to research, not that LiteCowork adapter has passed conformance.
+
+
+## ZCode and DeepSeek desktop source audit - pinned 2026-10-31
+
+A targeted source-level review of the actual desktop clients is now recorded in [DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md](DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md). Pins: ZCode `a60ba6a7e5a06742270ca605f5d2cc2766afa7e1` (`packages/desktop`, Apache-2.0 plus root NOTICE) and DeepSeek Harness `ce7073d51254c26cd63b22a60835b8f948deb447` (`apps/desktop`, MIT at root). The review distinguishes their process models, narrow native API boundaries, plugin isolation, update/quit handoff, resource transfer and test-corpus patterns from LiteCowork's Tauri + durable daemon + Core/LiteSPM ownership.
+
+The clones are local ignored research material under `litecowork/repo_take/`; neither upstream was built or tested, and no source was copied. The active LiteCowork checkout has no root LICENSE. That absence does not automatically prohibit private/internal adaptation, but exact-file provenance, dependency licenses and required notices must be reviewed and the intended redistribution posture confirmed before shipping adapted code. Do not treat this research entry as implementation approval or product qualification.
+
+
+## OpenBot exact files and LiteCowork boundary
+
+Repository: [nightly-labs/openbot](https://github.com/nightly-labs/openbot)
+
+Pinned revision: [6759fa3ee857f4f4966865e12de99ae84ab6de07](https://github.com/nightly-labs/openbot/tree/6759fa3ee857f4f4966865e12de99ae84ab6de07), package version 0.62.0 at the inspected package.json. Declared license: PolyForm Noncommercial 1.0.0. The README labels the product a development preview and documents danger-full-access / approvalPolicy never behavior. This is architecture/UI research only; do not reuse code or permission defaults without separate license and security review.
+
+| File | Exact pinned link | What to study | LiteCowork decision |
+|---|---|---|---|
+| README.md | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/README.md | Product scope, development-preview warning, advertised agent/permission behavior | Treat claims as preview status; never adopt danger-full-access as LiteCowork Trust policy |
+| docs/architecture/structure.md | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/docs/architecture/structure.md | Bun workspace, ownership of daemon/provider/renderer/database and local state | Study separation; LiteCowork retains Tauri/Rust Runtime/Operator/domain owners |
+| docs/architecture/agents.md | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/docs/architecture/agents.md | Agent sessions, routine flows, agent communication and task patterns | UX/runtime reference only; LiteCowork Task/Attempt remains authoritative |
+| docs/architecture/analytics.md | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/docs/architecture/analytics.md | Durable local usage records, cumulative counters, provider-specific usage and quota readers | Retain the stricter LiteCowork two-ledger cost/quota and provenance model |
+| packages/ui/src/components/ProviderModelPicker.tsx | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/packages/ui/src/components/ProviderModelPicker.tsx | Searchable provider-specific picker | Adopt compact interaction only; require fresh descriptor and exact Binding scope |
+| packages/ui/src/features/tasks/TasksPage.tsx | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/packages/ui/src/features/tasks/TasksPage.tsx | Task composer, agent selector, grouped list and side panel | Adapt to LiteCowork Task/UserRequest state semantics; no localStorage authority |
+| src/renderer/src/features/usage/AgentUsagePanel.tsx | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/src/renderer/src/features/usage/AgentUsagePanel.tsx | Host-wide and agent-filtered Usage surface | Layout inspiration; API-equivalent estimate is not billed spend |
+| src/backend/workflows/workflow-schema.ts | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/src/backend/workflows/workflow-schema.ts | Provider-independent graph storage and node kinds within OpenBot | Do not add this graph schema/runtime to LiteCowork Core V1 |
+| src/backend/workflows/workflow-tools.ts | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/src/backend/workflows/workflow-tools.ts | Constrained agent list/read/edit/run tools | Evidence of external product graph editing, not evidence of a separate draft/publish gate |
+| packages/ui/src/features/workflows/WorkflowCanvas.tsx | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/packages/ui/src/features/workflows/WorkflowCanvas.tsx | Canvas, node editing, run history, approvals and change visualization | UX reference only; LiteCowork V1 uses external backend's own editor |
+| packages/ui/src/features/workflows/workflow-build.ts | https://github.com/nightly-labs/openbot/blob/6759fa3ee857f4f4966865e12de99ae84ab6de07/packages/ui/src/features/workflows/workflow-build.ts | Before/after graph change plan | Study transparent agent-change visualization only |
+
+The complete source-grounded comparison, observed node kinds, code-node distinction, permission caveat and inspection limitations are in [OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md](OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md). OpenBot's graph does not establish a generic Code node; n8n's separately documented Code node is an external-provider capability with its own execution security boundary. Neither creates a LiteCowork Core node type.
+
+## External workflow provider AI-authoring and code-step references
+
+These are provider documentation and security references, not LiteCowork runtime dependencies:
+
+| Provider reference | Link | Use | Boundary |
+|---|---|---|---|
+| n8n Assistant | https://blog.n8n.io/introducing-n8n-assistant/ | Natural-language authoring directly onto the n8n canvas; result is a normal editable graph; credential/activation confirmation | Provider-native feature remains preview-flagged; Docker self-hosted 2.36+ and supported availability required; not a LiteCowork agent feature |
+| n8n MCP landing/setup | https://n8n.io/mcp/ · https://docs.n8n.io/connect/connect-to-n8n-mcp-server/ | External AI client can build/edit/validate/test provider workflows and inspect execution logs | Instance owner/admin enablement, per-workflow exposure, per-client permission scope, exact instance/version check; workflows exposed to MCP are shared across connected clients |
+| n8n Code node | https://docs.n8n.io/code/code-node/ | JavaScript/Python workflow step | Executes in provider environment |
+| n8n Security Audit | https://docs.n8n.io/hosting/securing/security-audit/ | Identify risky nodes/host execution surfaces | Must be checked for the connected deployment |
+| n8n Python Task Runner advisory | https://github.com/n8n-io/n8n/security/advisories/GHSA-9pq8-m8gp-4p53 | Python Task Runner sandbox escape condition, affected/patched versions | Apply only under advisory's stated configuration; recheck current version/advisories |
+| Activepieces builder | https://www.activepieces.com/product/workflow-builder | Visual builder + Build by Asking + TypeScript code steps + step tests/run history | User/provider-owned graph |
+| Activepieces Agents | https://www.activepieces.com/docs/agents | Flow vs Agent semantics and agent-generated job definitions | Distinguish deterministic Flow execution from agent decisions |
+| Activepieces MCP overview | https://www.activepieces.com/docs/mcp/overview | OAuth, project scope, discovery read-only tools and per-project tool-category enablement | Connection does not imply all tools; credentials are not returned |
+| Activepieces MCP tools | https://www.activepieces.com/docs/mcp/tools | ap_build_flow, step/branch edits, validation, code review, testing, publish/status/delete | Provider-owned MCP authority; deletion irreversible; no LiteCowork adapter yet |
+| Activepieces architecture/workers | https://www.activepieces.com/docs/install/architecture/overview · https://www.activepieces.com/docs/install/architecture/workers | App, queue, worker, engine, sandbox, resource and network isolation settings | Provider-owned execution boundary; not a LiteCowork Environment |
+| Node-RED Function | https://nodered.org/docs/user-guide/writing-functions | JavaScript function execution in a flow | Provider-owned code runtime |
+
+For the dated source analysis, provider-native AI build path, and LiteCowork non-adoption decision see [OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md](OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md).
+
+## OpenHands exact files and LiteCowork boundary — PROPOSAL (2026-11-06)
+
+**Status: PROPOSAL for owner review. Nothing below is an accepted LiteCowork change, and no upstream code was copied, vendored, built or added as a dependency.** This entry exists because [REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md) §"OpenHands" carries the read-first list and the full copy/prototype/reject triage; this section records the pin and the exact upstream files so the register that consumes pins can trace it. Both repositories are MIT; every file below was read at the pinned revision on 2026-11-06, and `file:line` citations live in the index entry rather than here.
+
+| File | Exact pinned link | What to study | LiteCowork decision (proposal) |
+|---|---|---|---|
+| `openhands-agent-server/openhands/agent_server/models.py` | [engine pin](https://github.com/OpenHands/software-agent-sdk/blob/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f/openhands-agent-server/openhands/agent_server/models.py) | `BashOutput{command_id, order, exit_code=None⇒running, stdout, stderr}`, `BashError`, `ConversationRuntimeStatus` + `can_resume` | Adopt the receipt and runtime-availability shapes; map to V1-INTEGRATED-TERMINAL-LLD and ENVIRONMENTS owners, never to a new LiteCowork authority |
+| `openhands-agent-server/openhands/agent_server/bash_service.py` | [engine pin](https://github.com/OpenHands/software-agent-sdk/blob/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f/openhands-agent-server/openhands/agent_server/bash_service.py) | Persist-before-publish chunked output with monotonic `order`; timeout = process-group SIGTERM→SIGKILL→`exit_code=-1`; stop requests racing a spawn | Study as the reference receipt producer; LiteCowork keeps daemon-owned PTY/ConPTY authority (Feature 008) |
+| `openhands-sdk/openhands/sdk/workspace/remote/remote_workspace_mixin.py` | [engine pin](https://github.com/OpenHands/software-agent-sdk/blob/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f/openhands-sdk/openhands/sdk/workspace/remote/remote_workspace_mixin.py) | Consumer-side integrity: duplicate receipt → hard error, unknown exit → `-1`, transport error never reported as success | Test-shape reference for "never claim unobserved success"; LiteCowork's Evidence levels remain stricter |
+| `openhands-tools/openhands/tools/terminal/definition.py` | [engine pin](https://github.com/OpenHands/software-agent-sdk/blob/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f/openhands-tools/openhands/tools/terminal/definition.py) | Soft-timeout `exit_code=-1` semantics, `timeout` flag, model-visible `[Command finished with exit code N]`, bounded truncation | Directly informs the Feature 008 defect where fabricated `exit code 0` is a release-blocking truthfulness issue |
+| `openhands-agent-server/openhands/agent_server/docker_runtime/registry.py` | [engine pin](https://github.com/OpenHands/software-agent-sdk/blob/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f/openhands-agent-server/openhands/agent_server/docker_runtime/registry.py) | Per-conversation container lifecycle: lease-generation compare-and-stop, idle eviction, owner-label orphan reaping, health-gated readiness with rollback | Study reclamation/liveness mechanics only; the hardening flag set itself is not sufficient isolation for LiteCowork |
+| `openhands-tools/openhands/tools/child_conversation/impl.py` | [engine pin](https://github.com/OpenHands/software-agent-sdk/blob/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f/openhands-tools/openhands/tools/child_conversation/impl.py) | Host-mediated child conversation: synchronous launch, real observation, ambiguity-honest timeout ("child may still have been created") | Study the observed-result and declared-isolation contract; LiteCowork child work stays inside DELEGATION/Task authority |
+| `openhands-workspace/openhands/workspace/remote_api/workspace.py` | [engine pin](https://github.com/OpenHands/software-agent-sdk/blob/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f/openhands-workspace/openhands/workspace/remote_api/workspace.py) | Attach-or-create keyed by stable session id; readiness classification of transient vs terminal states with evidence | Reference for RUNTIME-MESH pairing/identity; LiteCowork keeps opaque provider handles and its own Runtime incarnation model |
+| `openhands-sdk/openhands/sdk/mcp/config.py` | [engine pin](https://github.com/OpenHands/software-agent-sdk/blob/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f/openhands-sdk/openhands/sdk/mcp/config.py) | Transport union, credential types, per-server timeout, stdio-vs-remote validation | Input to the MCP owner contract (no MCP surface exists in the active LiteCowork tree today) |
+
+Re-verify every path against the current upstream revision before relying on it, and follow the [implementation rule](#implementation-rule) if any code is later adapted.

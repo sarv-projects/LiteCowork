@@ -1,0 +1,140 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { after, test } from "node:test";
+import { createElement, Fragment } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import react from "@vitejs/plugin-react";
+import { createServer } from "vite";
+
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const panelPath = "/src/workbench/WorkbenchPanel.tsx";
+
+const vite = await createServer({
+  configFile: false,
+  root: packageRoot,
+  plugins: [react()],
+  optimizeDeps: { noDiscovery: true },
+  server: { middlewareMode: true, hmr: false, ws: false },
+  appType: "custom",
+});
+const { WorkbenchPanel, TerminalPane, ReviewPane } = await vite.ssrLoadModule(panelPath);
+after(async () => vite.close());
+
+const render = node => renderToStaticMarkup(createElement(Fragment, null, node));
+
+/**
+ * Platform and process facts the mounted Workbench cannot back: this build serves no
+ * shell runtime, no process-containment surface and no diff producer, so any of these
+ * strings in the panel means it is claiming something it did not observe.
+ */
+const FABRICATED_PROCESS_CLAIMS = [
+  "exit code",
+  "ConPTY",
+  "Job Object",
+  "KILL_ON_CLOSE",
+  "pwsh",
+  "DACL",
+  "v1.0.0-release",
+];
+
+function panelProps(overrides = {}) {
+  return {
+    panelRef: null,
+    modal: false,
+    workspaceId: "ws-alpha",
+    workspaceName: "Workspace Alpha",
+    runtimeState: "ONLINE",
+    operatorReady: true,
+    resources: [],
+    resourceNextCursor: null,
+    resourcePageBusy: false,
+    resourceBusy: false,
+    resourceListFailed: false,
+    previewResourceId: null,
+    previewResourceRevisionId: null,
+    previewResourceName: null,
+    preview: null,
+    previewError: null,
+    onClose() {},
+    onOpenLibrary() {},
+    onOpenWork() {},
+    onOpenSettings() {},
+    onLoadMoreResources() {},
+    onRefreshResources() {},
+    onPreviewResource() {},
+    onClosePreview() {},
+    ...overrides,
+  };
+}
+
+test("the terminal pane executes nothing and states that plainly", () => {
+  const html = render(createElement(TerminalPane));
+  assert.match(html, /Terminal execution is unavailable/);
+  assert.match(html, /No terminal runtime served/);
+  assert.ok(
+    !html.includes("terminal-scrollback-screen"),
+    "no shell surface may be rendered while no shell runtime is served",
+  );
+  for (const claim of FABRICATED_PROCESS_CLAIMS) {
+    assert.ok(!html.includes(claim), `terminal pane must not claim ${JSON.stringify(claim)}`);
+  }
+});
+
+test("the review pane renders no diff and no change statistics", () => {
+  const html = render(createElement(ReviewPane));
+  assert.match(html, /Nothing to review yet/);
+  assert.ok(
+    !html.includes("diff-line line-add") && !html.includes("diff-line line-del"),
+    "no diff rows may be rendered without a diff source",
+  );
+  assert.ok(
+    !html.includes("additions") && !html.includes("deletions"),
+    "no change statistics may be rendered without a diff source",
+  );
+});
+
+test("the panel shows the real Workspace and operator state", () => {
+  const html = render(createElement(WorkbenchPanel, panelProps()));
+  assert.match(html, /Workspace Alpha/);
+  assert.match(html, /Operator connected/);
+  assert.ok(html.includes("ONLINE"), "the reported runtime state is shown as reported");
+  for (const claim of FABRICATED_PROCESS_CLAIMS) {
+    assert.ok(!html.includes(claim), `Workbench must not claim ${JSON.stringify(claim)}`);
+  }
+});
+
+test("the panel reports a missing operator connection as missing", () => {
+  const html = render(
+    createElement(WorkbenchPanel, panelProps({ operatorReady: false, runtimeState: null })),
+  );
+  assert.match(html, /Operator not connected/);
+  assert.ok(
+    !html.includes("Operator connected<!"),
+    "a disconnected operator must not read as connected",
+  );
+});
+
+test("the panel shows no Workspace rather than inventing one", () => {
+  const html = render(
+    createElement(WorkbenchPanel, panelProps({ workspaceId: "", workspaceName: "" })),
+  );
+  assert.match(html, /No Workspace selected/);
+});
+
+test("the Workbench module keeps no fabricated process, diff or containment claim", async () => {
+  const source = await readFile(join(packageRoot, "src/workbench/WorkbenchPanel.tsx"), "utf8");
+  for (const claim of FABRICATED_PROCESS_CLAIMS) {
+    assert.ok(
+      !source.includes(claim),
+      `WorkbenchPanel.tsx must not reintroduce the claim ${JSON.stringify(claim)}`,
+    );
+  }
+  assert.doesNotMatch(source, /Sandboxed/, "the browser pane may not claim containment");
+  assert.doesNotMatch(source, /127\.0\.0\.1:\d+/, "no invented loopback endpoint may be the default");
+  assert.doesNotMatch(source, /selectedDiffFile/, "no diff selection may be faked from local state");
+  assert.doesNotMatch(source, /idx % \d+ === \d+/, "no synthetic diff may be generated from text");
+  assert.doesNotMatch(source, /additions \/ -1 deletions/);
+  assert.match(source, /Embedded page preview/, "the browser pane states what it really is");
+});
