@@ -18,7 +18,7 @@ MANIFEST = ROOT / "docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md"
 CSV_PATH = OUTPUT / "active-corpus-manifest.csv"
 SKIP = {
     ".git", "node_modules", "target", ".venv", ".pytest_cache",
-    ".agent-worktrees", ".worktrees", ".zwork", ".superpowers",
+    ".agent-worktrees", ".worktrees", ".zwork", ".superpowers", ".agents",
     "archives", "archive", "repo_take", "reading", "staging_tar", "dist", "build",
     "coverage", ".next", ".cache", "vendor", "out", ".turbo", "audit",
 }

@@ -2710,7 +2710,7 @@ def check_gateway_and_names() -> None:
         if len(names) != len(set(names)):
             fail("Gateway tool list contains duplicates")
     excluded_dirs = {
-        ".git", ".agent-worktrees", ".worktrees", ".zwork", ".superpowers",
+        ".git", ".agent-worktrees", ".worktrees", ".zwork", ".superpowers", ".agents",
         "archive", "archives", "archive_code", "archives_docs", "ARCHIVE",
         "target", "node_modules", "__pycache__", ".venv", "reading",
         "repo_take", "audit", "dist", "build", "coverage", ".next",
@@ -2781,7 +2781,7 @@ def check_gateway_and_names() -> None:
 def check_markdown_links() -> None:
     pattern = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
     excluded_dirs = {
-        ".git", ".agent-worktrees", ".worktrees", ".zwork", ".superpowers",
+        ".git", ".agent-worktrees", ".worktrees", ".zwork", ".superpowers", ".agents",
         "archive", "archives", "archive_code", "archives_docs", "ARCHIVE",
         "repo_take", "reading", "audit", "node_modules", "target", "__pycache__",
         ".venv", "dist", "build", "coverage", ".next", ".cache", "vendor",

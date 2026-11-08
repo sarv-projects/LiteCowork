@@ -507,7 +507,8 @@ must not be copied into domain events, ordinary logs, or aggregate snapshots.
 `workspace.delegation.settings.changed.v1` stores the complete immutable settings revision
 and its prior revision in the same transaction that advances the Workspace settings head,
 Workspace aggregate version, and idempotency receipt. Workspace creation seeds revision 1
-with `NATIVE_DEFAULT`, an empty worker ceiling, and `AGENT_DEFAULT`; migration v28 seeds
+with `NATIVE_DEFAULT`, an empty worker ceiling, and `AGENT_DEFAULT`; migration v28 (defined
+but not yet wired, `SCHEMA_VERSION` is 27; register A-40) would seed
 existing Workspaces deterministically and does not fabricate user-authored setting events.
 The v1 settings event contains no credentials, model-provider secrets, native session data,
 or capability grant. The settings event changes future Task admission policy only.

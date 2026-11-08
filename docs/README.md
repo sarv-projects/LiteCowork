@@ -52,6 +52,7 @@ Do not create a second schema authority. Promote machine contracts in schemas/ a
 - SPEC-TASK-TRACEABILITY.md: requirements to SDD tasks, implementation work and acceptance tests.
 - COMPLETE-ACTIVE-CORPUS-INVENTORY.md: active first-party document manifest.
 - CONTRADICTION-AND-ALIGNMENT-REGISTER.md: adjudicated conflicts and unresolved owner decisions.
+- DOCS-REAUDIT-2026.md: assumption-free doc-claim → code-reality → verdict table across the five doc clusters, with the SDD-completeness gap list.
 - REPOSITORY-DOCUMENTATION-AUDIT.md: documentation consistency and validation status.
 - OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md: pinned comparison of OpenBot's Tasks, model picker, Usage and workflow graph; includes LiteCowork's non-adoption boundary.
 - IMPLEMENTATION-STATUS.md: source-backed implementation status and release blockers.

@@ -17,7 +17,7 @@ OUTPUT = DOCS / "audit"
 SKIP_DIRS = {
     ".git", "node_modules", "target", ".venv", ".pytest_cache",
     ".agent-worktrees", ".worktrees", ".zwork", ".superpowers", "superpowers", "reading", "staging_tar",
-    "repo_take", "dist", "build", "coverage",
+    ".agents", "repo_take", "dist", "build", "coverage",
     ".next", ".cache", "vendor", "out", ".turbo",
 }
 # Archives are pruned by prefix so archive/, archives/, archive_code/ and archives_docs/

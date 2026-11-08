@@ -48,4 +48,4 @@ DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package
 - [Implementation status](../docs/IMPLEMENTATION-STATUS.md)
 - [Acceptance and E2E plan](../docs/ACCEPTANCE-AND-E2E-PLAN.md)
 
-Every new package's RESEARCH.md must record pinned repository SHAs, current vendor documentation links, a copy/prototype/reject decision against LiteCowork invariants and unresolved questions with accountable owners. Tests must name executable commands and evidence outputs. UI contracts must cite the relevant UIV1 IDs and feature acceptance IDs.
+Every new package's RESEARCH.md must record pinned repository SHAs, current vendor documentation links, a copy/prototype/reject decision against LiteCowork invariants and unresolved questions with accountable owners. Tests must name executable commands and evidence outputs. UI contracts must cite the live flow IDs in [FLOWS.md](../docs/FLOWS.md) (F00–F143) and the feature EARS acceptance IDs. The legacy `UIV1-xxx` namespace is retired as an active acceptance authority (register [A-39](../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md)); treat any UIV1 citation as a provenance pointer to the archived catalog only.

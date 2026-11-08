@@ -279,8 +279,11 @@ revision. Settings edits affect future Task admissions only. An existing Task re
 pinned policy; applying new settings requires an explicit TaskSpec revision action that
 re-resolves policy server-side. The caller never submits a per-Task route override.
 
-A pre-v28 TaskSpecRevision may have a null policy snapshot because the earlier schema did
-not preserve this contract. Do not interpret null as native-only or reconstruct a policy
+This delegation-settings persistence is the migration v28 target, which is defined but not
+yet wired (`SCHEMA_VERSION` is 27; register A-40 and [STORAGE.md](STORAGE.md)); treat the
+snapshot behavior below as the contract that applies once v28 is wired. A pre-v28
+TaskSpecRevision may have a null policy snapshot because the earlier schema did not preserve
+this contract. Do not interpret null as native-only or reconstruct a policy
 from current mutable settings. Existing Attempts remain under their recorded provenance;
 new child admission for a legacy Task is blocked until an explicit TaskSpec revision
 resolves and pins policy under the current contract.

@@ -886,10 +886,20 @@ UI: show last verified backup time, restore point, and any missing artifact/effe
 | F112 | Inspect immutable TaskSpec history | Exact Task-scoped revisions, read-only; preserve cached history when offline |
 | F113 | Compare immutable Artifact versions | Exact versions through bounded side-by-side or literal line diff; no semantic inference or mutation |
 | F114 | Save an exact Artifact version from desktop | Native Save As for selected managed content up to 10 MiB; verify identity and digest; cancellation writes nothing |
+| F115 | Save the original current Resource from Library | Local export of a current managed FILE up to 10 MiB; no Resource/Artifact/Task/event mutation; ZIP copied opaque |
+| F116 | Create a Workspace-owned ContextDocument note in Library | Ordinary managed .md Resource with ACTIVE WORKSPACE_NOTES metadata; no agent attachment or RAG claim |
+| F117 | Preserve unsaved Resource revision drafts and require explicit rebasing | Preserve staged file/text draft and baseline on RESOURCE_CONFLICT; no silent rebase or lost work |
+| F118 | Preview an exact pinned Task Resource input | Lazy read-only escaped-text preview of the exact pinned revision; no head fallback, Grant, or RAG |
+| F119 | Run an active Routine into a saved READY Task | READY Task + TaskSpec revision 1 pinned to exact Routine/Resource revisions; no plan/agent; idempotent save |
+| F120 | Compare two exact Resource text revisions | Two read-only labeled panes of exact historical revisions; no generated diff, merge, restore, or mutation |
+| F121 | Owner runs a paused Automation through its local ManualTrigger | One logical occurrence/READY Task pinned to the paused definition; paused schedule stays paused |
+| F122 | Open a Goal-linked Task in Work | Navigate to the exact linked Task read; no Goal/Task state mutation from navigation |
+| F123 | Resolve an ambiguous Artifact text publish with the original request | Reuse exact request/version after ambiguous response; confirm one committed ArtifactVersion; no duplicate append |
+| F124 | Retry an unavailable Task detail read | Retry the exact Task/Workspace read; stale-safe; no source mutation on transient failure |
 | F125 | Recover an ambiguous ManualTrigger after navigation | Reuse exact Workspace-scoped request; only confirm a matching READY Task receipt |
 | F126 | Recover ambiguous Goal mutations after navigation | Keep exact request/version/payload in bounded volatile Workspace-scoped recovery |
 | F127 | Recover Suggestion and preference mutations after navigation | Retry exact owner command and validate matching receipt |
-| F128 | Run an active Routine into a READY Task | Validate pinned Routine inputs; preserve exact request after ambiguous response; no execution implied |
+| F128 | Run an active Routine into an ordinary READY Task, recovering across navigation | Navigation-recovery variant of F119: bounded volatile retry registry reuses the exact Routine run request across route unmount/remount; one READY Task per key; process restart loses the envelope; no execution implied |
 | F129 | Recover Suggestion Task acceptance after navigation | Retry exact command and require an atomic linked READY-Task receipt |
 | F130 | Browse persisted Tasks needing attention | Exact status queries; stale-safe navigation to a fresh Task read; no source mutation |
 | F131 | Compose optional rich Conversation response | Semantic Message commits first; separately validated RichPresentation may upgrade it |
@@ -897,6 +907,14 @@ UI: show last verified backup time, restore point, and any missing artifact/effe
 | F133 | Present exact Artifact deliverables and ZIP | Bind committed ArtifactVersions; bundle only explicit immutable inputs |
 | F134 | Stream and fence rich draft frames | Bounded transient layout frames cannot block turns or cross retries |
 | F135 | Render portable rich response on a constrained channel | Flatten safely without adding authority or losing semantic fallback |
+| F136 | Prepare and revalidate an isolated local Task Environment | Preparation result only with private IsolationAttestation; no AgentSession/Attempt/lease/Effect; fail closed on UNKNOWN |
+| F137 | Refresh ACP Agent Registry without granting authority | Atomic validated cache replacement; no install/binding/auth/session/Task change; stale cache remains on failure |
+| F138 | Install or update one agent through its AgentModule | Bounded lifecycle plan with re-probed SUCCEEDED/FAILED/UNKNOWN; raw registry commands never executed; no session started |
+| F139 | Configure native sign-in or API-key credential | Adapter-owned auth flow or no-store SecretRef binding; credential never echoed; auth does not enable or default the agent |
+| F140 | Save agent-specific non-secret configuration and defaults | One transaction updating binding config/version/event/receipt; existing sessions keep pinned digests; stale descriptor rejected |
+| F141 | Switch composer Agent and rebuild dependent native surface | Atomically rebuild model/effort/palette/inputs from the new descriptor; invalid values cleared visibly; no provider fallback |
+| F142 | Native slash command or @ reference in chat | Store semantic NativeCommandInvocation/ReferenceSelection, revalidated at Send; host actions stay separate from native namespaces |
+| F143 | Expose one LiteSPM-managed capability through multiple agents | One install; per-agent bridge route selection; Effect evidence only where mediated; unsupported agents labeled, never faked |
 
 
 ## F37 — Runtime boot and incarnation recovery

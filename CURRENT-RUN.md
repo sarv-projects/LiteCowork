@@ -83,9 +83,9 @@ Current validation on the working tree:
 - Architecture/schema validator: passed active checks; one warning because the optional `openapi-spec-validator` package is not installed. JSON Schema, 148 event schemas, errors, OpenAPI structure, SQL, Gateway naming, concept and active Markdown checks passed.
 - Cross-owner consistency guard: **36 assertions passed, 0 issues**.
 - V1 contract/route/UI audit: **0 errors** (229 OpenAPI operations; 173 served, 1 outside OpenAPI, 56 target-only).
-- Design-depth audit: **0 findings**; 258 files, 54,687 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 11 packages.
+- Design-depth audit: **0 findings**; 259 files, 54,865 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 11 packages.
 - Feature SDD validator: **11/11 packages passed**.
-- Markdown audit: **0 broken relative links** across 255 files / 54,599 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 258 files / 54,687 lines.
+- Markdown audit: **0 broken relative links** across 256 files / 54,778 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 259 files / 54,865 lines.
 - Sandbox note: on this Linux sandbox, cargo and Python `uv` commands require the prefix `TMPDIR=/tmp PKG_CONFIG_SYSROOT_DIR=/tmp/sysroot PKG_CONFIG_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig LIBRARY_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu`.
 - Frontend production build: passed API type check, TypeScript and Vite. Main JS bundle is 1.05 MB minified (287 KB gzip), above Vite's 500 KB advisory.
 - Focused Conversation + responsive tests: **24/24 passed**, including journal retry, cursor pagination, drawer semantics and mobile canvas sizing.
@@ -154,9 +154,9 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 - Feature package validator: **11/11 passed**; structural checks only, not owner approval or runtime qualification.
 - Cross-owner consistency: **36 assertions passed, 0 issues**.
 - V1 contract audit: **0 errors**; 229 OpenAPI operations, 173 served, 1 authenticated local-only route and 56 target-only.
-- Design-depth audit: **0 findings**; 258 files, 54,687 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 11 packages.
-- Markdown audit: **0 broken relative links** across 255 files and 54,599 lines.
-- Active-corpus manifest: **258 files and 54,687 lines** (manifest excludes itself).
+- Design-depth audit: **0 findings**; 259 files, 54,865 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 11 packages.
+- Markdown audit: **0 broken relative links** across 256 files and 54,778 lines.
+- Active-corpus manifest: **259 files and 54,865 lines** (manifest excludes itself).
 - Architecture/schema validator: passed with one warning because optional openapi-spec-validator is not installed; JSON Schema, 148 typed events, errors, OpenAPI structure, SQLite, Gateway naming, canonical concepts and active Markdown checks passed.
 - Rust workspace: lint gate (`clippy --all-targets -- -D warnings`) **0 diagnostics**; `check --all-targets` **0 errors**; `fmt --all --check` clean; test counts as listed under "Current validation on the working tree".
 - Whitespace check: **passed** (`check.sh` whitespace stage, exit 0).
@@ -166,11 +166,21 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 
 1. Keep Send disabled until the exact native OS/provider/auth USER path and durable dispatch/single-flight/stop/retry recovery are qualified.
 2. Implement one safe Task vertical slice with accepted plan, Attempt, Environment, Trust, mediated Effect, reconciliation and independent verification.
-3. Replace simulated Terminal/Browser/Diffs claims with real provider-backed sessions and evidence; defer unsupported Computer use.
+3. The Workbench Terminal/Diffs/Browser simulation is already removed from the UI (register A-51): Terminal shows "unavailable", Diffs/Review shows "nothing to review", the browser iframe starts empty with no containment claim. The remaining obligation is to implement real provider-backed sessions and evidence (PTY/ConPTY B-23, browser B-22) and defer unsupported Computer use (B-32).
 4. Complete one Artifact create/format/export/reopen path with a durable receipt.
 5. Complete one account Connection and provider read/write/revoke journey; Approval alone is not execution.
 6. Close Coworker-owned Conversation, scoped Memory and proactive PAUSED-admission gaps before enabling those claims.
 7. Keep local automation, notification delivery and Settings controls honest until their actual consumers/handlers exist.
+
+### Phase 1 assumption-free doc re-audit resolved (FEAT-002)
+
+The full-corpus re-audit verdict table is [docs/DOCS-REAUDIT-2026.md](docs/DOCS-REAUDIT-2026.md) (five clusters, plus an SDD-completeness-gap list for specs/001-011). It reconciled the known danglers at their owners and recorded the decisions in the register:
+
+- **A-38** (FLOWS.md flow index): the "Flow outputs and UI projection" index now covers F00-F143 (added F115-F124 and F136-F143), and the F119/F128 duplicate is resolved by distinguishing the save flow (F119) from its navigation-recovery sibling (F128).
+- **A-39** (UIV1 namespace): retired as an active acceptance authority; acceptance resolves on live flow IDs and feature AC IDs, with resolution notes at V1-UI-ACTION-STATE-LEDGER.md and V1-END-TO-END-FLOW-AND-RACE-CONTRACTS.md. The archived catalog stays provenance-only; specs/README.md's UIV1 instruction is updated.
+- **A-40** (sqlite-v28 unreachable): v28 is recorded as defined-but-not-yet-wired (`SCHEMA_VERSION` is 27); STORAGE.md ("current schema version is 28" corrected to 27), EVENTS.md, DELEGATION.md and COVERAGE-MATRIX.md are corrected to stop presenting v28 as active.
+- **Line-count drift**: CURRENT-RUN.md and IMPLEMENTATION-STATUS.md now cite the live generator output; the corpus audits/generators exclude `.agents/` plan files so plan-file churn no longer inflates corpus counts.
+- **A-51 (new)**: the Workbench Terminal/Diff/Browser status docs were stale after the UI was remediated; IMPLEMENTATION-STATUS.md and rows A-08/A-09/A-10/A-30 are corrected to the current source.
 
 ### Pending research (recorded 2026-11-07)
 

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKIP = {
     ".git", "node_modules", "target", ".venv", "dist", "build", "coverage",
     ".next", "out", ".turbo", "vendor", ".cache", ".pytest_cache",
-    ".agent-worktrees", ".worktrees", ".zwork", "archives", "archive",
+    ".agent-worktrees", ".worktrees", ".zwork", ".agents", "archives", "archive",
     "repo_take", "reading", "staging_tar", "audit",
 }
 docs = {}
