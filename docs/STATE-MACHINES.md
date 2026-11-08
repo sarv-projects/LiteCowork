@@ -1395,14 +1395,17 @@ other and neither may be substituted for the other.
 
 ## Coworker standing responsibility and learning target (not yet implemented)
 
-StandingResponsibility: DRAFT -> ENABLED <-> PAUSED -> COMPLETED/EXPIRED/ARCHIVED. The group is fenced by Coworker ACTIVE status and provider readiness at each new proactive admission, not by historic edit-time checks alone. Health is a derived HEALTHY/DEGRADED/BLOCKED/UNKNOWN projection, not an independently authoritative status. MemoryCandidate: QUEUED -> EVALUATING -> ACCEPTED/REJECTED/CONFLICTED; Accepted creates an immutable Resource-backed ContextDocument revision only after deterministic policy checks and provenance. Deletion/revocation remains ResourceService-owned. Connection assignment: ENABLED <-> PAUSED -> REVOKED; it is an access ceiling, never a CapabilityGrant. These are accepted target states and MUST NOT appear in the shipped API/event allowlist until their owning schemas and persistence are implemented.
+StandingResponsibility: DRAFT -> ENABLED <-> PAUSED -> COMPLETED/EXPIRED/ARCHIVED. The group is fenced by Coworker ACTIVE status and provider readiness at each new proactive admission, not by historic edit-time checks alone. Health is a derived HEALTHY/DEGRADED/BLOCKED/UNKNOWN projection, not an independently authoritative status. The learning candidate lifecycle is the single `LearningCandidate` vocabulary owned by [LEARNING.md](LEARNING.md) §20 and restated in the next section; a committed candidate materializes an immutable Resource-backed ContextDocument revision only after deterministic policy checks and provenance, then follows the `MemoryRecordMetadata.status` lifecycle in [DATA-MODEL.md](DATA-MODEL.md). Deletion/revocation remains ResourceService-owned. The earlier `MemoryCandidate` set (QUEUED/EVALUATING/ACCEPTED/REJECTED/CONFLICTED) that once appeared here is **superseded by the PROPOSED owner resolution** recorded at [LEARNING.md](LEARNING.md) (register A-34/A-20) and MUST NOT be used; it is noted here only so the supersession is traceable, not deleted silently. Connection assignment: ENABLED <-> PAUSED -> REVOKED; it is an access ceiling, never a CapabilityGrant. These are accepted target states and MUST NOT appear in the shipped API/event allowlist until their owning schemas and persistence are implemented.
 
 
 ## Target AuthAttempt, Connection, and LearningCandidate state machines
 
 These accepted target state machines are specified by
 [Connectors & Workflows](CONNECTORS-WORKFLOWS.md) and [Learning](LEARNING.md); current
-machine contracts remain unchanged until implementation.
+machine contracts remain unchanged until implementation. The `LearningCandidate` machine
+below is the single candidate-lifecycle vocabulary selected by the PROPOSED owner
+resolution in [LEARNING.md](LEARNING.md) (register A-34/A-20); it supersedes the earlier
+`MemoryCandidate` set and remains pending owner acceptance.
 
 ~~~text
 AuthAttempt:

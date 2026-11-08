@@ -8157,9 +8157,9 @@ components:
       type: object
       additionalProperties: false
       required: [kind, owner_ref]
-      description: Current domain-workspace create validation accepts only PERSONAL_PROFILE with a USER owner_ref matching the authenticated principal, and WORKSPACE_NOTES with a WORKSPACE owner_ref matching the selected Workspace. COWORKER_NOTES and GOAL_NOTES remain target enum values and are rejected by the current create validator until their authoritative owner aggregates and resource authorization are implemented.
+      description: 'PROPOSED owner resolution (register A-18, pending acceptance): the create-metadata kind enum is narrowed to the two kinds the domain-workspace create validator actually accepts, PERSONAL_PROFILE with a USER owner_ref matching the authenticated principal and WORKSPACE_NOTES with a WORKSPACE owner_ref matching the selected Workspace, so the machine create contract no longer overstates it. COWORKER_NOTES and GOAL_NOTES remain valid ContextDocumentKind values for the record/read type and policy allowlists but are TARGET-pending-aggregate-services for creation: they cannot be created until their authoritative Coworker/Goal owner aggregates and resource authorization exist, so they are not offered here. See DATA-MODEL.md ContextDocument create ownership.'
       properties:
-        kind: {type: string, enum: [PERSONAL_PROFILE, COWORKER_NOTES, WORKSPACE_NOTES, GOAL_NOTES]}
+        kind: {type: string, enum: [PERSONAL_PROFILE, WORKSPACE_NOTES]}
         owner_ref: {$ref: '#/components/schemas/ContextOwnerRef'}
     CoworkerRevisionRef:
       type: object

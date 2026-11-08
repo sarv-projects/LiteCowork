@@ -17,6 +17,39 @@ Memory browser or Learning Inbox. Coworker ContextDocument creation and retrieva
 also not Coworker-scoped today. The current implementation crosswalk is maintained in
 [CONTEXT.md](CONTEXT.md) and [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).
 
+## Candidate-lifecycle vocabulary (PROPOSED, owner acceptance required)
+
+Three incompatible vocabularies described the same automatic-learning capability
+(register A-34/A-20): `LearningCandidate` (NEW/CLASSIFIED/NEEDS_REVIEW/
+AUTO_COMMIT_ELIGIBLE/COMMITTED/DISMISSED/REJECTED/SUPERSEDED), a second
+`MemoryCandidate` set (QUEUED/EVALUATING/ACCEPTED/REJECTED/CONFLICTED) that appeared only
+in [STATE-MACHINES.md](STATE-MACHINES.md), and the committed-record lifecycle
+`MemoryRecordMetadata.status` (ACTIVE/SUPERSEDED/REVOKED/PURGE_PENDING) in
+[DATA-MODEL.md](DATA-MODEL.md). This is an owner decision, not an implementation choice,
+and the author may not self-approve it ([SPECIFICATION-STANDARD.md](SPECIFICATION-STANDARD.md) §7).
+
+**RECOMMENDED resolution (PROPOSED, owner acceptance required):**
+
+- The single normative candidate-lifecycle vocabulary is `LearningCandidate` as defined in
+  §3 and §20 of this document. Every active document that names the candidate lifecycle
+  must use these states and no others.
+- `MemoryRecordMetadata.status` (ACTIVE/SUPERSEDED/REVOKED/PURGE_PENDING, §7) is **not** a
+  competing candidate vocabulary. It is the distinct lifecycle of a *committed* memory
+  record after a candidate reaches `COMMITTED`, and it stays as written.
+- The `MemoryCandidate` (QUEUED/EVALUATING/ACCEPTED/REJECTED/CONFLICTED) set is
+  **superseded by this proposal**. `MemoryCandidatePayload` (§5) keeps its name because it
+  is a candidate *payload shape*, not a second state machine; the superseded *state* set is
+  retired, not the payload type.
+
+The choice is `LearningCandidate` because it is already the owner state machine here (§20),
+it is the richer set (it distinguishes NEEDS_REVIEW from AUTO_COMMIT_ELIGIBLE and carries
+the explicit terminal DISMISSED/SUPERSEDED cases that the policy and auto-commit gates in
+§6 and §11 rely on), and [DATA-MODEL.md](DATA-MODEL.md) already models the persisted record
+with it. No learning record may be persisted or shown on the strength of this note: it is a
+target vocabulary decision pending the named owner, not evidence that any store, service or
+UI exists (see the current implementation checkpoint above and
+[IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md)).
+
 This document defines how a Coworker can improve from corrections and successful work
 without allowing the model to silently widen authority or rewrite arbitrary persistent
 configuration.

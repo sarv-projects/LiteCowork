@@ -51,9 +51,24 @@ The Conversation is the default surface and the authoritative human-visible hist
 
 A Conversation does not create a Task unless the user explicitly promotes outcome-oriented work through a reviewed action. A Coworker is optional. Conversation history can outlive a provider process without claiming the private provider session survived.
 
+### Empty-state contract (TARGET)
+
+When no Conversation is selected or a new Conversation has no messages, the canvas shows a
+product-owned empty state. The TARGET copy is truthful and LiteCowork-branded: a neutral
+heading such as "Start a conversation" with supporting text that describes only what the
+product actually offers (select an agent binding, type a message, attach supported
+Workspace context) and no capability the current build cannot perform. The empty state
+MUST NOT carry third-party "Antigravity" branding and MUST NOT advertise unsupported
+affordances (file/context attachment, voice input, @-mention or slash actions) as if they
+were live. Any capability named in the empty state must have a wired handler and a served
+route behind it; otherwise it is omitted or shown as needs-setup from a real provider-health
+observation. This is the owned target the current `conversations/ConversationsPage.tsx`
+empty canvas must be corrected to meet; see the current implementation boundary below and
+register A-26 for the still-open defect.
+
 ### Current implementation boundary
 
-The current UI has persisted cursor-paginated Recent Chats (including parent-sidebar Load more), create with an idempotency journal, snapshot/message pagination, local drafts, agent-binding selection and an OpenCode-only submit path. Send remains visibly enabled despite the target disabled-until-qualified gate and does not require a qualified binding/provider or Operator readiness. The visible Stop control is not effective for the OpenCode path: it searches presentation-stream transient turns that the native path does not emit, and its fallback request uses a hard-coded version. The cancel Operator route immediately marks the turn CANCELLED without interrupt/quiescence. Failed-turn Retry has an Operator route but no UI call site; the separate pending-create journal retry is available in the New Chat error state. The composer does not consistently fence OPEN/WAITING_DEPENDENCY/CANCEL_REQUESTED, and the submit transaction lacks strict single-flight admission. Add context/file and Voice Input are inert, More options has no handler, Turbo is static, @/slash copy is placeholder and every submit sends resource_refs=[]. The empty state contains hard-coded Antigravity branding/capability claims. The active-turn projection has no aggregate version. See Feature 001 SPEC and its UI behavior crosswalk for exact source details. Other provider selections are not proof of a supported Send route; do not infer agent support from a profile probe or catalog entry.
+The current UI has persisted cursor-paginated Recent Chats (including parent-sidebar Load more), create with an idempotency journal, snapshot/message pagination, local drafts, agent-binding selection and an OpenCode-only submit path. Send remains visibly enabled despite the target disabled-until-qualified gate and does not require a qualified binding/provider or Operator readiness. The visible Stop control is not effective for the OpenCode path: it searches presentation-stream transient turns that the native path does not emit, and its fallback request uses a hard-coded version. The cancel Operator route immediately marks the turn CANCELLED without interrupt/quiescence. Failed-turn Retry has an Operator route but no UI call site; the separate pending-create journal retry is available in the New Chat error state. The composer does not consistently fence OPEN/WAITING_DEPENDENCY/CANCEL_REQUESTED, and the submit transaction lacks strict single-flight admission. Add context/file and Voice Input are inert, More options has no handler, Turbo is static, @/slash copy is placeholder and every submit sends resource_refs=[]. The empty state contains hard-coded Antigravity branding/capability claims, which violates the empty-state contract (TARGET) above and is tracked as a still-open UI defect in register A-26; it is a doc/UI-contract gap only and no UI source is changed here. The active-turn projection has no aggregate version. See Feature 001 SPEC and its UI behavior crosswalk for exact source details. Other provider selections are not proof of a supported Send route; do not infer agent support from a profile probe or catalog entry.
 
 ## 3. Work and Task detail
 
