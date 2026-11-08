@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 259
-- Included lines: 54865
-- Included bytes: 4318715
+- Included lines: 55322
+- Included bytes: 4360050
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,7 +25,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 129 | 46186 |
+| docs/ | 129 | 46643 |
 | repository root | 6 | 1542 |
 | scripts/ | 1 | 14 |
 | specs/ | 111 | 6343 |
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 60 | 3726 | aa800aa8fda07635 |
-| CURRENT-RUN.md | 194 | 23963 | 7615b9492ebbf76d |
+| CURRENT-RUN.md | 194 | 24755 | a55e9ff1566b9644 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 75 | 6169 | 3ecd058f34d1ee80 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -65,8 +65,8 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CHANNELS.md | 280 | 17363 | ebf5c54dff8e2c6d |
 | docs/CHROME-BROWSER-LLD.md | 181 | 19891 | ba9613ca8f253f76 |
 | docs/CODING-COCKPIT-UI-SPEC.md | 113 | 8662 | 51e4f0bbc4a51dc2 |
-| docs/COMPETITIVE-RESEARCH.md | 675 | 89127 | 8f02e5324d3ea590 |
-| docs/COMPETITOR-PROMOTED-USE-CASES.md | 140 | 10843 | c2b31ed3f0f1def1 |
+| docs/COMPETITIVE-RESEARCH.md | 989 | 114232 | d2bffb1b98873bad |
+| docs/COMPETITOR-PROMOTED-USE-CASES.md | 147 | 12601 | 2c0af44925d380a5 |
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
 | docs/CONTEXT.md | 272 | 19955 | f80c31cda1a4c7aa |
@@ -101,15 +101,15 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/NATIVE-COMPOSER-LLD.md | 300 | 27971 | 716852c1e987a5f5 |
 | docs/NETWORK-SECURITY.md | 312 | 21908 | 03145de8b91e6486 |
 | docs/OBSERVABILITY.md | 262 | 12291 | 3192bfcda6340d0a |
-| docs/OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md | 266 | 28912 | b2e6e27996fb861e |
+| docs/OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md | 279 | 29919 | 2bf520dce2718a2e |
 | docs/PRESENTATION-RUNTIME.md | 533 | 31633 | 4003073b58c690de |
 | docs/PRODUCT-CONTRACT-INDEX.md | 38 | 6373 | 265eef23bbd47c0f |
 | docs/PRODUCT-STRATEGY.md | 113 | 10724 | 8e39b7022710cfef |
 | docs/PRODUCT.md | 254 | 16913 | 76a270f4af39c91c |
 | docs/PROTOCOLS.md | 187 | 9391 | de2062d24c901037 |
 | docs/README.md | 83 | 7467 | e9dcdc1d130b3cfd |
-| docs/REFERENCE-IMPLEMENTATIONS.md | 766 | 85050 | 3137d47665f8631c |
-| docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md | 192 | 20784 | b41c0dadef229e61 |
+| docs/REFERENCE-IMPLEMENTATIONS.md | 779 | 89019 | 4aa2d72c2b1baa7c |
+| docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md | 264 | 24873 | f1d7303606da51da |
 | docs/RENDERING-CONFORMANCE-LLD.md | 271 | 16026 | c99abd47adbeda47 |
 | docs/REPOSITORY-DOCUMENTATION-AUDIT.md | 65 | 5253 | 2ce16d7805706cf8 |
 | docs/RESET-AND-ARCHIVE-RECORD.md | 65 | 4154 | 4f247a4168955440 |
@@ -148,7 +148,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/V1-UI-ACTION-STATE-LEDGER.md | 62 | 12248 | d80a0bb4134daaea |
 | docs/V1-UI-SCREEN-CONTRACT.md | 351 | 48366 | 53fdb3870090db3a |
 | docs/V1-WORKFLOW-EVENT-LLD.md | 139 | 14813 | aa20f0e960080e6e |
-| docs/VIABILITY-VS-COMPETITORS.md | 199 | 18925 | 0e4716e12d99f221 |
+| docs/VIABILITY-VS-COMPETITORS.md | 237 | 23540 | 83066b001c841626 |
 | docs/WORLD-RESOURCES.md | 529 | 38043 | bef06f6e6dd86d16 |
 | docs/ZCODE-UI-INSPIRATION-AUDIT.md | 265 | 34660 | 84bc346175de6632 |
 | docs/adr/0001-durable-task-core.md | 23 | 922 | be124ace88b60190 |

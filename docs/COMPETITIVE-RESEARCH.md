@@ -78,14 +78,18 @@ workflow execution engines remain external integrations.
 
 The accepted consumer and open-source feature comparison is in [Coworker target](COWORKERS-TARGET.md), section 12, with source links and the distinction between claimed experience and qualified behavior. The engineering decisions are optional chat-first assistants, reviewed standing responsibilities, bounded proactive observation, provider-native agent reasoning, secure reuse of app/MCP connections, and local daemon/background limitations without cloud equivalence claims. Do not treat marketing descriptions of Dots, Grok Bot, Muse, Claude Cowork, Kimi Work, OpenClaw, Eigent or OpenWork as independent reliability test evidence.
 
-## Primary rivals index — documentation pass 2026-11-01
+## Primary rivals index — documentation pass 2026-11-01 (rivals/SHAs refreshed 2026-11-08)
 
-Use this table before locking any UX-heavy SDD. Vendor pages and repos are **evidence**, not LiteCowork requirements.
+Use this table before locking any UX-heavy SDD. Vendor pages and repos are **evidence**, not LiteCowork requirements. The 2026-11-08 Phase 2 deep-dive section below carries the pinned SHAs, feature surface, runtime/HLD/LLD and borrowable-file URLs per rival.
 
 | Name | What it is | Doc / repo evidence in this repository | Distinguish from |
 |---|---|---|---|
-| Grok Bot | xAI persistent Bots, routines, cloud computer + separate local permission | § Grok Bot (desktop benchmark) | LiteCowork Coworkers optional; local Environment scopes |
-| Claude Cowork / Claude chat | Anthropic unified chat+Cowork direction; desktop VM roots | § Claude Cowork; Oct 2026 recheck | LiteCowork native harness BYOA, not one vendor |
+| Grok Bot | xAI persistent Bots, routines, cloud computer + separate local permission; app/marketplace layer now routes through Cursor (SpaceXSI/Cursor bundling) | § Grok Bot (desktop benchmark); § 2026-11-08 correction | LiteCowork Coworkers optional; local Environment scopes |
+| Claude Code Desktop | Anthropic desktop app **Code tab**: parallel sessions with Git-worktree isolation, pane layout, side chats, local/cloud/SSH env, local vs cloud scheduled tasks | **§ 2026-11-08 Claude Code Desktop vs Cowork** | Distinct tab from chat and Cowork in the same app |
+| Claude Cowork / Claude chat | Anthropic unified chat+Cowork direction; Cowork tab handles Dispatch + longer agentic work; desktop VM roots | § Claude Cowork; Oct 2026 recheck; § 2026-11-08 | LiteCowork native harness BYOA, not one vendor |
+| Claude Duet | Anthropic synchronous human+Claude pair/duet surface (tracked; first-party URL unresolved — RV-14) | **§ Claude Duet (2026-11-08)** | Distinct from chat/Code/Cowork; co-edit UX, not durable Task |
+| Rowboat | rowboatlabs/rowboat — Apache-2.0 desktop AI coworker; living work knowledge-graph; email/notes/browser/code/meeting surfaces | **§ Rowboat (2026-11-08)**; REFERENCE matrix | On-machine desktop app, not a cloud-only coworker |
+| OpenLoomi | melandlabs/openloomi — Apache-2.0 **Tauri** local-first "Attention Agent"; screen-understanding triage | **§ OpenLoomi (2026-11-08)**; REFERENCE matrix | Same Tauri+Rust stack as LiteCowork; attention/triage focus |
 | ChatGPT Plus | Consumer Plus subscription tier (models/features in ChatGPT app) | **This pass:** product boundary note below | Not the same as **Work** or **Codex** SKUs |
 | ChatGPT Work / Codex | Work mode, local sync, team tasks, scheduled work | § ChatGPT Work; dots section for Codex/local | LiteCowork Task/Effect truth separate from provider cloud |
 | Kimi Work | Moonshot local-agent / dashboard beta | Kimi Work overview link in Oct recheck; Kimi Code CLI in archive portfolio | Registry vs active `kimi-code` project |
@@ -673,3 +677,313 @@ The important competitor pattern is **hybrid authoring over one provider-owned g
 LiteCowork should expose that pattern through provider-owned workflow integration, not by implementing a native workflow graph engine in Core. The user may use the connected provider's own builder/assistant directly. LiteCowork Coworkers can help create a LiteCowork Routine and map inputs. Direct LiteCowork-agent graph mutation requires a future provider-specific authoring capability and explicit owner/security approval. The current source tree has no production WorkflowBackendAdapter or WorkflowAuthoringAdapter implementation, so external workflow selection/invocation and AI graph authoring are not yet available LiteCowork features.
 
 Source study and pinned OpenBot comparison: [OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md](OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md).
+
+## 2026-11-08 Phase 2 fresh rival re-verification (assumption-free deep-dive)
+
+This pass re-verified every tracked rival from scratch with open web search and shallow
+`repo_take/` clones at exact HEAD SHAs (gitignored; never staged). It resolves the
+competitive corrections verified 2026-11-06 but not yet applied, reconciles Claude Code
+Desktop against Claude Cowork, adds **Claude Duet** as a tracked rival, and adds two
+genuinely new local-first desktop coworkers found by search (**Rowboat**, **OpenLoomi**).
+Clone date for every repo below is **2026-11-08**. Vendor/doc claims are evidence, not
+LiteCowork qualification; a repo HEAD and a dated vendor page are the proof, not a mutable
+product-marketing URL.
+
+### Pinned clones and corrected versions (this pass)
+
+| Rival | Repo | HEAD SHA (shallow, 2026-11-08) | Version at HEAD | License | App path |
+|---|---|---|---|---|---|
+| OpenWork | different-ai/openwork | `5493b18a6af64d56454658a53da00eabbc6e033d` | 0.0.0 (monorepo) | MIT (except `/ee` Enterprise Edition; pre-EE content FSL-1.1/MIT-Future) | `apps/desktop`, `apps/server`; capability `packages/*` |
+| Open Cowork | opencoworkai/open-cowork | `e94ee2c50239e64ba0e18921e339d49b93dae31f` | 3.3.1 | MIT | `src/main` + `src/renderer` (Electron) |
+| ZCode | zai-org/ZCode | `a9fe401eede6e6e5e01be9048679c206fe6f02d9` | **3.17.2** (was pinned 3.17.1) | Apache-2.0 + NOTICE | `packages/desktop` |
+| DeepSeek Harness | deepseek-ai/deepseek-harness | `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` | **0.2.2-rc.1** (was pinned 0.2.2-alpha.2) | MIT | `apps/desktop` |
+| OpenBot | nightly-labs/openbot | `3ec318ef791bf3259d84c3dc326d7c66545bc1ec` | **0.65.0** (was pinned 0.62.0) | PolyForm Noncommercial 1.0.0 | reference/UX only |
+| Rowboat (NEW) | rowboatlabs/rowboat | `9052e28b9ede46478e04f9cf600c7ebaf5895dc7` | monorepo | Apache-2.0 | `apps/x` (desktop), `apps/harbor` (agent runtime) |
+| OpenLoomi (NEW) | melandlabs/openloomi | `2aca1016fa3065e2fee912afd0e94576d0483c66` | monorepo | Apache-2.0 | `apps/web` + `apps/web/src-tauri` (Tauri) |
+
+Products with **no public repo** (documentation/SDK/announcement evidence only): Claude Code
+Desktop, Claude Cowork, Claude Duet, OpenAI dots, ChatGPT Work, Meta Muse, Grok Bot.
+
+### Claude Code Desktop vs Claude Cowork — reconciled (distinct surfaces, one app)
+
+The 2026-11-08 Claude Code Desktop docs make the relationship explicit and it is **not** the
+same surface as the previously documented "Claude Cowork". In the single **Claude Desktop
+app** there are three tabs: **chat**, **Code**, and **Cowork**. Claude Code is the **Code
+tab**; Cowork is a separate tab that "handles Dispatch and longer agentic work"
+([Desktop application](https://code.claude.com/docs/en/desktop/)).
+
+- **Code tab (Claude Code Desktop):** each conversation is a **session** with its own chat
+  history and project folder; the sidebar runs several in parallel. Features: parallel
+  sessions with **Git isolation (worktree per session)**, drag-and-drop pane layout
+  (chat/diff/browser/terminal/file-editor side by side), integrated terminal and file
+  editor, **side chats** that use session context without derailing it, computer use,
+  **Dispatch sessions from a phone**, visual diff review, app preview in a Browser pane,
+  external site browsing, iOS Simulator pane, PR monitoring through CI, connectors
+  (GitHub/Slack/Linear), SSH sessions, and a choice of **local / cloud / SSH environment**
+  per session. macOS/Windows/Linux(beta)/Windows-ARM64 installers.
+- **Scheduled tasks (Code tab)** distinguish three mechanisms with honest machine-dependency
+  semantics, directly validating LiteCowork's TriggerHost/Environment truth-telling:
+
+  | Option | Runs on | Machine on? | Open session? | Local files | Min interval |
+  |---|---|---|---|---|---|
+  | Cloud (routines) | Anthropic-managed | No | No | No (fresh clone) | 1 hour |
+  | Desktop (local) | Your machine | **Yes** | No | **Yes** | 1 minute (Claude-set) / 1 hour (forms) |
+  | `/loop` | Your machine | Yes | **Yes** | Yes | 1 minute |
+
+  A local scheduled task "only fires while the app is open and your computer is awake"; a
+  cloud task "runs even when your computer is off" and can start on API calls or GitHub
+  events. Each local run can be given its own isolated Git worktree. Requires Claude Desktop
+  1.1.5368+. Source: [Schedule recurring tasks in Claude Code Desktop](https://code.claude.com/docs/en/desktop-scheduled-tasks.md).
+
+**LiteCowork implication:** Claude Code Desktop is the strongest desktop benchmark for the
+**developer "Code" preset inside one app** — exactly LiteCowork's "Code is a launch preset,
+not a separate product" direction (PRODUCT-STRATEGY). Borrow: session=own-folder-and-history,
+**per-session Git worktree isolation**, pane layout where chat/diff/browser/terminal/editor
+are one shell with distinct authority, side-chat that reuses context without a new session,
+and the local-vs-cloud scheduling truth table (machine-on / open-session / local-file columns
+map to LiteCowork TriggerHost placement + Environment availability). Do **not** claim cloud
+continuation for a local V1 Task; keep LiteCowork's `/loop`-style polling honest about open
+session requirement. Treat Code, chat, and Cowork as **intents/routes in one shell**, not
+three products. Sources: [Desktop application](https://code.claude.com/docs/en/desktop/),
+[Scheduled tasks](https://code.claude.com/docs/en/desktop-scheduled-tasks.md).
+
+### Claude Duet — newly tracked rival (previously absent from docs/specs)
+
+**Status:** verified 2026-11-06 as a distinct Anthropic surface that appeared nowhere under
+`docs/` or `specs/`; added here per the CURRENT-RUN.md pending-research item. **Re-verification
+limitation (2026-11-08):** no stable first-party Claude Duet product URL resolved on this pass
+(`claude.com/product/duet` 404s, `anthropic.com/news/claude-duet` 404s, and a Bing query
+surfaced only the general Claude product pages). It is recorded here as a tracked rival on the
+strength of the 2026-11-06 verification, with the open-URL gap noted as research gate **RV-14**
+in [VIABILITY-VS-COMPETITORS.md](VIABILITY-VS-COMPETITORS.md). Do not cite a Duet capability as
+fact until a dated first-party page is pinned.
+
+**What it is (as understood 2026-11-06):** a Claude pair/duet collaboration surface distinct
+from chat, Code, and Cowork — a real-time side-by-side human+Claude working mode rather than
+delegated background work. **LiteCowork implication:** this maps to a *synchronous co-editing /
+take-control* UX pattern layered on an ordinary Conversation, not a new durable-Task type; keep
+it as a RESEARCH surface until the first-party contract is pinned.
+
+### OpenWork (different-ai/openwork) — refresh at `5493b18`
+
+**Feature surface (what a user can do today):** OpenCode-backed local-first desktop cowork on
+macOS/Windows/Linux; local files stay local in desktop mode; model/provider choice incl. local
+models; skills/plugins/MCP; **local browser automation** (`packages/browser-tabs`,
+`packages/computer-use`), **documents/presentation/workbook** artifact packages, **scheduled
+automations**, connected services, **code mode** (`packages/codemode` — a JS/TS code-step
+package), and a capability gateway that collapses a large inventory into
+`search_capabilities`/`execute_capability`. A separate `apps/server` is the optional
+control-plane/remote path.
+
+**Runtime / HLD:** pnpm/turbo monorepo; `apps/desktop` client + optional `apps/server`
+control plane; capabilities are independent `packages/*` (automations, browser-tabs,
+computer-use, documents, presentation, mcp-apps, remote-sessions, sandbox-*, review). The
+**automations engine** declares a provider-neutral capability contract whose explicit doctrine
+is that "receipts, events, and results remain readable after the Den process that admitted the
+run has stopped" — a direct validation of LiteCowork's durable-Task-outlives-worker invariant.
+
+**Borrowable (MIT, permissive with attribution; re-check per file before reuse):**
+- Automation engine + port contract (durable receipts/events survive process exit):
+  [`packages/automations/src/engine.ts`](https://github.com/different-ai/openwork/blob/5493b18a6af64d56454658a53da00eabbc6e033d/packages/automations/src/engine.ts),
+  [`packages/automations/src/ports.ts`](https://github.com/different-ai/openwork/blob/5493b18a6af64d56454658a53da00eabbc6e033d/packages/automations/src/ports.ts),
+  [`packages/automations/src/contracts.ts`](https://github.com/different-ai/openwork/blob/5493b18a6af64d56454658a53da00eabbc6e033d/packages/automations/src/contracts.ts).
+- Calendar/event trigger shape:
+  [`packages/automations/src/calendar-trigger.ts`](https://github.com/different-ai/openwork/blob/5493b18a6af64d56454658a53da00eabbc6e033d/packages/automations/src/calendar-trigger.ts).
+- Code-step package (study only; executes under provider host rules):
+  [`packages/codemode`](https://github.com/different-ai/openwork/tree/5493b18a6af64d56454658a53da00eabbc6e033d/packages/codemode).
+- Design doctrine: [`DESIGN.md`](https://github.com/different-ai/openwork/blob/5493b18a6af64d56454658a53da00eabbc6e033d/DESIGN.md).
+
+**Verdict:** **prototype** the automation-receipt-after-process-exit contract against
+LiteCowork AUTOMATION/TASK-RUNTIME owners; **reject** importing the OpenCode agent loop as a
+second authority. `/ee` directory is Enterprise-Edition licensed — do not reuse.
+Source: [OpenWork repository](https://github.com/different-ai/openwork).
+
+### Open Cowork (opencoworkai/open-cowork) — matured well past the 2026-10-25 "single-turn wrapper"
+
+**Correction:** the 2026-10-25 note recorded Open Cowork as a single-session, single-turn Claude
+Agent SDK wrapper per its roadmap. At `e94ee2c5` (v3.3.1) its ROADMAP **Completed** section now
+documents a substantially broader shipped surface; the old "single-turn wrapper" framing is
+**stale** and is superseded here.
+
+**Feature surface (ROADMAP Completed, v3.3.1):** stable Windows & macOS installers;
+**filesystem sandboxing + path-traversal/zip-slip hardening**; **VM-level isolation via WSL2
+(Windows) and Lima (macOS)**; Skills for **PPTX/DOCX/PDF/XLSX** + custom skill management with
+hot-reload; **MCP connectors (stdio / SSE / Streamable HTTP)**; rich file/image input;
+multi-model (Claude, GPT, Gemini, DeepSeek, Qwen, GLM, Kimi, Grok, MiniMax, Ollama); **remote
+control via Feishu/Lark bot with pairing + approval panel**; **GUI computer-use** on macOS and
+Windows through screen capture + mouse/keyboard via a built-in `GUI_Operate` connector; a
+unified **memory system** (core/experience memory, source-aware retrieval). **Still Planned,
+not shipped:** cron-like **Scheduled Tasks** with UI + persistent execution, first-class Linux
+builds, native tool schemas for API-key users, sandbox-hardening. Roadmap "Planned" items must
+not be credited as shipped reliability.
+
+**Runtime / HLD / LLD:** Electron; `src/main` owns `agent/` (agent-runner loop +
+`agent-runner-loop-guard.ts`), `session/` (session-manager), `schedule/`
+(scheduled-task-manager + `local-condition-checker.ts`), `sandbox/` (lima/wsl bridges,
+path-guard, native-executor), `mcp/` (mcp-manager, mcp-oauth, gui-operate-server), `memory/`,
+`skills/`, `remote/`. `src/renderer` exposes ChatView/Sidebar/ContextPanel/TracePanel.
+
+**Borrowable (MIT, attribution; re-check per file):**
+- Non-progress / loop guard (maps to the OpenHands non-progress guard proposal):
+  [`src/main/agent/agent-runner-loop-guard.ts`](https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/agent/agent-runner-loop-guard.ts).
+- Scheduler + condition polling (study for TriggerHost/ON_CONDITION):
+  [`src/main/schedule/scheduled-task-manager.ts`](https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/schedule/scheduled-task-manager.ts),
+  [`src/main/schedule/local-condition-checker.ts`](https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/schedule/local-condition-checker.ts).
+- VM isolation + path guard (study for ENVIRONMENTS isolation attestation):
+  [`src/main/sandbox/path-guard.ts`](https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/sandbox/path-guard.ts),
+  [`src/main/sandbox/lima-bridge.ts`](https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/sandbox/lima-bridge.ts).
+- MCP manager + OAuth indirection:
+  [`src/main/mcp/mcp-manager.ts`](https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/mcp/mcp-manager.ts),
+  [`src/main/mcp/mcp-oauth.ts`](https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/mcp/mcp-oauth.ts).
+
+**Verdict:** **prototype** the condition-checker + VM path-guard patterns under LiteCowork
+Environment/Trust ownership; keep **TracePanel behind Inspector** (reject as default). Cron
+scheduling is still roadmap — do not treat as a shipped parity point.
+Sources: [Open Cowork repository](https://github.com/opencoworkai/open-cowork),
+[ROADMAP](https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/ROADMAP.md).
+
+### ZCode desktop (zai-org/ZCode) — version corrected 3.17.1 → 3.17.2
+
+**Feature surface:** Electron desktop coding/cowork app with Main / Renderer / Host / CLI
+ownership split; plugin guest sandbox; conversation sessions; managed Chrome (cookie/credential
+managers under `packages/desktop/src/main/chrome*`). Apache-2.0 + NOTICE.
+
+**Runtime / HLD:** CLI owns conversation state; Host (UtilityProcess) routes scopes; Renderer
+never calls the CLI directly — matches LiteCowork's UI≠daemon, Core-SQLite-truth boundary.
+
+**Borrowable (Apache-2.0, attribution):** architecture overview + host lifecycle + plugin
+sandbox contract — exact read-first paths and verdicts in
+[REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md) §ZCode
+and [DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md](DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md).
+**Verdict:** **port patterns only** (thin-shell/Host/CLI split, plugin guest sandbox); do not
+drop in React components.
+
+### DeepSeek Harness (deepseek-ai/deepseek-harness) — desktop pin corrected 0.2.2-alpha.2 → 0.2.2-rc.1
+
+**Feature surface:** developer-preview harness with a web entry point and an Electron **desktop
+app** (`apps/desktop`), plus `apps/desktop-host`, `apps/cli`, `apps/web`, and a
+`plugin-market-generator`. Typed IPC channels with sender assertion; contextBridge preload
+surface; **quit-with-active-work UNKNOWN** confirmation UX. MIT.
+
+**Runtime / HLD / LLD:** `apps/desktop/src/main.ts` (window + lifecycle), `ipc.ts`/`platform-ipc.ts`
+(typed channels + sender assert), many `preload-*.ts` (contextBridge surfaces),
+`host-process.ts`/`host-protocol.ts` (host lifecycle, deadlines), `quit-confirmation.ts`.
+**Borrowable (MIT, attribution):** typed IPC + quit-drain UX — read-first paths in
+[REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md) §DeepSeek.
+**Verdict:** **prototype** the quit-with-active-work UNKNOWN confirmation against LiteCowork
+RUNTIME-LIFECYCLE drain (the documented gap); **port** the typed-IPC sender-assert pattern.
+
+### Rowboat (rowboatlabs/rowboat) — NEW rival, Apache-2.0 desktop AI coworker
+
+**Feature surface:** open-source personal AI assistant that "indexes your work into a living
+**knowledge graph** and uses that to get work done **on your machine**." Desktop downloads for
+Mac/Windows/Linux. Work surfaces: **email client, notes, browser, code mode, meeting note taker,
+and per-project workspaces**; works solo or with a team. (Y Combinator S24; actively maintained,
+HEAD pushed 2026-11-07.)
+
+**Runtime / HLD:** pnpm/turbo monorepo. `apps/x` is the desktop app (with plan docs for
+`CODE_MODE_ENGINES_PLAN.md`, `GRANOLA_PARITY.md` meeting-notes parity, `MINI_APPS_PLAN.md`);
+`apps/harbor` is the agent runtime and carries its own `SPEC.md` + `CONTRACT.md` (spec-driven,
+like LiteCowork). A Dockerfile ships with harbor.
+
+**Borrowable (Apache-2.0, attribution; re-check per file):**
+- Agent-runtime contract + spec:
+  [`apps/harbor/CONTRACT.md`](https://github.com/rowboatlabs/rowboat/blob/9052e28b9ede46478e04f9cf600c7ebaf5895dc7/apps/harbor/CONTRACT.md),
+  [`apps/harbor/SPEC.md`](https://github.com/rowboatlabs/rowboat/blob/9052e28b9ede46478e04f9cf600c7ebaf5895dc7/apps/harbor/SPEC.md).
+- Code-mode engine plan + meeting-note parity:
+  [`apps/x/CODE_MODE_ENGINES_PLAN.md`](https://github.com/rowboatlabs/rowboat/blob/9052e28b9ede46478e04f9cf600c7ebaf5895dc7/apps/x/CODE_MODE_ENGINES_PLAN.md),
+  [`apps/x/GRANOLA_PARITY.md`](https://github.com/rowboatlabs/rowboat/blob/9052e28b9ede46478e04f9cf600c7ebaf5895dc7/apps/x/GRANOLA_PARITY.md).
+
+**Take for LiteCowork:** the **living knowledge-graph-of-your-work** is a strong
+Memory/Knowledge reference (maps to LiteCowork quiet scoped memory + source-backed Knowledge);
+the **meeting-note-taker** and multi-surface (email/notes/browser/code) layout are magnetic
+use-case references. **Verdict:** **prototype** the knowledge-graph-as-context idea under
+LiteCowork's source-eligibility/Trust rules (not an auto-indexing background crawler);
+**reject** adopting harbor as LiteCowork's Task authority.
+Sources: [Rowboat repository](https://github.com/rowboatlabs/rowboat),
+[rowboatlabs.com](https://www.rowboatlabs.com/).
+
+### OpenLoomi (melandlabs/openloomi) — NEW rival, Apache-2.0 **Tauri** desktop "Attention Agent"
+
+**Feature surface:** local-first open-source AI coworker for Windows/macOS/Linux that connects
+work tools and, **with permission, understands what is on your screen**, then "surfaces only what
+needs your decision or action" — an attention/triage agent. (Actively maintained; HEAD pushed
+2026-09-24.)
+
+**Runtime / HLD:** pnpm monorepo; `apps/web` React front end packaged as a **Tauri** desktop app
+(`apps/web/src-tauri`) — the **same Tauri + Rust stack as LiteCowork**, making it the closest
+architectural analogue found this pass. The Rust side includes `audio_capture.rs`,
+`js_scheduler.rs`, `lifecycle.rs`, `close_behavior.rs`, and `launch_mode.rs`, plus a `cli/` and
+Tauri `capabilities/`+`permissions/` manifests.
+
+**Borrowable (Apache-2.0, attribution; re-check per file):**
+- Tauri Rust lifecycle + quit/close behavior (direct LiteCowork-stack reference):
+  [`apps/web/src-tauri/src/lifecycle.rs`](https://github.com/melandlabs/openloomi/blob/2aca1016fa3065e2fee912afd0e94576d0483c66/apps/web/src-tauri/src/lifecycle.rs),
+  [`apps/web/src-tauri/src/close_behavior.rs`](https://github.com/melandlabs/openloomi/blob/2aca1016fa3065e2fee912afd0e94576d0483c66/apps/web/src-tauri/src/close_behavior.rs),
+  [`apps/web/src-tauri/src/launch_mode.rs`](https://github.com/melandlabs/openloomi/blob/2aca1016fa3065e2fee912afd0e94576d0483c66/apps/web/src-tauri/src/launch_mode.rs).
+- In-process scheduler + Tauri capability/permission manifests:
+  [`apps/web/src-tauri/src/js_scheduler.rs`](https://github.com/melandlabs/openloomi/blob/2aca1016fa3065e2fee912afd0e94576d0483c66/apps/web/src-tauri/src/js_scheduler.rs),
+  [`apps/web/src-tauri/capabilities`](https://github.com/melandlabs/openloomi/tree/2aca1016fa3065e2fee912afd0e94576d0483c66/apps/web/src-tauri/capabilities).
+
+**Take for LiteCowork:** the **attention/triage "surface only what needs you"** framing is a
+magnetic use-case parallel to LiteCowork's **Needs You** projection; the Tauri lifecycle/
+close-behavior/scheduler Rust modules are the most direct same-stack reference for Operator vs
+daemon lifecycle. **Verdict:** **prototype** the Tauri capability/permission manifest discipline
+and lifecycle patterns; **flag** screen-understanding/audio-capture as RESEARCH behind explicit
+consent (never a default). Sources: [OpenLoomi repository](https://github.com/melandlabs/openloomi),
+[openloomi.ai](https://openloomi.ai/).
+
+### OpenAI dots — model now GPT-6.1 Terra (evidence moved to learn.chatgpt.com)
+
+**Correction:** the dots model family now includes **GPT-6.1 Terra** ("builds on the GPT-6
+series' alignment improvements and uses safeguards developed for GPT-6 Astra"; a dot can draw on
+different models for different parts of its work). Primary evidence is now
+[learn.chatgpt.com/docs/dots](https://learn.chatgpt.com/docs/dots) (the older help.openai.com
+articles are superseded for this fact). A dot is a cloud-resident always-on agent with its own
+cloud computer + browser that keeps working with the user's computer off; reached in ChatGPT
+mobile/desktop/browser, **Slack, Teams, and calls/texts** (texting in beta to Pro users in the
+U.S.); it can decide when to pause/wake (no fixed schedule required) and uses **background
+agents for parallel work**. Local-computer connection remains a separate desktop-app bridge.
+**LiteCowork implication unchanged:** local V1 never claims laptop-off continuation; dots'
+channel breadth (Slack/Teams/call/text) is DEFER-V2 for LiteCowork.
+Source: [Meet dots](https://learn.chatgpt.com/docs/dots).
+
+### ChatGPT Work — evidence source moved to learn.chatgpt.com
+
+**Correction:** ChatGPT Work / Codex / automations evidence now lives at `learn.chatgpt.com`
+(e.g. [learn.chatgpt.com/docs/automations](https://learn.chatgpt.com/docs/automations),
+[learn.chatgpt.com/docs/windows/windows-app](https://learn.chatgpt.com/docs/windows/windows-app)).
+The previously cited `help.openai.com/en/articles/20001275-chatgpt-work-and-codex` returns **403
+to a direct fetch** and must not be treated as the live source. Capability reading is unchanged
+(Chat/Work/Codex in one desktop app; local Work requires the machine online; web event triggers
+do not grant local-folder access).
+
+### Grok Bot — xAI vendor layer now routes through Cursor (SpaceXSI/Cursor bundling)
+
+**Correction / observed fact (2026-11-08):** the Grok Bot overview page's "Browse all apps" and
+app-browsing links now point to **`cursor.com/marketplace`**, and its guide links to
+`x.ai/bot/marketplace`. This confirms the vendor rebrand in which xAI's Grok Bot app/marketplace
+layer bundles **Cursor**. Capability framing is otherwise consistent with the prior snapshot
+(persistent cloud computer shared across a user's Bots; routines/skills-by-demonstration;
+separate local-computer permission; voice call/note entry points; Slack/X surfaces). **LiteCowork
+implication:** record the Cursor-bundled marketplace as the current app-distribution path and
+keep it as evidence of an **external marketplace**, not a LiteCowork capability; the shared cloud
+computer remains a documented **non-goal** for local V1. Source:
+[Grok Bot overview](https://docs.x.ai/grok-bot/overview).
+
+### Meta Muse — unchanged this pass (no repo; doc evidence)
+
+Re-verification found no public repository and no capability delta beyond the 2026-10-25 record
+(persistent agent, Muse Secure VM with Sentinel egress gate, Mac local-file/app/tab access,
+goals/memory/audit trail; Mac/iOS/Android/web/WhatsApp surfaces). Evidence remains the Meta
+product/launch pages already cited. No change required beyond the dated re-check.
+
+### Phase 2 evidence discipline note
+
+Every borrowable file URL above is a **blob/tree URL pinned at the recorded HEAD SHA** so code
+can be lifted later against the exact reviewed revision. PolyForm Noncommercial (OpenBot),
+Elastic (Nango), and SUL (n8n) items remain **reference/UX study only — no code reuse**. MIT
+(OpenWork outside `/ee`, Open Cowork, DeepSeek Harness) and Apache-2.0 (ZCode, Rowboat,
+OpenLoomi) items are permissive with attribution; re-check each file's license and whether the
+pinned behavior still exists before adapting. Clones live in `repo_take/` (gitignored, never
+staged); the LiteCowork repo itself was not re-cloned.

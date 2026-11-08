@@ -5,8 +5,8 @@ hashes their bytes and checks literal relative Markdown links. It does not estab
 semantic correctness, implementation, integration or release qualification.
 
 - Files read: 256
-- Lines read: 54778
-- Bytes read: 4314040
+- Lines read: 55235
+- Bytes read: 4355073
 - Broken relative targets: 0
 - Excluded: archives, reference clones, generated audit outputs, dependency/build/cache directories and local run worktrees.
 - Per-file SHA-256 values: V1-MARKDOWN-INVENTORY.csv
@@ -25,7 +25,7 @@ semantic correctness, implementation, integration or release qualification.
 | AGENTS.md | 118 | 63d7f2acf5a2 | agent/composer;shell/settings/motion;workflow/recovery;trust/security |
 | ARCHITECTURE.md | 803 | 370f19d571ec | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | CONTRIBUTING.md | 60 | aa800aa8fda0 | rendering;workflow/recovery;trust/security |
-| CURRENT-RUN.md | 194 | 7615b9492ebb | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
+| CURRENT-RUN.md | 194 | a55e9ff1566b | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | GLOSSARY.md | 292 | bd9ffa34cb5e | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | README.md | 75 | 3ecd058f34d1 | agent/composer;browser/computer;workflow/recovery;trust/security |
 | apps/litecowork-ui/README.md | 77 | c47d822925a4 | browser/computer;shell/settings/motion;workflow/recovery |
@@ -46,9 +46,9 @@ semantic correctness, implementation, integration or release qualification.
 | docs/CHANNELS.md | 280 | ebf5c54dff8e | workflow/recovery;trust/security |
 | docs/CHROME-BROWSER-LLD.md | 181 | ba9613ca8f25 | browser/computer;shell/settings/motion;workflow/recovery;trust/security |
 | docs/CODING-COCKPIT-UI-SPEC.md | 113 | 51e4f0bbc4a5 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
-| docs/COMPETITIVE-RESEARCH.md | 675 | 8f02e5324d3e | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
-| docs/COMPETITOR-PROMOTED-USE-CASES.md | 140 | c2b31ed3f0f1 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
-| docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md | 303 | 665581be3758 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
+| docs/COMPETITIVE-RESEARCH.md | 989 | d2bffb1b9887 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
+| docs/COMPETITOR-PROMOTED-USE-CASES.md | 147 | 2c0af44925d3 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
+| docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md | 303 | 2a5a2fce2d41 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 6212797fb13b | shell/settings/motion;workflow/recovery;trust/security |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 61c945321250 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
 | docs/CONTEXT.md | 272 | f80c31cda1a4 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
@@ -83,15 +83,15 @@ semantic correctness, implementation, integration or release qualification.
 | docs/NATIVE-COMPOSER-LLD.md | 300 | 716852c1e987 | agent/composer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/NETWORK-SECURITY.md | 312 | 03145de8b91e | browser/computer;rendering;workflow/recovery;trust/security |
 | docs/OBSERVABILITY.md | 262 | 3192bfcda634 | browser/computer;rendering;workflow/recovery;trust/security |
-| docs/OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md | 266 | b2e6e27996fb | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
+| docs/OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md | 279 | 2bf520dce271 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/PRESENTATION-RUNTIME.md | 533 | 4003073b58c6 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/PRODUCT-CONTRACT-INDEX.md | 38 | 265eef23bbd4 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/PRODUCT-STRATEGY.md | 113 | 8e39b7022710 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
 | docs/PRODUCT.md | 254 | 76a270f4af39 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
 | docs/PROTOCOLS.md | 187 | de2062d24c90 | agent/composer;browser/computer;rendering;workflow/recovery;trust/security |
 | docs/README.md | 83 | e9dcdc1d130b | agent/composer;shell/settings/motion;rendering;workflow/recovery;trust/security |
-| docs/REFERENCE-IMPLEMENTATIONS.md | 766 | 3137d47665f8 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
-| docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md | 192 | b41c0dadef22 | agent/composer;browser/computer;rendering;workflow/recovery;trust/security |
+| docs/REFERENCE-IMPLEMENTATIONS.md | 779 | 4aa2d72c2b1b | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
+| docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md | 264 | f1d7303606da | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/RENDERING-CONFORMANCE-LLD.md | 271 | c99abd47adbe | browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/REPOSITORY-DOCUMENTATION-AUDIT.md | 65 | 2ce16d780570 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery |
 | docs/RESET-AND-ARCHIVE-RECORD.md | 65 | 4f247a416895 | agent/composer;rendering;workflow/recovery;trust/security |
@@ -130,7 +130,7 @@ semantic correctness, implementation, integration or release qualification.
 | docs/V1-UI-ACTION-STATE-LEDGER.md | 62 | d80a0bb4134d | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
 | docs/V1-UI-SCREEN-CONTRACT.md | 351 | 53fdb3870090 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/V1-WORKFLOW-EVENT-LLD.md | 139 | aa20f0e96008 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
-| docs/VIABILITY-VS-COMPETITORS.md | 199 | 0e4716e12d99 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
+| docs/VIABILITY-VS-COMPETITORS.md | 237 | 83066b001c84 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/WORLD-RESOURCES.md | 529 | bef06f6e6dd8 | agent/composer;browser/computer;workflow/recovery;trust/security |
 | docs/ZCODE-UI-INSPIRATION-AUDIT.md | 265 | 84bc346175de | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/adr/0001-durable-task-core.md | 23 | be124ace88b6 | workflow/recovery |
