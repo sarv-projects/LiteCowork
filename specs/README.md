@@ -10,17 +10,17 @@ DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package
 | ID | Feature | Status | Package |
 |---|---|---|---|
 | 001 | Conversation Session Supervisor and Native Turn Execution | IN_REVIEW — decisions B-01–B-10 declared, owner acceptance not yet evidenced; API/UI/error subcontracts remain DRAFT | [001-conversation-session-supervisor](001-conversation-session-supervisor/README.md) |
-| 002 | Native agent installation, authentication and binding | DRAFT — deepened to the specs/001 bar; B-11/B-12 PROPOSED, pending owner; links A-35 Settings-screen owner (011) | [002-native-agent-install-auth-binding](002-native-agent-install-auth-binding/README.md) |
-| 003 | Workspace roots and context ingestion | DRAFT — deepened; B-13/B-14 PROPOSED, pending owner | [003-workspace-roots-context-ingestion](003-workspace-roots-context-ingestion/README.md) |
-| 004 | Agent relay | DRAFT — deepened; B-15/B-16 PROPOSED, pending owner | [004-agent-relay](004-agent-relay/README.md) |
-| 005 | Safe Task path | DRAFT — deepened; B-17/B-18 PROPOSED, pending owner | [005-safe-task-path](005-safe-task-path/README.md) |
-| 006 | Golden Connection and one capability write | DRAFT — deepened; B-19/B-20 PROPOSED, pending owner | [006-golden-connection-capability-write](006-golden-connection-capability-write/README.md) |
-| 007 | Professional Artifacts, one format | DRAFT — deepened to the specs/001 bar; B-21/B-30/B-31 PROPOSED, pending owner | [007-professional-artifacts](007-professional-artifacts/README.md) |
-| 008 | Workbench browser, terminal and computer | DRAFT — deepened; B-22/B-23/B-32 PROPOSED, pending owner; managed-Chromium adapter disables ambient-CDP/profile-copy | [008-workbench-browser-terminal-computer](008-workbench-browser-terminal-computer/README.md) |
-| 009 | Coworkers and scoped memory | DRAFT — deepened; B-24/B-25 PROPOSED, pending owner; aligned to the single A-34 learning vocabulary | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |
-| 010 | Automations and recurring host | DRAFT — deepened; B-26/B-27 PROPOSED, pending owner; owns A-35 quiet-hours surface | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
-| 011 | Desktop shell, IPC, settings and Runtime | DRAFT — deepened; B-28/B-29/B-33 PROPOSED, pending owner; owns A-35 Settings->Agents screen, links 010 for quiet-hours | [011-desktop-shell-ipc-settings-runtime](011-desktop-shell-ipc-settings-runtime/README.md) |
-| 012 | Conversation co-edit and take-control | DRAFT — new package for SUPERSET-GAP-MATRIX List-3 item 12 (co-edit/take-control); B-34 PROPOSED, pending owner; cites research gate RV-14; depends on Feature 001 Stop/quiescence fixes (A-25) | [012-conversation-coedit-take-control](012-conversation-coedit-take-control/README.md) |
+| 002 | Native agent installation, authentication and binding | DRAFT - deepened to the specs/001 bar; B-11/B-12 PROPOSED, pending owner; links A-35 Settings-screen owner (011) | [002-native-agent-install-auth-binding](002-native-agent-install-auth-binding/README.md) |
+| 003 | Workspace roots and context ingestion | DRAFT - deepened; B-13/B-14 PROPOSED, pending owner | [003-workspace-roots-context-ingestion](003-workspace-roots-context-ingestion/README.md) |
+| 004 | Agent relay | DRAFT - deepened; B-15/B-16 PROPOSED, pending owner | [004-agent-relay](004-agent-relay/README.md) |
+| 005 | Safe Task path | DRAFT - deepened; B-17/B-18 PROPOSED, pending owner | [005-safe-task-path](005-safe-task-path/README.md) |
+| 006 | Golden Connection and one capability write | DRAFT - deepened; B-19/B-20 PROPOSED, pending owner | [006-golden-connection-capability-write](006-golden-connection-capability-write/README.md) |
+| 007 | Professional Artifacts, one format | DRAFT - deepened to the specs/001 bar; B-21/B-30/B-31 PROPOSED, pending owner | [007-professional-artifacts](007-professional-artifacts/README.md) |
+| 008 | Workbench browser, terminal and computer | DRAFT - deepened; B-22/B-23/B-32 PROPOSED, pending owner; managed-Chromium adapter disables ambient-CDP/profile-copy | [008-workbench-browser-terminal-computer](008-workbench-browser-terminal-computer/README.md) |
+| 009 | Coworkers and scoped memory | DRAFT - deepened; B-24/B-25 PROPOSED, pending owner; aligned to the single A-34 learning vocabulary | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |
+| 010 | Automations and recurring host | DRAFT - deepened; B-26/B-27 PROPOSED, pending owner; owns A-35 quiet-hours surface | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
+| 011 | Desktop shell, IPC, settings and Runtime | DRAFT - deepened; B-28/B-29/B-33 PROPOSED, pending owner; owns A-35 Settings->Agents screen, links 010 for quiet-hours | [011-desktop-shell-ipc-settings-runtime](011-desktop-shell-ipc-settings-runtime/README.md) |
+| 012 | Conversation co-edit and take-control | DRAFT - new package for SUPERSET-GAP-MATRIX List-3 item 12 (co-edit/take-control); B-34 PROPOSED, pending owner; cites research gate RV-14; depends on Feature 001 Stop/quiescence fixes (A-25) | [012-conversation-coedit-take-control](012-conversation-coedit-take-control/README.md) |
 
 ## Package 001 manifest
 

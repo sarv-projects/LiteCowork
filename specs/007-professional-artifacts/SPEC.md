@@ -249,6 +249,15 @@ Export / concurrency:
 - **AC-006:** WHEN export succeeds, THE SYSTEM SHALL record an export receipt distinct from the version commit. Verify: export-receipt test.
 - **AC-012:** WHEN an export or create idempotency key replays with an unchanged payload, THE SYSTEM SHALL return the original receipt, and a changed payload with the same key SHALL conflict. Verify: replay/conflict test.
 
+Concurrency:
+- **AC-013:** WHEN two owner saves publish against the same Artifact head concurrently, THE SYSTEM SHALL commit exactly one new immutable version and SHALL reject the losing writer with a typed `STALE_VERSION` conflict without committing a partial version, receipt or event. Verify: concurrent-publish conflict test.
+
+Performance:
+- **AC-014:** WHILE a committed document within the declared input bound (PROPOSED 1 MiB) is reopened, THE SYSTEM SHALL load the last committed version bytes and provenance within a PROPOSED 500 ms local-store budget, and SHALL surface a progress or deferred-load state rather than block the workbench if the budget is exceeded. Verify: reopen latency performance test.
+
+UI-accessibility:
+- **AC-015:** WHEN the Artifact workbench renders version history, compare and save/export controls, THE SYSTEM SHALL expose every control with a stable keyboard focus order and an accessible name and role, and SHALL convey version-difference and unsupported/read-only state through text or shape rather than color alone. Verify: workbench accessibility audit test.
+
 ## 16. Executable acceptance command
 
 ```bash
@@ -311,3 +320,6 @@ Read from ARTIFACTS-EVIDENCE, PRESENTATION-RUNTIME, and INTERACTIVE-ARTIFACT-RUN
 | Atomic initial create (B-30) | ARTIFACTS-EVIDENCE, EVENTS, STORAGE | 007-T02 | AC-010 | Atomic-create transaction test |
 | Untrusted content and redacted export | SECURITY, PRESENTATION-RUNTIME | 007-T04 | AC-011 | Untrusted-content / export-redaction tests |
 | Create/export replay idempotency | STORAGE, ARTIFACTS-EVIDENCE | 007-T02 | AC-012 | Replay/conflict test |
+| Concurrent publish conflict | STORAGE, ARTIFACTS-EVIDENCE | 007-T02 | AC-013 | Concurrent-publish conflict test |
+| Reopen latency budget | STORAGE, PRESENTATION-RUNTIME | 007-T03 | AC-014 | Reopen latency performance test |
+| Workbench accessibility | ui-behavior, PRESENTATION-RUNTIME | 007-T04 | AC-015 | Workbench accessibility audit test |

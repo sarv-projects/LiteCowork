@@ -221,6 +221,9 @@ UI and accessibility:
 Performance:
 - **AC-012:** WHEN drain is requested, THE SYSTEM SHALL stop admission before persisting DRAINING, allow admitted handlers their bounded deadline, and SHALL NOT claim STOPPED before those handlers finish. Verify: graceful-drain timing test.
 
+Concurrency:
+- **AC-013:** WHILE the IPC admission bounds are reached (PROPOSED 8 concurrently accepted requests and 128 MiB combined in-flight request bodies), THE SYSTEM SHALL reject or hold the excess with a typed backpressure error, SHALL NOT exceed either bound, and SHALL keep each accepted request's framing isolated so concurrent peers cannot interleave or corrupt one another's response. Verify: IPC concurrency-limit and frame-isolation test.
+
 ## 16. Executable acceptance command
 
 ```bash
@@ -271,6 +274,7 @@ Read from LOCAL-OPERATOR-IPC and RUNTIME-LIFECYCLE.
 | Remote peer rejected (B-28) | LOCAL-OPERATOR-IPC | 011-T02 | AC-010 | Remote-peer rejection test |
 | Accessible Settings shell (B-33) | V1-UI-SCREEN-CONTRACT; contracts/ui-behavior.md | 011-T04 | AC-011 | Settings render + a11y test |
 | Graceful drain timing | RUNTIME-LIFECYCLE | 011-T03 | AC-012 | Graceful-drain timing test |
+| IPC concurrency bound and frame isolation | LOCAL-OPERATOR-IPC | 011-T02 | AC-013 | IPC concurrency-limit and frame-isolation test |
 
 
 ## V1 Settings screen map and control behavior — 2026-11-06

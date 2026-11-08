@@ -23,7 +23,7 @@
 - **Allowed paths:** IPC adapters and tests
 - **Contract:** LOCAL-OPERATOR-IPC
 - **Change intent:** Reject unauthenticated peers on each qualified OS.
-- **Acceptance:** AC-001, AC-002, AC-009, AC-010; no bearer fallback, a failed Windows DACL does not open an unauthenticated pipe, remote peers are rejected, redacted frames, OS security tests.
+- **Acceptance:** AC-001, AC-002, AC-009, AC-010, AC-013; no bearer fallback, a failed Windows DACL does not open an unauthenticated pipe, remote peers are rejected, redacted frames, the concurrent-request and in-flight-body admission bounds are enforced with a typed backpressure error and isolated framing, OS security tests.
 - **Command:** `cargo test -p operator-ipc --locked ipc_peer_auth`
 
 ## 011-T03 - Runtime health and power/recovery observation

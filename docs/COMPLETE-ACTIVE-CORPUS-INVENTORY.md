@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 270
-- Included lines: 57485
-- Included bytes: 4601709
+- Included lines: 57517
+- Included bytes: 4606661
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -28,7 +28,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/ | 130 | 46932 |
 | repository root | 6 | 1549 |
 | scripts/ | 1 | 14 |
-| specs/ | 121 | 8210 |
+| specs/ | 121 | 8242 |
 
 ## Complete file manifest
 
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 60 | 3726 | aa800aa8fda07635 |
-| CURRENT-RUN.md | 201 | 26331 | b50cc62dff79b75c |
+| CURRENT-RUN.md | 201 | 26331 | e04a2a62b5d146f3 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 75 | 6169 | 3ecd058f34d1ee80 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -79,7 +79,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13179 | 927654c3ec9db132 |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13326 | 404bb17ada4c842c |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 927 | 69198 | f6753a21cfcfe5eb |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
@@ -88,7 +88,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 297 | 58127 | 806f2086f79f6768 |
+| docs/IMPLEMENTATION-STATUS.md | 297 | 58127 | f739370f8116bf6b |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -247,8 +247,8 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/007-professional-artifacts/PLAN.md | 37 | 1670 | ccf000537194e02f |
 | specs/007-professional-artifacts/README.md | 27 | 1525 | 1f6ee056dccd067f |
 | specs/007-professional-artifacts/RESEARCH.md | 68 | 10365 | 2b3505eed57c7aeb |
-| specs/007-professional-artifacts/SPEC.md | 313 | 33253 | 36f01311c548c19a |
-| specs/007-professional-artifacts/TASKS.md | 53 | 4086 | fb30803fa99a98af |
+| specs/007-professional-artifacts/SPEC.md | 325 | 34712 | 2186f6b20c862dd6 |
+| specs/007-professional-artifacts/TASKS.md | 53 | 4494 | b3e9e7301b4a8b8b |
 | specs/007-professional-artifacts/contracts/README.md | 7 | 216 | abd27bbc2d1d6b5a |
 | specs/007-professional-artifacts/contracts/api-events.md | 35 | 4465 | 242d256f1ac76434 |
 | specs/007-professional-artifacts/contracts/errors-recovery.md | 28 | 3806 | 89de9e0f37e13d9c |
@@ -267,8 +267,8 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/009-coworkers-scoped-memory/PLAN.md | 39 | 2566 | 480bdda0cc69e22c |
 | specs/009-coworkers-scoped-memory/README.md | 27 | 2516 | f323fb11c0da445d |
 | specs/009-coworkers-scoped-memory/RESEARCH.md | 71 | 10096 | ac94fb06e403d836 |
-| specs/009-coworkers-scoped-memory/SPEC.md | 294 | 26707 | 0fceafea94436092 |
-| specs/009-coworkers-scoped-memory/TASKS.md | 55 | 3447 | 1f8c5ac8e0fb603c |
+| specs/009-coworkers-scoped-memory/SPEC.md | 310 | 28526 | 728120cd61a4f9e3 |
+| specs/009-coworkers-scoped-memory/TASKS.md | 55 | 3861 | ada1aea78508414d |
 | specs/009-coworkers-scoped-memory/contracts/README.md | 7 | 216 | ef36c293f544da88 |
 | specs/009-coworkers-scoped-memory/contracts/api-events.md | 51 | 3968 | aefac615584099b1 |
 | specs/009-coworkers-scoped-memory/contracts/errors-recovery.md | 31 | 3607 | 123f88322a86774c |
@@ -287,8 +287,8 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/011-desktop-shell-ipc-settings-runtime/PLAN.md | 37 | 1680 | d7dcd60234c2553e |
 | specs/011-desktop-shell-ipc-settings-runtime/README.md | 35 | 2928 | 80d03b70927c7b99 |
 | specs/011-desktop-shell-ipc-settings-runtime/RESEARCH.md | 55 | 7629 | 70e1234c74051d7d |
-| specs/011-desktop-shell-ipc-settings-runtime/SPEC.md | 328 | 32510 | 0538982327edfef0 |
-| specs/011-desktop-shell-ipc-settings-runtime/TASKS.md | 75 | 5685 | 07a9e663b6d4b7f1 |
+| specs/011-desktop-shell-ipc-settings-runtime/SPEC.md | 332 | 33103 | caf454b16c613098 |
+| specs/011-desktop-shell-ipc-settings-runtime/TASKS.md | 75 | 5819 | c4810f5a4ab380e0 |
 | specs/011-desktop-shell-ipc-settings-runtime/contracts/README.md | 7 | 216 | 6820169d800c9593 |
 | specs/011-desktop-shell-ipc-settings-runtime/contracts/api-events.md | 7 | 523 | bade562df421a9d7 |
 | specs/011-desktop-shell-ipc-settings-runtime/contracts/errors-recovery.md | 5 | 430 | 787fbdcb00b4372d |
@@ -303,7 +303,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/012-conversation-coedit-take-control/contracts/api-events.md | 26 | 2579 | 9559edf84a96db23 |
 | specs/012-conversation-coedit-take-control/contracts/errors-recovery.md | 33 | 3133 | 3e6fa56d3eb8832f |
 | specs/012-conversation-coedit-take-control/contracts/ui-behavior.md | 40 | 4856 | 8ae56e109bc41a0f |
-| specs/README.md | 52 | 5761 | 0c50c75020830c2d |
+| specs/README.md | 52 | 5739 | 5b414415e82d60cd |
 
 ## Review rule
 

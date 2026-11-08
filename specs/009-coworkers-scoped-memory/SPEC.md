@@ -241,6 +241,18 @@ Boundary / concurrency:
 UI and accessibility:
 - **AC-007:** WHEN the Coworker surface renders, THE SYSTEM SHALL keep ordinary New Chat available without a Coworker and SHALL present memory review/revoke as keyboard- and screen-reader-accessible states. Verify: Coworker UI render + a11y test.
 
+Boundary:
+- **AC-013:** WHEN an Add Memory write exceeds the declared per-document or per-Coworker memory bound (PROPOSED), THE SYSTEM SHALL reject it with a typed `TooLarge`/`QuotaExceeded` error and SHALL NOT commit a truncated or partial ContextDocument. Verify: memory size/quota boundary test.
+
+Security:
+- **AC-014:** WHEN owner-authored memory text contains model-directed instructions, embedded links or secret-looking content, THE SYSTEM SHALL store it as inert scoped data, SHALL NOT let it grant a permission, Connection, package or schedule, and SHALL NOT write a raw local path into a shared event. Verify: memory injection containment and event-redaction test.
+
+Concurrency:
+- **AC-015:** WHEN an Add Memory write and a revoke/purge of the same Coworker scope commit concurrently, THE SYSTEM SHALL serialize them so the purge/revoke fence remains authoritative and SHALL NOT resurrect purged bytes or leave a writer observing a half-applied scope. Verify: concurrent memory-mutation ordering test.
+
+Performance:
+- **AC-016:** WHILE scoped retrieval assembles context for a Coworker chat, THE SYSTEM SHALL bound the memory scan to that Coworker's scope within a PROPOSED retrieval budget and SHALL NOT perform a full-corpus or cross-Coworker scan to satisfy one chat. Verify: scoped-retrieval performance test.
+
 ## 16. Executable acceptance command
 
 ```bash
@@ -292,3 +304,7 @@ Read from RESPONSIBILITIES, COWORKERS-TARGET, and LEARNING boundaries those docs
 | Owner-kind boundary (B-24) | CONTEXT, DATA-MODEL | 009-T02 | AC-010 | Owner-kind rejection test |
 | Purge receipt without bytes | CONTEXT, LEARNING | 009-T02 | AC-011 | Purge-receipt test |
 | Quick Create partial-failure safety (B-25) | COWORKERS-TARGET | 009-T01 | AC-012 | Quick Create partial-failure test |
+| Memory size/quota boundary | CONTEXT, DATA-MODEL | 009-T02 | AC-013 | Memory size/quota boundary test |
+| Memory text is inert, grants nothing | SECURITY, TRUST, LEARNING | 009-T02 | AC-014 | Memory injection containment and event-redaction test |
+| Concurrent memory mutation ordering | CONTEXT, STATE-MACHINES | 009-T02 | AC-015 | Concurrent memory-mutation ordering test |
+| Scoped retrieval stays bounded | CONTEXT | 009-T03 | AC-016 | Scoped-retrieval performance test |

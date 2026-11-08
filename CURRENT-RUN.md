@@ -83,9 +83,9 @@ Current validation on the working tree:
 - Architecture/schema validator: passed active checks; one warning because the optional `openapi-spec-validator` package is not installed. JSON Schema, 148 event schemas, errors, OpenAPI structure, SQL, Gateway naming, concept and active Markdown checks passed.
 - Cross-owner consistency guard: **36 assertions passed, 0 issues**.
 - V1 contract/route/UI audit: **0 errors** (229 OpenAPI operations; 173 served, 1 outside OpenAPI, 56 target-only).
-- Design-depth audit: **0 findings**; 270 files, 57,485 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 12 packages.
+- Design-depth audit: **0 findings**; 270 files, 57,517 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 12 packages.
 - Feature SDD validator: **12/12 packages passed**.
-- Markdown audit: **0 broken relative links** across 267 files / 57,409 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 270 files / 57,485 lines.
+- Markdown audit: **0 broken relative links** across 267 files / 57,441 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 270 files / 57,517 lines.
 - Sandbox note: on this Linux sandbox, cargo and Python `uv` commands require the prefix `TMPDIR=/tmp PKG_CONFIG_SYSROOT_DIR=/tmp/sysroot PKG_CONFIG_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig LIBRARY_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu`.
 - Frontend production build: passed API type check, TypeScript and Vite. Main JS bundle is 1.05 MB minified (287 KB gzip), above Vite's 500 KB advisory.
 - Focused Conversation + responsive tests: **24/24 passed**, including journal retry, cursor pagination, drawer semantics and mobile canvas sizing.
@@ -154,9 +154,9 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 - Feature package validator: **12/12 passed**; structural checks only, not owner approval or runtime qualification.
 - Cross-owner consistency: **36 assertions passed, 0 issues**.
 - V1 contract audit: **0 errors**; 229 OpenAPI operations, 173 served, 1 authenticated local-only route and 56 target-only.
-- Design-depth audit: **0 findings**; 270 files, 57,485 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 12 packages.
-- Markdown audit: **0 broken relative links** across 267 files and 57,409 lines.
-- Active-corpus manifest: **270 files and 57,485 lines** (manifest excludes itself).
+- Design-depth audit: **0 findings**; 270 files, 57,517 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 12 packages.
+- Markdown audit: **0 broken relative links** across 267 files and 57,441 lines.
+- Active-corpus manifest: **270 files and 57,517 lines** (manifest excludes itself).
 - Architecture/schema validator: passed with one warning because optional openapi-spec-validator is not installed; JSON Schema, 148 typed events, errors, OpenAPI structure, SQLite, Gateway naming, canonical concepts and active Markdown checks passed.
 - Rust workspace: lint gate (`clippy --all-targets -- -D warnings`) **0 diagnostics**; `check --all-targets` **0 errors**; `fmt --all --check` clean; test counts as listed under "Current validation on the working tree".
 - Whitespace check: **passed** (`check.sh` whitespace stage, exit 0).
