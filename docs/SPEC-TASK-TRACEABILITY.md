@@ -35,7 +35,7 @@
 
 **Validator:** `python3 .specify/scripts/validate_feature_package.py` (the validator walks every package under specs/; it takes no package argument)
 
-## Features 002–011
+## Features 002–012
 
 Each package is a DRAFT (README, SPEC, PLAN, TASKS, DATA-MODEL, RESEARCH, WIRING, and required contracts). Status is not ACCEPTED/LOCKED. Blockers live in the owning SPEC. Task ids are package-specific; always read the current TASKS.md rather than assume a fixed upper bound. Feature 002 now includes 002-T06 for a descriptor-bound model/effort picker (blocked on exact native dispatch). Feature 010 includes 010-T05 for future qualified external WorkflowBackend Routine mapping (blocked) and 010-T06 for provider-authoring evaluation (deferred; not V1 authorization).
 
@@ -51,6 +51,7 @@ Each package is a DRAFT (README, SPEC, PLAN, TASKS, DATA-MODEL, RESEARCH, WIRING
 | 009 | P8 | UC optional coworker chat and scoped memory | B-24, B-25 (PROPOSED resolutions in specs/009 §5, still open pending owner, aligned to the single A-34 learning vocabulary); T02 Coworker origin + owner-scoped ContextDocument; T03 retrieval/restart fence; T04 optional New Chat/first Coworker chat |
 | 010 | P9 | UC schedule exactly once; future provider-owned workflow mapping | B-26, B-27 (PROPOSED resolutions in specs/010 §5, still open pending owner; 010 owns the A-35 quiet-hours surface); T05 depends on qualified Features 005/006; T06 deferred |
 | 011 | P0–P11 shell | UC settings honesty and health | B-28, B-29, B-33 (PROPOSED resolutions in specs/011 §5, still open pending owner; 011 owns the A-35 Settings->Agents screen and links 010 for quiet-hours) |
+| 012 | P1 chat | UC co-edit / take-control on one Conversation | B-34 (PROPOSED resolution in specs/012 §5, still open pending owner; maps co-edit onto a Conversation take-control/side-chat UX, no new durable-Task type); research gate RV-14 (Claude Duet, URL unresolved, cited as RESEARCH); 012-T02 take-control depends on the Feature 001 Stop/quiescence fixes (register A-25) |
 
 When an owner resolves a blocker, edit that SPEC and leave status DRAFT until explicit acceptance.
 

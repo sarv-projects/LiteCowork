@@ -1,0 +1,69 @@
+feature_id: "012"
+status: "DRAFT"
+nodes:
+  - id: "ui"
+    owner: Desktop UI
+    kind: component
+  - id: "operator"
+    owner: authenticated Operator
+    kind: service
+  - id: "conversation"
+    owner: ConversationService
+    kind: service
+  - id: "supervisor"
+    owner: AgentSessionSupervisor (Feature 001)
+    kind: service
+  - id: "storage"
+    owner: Storage
+    kind: store
+  - id: "host"
+    owner: Native host/process
+    kind: external
+edges:
+  - id: "e-ui-op"
+    from: "ui"
+    to: "operator"
+    kind: command
+  - id: "e-op-conversation"
+    from: "operator"
+    to: "conversation"
+    kind: request
+  - id: "e-conversation-storage"
+    from: "conversation"
+    to: "storage"
+    kind: transaction
+  - id: "e-conversation-supervisor"
+    from: "conversation"
+    to: "supervisor"
+    kind: cancel
+  - id: "e-supervisor-host"
+    from: "supervisor"
+    to: "host"
+    kind: stop
+  - id: "e-storage-ui"
+    from: "storage"
+    to: "ui"
+    kind: projection
+transactions:
+  - id: "tx-take-control"
+    owner: Conversation
+    atomic_records: ["conversation_turn", "conversation_control_event"]
+    external_calls_inside: false
+  - id: "tx-side-note"
+    owner: Conversation
+    atomic_records: ["owner_side_note"]
+    external_calls_inside: false
+external_boundaries:
+  - id: "outside-sqlite"
+    owner: AgentSessionSupervisor
+    input_trust: untrusted
+    timeout: bounded
+    retry: reconcile-before-retry
+recovery:
+  owner: Conversation
+  source_of_truth: durable-owner-records
+  restart_action: reload-last-commit-and-reconcile
+
+# Implementation evidence boundary (2026-11-08)
+
+This YAML is the DRAFT target dependency graph, not a description of currently working wiring. In the active daemon there is no take-control or side-chat path; the cancel edge exists (Feature 001) but does not observe native quiescence (register A-25). The native stop/quiescence step on `e-supervisor-host` happens outside the `tx-take-control` transaction; do not place any native call inside a SQLite transaction. Do not mark these edges served or integrated until take-control and side-chat are wired, qualified and covered by the USER path, and until the Feature 001 Stop/quiescence fixes land.

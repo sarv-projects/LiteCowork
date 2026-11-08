@@ -20,6 +20,7 @@ DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package
 | 009 | Coworkers and scoped memory | DRAFT — deepened; B-24/B-25 PROPOSED, pending owner; aligned to the single A-34 learning vocabulary | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |
 | 010 | Automations and recurring host | DRAFT — deepened; B-26/B-27 PROPOSED, pending owner; owns A-35 quiet-hours surface | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
 | 011 | Desktop shell, IPC, settings and Runtime | DRAFT — deepened; B-28/B-29/B-33 PROPOSED, pending owner; owns A-35 Settings->Agents screen, links 010 for quiet-hours | [011-desktop-shell-ipc-settings-runtime](011-desktop-shell-ipc-settings-runtime/README.md) |
+| 012 | Conversation co-edit and take-control | DRAFT — new package for SUPERSET-GAP-MATRIX List-3 item 12 (co-edit/take-control); B-34 PROPOSED, pending owner; cites research gate RV-14; depends on Feature 001 Stop/quiescence fixes (A-25) | [012-conversation-coedit-take-control](012-conversation-coedit-take-control/README.md) |
 
 ## Package 001 manifest
 
