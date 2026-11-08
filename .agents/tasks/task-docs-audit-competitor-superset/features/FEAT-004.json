@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-004",
+  "type": "docs",
+  "description": "Phase 3 - Superset matrix + three-way gap analysis. Using the Phase 1 verdict table (FEAT-002) and the Phase 2 refreshed competitor intel (FEAT-003), author one feature x {LiteCowork done? / doc-claims? / doc-accuracy / each competitor has it?} matrix as a new doc in the repo, then derive the three explicit lists the user asked for: (1) Done / Not-done (LiteCowork's real state), (2) what is wrong in the docs (stale / over-claiming / contradicted / missing), (3) what is still missing to be a maximum superset of all competitors' first releases. Cross-link it from the viability and competitive docs and close out the plan. Depends on FEAT-002 and FEAT-003.",
+  "status": "pending",
+  "steps": [
+    "Work on branch docs/audit-competitor-superset. Re-read docs/DOCS-REAUDIT-2026.md (Phase 1 verdicts), the updated five competitor docs (Phase 2), and docs/VIABILITY-VS-COMPETITORS.md (its capability ladder L0-L9 and TARGET/PARTIAL/DEFER-V2/RESEARCH/NO verdicts) so the matrix reuses existing vocabulary and does not re-derive competitor facts.",
+    "Author a new doc docs/SUPERSET-GAP-MATRIX.md (no existing owner combines LiteCowork real-state x doc-accuracy x per-competitor coverage into one matrix; VIABILITY-VS-COMPETITORS.md owns the parity verdicts and COVERAGE-MATRIX.md owns concern->owner, so link to both and do not duplicate their authority). The matrix has one row per capability/feature and columns: Feature | LiteCowork done? (Done/Partial/Not-done with evidence vocab TARGET/CODE/SERVED/INTEGRATED/QUALIFIED) | Doc claims it? | Doc accuracy (true/stale/over-claiming/contradicted, linking the DOCS-REAUDIT-2026 row/A-xx) | per-competitor columns (one per resolved rival: has-it / partial / no, citing the Phase 2 evidence). Derive the feature axis as the UNION of LiteCowork's own capability set and every competitor's first-release feature surface so the matrix can express 'max superset'.",
+    "From the matrix derive the three lists as explicit sections in the same doc: (1) a Done vs Not-done list for LiteCowork's REAL state grounded in IMPLEMENTATION-STATUS.md and Phase 1; (2) a doc-errors list (stale / over-claiming / contradicted / missing) cross-referencing the DOCS-REAUDIT-2026 verdicts and the A-xx register rows; (3) a 'missing to be a superset of all competitors first releases' list, each item tied to the competitor(s) that have it and, where a borrowable implementation exists, the Phase 2 exact-file URL + LICENSE note. Where an item is a genuine new owner decision or research gate, reference the allocated B-xx / RV-xx id rather than inventing a parallel tracker.",
+    "Cross-link docs/SUPERSET-GAP-MATRIX.md from docs/VIABILITY-VS-COMPETITORS.md and docs/COMPETITIVE-RESEARCH.md (a short 'see the superset gap matrix' pointer under each file's own rules) and add it to the docs/README.md index. Do not move parity authority out of VIABILITY-VS-COMPETITORS.md.",
+    "Update CURRENT-RUN.md in place to note the superset matrix is the current cross-cutting gap view and summarize the headline gap count; do not preserve stale status paragraphs or rewrite historical dates.",
+    "Regenerate any affected generated doc via its generator, run the doc gates, and commit on the feature branch with a message like 'docs(gap): phase 3 superset matrix + three-way gap analysis'."
+  ],
+  "acceptance_criteria": [
+    "docs/SUPERSET-GAP-MATRIX.md exists with a single matrix whose feature axis is the union of LiteCowork and all resolved competitors' first-release features, and whose columns include LiteCowork done? (with evidence vocabulary), Doc claims it?, Doc accuracy (linked to DOCS-REAUDIT-2026 / A-xx), and one column per resolved rival.",
+    "The doc contains three explicit lists: Done/Not-done (LiteCowork real state), doc errors (stale/over-claiming/contradicted/missing cross-linked to A-xx), and missing-to-be-superset (each tied to the competitor(s) that have it, with borrowable-file URL + LICENSE where available).",
+    "docs/SUPERSET-GAP-MATRIX.md is cross-linked from VIABILITY-VS-COMPETITORS.md and COMPETITIVE-RESEARCH.md and indexed in docs/README.md; parity authority remains in VIABILITY-VS-COMPETITORS.md (not duplicated).",
+    "Every 'missing' item that represents a new owner decision or research gate references an allocated B-xx or RV-xx id consistently rather than a parallel ad-hoc tracker."
+  ],
+  "verification": [
+    "Run python3 scripts/audit_v1_markdown.py and confirm 0 broken relative links including the new cross-links.",
+    "Run python3 scripts/validate_design_owner_consistency.py and confirm 0 issues.",
+    "Open docs/SUPERSET-GAP-MATRIX.md and confirm the matrix has the required columns and that each of the three lists is present and cross-references the Phase 1 verdicts / A-xx and the Phase 2 competitor evidence.",
+    "grep docs/VIABILITY-VS-COMPETITORS.md and docs/COMPETITIVE-RESEARCH.md and docs/README.md for a link to SUPERSET-GAP-MATRIX.md and confirm it resolves."
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
