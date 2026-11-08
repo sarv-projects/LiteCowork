@@ -73,11 +73,66 @@ This package remains DRAFT until its named owners accept the decisions and suppo
 - B-24: minimal memory record and purge semantics.
 - B-25: whether Quick Create pins a default lead binding or starts unbound until 002.
 
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
+
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. B-24 and B-25 remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md). B-24 is gated on the A-34/A-20 learning-vocabulary PROPOSED decision authored at the owner [LEARNING.md](../../docs/LEARNING.md); this package uses that vocabulary and does not reintroduce `MemoryCandidate`.
+
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-24 | Minimal Coworker memory record, retention and purge | **RECOMMENDED: The V1 minimal memory record is an owner-authored Coworker-scoped ContextDocument only, with embeddings and the automatic-learning pipeline deferred.** It uses the single learning vocabulary chosen in FEAT-001: a committed memory record carries `MemoryRecordMetadata.status` (ACTIVE / SUPERSEDED / REVOKED / PURGE_PENDING) per [LEARNING.md](../../docs/LEARNING.md) §7, and the automatic candidate lifecycle (`LearningCandidate`: NEW / CLASSIFIED / NEEDS_REVIEW / AUTO_COMMIT_ELIGIBLE / COMMITTED / DISMISSED / REJECTED / SUPERSEDED) stays deferred and is NOT exercised in V1. Add Memory writes a user-authored ContextDocument/Resource revision with owner/scope/source provenance through ResourceService; it never forges a `LearningCandidate` or `source_candidate_id`. Revoke moves the record to REVOKED and purge moves it to PURGE_PENDING, fencing future context assembly and retaining a deletion receipt without the deleted bytes. A memory change never grants a permission, Connection, package or schedule. To support Coworker-owned memory, the domain `valid_context_document_metadata` validator must additionally accept the COWORKER-owned `COWORKER_NOTES` owner kind (currently rejected), promoted in the owner doc and schema together. | [LEARNING.md](../../docs/LEARNING.md), [CONTEXT.md](../../docs/CONTEXT.md), [DATA-MODEL.md](../../docs/DATA-MODEL.md). The `MemoryCandidate` set is superseded-by-proposal in FEAT-001; do not reintroduce it. The validator/schema change must be promoted before this leaves PROPOSED. |
+| B-25 | Quick Create Coworker binding | **PROPOSED: Quick Create starts the Coworker UNBOUND (no default lead AgentBinding) until Feature 002 qualifies a binding, and the Coworker identity commit and the first Conversation commit are two separate idempotent commits.** A failed first chat leaves the Coworker created for safe retry (distinct idempotency identities). The Coworker is immediately usable for ordinary chat under Feature 001 once a Send route exists; it does not fabricate a lead binding or imply agent qualification. If Product later wants an initial lead, it is a separate explicit binding step owned by Feature 002, never an implicit side effect of Quick Create. | [COWORKERS-TARGET.md](../../docs/COWORKERS-TARGET.md), [ADR-0024](../../docs/adr/0024-optional-chat-first-coworkers.md), Feature 002. The exact first-binding policy stays owner-pinned; Quick Create must not pretend a qualified lead exists before this leaves PROPOSED. |
+
+Both rows are declared design positions only. This package stays DRAFT; owner acceptance, the promoted validator/schema change and the exact Quick Create binding policy are not complete. Do not infer owner sign-off from the presence of a decision row.
+
 ## 6. High-level design
 
 Target design: Coworker service commits identity and revision. Chat uses the Conversation model with an explicit immutable Coworker origin. Retrieval filters by Coworker and Workspace scope. Purge fences future context assembly and retains a deletion receipt without deleted bytes.
 
 Current checkout limitation: the Coworker aggregate and primary selection are served, but Conversation has no Coworker-origin fields and retrieval has no Coworker scope. The Coworker-bound chat and scoped retrieval described above are not current capabilities.
+
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  UI[Home Quick Create / Coworker chat / Add Memory] --> OP[Authenticated Operator]
+  OP --> CW[Coworker service identity+revision]
+  OP --> CONV[Conversation with immutable Coworker origin]
+  OP --> MEM[Add Memory -> ResourceService ContextDocument]
+  OP --> RET[Scoped retrieval filter]
+  CW --> DB[(SQLite Coworker/revision)]
+  CONV --> DB
+  MEM --> DB2[(ContextDocument + MemoryRecordMetadata.status)]
+  RET --> DB2
+  RET -. Coworker+Workspace scope only .-> FILTER[Exclude other Coworkers and Coworker-less chat]
+  PURGE[Revoke/Purge] --> DB2
+  PURGE --> RECEIPT[Deletion receipt, no deleted bytes]
+```
+
+Coworker identity, Coworker-origin Conversation, owner-authored memory and scoped retrieval are separate axes. Memory records carry `MemoryRecordMetadata.status`; the automatic `LearningCandidate` pipeline is deferred and absent from this diagram.
+
+### Trust boundaries
+
+The desktop UI is untrusted; the authenticated Operator is the only command path. Every memory read enforces Coworker + Workspace scope; a cross-Coworker id fails. Memory text is data, never a Trust policy document, and cannot grant a permission, Connection, package or schedule. Purge is owner-authorized and retains a receipt without the bytes. SQLite transactions make no network or process call.
+
+### Actor sequence (target)
+
+1. Owner uses ordinary New Chat with no Coworker; an ordinary Conversation is created (Coworkers stay optional).
+2. Owner Quick Creates a Coworker; the Coworker identity commit and the first Conversation commit are separate idempotent commits; the Coworker starts UNBOUND (B-25).
+3. Owner adds memory; Add Memory writes an owner-authored Coworker-scoped ContextDocument with `MemoryRecordMetadata.status = ACTIVE`, never a forged `LearningCandidate`.
+4. Retrieval for that Coworker filters by Coworker + Workspace scope and excludes other Coworkers and Coworker-less retrieval.
+5. Owner revokes/purges; the record moves to REVOKED/PURGE_PENDING and future prompts are fenced; no capability is granted.
+6. After restart the Coworker chat is restored with no cross-scope leakage.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop UI | Optional New Chat, Quick Create, memory review/revoke affordances | Granting authority or forging learned memory |
+| Operator | Auth, Workspace/Coworker scope, version/idempotency | Parsing memory text as policy |
+| Coworker service | Identity, immutable revisions, status | Starting an agent session |
+| ResourceService (memory) | Owner-authored ContextDocument + `MemoryRecordMetadata.status` | Creating a `LearningCandidate` for a manual edit |
+| Retrieval | Coworker + Workspace scoped read, exclusion fence | Widening scope or granting capability |
+| Storage | Atomic commits, deletion receipts without bytes | External process/network calls |
 
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
@@ -88,6 +143,45 @@ Records proposed in COWORKERS-TARGET stay PROPOSED until promoted. This package'
 Current context ownership is narrower: Resource ContextDocument creation accepts only authenticated USER-owned PERSONAL_PROFILE and WORKSPACE-owned WORKSPACE_NOTES. COWORKER_NOTES and GOAL_NOTES are rejected by the current domain-workspace validator, even though the generic OpenAPI enum and Coworker Settings UI expose those names. The persisted CoworkerContextPolicy is not enforced by retrieval.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
+
+### 7.1 Existing signatures (CODE)
+
+Observed in the active source; existence is CODE evidence, not SYSTEM/USER qualification.
+
+- Served: Coworker list/create/get/revision/status, `setPrimaryCoworker`; `POST /v1/resources/retrieval` (Workspace/explicit-Resource scope, lexical, no Coworker scope); ContextDocument create accepting only USER `PERSONAL_PROFILE` and WORKSPACE `WORKSPACE_NOTES`; `setContextDocumentStatus`, `requestContextDocumentDeletion`.
+- Fail-closed: `GET /v1/coworkers/{id}/presence` returns 503 `DEPENDENCY_UNAVAILABLE`.
+- Deterministic-only: `crates/storage-core/src/coworker_learning.rs` defines `LearningCandidate`, `CoworkerLearningPolicy` and gates with no production caller; no `LearningCandidate`/`MemoryRecord` SQLite store, migration, Operator route or Learning Inbox exists.
+- Not present: Conversation has no Coworker origin fields; no Coworker-scoped retrieval or Coworker-owned Add Memory path.
+
+### 7.2 PROPOSED signatures (not yet served)
+
+Every signature below is PROPOSED and is not promotable until LEARNING.md / CONTEXT.md and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: owner-authored Coworker-scoped memory (B-24); never a forged LearningCandidate.
+pub struct AddCoworkerMemory {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub coworker_id: String,
+    pub owner_kind: ContextDocumentOwner, // must accept COWORKER_NOTES (validator change)
+    pub body: StagedBlob,                 // bounded ContextDocument/Resource revision
+    pub idempotency_key: String,
+}
+
+// PROPOSED: committed-record lifecycle uses MemoryRecordMetadata.status, not a candidate vocabulary.
+pub enum MemoryRecordStatus { Active, Superseded, Revoked, PurgePending }
+
+// PROPOSED: separate idempotent commits for Quick Create (B-25).
+pub struct QuickCreateCoworker {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub coworker_idempotency_key: String,       // distinct from the first-chat key
+    pub first_conversation_idempotency_key: String,
+    pub initial_binding: Option<AgentBindingRef>, // PROPOSED default None (unbound until Feature 002)
+}
+```
+
+Typed errors (PROPOSED): `MemoryError::{CrossScopeDenied, OwnerKindRejected, StaleCoworkerVersion}`; a revoke/purge never deletes bytes without a retained receipt.
 
 ## 8. Data
 
@@ -123,12 +217,29 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN the owner uses New Chat without a Coworker, THE SYSTEM SHALL create an ordinary Conversation.
-- **AC-002:** WHEN the owner Quick Creates a Coworker, THE SYSTEM SHALL open a chat scoped to that Coworker id.
-- **AC-003:** WHEN context is attached to a Coworker, THE SYSTEM SHALL exclude it from other Coworkers and from Coworker-less retrieval.
-- **AC-004:** WHEN the owner revokes or purges memory, THE SYSTEM SHALL fence future prompts and SHALL NOT grant any capability.
-- **AC-005:** IF a Task names a stale Coworker version, THEN THE SYSTEM SHALL conflict and SHALL NOT switch Coworker implicitly.
-- **AC-006:** WHEN the app restarts, THE SYSTEM SHALL restore the Coworker chat without cross-scope leakage.
+Positive:
+- **AC-001:** WHEN the owner uses New Chat without a Coworker, THE SYSTEM SHALL create an ordinary Conversation. Verify: optional-chat test.
+- **AC-002:** WHEN the owner Quick Creates a Coworker, THE SYSTEM SHALL open a chat scoped to that Coworker id. Verify: Quick Create chat-open test.
+- **AC-008:** WHEN the owner adds memory, THE SYSTEM SHALL write an owner-authored Coworker-scoped ContextDocument with `MemoryRecordMetadata.status = ACTIVE` and SHALL NOT forge a `LearningCandidate` or `source_candidate_id`. Verify: Add-Memory provenance test.
+
+Scope / security:
+- **AC-003:** WHEN context is attached to a Coworker, THE SYSTEM SHALL exclude it from other Coworkers and from Coworker-less retrieval. Verify: scoped-retrieval exclusion test.
+- **AC-009:** WHEN a memory change is committed, THE SYSTEM SHALL NOT grant any permission, Connection, package or schedule. Verify: no-grant security test.
+
+Negative:
+- **AC-005:** IF a Task names a stale Coworker version, THEN THE SYSTEM SHALL conflict and SHALL NOT switch Coworker implicitly. Verify: stale-version conflict test.
+- **AC-010:** IF Add Memory targets a Coworker owner kind the validator has not promoted, THEN THE SYSTEM SHALL reject it rather than silently widen the owner boundary. Verify: owner-kind rejection test.
+
+Recovery:
+- **AC-004:** WHEN the owner revokes or purges memory, THE SYSTEM SHALL fence future prompts and SHALL NOT grant any capability. Verify: revoke/purge fence test.
+- **AC-006:** WHEN the app restarts, THE SYSTEM SHALL restore the Coworker chat without cross-scope leakage. Verify: restart isolation test.
+
+Boundary / concurrency:
+- **AC-011:** WHEN purge is requested, THE SYSTEM SHALL move the record to PURGE_PENDING and retain a deletion receipt without the deleted bytes. Verify: purge-receipt test.
+- **AC-012:** WHEN Quick Create's first-chat commit fails, THE SYSTEM SHALL leave the Coworker created for safe retry under distinct idempotency identities. Verify: Quick Create partial-failure test.
+
+UI and accessibility:
+- **AC-007:** WHEN the Coworker surface renders, THE SYSTEM SHALL keep ordinary New Chat available without a Coworker and SHALL present memory review/revoke as keyboard- and screen-reader-accessible states. Verify: Coworker UI render + a11y test.
 
 ## 16. Executable acceptance command
 
@@ -167,11 +278,17 @@ Read from RESPONSIBILITIES, COWORKERS-TARGET, and LEARNING boundaries those docs
 
 ## 19. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 009-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 009-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 009-T02 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 009-T02 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 009-T02 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 009-T03 | AC-006 |
+| Ordinary chat without a Coworker | ARCHITECTURE, ADR-0024 | 009-T04 | AC-001 | Optional-chat test |
+| Quick Create opens scoped chat (B-25) | COWORKERS-TARGET, ADR-0024 | 009-T04 | AC-002 | Quick Create chat-open test |
+| Scoped retrieval exclusion | CONTEXT | 009-T03 | AC-003 | Scoped-retrieval exclusion test |
+| Revoke/purge fence | CONTEXT, LEARNING | 009-T02 | AC-004 | Revoke/purge fence test |
+| Stale Coworker version conflict | RESPONSIBILITIES, STATE-MACHINES | 009-T02 | AC-005 | Stale-version conflict test |
+| Restart isolation | CONTEXT | 009-T03 | AC-006 | Restart isolation test |
+| Optional/accessible Coworker UI | COWORKERS-TARGET; contracts/ui-behavior.md | 009-T04 | AC-007 | Coworker UI render + a11y test |
+| Owner-authored memory provenance (B-24) | LEARNING, CONTEXT | 009-T02 | AC-008 | Add-Memory provenance test |
+| Memory grants no capability | COWORKERS-TARGET, TRUST | 009-T02 | AC-009 | No-grant security test |
+| Owner-kind boundary (B-24) | CONTEXT, DATA-MODEL | 009-T02 | AC-010 | Owner-kind rejection test |
+| Purge receipt without bytes | CONTEXT, LEARNING | 009-T02 | AC-011 | Purge-receipt test |
+| Quick Create partial-failure safety (B-25) | COWORKERS-TARGET | 009-T01 | AC-012 | Quick Create partial-failure test |

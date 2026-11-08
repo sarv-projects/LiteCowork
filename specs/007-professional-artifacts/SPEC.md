@@ -74,9 +74,68 @@ Feature 007 remains DRAFT. The stated journey (create, revise, export, reopen on
 - B-30: Artifacts, Storage and Task owners must accept the initial Artifact creation authority and atomic create contract, including the Task/Attempt provenance rules, uploaded/imported-vs-generated distinctions, first-version content staging, immutable identity and event/receipt ordering. The current Artifact store has no create method/route.
 - B-31: Artifacts, Storage, Desktop UI and Security must accept the export semantics and receipt owner. Define native Save As separately from server/provider export, pin exact ArtifactVersion and content digest, persist only approved destination metadata, and make retry/restart behavior idempotent. Current Save As has no durable export receipt.
 
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
+
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. B-21, B-30 and B-31 remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md). They are independent: a format choice does not by itself create an Artifact create route or an export receipt.
+
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-21 | First professional Artifact deliverable format | **RECOMMENDED: Markdown document (`text/markdown`, CommonMark + GFM tables) as the first qualified professional format, with a deterministic in-process serializer/validator and no external Office engine in the first slice.** The format has an exact ID (`text/markdown`), a declared parser/serializer (CommonMark-compliant, GFM table extension), supported operations (view/edit/export/reopen/compare), a deterministic round-trip check (parse -> AST -> re-serialize -> byte-stable canonical form), a 1 MiB input bound and a 10 MiB export bound, and an explicit `UNSUPPORTED_FORMAT` result for any other media. Preview availability of CSV/JSON/YAML/XML does NOT make them editable; they stay read-only until separately qualified. DOCX/XLSX/PPTX/PDF remain read-only/unsupported in this slice; an Office-readiness probe is not an engine. | [ARTIFACTS-EVIDENCE.md](../../docs/ARTIFACTS-EVIDENCE.md), [V1-PRODUCT-RELEASE-CONTRACT.md](../../docs/V1-PRODUCT-RELEASE-CONTRACT.md) area 9. The exact engine/version and round-trip fidelity criteria must land in the owner contract before this leaves PROPOSED. |
+| B-30 | Initial Artifact creation authority and atomic transaction | **PROPOSED: One authenticated `POST /v1/artifacts` create command owned by ArtifactStore that atomically commits the Artifact, its ARTIFACT Resource, first ResourceRevision, immutable version 1, provenance/dependency edges, `artifact.created.v1`, the aggregate snapshot and an owner-scoped idempotency receipt in a single SQLite IMMEDIATE transaction.** The create contract declares three authorized source classes kept distinct: user-authored (owner supplies first-version bytes), imported (an admitted Resource is copied into a new ARTIFACT Resource, never relabelled in place) and Task-generated (pins `source_task_id`/`source_attempt_id`, available only once Feature 005 produces a Task output). A Resource upload is never implicitly an Artifact. Identical replay returns the receipt; a changed payload under the same key conflicts. | [ARTIFACTS-EVIDENCE.md](../../docs/ARTIFACTS-EVIDENCE.md), [STORAGE.md](../../docs/STORAGE.md), [EVENTS.md](../../docs/EVENTS.md). `artifact.created.v1` exists in the event registry but has no production producer; the OpenAPI create route and the producer must be promoted together with the owner contract before this leaves PROPOSED. |
+| B-31 | Durable Artifact export receipt distinct from native Save As | **PROPOSED: A durable `ArtifactExportReceipt` record and `artifact.exported.v1` event, committed by an authenticated export command, that is explicitly separate from the existing native desktop Save As.** The receipt pins exact `artifact_id` + `artifact_version`, the export format and transformer/engine version, a destination class (never a raw local path in a shared event), the exported content digest, the actor, the timestamp and a replay identity. Native Save As stays a local file write that creates no Artifact/Resource version, no domain event and no receipt, and is labelled SAVED/CANCELLED only. V1 may require the persisted export receipt only for the server/provider export path; a native local export remains visibly distinct unless Product accepts a narrower local-export-receipt contract with durable, safe destination metadata. | [ARTIFACTS-EVIDENCE.md](../../docs/ARTIFACTS-EVIDENCE.md), [STORAGE.md](../../docs/STORAGE.md), [SECURITY.md](../../docs/SECURITY.md). No export receipt record/event/route exists today; the schema and owner prose must change together before this leaves PROPOSED. |
+
+All three rows are declared design positions only. This package stays DRAFT; owner acceptance, the exact engine/version and the promoted create/export contracts are not complete. Do not infer owner sign-off or release qualification from the presence of a decision row.
+
 ## 6. High-level design
 
 Target: UI Library commands call ArtifactStore through the authenticated Operator. A distinct create operation publishes the initial Artifact/ARTIFACT Resource/revision/version and provenance atomically. Subsequent versions are immutable. A format adapter performs bounded edit/round-trip and deterministic export outside SQLite; the exact output is digest-verified before the export receipt is committed. Native desktop Save As is a separate local file operation and is not substituted for a provider/durable export receipt. Presentation renders committed projections only. None of the create or durable export receipt path is served in the current checkout.
+
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  UI[Library / Workbench UI] --> OP[Authenticated Operator]
+  OP --> CREATE[Artifact create command B-30]
+  OP --> VER[Immutable version append]
+  OP --> FMT[B-21 format adapter edit/validate/round-trip]
+  OP --> EXP[B-31 export command]
+  OP --> LIB[Library promote/archive]
+  CREATE --> DB[(SQLite Artifact/Resource/version/events/receipt)]
+  VER --> DB
+  FMT -. bounded, outside SQLite .-> WORK[Serializer/validator + digest]
+  WORK --> VER
+  EXP --> DIGEST[Digest-verify exact version]
+  DIGEST --> DB
+  SAVEAS[Native desktop Save As] -. local file only, no event .-> FS[Owner-selected destination]
+  DB --> PRES[Presentation projection]
+  PRES --> UI
+```
+
+Create, version append, format edit/round-trip and export are separate axes. The format adapter and native Save As both run outside the SQLite transaction; only digest-verified results are committed. Save As is deliberately drawn with no edge into the event/receipt store.
+
+### Trust boundaries
+
+The desktop UI is untrusted; the authenticated Operator is the only command path. Artifacts are Workspace-scoped and no presentation payload can invoke a host action. The format adapter treats document bytes as untrusted input and never executes embedded HTML, scriptable SVG or model-provided JavaScript during edit, validation or export. Export destinations stay inside authorized roots and a raw local path is never written into a shared event. SQLite transactions make no network or process call; the adapter and Save As run outside the transaction and then persist a digest-verified result.
+
+### Actor sequence (target)
+
+1. Owner issues an authenticated create command for the chosen source class (user-authored, imported or Task-generated); the create transaction commits Artifact + ARTIFACT Resource + revision 1 + version 1 + provenance + `artifact.created.v1` + snapshot + receipt atomically.
+2. Owner opens the Markdown Artifact in the Workbench; the adapter parses it and renders an editable surface.
+3. Owner edits and saves; the adapter validates and round-trips the content, the digest is verified, and a new immutable version is appended (or the prior version stays current).
+4. Owner compares two versions; differences are computed from committed versions, not from the unsaved editor buffer alone.
+5. Owner exports; the export command digest-verifies the exact pinned version and commits an `ArtifactExportReceipt` distinct from the version commit.
+6. A native Save As for a managed blob remains a local file write labelled SAVED/CANCELLED only; it creates no version, event or receipt.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop UI | Edit surface, version history/compare, honest unsupported/read-only states | Owning bytes, versions or export authority |
+| Operator | Auth, Workspace scope, version/idempotency validation | Running the format engine itself |
+| ArtifactStore | Atomic create/append, immutable versions, provenance, receipts | External process/network calls |
+| Format adapter (B-21) | Parse, edit, validate, deterministic round-trip and export transform outside SQLite | Durable state or authority |
+| Export command (B-31) | Digest-verify exact version, commit export receipt + event | Native local Save As behavior |
+| Presentation | Render committed projections, semantic fallback when rich render fails | Converting rendered output into durable state |
 
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
@@ -85,6 +144,52 @@ Trust boundary: the desktop UI is untrusted; the authenticated Operator is the o
 Follow ARTIFACTS-EVIDENCE ArtifactStore and Library commands. First commit an initial Artifact under the B-30 create contract. The B-21 format adapter must implement the exact declared read, edit, validation, save, export and reopen path; publish new immutable versions only after the content blob and digest are verified. The B-31 export boundary creates a receipt distinct from the Artifact version. Unsupported media/operations return a typed unsupported error rather than a silent no-op. Existing managed text/plain append is a separate narrow fallback, not the selected format editor.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
+
+### 7.1 Existing signatures (CODE)
+
+Observed in the active source; existence/invocation is CODE evidence, not SYSTEM/USER qualification.
+
+- Served: `GET /v1/artifacts`, `GET /v1/artifacts/{id}`, exact version metadata/content, `POST /v1/artifacts/{artifact_id}/text-version` (managed `text/plain`, <=1 MiB, `If-Match` + content/Resource aggregate version + exact parent ResourceRevision), Library list/saved/promote/archive, `GET /v1/tasks/{task_id}/artifacts` (read-only).
+- Native bridge: desktop Save As for one MANAGED_BLOB version <=10 MiB with digest/size/media revalidation and atomic same-directory write; returns SAVED/CANCELLED only.
+- Not present: no `create_artifact` storage method, no `POST /v1/artifacts`, no `artifact.created.v1` producer, no export receipt record/route/event. Office-readiness probes in `environment_office_qualification.rs` are observations, not an engine.
+
+### 7.2 PROPOSED signatures (not yet served)
+
+Every signature below is PROPOSED and is not promotable until ARTIFACTS-EVIDENCE and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: atomic Artifact creation (B-30), one SQLite IMMEDIATE transaction.
+pub struct CreateArtifact {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub source: ArtifactSource,          // UserAuthored | Imported{resource_id} | TaskGenerated{task_id, attempt_id}
+    pub media_type: String,              // first slice: "text/markdown"
+    pub first_version_bytes: StagedBlob, // digest/size/UTF-8 verified before commit
+    pub idempotency_key: String,         // 1..=200 printable ASCII
+}
+
+// PROPOSED: deterministic round-trip + validation for the B-21 format (outside SQLite).
+pub trait ArtifactFormatAdapter: Send + Sync {
+    fn validate(&self, media_type: &str, bytes: &[u8]) -> Result<ValidationReport, FormatError>;
+    fn round_trip(&self, bytes: &[u8]) -> Result<CanonicalBlob, FormatError>; // byte-stable canonical form
+    fn export(&self, bytes: &[u8], target: ExportFormat) -> Result<ExportedBlob, FormatError>;
+}
+
+// PROPOSED: durable export receipt (B-31), distinct from version commit.
+pub struct CommitArtifactExport {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub artifact_id: String,
+    pub artifact_version: u64,           // exact pinned version
+    pub export_format: String,
+    pub transformer_version: String,
+    pub destination_class: DestinationClass,   // never a raw local path in a shared event
+    pub exported_digest: ContentDigest,
+    pub idempotency_key: String,
+}
+```
+
+Typed errors (PROPOSED): `FormatError::{Unsupported, ValidationFailed, RoundTripMismatch, TooLarge}`; `ArtifactError::{Archived, StaleVersion, ReplayConflict, SourceNotAdmitted}`.
 
 ## 8. Data
 
@@ -120,12 +225,29 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN the owner saves, THE SYSTEM SHALL commit a new immutable Artifact version or leave the prior version current.
-- **AC-002:** WHEN the owner reopens after restart, THE SYSTEM SHALL load the last committed version bytes and provenance.
-- **AC-003:** WHEN two versions are compared, THE SYSTEM SHALL show differences from stored versions, not from an unsaved editor buffer alone.
-- **AC-004:** IF presentation rendering fails, THEN THE SYSTEM SHALL still show the semantic artifact text or source.
-- **AC-005:** IF the format does not support editing, THEN THE SYSTEM SHALL label it unsupported or read-only and SHALL NOT claim save.
-- **AC-006:** WHEN export succeeds, THE SYSTEM SHALL record an export receipt distinct from the version commit.
+Positive:
+- **AC-001:** WHEN the owner saves, THE SYSTEM SHALL commit a new immutable Artifact version or leave the prior version current. Verify: version-append transaction test.
+- **AC-002:** WHEN the owner reopens after restart, THE SYSTEM SHALL load the last committed version bytes and provenance. Verify: restart reopen test.
+- **AC-003:** WHEN two versions are compared, THE SYSTEM SHALL show differences from stored versions, not from an unsaved editor buffer alone. Verify: version-compare test.
+- **AC-010:** WHEN the owner creates the first Artifact under the B-30 create command, THE SYSTEM SHALL atomically commit the Artifact, ARTIFACT Resource, ResourceRevision, version 1, provenance, `artifact.created.v1`, snapshot and receipt. Verify: atomic-create transaction test.
+
+Recovery:
+- **AC-004:** IF presentation rendering fails, THEN THE SYSTEM SHALL still show the semantic artifact text or source. Verify: presentation-fallback test.
+- **AC-008:** IF a crash occurs during save or export, THEN THE SYSTEM SHALL leave the current version pointer unchanged and SHALL NOT commit a partial version or receipt. Verify: crash/rollback test.
+
+Negative:
+- **AC-005:** IF the format does not support editing, THEN THE SYSTEM SHALL label it unsupported or read-only and SHALL NOT claim save. Verify: unsupported-format labeling test.
+- **AC-009:** IF an uploaded Resource is presented as an Artifact without the create command, THEN THE SYSTEM SHALL reject it and SHALL NOT relabel the Resource as an Artifact. Verify: resource-not-artifact negative test.
+
+Boundary:
+- **AC-007:** WHEN document bytes exceed the declared input bound (PROPOSED 1 MiB) or the export bound (PROPOSED 10 MiB), THE SYSTEM SHALL reject the operation with a typed `TooLarge` error. Verify: size-boundary test.
+
+Security:
+- **AC-011:** WHEN a document contains embedded HTML, scriptable SVG or model-provided JavaScript, THE SYSTEM SHALL neither execute it during edit/validate/export nor write a raw local path into a shared export event. Verify: untrusted-content and export-destination redaction tests.
+
+Export / concurrency:
+- **AC-006:** WHEN export succeeds, THE SYSTEM SHALL record an export receipt distinct from the version commit. Verify: export-receipt test.
+- **AC-012:** WHEN an export or create idempotency key replays with an unchanged payload, THE SYSTEM SHALL return the original receipt, and a changed payload with the same key SHALL conflict. Verify: replay/conflict test.
 
 ## 16. Executable acceptance command
 
@@ -175,11 +297,17 @@ Read from ARTIFACTS-EVIDENCE, PRESENTATION-RUNTIME, and INTERACTIVE-ARTIFACT-RUN
 
 ## 19. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 007-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 007-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 007-T03 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 007-T04 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 007-T03 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 007-T02 | AC-006 |
+| Save commits immutable version | ARTIFACTS-EVIDENCE, STORAGE | 007-T03 | AC-001 | Version-append transaction test |
+| Reopen after restart | ARTIFACTS-EVIDENCE | 007-T03 | AC-002 | Restart reopen test |
+| Version compare from stored versions | ARTIFACTS-EVIDENCE, PRESENTATION-RUNTIME | 007-T03 | AC-003 | Version-compare test |
+| Semantic fallback on render failure | PRESENTATION-RUNTIME | 007-T04 | AC-004 | Presentation-fallback test |
+| Unsupported format labeled honestly | V1-PRODUCT-RELEASE-CONTRACT | 007-T04 | AC-005 | Unsupported-format labeling test |
+| Export receipt distinct from version (B-31) | ARTIFACTS-EVIDENCE, STORAGE | 007-T02 | AC-006 | Export-receipt test |
+| Size boundary rejection (B-21) | ARTIFACTS-EVIDENCE | 007-T03 | AC-007 | Size-boundary test |
+| Crash leaves pointer unchanged | STORAGE, FAILURE-RECOVERY | 007-T03 | AC-008 | Crash/rollback test |
+| Resource is not an Artifact (B-30) | ARTIFACTS-EVIDENCE | 007-T02 | AC-009 | Resource-not-artifact negative test |
+| Atomic initial create (B-30) | ARTIFACTS-EVIDENCE, EVENTS, STORAGE | 007-T02 | AC-010 | Atomic-create transaction test |
+| Untrusted content and redacted export | SECURITY, PRESENTATION-RUNTIME | 007-T04 | AC-011 | Untrusted-content / export-redaction tests |
+| Create/export replay idempotency | STORAGE, ARTIFACTS-EVIDENCE | 007-T02 | AC-012 | Replay/conflict test |

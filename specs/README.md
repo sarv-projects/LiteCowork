@@ -15,11 +15,11 @@ DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package
 | 004 | Agent relay | DRAFT — deepened; B-15/B-16 PROPOSED, pending owner | [004-agent-relay](004-agent-relay/README.md) |
 | 005 | Safe Task path | DRAFT — deepened; B-17/B-18 PROPOSED, pending owner | [005-safe-task-path](005-safe-task-path/README.md) |
 | 006 | Golden Connection and one capability write | DRAFT — deepened; B-19/B-20 PROPOSED, pending owner | [006-golden-connection-capability-write](006-golden-connection-capability-write/README.md) |
-| 007 | Professional Artifacts, one format | DRAFT | [007-professional-artifacts](007-professional-artifacts/README.md) |
-| 008 | Workbench browser, terminal and computer | DRAFT | [008-workbench-browser-terminal-computer](008-workbench-browser-terminal-computer/README.md) |
-| 009 | Coworkers and scoped memory | DRAFT | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |
-| 010 | Automations and recurring host | DRAFT | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
-| 011 | Desktop shell, IPC, settings and Runtime | DRAFT | [011-desktop-shell-ipc-settings-runtime](011-desktop-shell-ipc-settings-runtime/README.md) |
+| 007 | Professional Artifacts, one format | DRAFT — deepened to the specs/001 bar; B-21/B-30/B-31 PROPOSED, pending owner | [007-professional-artifacts](007-professional-artifacts/README.md) |
+| 008 | Workbench browser, terminal and computer | DRAFT — deepened; B-22/B-23/B-32 PROPOSED, pending owner; managed-Chromium adapter disables ambient-CDP/profile-copy | [008-workbench-browser-terminal-computer](008-workbench-browser-terminal-computer/README.md) |
+| 009 | Coworkers and scoped memory | DRAFT — deepened; B-24/B-25 PROPOSED, pending owner; aligned to the single A-34 learning vocabulary | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |
+| 010 | Automations and recurring host | DRAFT — deepened; B-26/B-27 PROPOSED, pending owner; owns A-35 quiet-hours surface | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
+| 011 | Desktop shell, IPC, settings and Runtime | DRAFT — deepened; B-28/B-29/B-33 PROPOSED, pending owner; owns A-35 Settings->Agents screen, links 010 for quiet-hours | [011-desktop-shell-ipc-settings-runtime](011-desktop-shell-ipc-settings-runtime/README.md) |
 
 ## Package 001 manifest
 

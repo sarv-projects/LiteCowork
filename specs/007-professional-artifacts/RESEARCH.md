@@ -9,6 +9,14 @@
 - Native bridge and UI: `apps/litecowork-ui/src-tauri/src/artifact_bridge.rs`; `apps/litecowork-ui/src/artifacts/ArtifactLibrary.tsx`, `ArtifactWorkbench.tsx`, `TaskArtifactOutputs.tsx`, `StructuredTextPreview.tsx`, `artifact-api.ts`, `desktop-artifact-api.ts`, `README.md`; `apps/litecowork-ui/src/App.tsx` Library/Work integration.
 - Machine route inventory: `docs/schemas/served-route-inventory.json` checked against `artifact_operator.rs` route composition.
 
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs this feature | Verdict |
+|---|---|---|---|---|
+| Open Cowork document-skills surface (`opencoworkai/open-cowork`) | https://github.com/opencoworkai/open-cowork/tree/e94ee2c50239e64ba0e18921e339d49b93dae31f | MIT at checked root LICENSE | Its document Skills UX (one-deliverable create/edit/export flow, per-format skill surface and inspect-then-publish habit) is a reference for how the B-21 one-format editor, B-30 create entry point and B-31 export surface should feel, including keeping an unsupported format visibly read-only rather than fake-editable. | Prototype the create/edit/export UX shape only; keep the LiteCowork Artifact/Evidence identity, immutable versions and ArtifactStore owner. Do not import Open Cowork code, its Electron host or its Claude Agent SDK runner. |
+
+No Open Cowork code is imported; it is a UX/skill reference read at the pinned SHA. LiteCowork retains its own Artifact/Resource/ExportReceipt model and does not adopt any competitor's document store or renderer.
+
 ## Source and route findings
 
 - Artifact domain models and immutable version records exist. The active read store has Artifact list/get, exact version read and bounded content read. The Library write store handles promote/archive. The version-write store handles idempotent append only; there is no `create_artifact` method in the production Storage traits or `SqliteWorkspaceStore` implementation.

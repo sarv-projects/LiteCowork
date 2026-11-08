@@ -75,9 +75,68 @@ Feature 008 remains DRAFT. The current Workbench is a Resource preview plus simu
 - B-23: Desktop shell, Environments and Security must accept one real PTY/ConPTY implementation and shell profile, tied to a qualified Environment. Acceptance requires a real process, exact executable/argv/cwd/allowlisted env, per-session process-tree containment, bounded streaming, resize, explicit stop, detach/reattach and quiescence/lost-session proof on UI close, Runtime restart and crash.
 - B-32: Product and Desktop shell must decide Computer-use scope. If same V1 milestone, Environments/Trust must supply an exact OS provider with explicit capture/input permission, scope, excluded sensitive regions, revocation and per-action authority; current code explicitly has no capture or injection backend. Otherwise defer the surface and state it as unavailable.
 
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
+
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. B-22, B-23 and B-32 remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md). Browser, terminal and computer-use are three independent qualification axes.
+
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-22 | First real browser mode on the GA OS/build | **RECOMMENDED: `MANAGED_CHROMIUM` with a LiteCowork-managed isolated profile as the first qualified browser mode, not `CONNECT_EXISTING_CHROME`.** The provider launches a version-pinned Chromium under a dedicated managed profile directory; it never copies the user's default profile, cookies, history or login state, and ambient CDP discovery against the default user directory is DISABLED. The visible-surface adapter (`LIVE_INTERACTIVE` or `OBSERVATION_FRAMES`) is separate from the provider session identity. Consent is recorded before any agent action, Take control is an atomic epoch transfer that fences queued agent input, and Return requires explicit confirmation plus a fresh observation. `CONNECT_EXISTING_CHROME` stays a later, separately consented mode. | [CHROME-BROWSER-LLD.md](../../docs/CHROME-BROWSER-LLD.md), [TRUST.md](../../docs/TRUST.md). The exact Chromium channel/version, profile policy and provider transport must land in the owner contract before this leaves PROPOSED. |
+| B-23 | First real terminal provider, shell profile and Environment binding | **PROPOSED: One daemon-owned PTY/ConPTY provider bound to an admitted Environment, pinned to the Feature 001/011 first GA OS, with a discovered default shell profile and no startup-script execution during discovery.** The provider spawns exactly one process tree per terminal tab under the admitted Environment, with exact shell executable/argv/cwd and an allowlisted environment, a process-tree containment receipt (Job Object on Windows, cgroup on Linux), bounded scrollback/backpressure, resize and stdin bridged to Tauri. Tab switch/detach/reattach never respawns or kills the process; explicit Stop terminates the owned tree; UI close, Runtime stop and crash yield exact QUIESCENT or LOST/UNKNOWN evidence. Discovery performs bounded executable/version probing only and never sources rc files or scrapes secrets. The command-receipt shape and timeout-as-receipt doctrine are informed by OpenHands (RESEARCH.md). | [V1-INTEGRATED-TERMINAL-LLD.md](../../docs/V1-INTEGRATED-TERMINAL-LLD.md), [ENVIRONMENTS.md](../../docs/ENVIRONMENTS.md). The exact OS/shell/PTY implementation must land in the owner contract before this leaves PROPOSED; the current simulated terminal stays unavailable until then. |
+| B-32 | Computer-use milestone and takeover boundary | **RECOMMENDED: Defer Computer use from the first V1 milestone and keep the surface explicitly UNAVAILABLE.** No disabled-but-ready computer button, synthetic cursor or capture control is rendered; `probe_computer_provider()` continues to report UNSUPPORTED/UNAVAILABLE on the supported targets. If Product later includes it, Environments/Trust must supply an exact OS capture/input provider with explicit permission flow, scope, excluded sensitive regions (password/payment/CAPTCHA/MFA remain human-only), revocation and per-action authority sharing the same consent epoch as the browser. | [ENVIRONMENTS.md](../../docs/ENVIRONMENTS.md), [TRUST.md](../../docs/TRUST.md). Keeping the surface unavailable is the safe default; any inclusion requires a promoted provider contract before this leaves PROPOSED. |
+
+All three rows are declared design positions only. This package stays DRAFT; owner acceptance and the exact providers are not complete. Do not infer owner sign-off or release qualification from the presence of a decision row.
+
 ## 6. High-level design
 
 Right Workbench hosts views. Browser control goes through a lease gateway outside SQLite. Terminal opens a PTY only after Environment admission. Computer actions use the same epoch and consent record. UI disablement follows provider availability.
+
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  UI[Workbench right pane views] --> OP[Authenticated Operator]
+  OP --> BGW[Browser lease gateway B-22]
+  OP --> TSS[TerminalSessionService B-23]
+  OP --> CU[Computer-use policy B-32 deferred]
+  BGW --> LEASE[(EnvironmentControlLease epoch store)]
+  BGW -. outside SQLite .-> BROW[Managed Chromium provider + isolated profile]
+  TSS --> ENV[Admitted Environment]
+  TSS -. outside SQLite .-> PTY[One PTY/ConPTY process tree per tab]
+  PTY --> CONTAIN[Job Object / cgroup containment receipt]
+  BROW -->|untrusted screenshots/DOM| BGW
+  PTY -->|ordered command receipts| TSS
+  BGW --> DB[(SQLite epoch/receipt/audit)]
+  TSS --> DB
+  DB --> UI
+```
+
+Browser, terminal and computer-use are three separate providers. The managed Chromium process and the PTY process both live outside SQLite; only epoch transitions, receipts and audit rows commit inside the transaction.
+
+### Trust boundaries
+
+The desktop UI is untrusted; the authenticated Operator is the only command path. Screenshots, page text and terminal output are untrusted observations, never authorization. The managed browser profile is isolated: no default-profile copy, no ambient CDP discovery, no cookie/history/login import; password/payment/CAPTCHA/MFA stay human-only. The raw CDP handle and the PTY handle never enter events, snapshots or logs; the model receives a capability grant, not the handle. SQLite transactions make no network or process call.
+
+### Actor sequence (target)
+
+1. Owner opens the Workbench bound to a Conversation or Task; unqualified surfaces render UNAVAILABLE rather than a fake Chrome/terminal.
+2. Owner starts a managed browser epoch; consent and session epoch are recorded before any agent browser action.
+3. Agent acts under epoch n; every action rechecks session/tab generation, principal, control epoch and lease.
+4. Owner takes over; the epoch advances to n+1 atomically and queued agent input is fenced/discarded.
+5. Owner returns control with explicit confirmation; the epoch increments again and the agent replans from a fresh observation.
+6. Owner opens a terminal; one real PTY/ConPTY process spawns in the admitted Environment with a containment receipt; tab switch/detach/reattach does not respawn or kill it; Stop terminates the owned tree.
+7. Provider loss marks the epoch LOST/RECOVERING/AMBIGUOUS and reconciles in-flight actions before any retry.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop UI | Honest availability states, consent/takeover affordances, never label a WebView as Chrome | Owning the provider process or lease authority |
+| Operator | Auth, Workspace scope, epoch/lease validation | Native process custody |
+| Browser lease gateway (B-22) | Consent, epoch transfer, stale-epoch rejection, action dispatch outside SQLite | Copying the user's Chrome profile |
+| TerminalSessionService (B-23) | PTY/ConPTY spawn, one process tree per tab, containment receipt, streaming, stop | Executing shell startup scripts during discovery |
+| Computer-use policy (B-32) | Consent/scope policy; stays UNAVAILABLE until a provider is qualified | Capture/input without an OS provider |
+| Storage | Atomic epoch/receipt/audit commits | External process/network calls |
 
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
@@ -86,6 +145,48 @@ Trust boundary: the desktop UI is untrusted; the authenticated Operator is the o
 Takeover keeps the EnvironmentControlLease ACTIVE, moves control from AGENT epoch n to HUMAN epoch n+1, and rejects the old epoch. The browser process may stay up. Return requires explicit confirmation and another epoch increment. Handle presentation to the model is a capability grant, not the raw CDP or PTY handle in events.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
+
+### 7.1 Existing signatures (CODE)
+
+Observed in the active source; existence is CODE evidence, not SYSTEM/USER qualification.
+
+- `browser_consent.rs` and `browser_control_service.rs`: pure policy/admission helpers (managed-profile marker, consent, high-trust, exact major-version match, Chrome 144+ for connect-existing; actor/lease/epoch/stale-input admission and takeover/return decisions). Compiled with `allow(dead_code)`; the only call sites are unit tests. They do not dispatch a provider action.
+- `environment_computer_use.rs`: policy boundary with `probe_computer_provider()`; every capture/input request is refused; capability flags are false.
+- `WorkbenchPanel.tsx`: iframe browser preview, Resource Files preview, honest unavailable Terminal/Review panes (per register A-51).
+- Not served: no BrowserSession create/list/get/navigate/capture/action/control-lease route, no TerminalSession/profile/PTY route, no Computer-use route. `takeEnvironmentControl`/`returnEnvironmentControl` are target-only Environment operations, not BrowserControlLease handlers.
+
+### 7.2 PROPOSED signatures (not yet served)
+
+Every signature below is PROPOSED and is not promotable until CHROME-BROWSER-LLD / V1-INTEGRATED-TERMINAL-LLD and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: atomic browser control epoch transfer (B-22, AC-003/AC-004).
+pub struct TakeBrowserControl {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub session_id: String,
+    pub expected_epoch: u64,          // stale epoch => rejected
+    pub expected_session_version: u64,
+}
+
+// PROPOSED: daemon-owned terminal session bound to an admitted Environment (B-23).
+pub trait TerminalSessionService: Send + Sync {
+    fn open(&self, env_id: &str, profile: ShellProfile) -> Result<TerminalSession, TerminalError>;
+    fn write_stdin(&self, session_id: &str, bytes: &[u8]) -> Result<(), TerminalError>;
+    fn resize(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), TerminalError>;
+    fn stop(&self, session_id: &str) -> Result<QuiescenceReceipt, TerminalError>; // QUIESCENT | LOST | UNKNOWN
+}
+
+// PROPOSED: ordered terminal command receipt (B-23), informed by OpenHands RESEARCH.
+pub struct CommandReceipt {
+    pub session_id: String,
+    pub order: u64,                    // monotonic; persisted before publication
+    pub exit_code: Option<i32>,        // None => still running; -1 => timed out
+    pub timed_out: bool,
+}
+```
+
+Typed errors (PROPOSED): `BrowserControlError::{StaleEpoch, LeaseLost, ConsentMissing, ProviderUnavailable}`; `TerminalError::{EnvironmentNotAdmitted, SpawnFailed, ContainmentUnavailable, Lost}`.
 
 ## 8. Data
 
@@ -121,13 +222,33 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN no qualified browser provider exists, THE SYSTEM SHALL show UNAVAILABLE and SHALL NOT label a WebView as Chrome.
-- **AC-002:** WHEN the owner starts a managed browser epoch, THE SYSTEM SHALL record consent and a session epoch before any agent browser action.
-- **AC-003:** WHEN the owner takes over, THE SYSTEM SHALL atomically advance the control epoch and fence/discard queued agent input; the agent SHALL perform no further browser action until a separate confirmed return to a fresh observation or the session is closed.
-- **AC-004:** IF a stale epoch handle is presented, THEN THE SYSTEM SHALL reject it.
-- **AC-005:** WHEN a terminal opens, THE SYSTEM SHALL spawn one real PTY/ConPTY process in the admitted Environment, persist its exact session/process identity, and SHALL NOT merge tabs or process trees across Environments.
-- **AC-006:** WHEN shell profiles are discovered, THE SYSTEM SHALL perform bounded executable/version discovery without executing profile startup scripts, sourcing shell rc files, or scraping environment secrets.
-- **AC-007:** WHEN the Runtime loses the provider, THE SYSTEM SHALL mark the epoch lost and reconcile in-flight actions before retry.
+Positive:
+- **AC-002:** WHEN the owner starts a managed browser epoch, THE SYSTEM SHALL record consent and a session epoch before any agent browser action. Verify: consent/epoch-ordering test.
+- **AC-005:** WHEN a terminal opens, THE SYSTEM SHALL spawn one real PTY/ConPTY process in the admitted Environment, persist its exact session/process identity, and SHALL NOT merge tabs or process trees across Environments. Verify: PTY spawn/containment test.
+
+Negative:
+- **AC-001:** WHEN no qualified browser provider exists, THE SYSTEM SHALL show UNAVAILABLE and SHALL NOT label a WebView as Chrome. Verify: unavailable-state labeling test.
+- **AC-004:** IF a stale epoch handle is presented, THEN THE SYSTEM SHALL reject it. Verify: stale-epoch rejection test.
+
+Concurrency:
+- **AC-003:** WHEN the owner takes over, THE SYSTEM SHALL atomically advance the control epoch and fence/discard queued agent input; the agent SHALL perform no further browser action until a separate confirmed return to a fresh observation or the session is closed. Verify: atomic takeover/fence test.
+
+Boundary:
+- **AC-006:** WHEN shell profiles are discovered, THE SYSTEM SHALL perform bounded executable/version discovery without executing profile startup scripts, sourcing shell rc files, or scraping environment secrets. Verify: discovery-safety test.
+- **AC-009:** WHEN a terminal command finishes or times out, THE SYSTEM SHALL emit an ordered command receipt with the exact exit status (timeout recorded as `exit_code = -1`) and SHALL NOT fabricate a successful exit code. Verify: command-receipt and no-fabrication test.
+
+Recovery:
+- **AC-007:** WHEN the Runtime loses the provider, THE SYSTEM SHALL mark the epoch lost and reconcile in-flight actions before retry. Verify: provider-loss reconciliation test.
+- **AC-010:** WHEN the terminal UI closes, the Runtime stops or the process crashes, THE SYSTEM SHALL record exact QUIESCENT or LOST/UNKNOWN evidence and SHALL NOT claim continuation without a surviving process. Verify: close/stop/crash evidence matrix.
+
+Security:
+- **AC-008:** WHEN a managed browser launches, THE SYSTEM SHALL use an isolated LiteCowork-managed profile, SHALL NOT copy the default profile/cookies/history/login state, SHALL NOT perform ambient CDP discovery against the default user directory, and SHALL keep password/payment/CAPTCHA/MFA human-only. Verify: profile-isolation and human-only-field tests.
+
+UI and accessibility:
+- **AC-011:** WHEN the Workbench renders, THE SYSTEM SHALL present browser/terminal/computer availability as keyboard- and screen-reader-accessible states and SHALL NOT render a disabled-but-ready Computer control while B-32 is deferred. Verify: Workbench render + a11y test.
+
+Performance:
+- **AC-012:** WHEN terminal output is high-volume, THE SYSTEM SHALL apply bounded scrollback/backpressure and SHALL NOT block the Operator or other tabs. Verify: backpressure/throughput test.
 
 ## 16. Executable acceptance command
 
@@ -178,12 +299,17 @@ Read from CHROME-BROWSER-LLD, V1-INTEGRATED-TERMINAL-LLD, and STATE-MACHINES.
 
 ## 19. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 008-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 008-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 008-T02 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 008-T02 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 008-T03 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 008-T03 | AC-006 |
-| AC-007 | EARS acceptance | canonical owner docs cited in this SPEC | 008-T02 | AC-007 |
+| WebView is not Chrome | CHROME-BROWSER-LLD | 008-T01 | AC-001 | Unavailable-state labeling test |
+| Consent before agent action | CHROME-BROWSER-LLD, TRUST | 008-T02 | AC-002 | Consent/epoch-ordering test |
+| Atomic takeover fences input | CHROME-BROWSER-LLD | 008-T02 | AC-003 | Atomic takeover/fence test |
+| Stale epoch rejected | CHROME-BROWSER-LLD | 008-T02 | AC-004 | Stale-epoch rejection test |
+| One PTY per Environment | V1-INTEGRATED-TERMINAL-LLD, ENVIRONMENTS | 008-T03 | AC-005 | PTY spawn/containment test |
+| Safe profile discovery | V1-INTEGRATED-TERMINAL-LLD | 008-T03 | AC-006 | Discovery-safety test |
+| Provider loss reconciliation | CHROME-BROWSER-LLD, FAILURE-RECOVERY | 008-T02 | AC-007 | Provider-loss reconciliation test |
+| Isolated managed profile (B-22) | CHROME-BROWSER-LLD, TRUST | 008-T02 | AC-008 | Profile-isolation / human-only tests |
+| Ordered command receipt (B-23) | V1-INTEGRATED-TERMINAL-LLD | 008-T03 | AC-009 | Command-receipt / no-fabrication test |
+| Close/stop/crash evidence | V1-INTEGRATED-TERMINAL-LLD, RUNTIME-LIFECYCLE | 008-T03 | AC-010 | Close/stop/crash evidence matrix |
+| Accessible availability states (B-32) | DESKTOP-SHELL-LLD; contracts/ui-behavior.md | 008-T04 | AC-011 | Workbench render + a11y test |
+| Bounded terminal backpressure | V1-INTEGRATED-TERMINAL-LLD | 008-T03 | AC-012 | Backpressure/throughput test |

@@ -14,7 +14,7 @@
 - **Allowed paths:** this package
 - **Contract:** SPEC §5
 - **Change intent:** Resolve B-26 and B-27.
-- **Acceptance:** Trigger and notification rules written. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-010, AC-011; B-26 trigger type/misfire policy and B-27 notification channel/quiet-hours rules are recorded in SPEC by the named owners; an Automation is created PAUSED, resume does not fire at enable time, and a trigger/routine text grants no capability and opens no inbound port.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -26,7 +26,7 @@
 - **Allowed paths:** trigger host
 - **Contract:** AUTOMATION.md
 - **Change intent:** Exactly-one occurrence and Task link.
-- **Acceptance:** AC-001, AC-002, AC-004. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-001, AC-002, AC-004, AC-009; one occurrence identity maps to exactly one Task, a duplicate observation returns the original Task, the next fire is computed from the stored timezone, and a reused delivery id with a changed payload digest is OCCURRENCE_CONFLICT.
 - **Command:** `cargo test -p storage-sqlite --locked automation_occurrence`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -38,7 +38,7 @@
 - **Allowed paths:** lifecycle and notifications
 - **Contract:** RUNTIME-LIFECYCLE and AUTOMATION.md
 - **Change intent:** Misfire and distinct notification status.
-- **Acceptance:** AC-003, AC-005, AC-006. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-003, AC-005, AC-006, AC-007, AC-012; sleep/restart records a bounded misfire-recovered occurrence without claiming success, window-close keeps observing while Runtime-stop claims no un-started run, notification status stays distinct from Task settlement, quiet hours mark a suppressed delivery SUPPRESSED (not a silent drop), and catch-up stays bounded.
 - **Command:** `cargo test -p litecoworkd --locked automation_recovery`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -50,7 +50,7 @@
 - **Allowed paths:** automations
 - **Contract:** ui-behavior
 - **Change intent:** History shows occurrence, Task and notification separately.
-- **Acceptance:** UI matches settlement. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-008; history renders occurrence, Task and notification status separately as keyboard- and screen-reader-accessible states, matches settlement, and never presents a PENDING delivery row as a delivered notification.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 

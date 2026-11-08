@@ -62,10 +62,69 @@ The active App.tsx Settings route mounts `SettingsView.tsx`, with four visible c
 
 - B-28: GA OS and IPC qualification bar.
 - B-29: first settings groups allowed to be enabled in the shell.
+- B-33: V1 Settings acceptance surface (mounted four categories vs the 16-category/187-control target IA).
+
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
+
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. B-28, B-29 and B-33 remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md).
+
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-28 | First GA operating system and exact security profile | **RECOMMENDED: Windows 11 / Windows 10 (`x86_64-pc-windows-msvc`) as the first GA desktop, matching the Feature 001 B-02 first route, with the LOCAL-OPERATOR-IPC named-pipe security profile as the IPC bar.** The Windows named pipe DACL grants only the current logon SID and SYSTEM; remote clients are rejected; if the DACL cannot be created, startup does not open an unauthenticated pipe and does not fall back to loopback bearer. Linux (owner-only 0600 socket in an owner-only 0700 directory, peer-UID match, symlink rejection) is the second qualified OS. WSL2 never counts as native Windows or native Linux qualification. Each OS is qualified independently; shared Rust code does not imply cross-OS qualification. | [LOCAL-OPERATOR-IPC.md](../../docs/LOCAL-OPERATOR-IPC.md), [RUNTIME-LIFECYCLE.md](../../docs/RUNTIME-LIFECYCLE.md). The register notes A-45/A-49 container test failures belong on the host qualification checklist for this bar. The exact packaged-peer test matrix must land before this leaves PROPOSED. |
+| B-29 | Which Settings groups are enabled in V1 | **PROPOSED: Only the groups whose owner operation is already served are interactive in V1; every other category renders visibly unavailable with a concrete missing prerequisite.** Concretely: Workspaces (selection/create/instruction revision/archive) and Runtime (health/readiness/start/refresh reads) are the interactive-served groups; Agents surfaces Feature 002's served catalogue/probe/binding operations; General appearance controls are LOCAL_ONLY preferences only once persistence is actually wired (today they are inert component state and must not look armed). No target-only control is presented active. | [V1-SETTINGS-CONTRACT-LEDGER.md](../../docs/V1-SETTINGS-CONTRACT-LEDGER.md), [SEMANTIC-SERVED-UI-MAP.md](../../docs/SEMANTIC-SERVED-UI-MAP.md). Every enabled control must map to a durable owner operation and recovery behavior before this leaves PROPOSED. |
+| B-33 | V1 Settings acceptance surface | **RECOMMENDED: The V1 acceptance surface is the honestly-mapped set of served controls within the mounted four categories (General, Workspaces, Agents, Runtime), NOT a claim that all 16 categories or 187 controls are served.** The 16-category IA in the screen map below is the authored target; it is explicitly not current navigation and does not assert all underlying controls are served. Acceptance is control-by-control: a control is in the V1 acceptance surface only if its owner operation is served and its empty/stale/offline/denied/error states exist. The target IA guides future growth; it does not expand the V1 acceptance surface by assertion. | [V1-PRODUCT-RELEASE-CONTRACT.md](../../docs/V1-PRODUCT-RELEASE-CONTRACT.md), [V1-UI-SCREEN-CONTRACT.md](../../docs/V1-UI-SCREEN-CONTRACT.md) §11/§14. This changes the acceptance surface by two orders of magnitude, so the owner must pin the exact four-category control set before this leaves PROPOSED. |
+
+All three rows are declared design positions only. This package stays DRAFT; owner acceptance, the packaged-peer OS matrix and the exact four-category control set are not complete. Do not infer owner sign-off from the presence of a decision row.
+
+### Settings surface ownership (A-35, PROPOSED, pending owner)
+
+Per the A-35 PROPOSED resolution in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md): Feature 011 OWNS the normative **Settings -> Agents screen surface** (control table, layout, categories and shell wiring); Feature 002 owns only the agent install/auth/binding operations the screen invokes and links to this package. Conversely, the notification **quiet-hours control surface** is owned by **Feature 010** (delivery); this package exposes only the Settings shell entry point for Notifications and LINKS to Feature 010's quiet-hours contract rather than republishing the control semantics.
 
 ## 6. High-level design
 
 Tauri shell renders. IPC carries Operator commands to litecoworkd. Runtime lifecycle owns incarnation and drain. Settings UI consults the semantic map: LOCAL_ONLY may change immediately; TARGET stays disabled with the ledger's failure text; served commands wait until a later package marks them SERVED.
+
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  SHELL[Tauri desktop shell] --> IPC[Authenticated local IPC peer]
+  IPC --> OP[Operator in litecoworkd]
+  OP --> LIFE[Runtime lifecycle incarnation/readiness/drain]
+  SHELL --> SET[Settings host consults semantic map]
+  SET --> LOCAL[LOCAL_ONLY preferences]
+  SET --> SERVED[Served owner operations]
+  SET -. link, not republish .-> F010[Feature 010 quiet-hours contract]
+  SET --> F002[Feature 002 agent operations under 011-owned Agents screen]
+  OP --> DB[(SQLite owner state)]
+  LIFE --> DB
+```
+
+The shell is not the security boundary: IPC peer authentication is. Settings never mounts a control whose owner operation is not served. Quiet-hours is drawn as a link to Feature 010, not a republished table.
+
+### Trust boundaries
+
+The desktop UI is untrusted and never supplies the principal; the principal comes from the authenticated transport (peer UID on Unix, logon-SID DACL on Windows). Remote pipe clients are rejected. There is no loopback bearer fallback. IPC frames are redacted in logs; native credentials and OS handles stay outside public events. Display preferences cannot restore grants. SQLite transactions make no network or process call.
+
+### Actor sequence (target)
+
+1. The shell connects over the OS-local IPC transport; the Operator accepts a command only from an authenticated local peer.
+2. A missing peer marker is rejected; no bearer fallback is attempted.
+3. The Settings host consults the semantic map and renders each control as LOCAL_ONLY, served or unavailable; a TARGET control is disabled with the ledger's failure text.
+4. A LOCAL_ONLY change persists a presentation preference without changing grants or bindings.
+5. Runtime health reads report incarnation/readiness/drain honestly; a STOPPED/STARTING/RECOVERING incarnation never shows execution as ready.
+6. Window close with the Runtime still running never reports the Runtime as stopped; drain stops admission before claiming stopped.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop shell/UI | Render, category navigation, honest unavailable states, 011-owned Agents screen | Being the security boundary |
+| Operator IPC | Authenticate local peer, reject remote/missing marker, redact frames | Changing API authorization |
+| Runtime lifecycle | Incarnation, readiness, drain, recovery reporting | Cancelling Tasks on window close |
+| Settings host | Semantic-map-driven control rendering, LOCAL_ONLY persistence | Mounting unserved controls as active |
+| Feature 010 (linked) | Quiet-hours normative control table | Being republished here |
+| Feature 002 (under 011 screen) | Agent install/auth/binding operations | Owning the Agents screen surface |
 
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
@@ -74,6 +133,37 @@ Trust boundary: the desktop UI is untrusted; the authenticated Operator is the o
 No new operationIds. Health reads use existing Runtime readiness contracts. Settings mutations use idempotency and If-Match only when the ledger class is OPERATOR_CAS and the operation is actually mounted. This package's implementation task is the shell gate plus IPC auth tests, not silently mounting all settings.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
+
+### 7.1 Existing signatures (CODE)
+
+Observed in the active source; existence is CODE evidence, not SYSTEM/USER qualification.
+
+- Served reads: `getLocalOperatorReadiness`, `getLocalRuntimeLifecycle`; Workspace selection/create/instruction-revision/archive; Feature 002 catalogue/probe/binding operations. Event: `runtime.availability.changed.v1`.
+- Target-only: `enrollLocalRuntimeInWorkspace`, `previewLocalRuntimeStop`, `requestLocalRuntimeStop`; Runtime stop route stays absent until Task/Effect/lease/local-service settlement exists.
+- UI reality: the mounted `SettingsView.tsx` exposes four categories (General, Workspaces, Agents, Runtime). General appearance controls are inert component state; shortcut labels are display-only; the exported `SettingsPage` is unmounted.
+
+### 7.2 PROPOSED signatures (not yet served)
+
+Every signature below is PROPOSED and is not promotable until LOCAL-OPERATOR-IPC / the ledger and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: authenticated local IPC peer check (B-28, AC-001/AC-002).
+pub trait LocalPeerAuthenticator: Send + Sync {
+    // Unix: peer UID must match the installation binding; Windows: pipe DACL = logon SID + SYSTEM.
+    fn authenticate(&self, peer: PeerCredential) -> Result<AuthenticatedPrincipal, IpcAuthError>;
+}
+
+// PROPOSED: semantic-map class that gates whether a Settings control is rendered active (B-29/B-33).
+pub enum SettingsControlClass { LocalOnly, Native, Target, OperatorServed }
+
+// PROPOSED: honest runtime health projection consumed by Settings/Advanced.
+pub struct RuntimeHealthView {
+    pub recovery_state: RecoveryState, // STARTING|RECOVERING|READY|DEGRADED|DRAINING|STOPPING|STOPPED
+    pub operator_readiness: OperatorReadiness, // SERVING or not; not execution readiness
+}
+```
+
+Typed errors (PROPOSED): `IpcAuthError::{MissingPeerMarker, RemotePeerRejected, DaclUnavailable}` (no bearer fallback); a LOCAL_ONLY control write never returns a grant/binding change.
 
 ## 8. Data
 
@@ -109,14 +199,27 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN the shell sends a command, THE SYSTEM SHALL accept it only from an authenticated local IPC peer.
-- **AC-002:** IF the peer marker is missing, THEN THE SYSTEM SHALL reject the command.
-- **AC-003:** WHEN a settings control is TARGET or unserved, THE SYSTEM SHALL render it unavailable and SHALL NOT send a mutation.
-- **AC-004:** WHEN a control is LOCAL_ONLY, THE SYSTEM SHALL persist presentation preference without changing grants or bindings.
-- **AC-005:** WHEN the Runtime incarnation is STOPPED, STARTING, or RECOVERING, THE SYSTEM SHALL show that health state and SHALL NOT present execution as ready. WHILE the incarnation is DEGRADED and GET /v1/operator/readiness is SERVING, THE SYSTEM SHALL still allow ordinary Operator commands and SHALL keep execution readiness and Task recovery closed.
-- **AC-006:** WHEN the window closes and the Runtime is still running, THE SYSTEM SHALL NOT report the Runtime as stopped.
-- **AC-007:** IF rich presentation fails, THEN THE SYSTEM SHALL still show semantic Conversation text.
-- **AC-008:** WHEN tests run only under WSL2, THE SYSTEM SHALL NOT record them as native Windows or native Linux desktop qualification.
+Positive / security:
+- **AC-001:** WHEN the shell sends a command, THE SYSTEM SHALL accept it only from an authenticated local IPC peer. Verify: peer-auth accept test.
+- **AC-002:** IF the peer marker is missing, THEN THE SYSTEM SHALL reject the command. Verify: missing-marker reject test.
+- **AC-009:** IF the Windows pipe DACL cannot be created, THEN THE SYSTEM SHALL NOT open an unauthenticated pipe and SHALL NOT fall back to loopback bearer authentication. Verify: DACL-failure no-fallback test.
+- **AC-010:** WHEN a remote pipe/socket client connects, THE SYSTEM SHALL reject it and SHALL NOT trust a WebView-supplied principal. Verify: remote-peer rejection test.
+
+Negative / boundary:
+- **AC-003:** WHEN a settings control is TARGET or unserved, THE SYSTEM SHALL render it unavailable and SHALL NOT send a mutation. Verify: unserved-control gate test.
+- **AC-004:** WHEN a control is LOCAL_ONLY, THE SYSTEM SHALL persist presentation preference without changing grants or bindings. Verify: local-only persistence test.
+- **AC-008:** WHEN tests run only under WSL2, THE SYSTEM SHALL NOT record them as native Windows or native Linux desktop qualification. Verify: WSL2 qualification-guard check.
+
+Recovery:
+- **AC-005:** WHEN the Runtime incarnation is STOPPED, STARTING, or RECOVERING, THE SYSTEM SHALL show that health state and SHALL NOT present execution as ready. WHILE the incarnation is DEGRADED and GET /v1/operator/readiness is SERVING, THE SYSTEM SHALL still allow ordinary Operator commands and SHALL keep execution readiness and Task recovery closed. Verify: incarnation health-state matrix.
+- **AC-006:** WHEN the window closes and the Runtime is still running, THE SYSTEM SHALL NOT report the Runtime as stopped. Verify: window-close vs Runtime-state test.
+
+UI and accessibility:
+- **AC-007:** IF rich presentation fails, THEN THE SYSTEM SHALL still show semantic Conversation text. Verify: presentation-fallback test.
+- **AC-011:** WHEN the Settings shell renders, THE SYSTEM SHALL present categories and disabled-control explanations as keyboard- and screen-reader-accessible states and SHALL NOT render a target-only control as armed. Verify: Settings render + a11y test.
+
+Performance:
+- **AC-012:** WHEN drain is requested, THE SYSTEM SHALL stop admission before persisting DRAINING, allow admitted handlers their bounded deadline, and SHALL NOT claim STOPPED before those handlers finish. Verify: graceful-drain timing test.
 
 ## 16. Executable acceptance command
 
@@ -154,16 +257,20 @@ Read from LOCAL-OPERATOR-IPC and RUNTIME-LIFECYCLE.
 
 ## 19. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 011-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 011-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 011-T04 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 011-T04 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 011-T03 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 011-T03 | AC-006 |
-| AC-007 | EARS acceptance | canonical owner docs cited in this SPEC | 011-T04 | AC-007 |
-| AC-008 | EARS acceptance | canonical owner docs cited in this SPEC | 011-T04 | AC-008 |
+| Authenticated local peer | LOCAL-OPERATOR-IPC | 011-T02 | AC-001 | Peer-auth accept test |
+| Missing peer marker rejected | LOCAL-OPERATOR-IPC | 011-T02 | AC-002 | Missing-marker reject test |
+| Unserved control gated | V1-SETTINGS-CONTRACT-LEDGER, SEMANTIC-SERVED-UI-MAP | 011-T04 | AC-003 | Unserved-control gate test |
+| LOCAL_ONLY preference persists | V1-SETTINGS-CONTRACT-LEDGER | 011-T04 | AC-004 | Local-only persistence test |
+| Incarnation health honesty | RUNTIME-LIFECYCLE | 011-T03 | AC-005 | Incarnation health-state matrix |
+| Window-close vs Runtime state | RUNTIME-LIFECYCLE | 011-T03 | AC-006 | Window-close vs Runtime-state test |
+| Semantic fallback | PRESENTATION-RUNTIME | 011-T04 | AC-007 | Presentation-fallback test |
+| WSL2 not native qualification (B-28) | TESTING, RUNTIME-LIFECYCLE | 011-T04 | AC-008 | WSL2 qualification-guard check |
+| DACL failure no fallback (B-28) | LOCAL-OPERATOR-IPC | 011-T02 | AC-009 | DACL-failure no-fallback test |
+| Remote peer rejected (B-28) | LOCAL-OPERATOR-IPC | 011-T02 | AC-010 | Remote-peer rejection test |
+| Accessible Settings shell (B-33) | V1-UI-SCREEN-CONTRACT; contracts/ui-behavior.md | 011-T04 | AC-011 | Settings render + a11y test |
+| Graceful drain timing | RUNTIME-LIFECYCLE | 011-T03 | AC-012 | Graceful-drain timing test |
 
 
 ## V1 Settings screen map and control behavior — 2026-11-06
@@ -194,9 +301,11 @@ Persistent category navigation on the left, focused content panel on the right. 
 Search searches settings labels/help and only the currently available configuration surface. It must not expose secrets or let a text match enable an unavailable control. Every setting row shows its scope (Global, Workspace, Coworker, AgentBinding, Runtime or local OS) and whether saved state is local, native-observed, Operator-committed, read-only or unavailable.
 
 ### Notifications tab
-Use four mutually exclusive delivery combinations: Sound + notification; Sound only; Notification only; Neither. Quiet hours show explicit timezone and selected notification classes. "Try it" plays a local sound preview and may request an OS notification only if the OS notification provider is implemented; its result reports each channel separately. Notification delivery queue is not Needs You: Needs You reflects unresolved actionable UserRequests/approvals, not all unseen notifications. No "Off" summary may hide which channel is disabled.
+This package exposes only the Settings shell entry point for Notifications. Per A-35 the normative **quiet-hours control surface** (quiet-hours start/end, timezone, selected notification classes and their suppression semantics) is owned by **Feature 010** (delivery); see the quiet-hours normative control table in [specs/010-automations-recurring-host/SPEC.md](../010-automations-recurring-host/SPEC.md) §5. This section LINKS to that owner and does not republish the control semantics.
 
-Buttons: select each delivery combination; edit quiet-hours start/end and timezone; choose supported classes; Try it; Reset to defaults. Each is LOCAL_PREF unless an OS notification delivery operation is explicitly owned and served. Preview never creates a domain event or external delivery receipt.
+The shell-local presentation choices that remain owned here are the four mutually exclusive sound/notification delivery combinations (Sound + notification; Sound only; Notification only; Neither) and the "Try it" local preview. "Try it" plays a local sound preview and may request an OS notification only if the OS notification provider is implemented; its result reports each channel separately and never creates a domain event or external delivery receipt. Notification delivery queue is not Needs You: Needs You reflects unresolved actionable UserRequests/approvals, not all unseen notifications. No "Off" summary may hide which channel is disabled.
+
+Buttons: select each delivery combination; Try it; Reset to defaults. The quiet-hours start/end, timezone and class controls follow Feature 010's contract rather than a table restated here. Each shell-local control is LOCAL_PREF unless an OS notification delivery operation is explicitly owned and served.
 
 ### Advanced tab
 Keep-awake choices: Off; While agents/work run (including battery); While agents/work run on power only. These require native OS power assertions and must expose unsupported/unavailable state per OS; do not infer behavior from a selected radio option. "Resume agents after restart" is not generic process resurrection: it applies only to LiteCowork-owned jobs with durable admission and a qualified recovery contract. It does not restore arbitrary third-party native CLI TTY/session state. Runtime startup policy (MANUAL, LOGIN_BACKGROUND, ALWAYS_ON_SERVICE) is independent from resume policy. Any control affecting active work must show the effective boundary, pending/restart-required status and what it cannot resume.

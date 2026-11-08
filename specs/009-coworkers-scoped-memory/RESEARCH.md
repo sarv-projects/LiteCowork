@@ -23,6 +23,14 @@
 - Deterministic learning gates: `crates/storage-core/src/coworker_learning.rs`; SkillProposal redaction reuse: `crates/storage-core/src/skill.rs`.
 - Storage module inventory: `crates/storage-sqlite/src/lib.rs`.
 
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs this feature | Verdict |
+|---|---|---|---|---|
+| Rowboat living knowledge-graph-as-context (`rowboatlabs/rowboat`) | https://github.com/rowboatlabs/rowboat/tree/9052e28b9ede46478e04f9cf600c7ebaf5895dc7 | Apache-2.0 at checked root LICENSE | A local desktop coworker that indexes work into a living knowledge graph used as retrieval context (`apps/x` desktop + `apps/harbor` agent runtime). It is a reference for how Coworker-scoped Memory & Knowledge can be surfaced as retrieval context, and for keeping provenance/deletion owner explicit on each entry. | REJECT the auto-indexing crawler model for V1. MAP the pattern to quiet, owner-authored, scoped Memory + Knowledge only: Add Memory writes an owner-authored Coworker-scoped ContextDocument (`MemoryRecordMetadata.status`), never an automatic `LearningCandidate`; the automatic-learning pipeline stays deferred (B-24). Do not adopt harbor as LiteCowork Task authority and import no Rowboat code. |
+
+No Rowboat code is imported; it is read at the pinned SHA as a design reference. LiteCowork's V1 memory is owner-authored and quiet, not an ambient indexer; the single learning vocabulary (`LearningCandidate` for candidate lifecycle, `MemoryRecordMetadata.status` for committed records) is owned by [LEARNING.md](../../docs/LEARNING.md) per register A-34/A-20.
+
 ## Findings from the active source tree
 
 1. Coworker list/create/get/revision/status and Workspace primary selection are served and stored. These operations create/update Coworker configuration; they do not start an agent or create a Coworker Conversation.

@@ -24,7 +24,7 @@
 - **Allowed paths:** browser gateway
 - **Contract:** CHROME-BROWSER-LLD
 - **Change intent:** Consent, epoch, takeover, stale reject.
-- **Acceptance:** On the declared OS/build, a real version-pinned browser provider launches/attaches only under approved profile policy; live view and provider session identities are distinct; exact session/tab generation, principal, control epoch and lease are checked at every action; Takeover fences/discards queued agent inputs atomically; Return requires explicit confirmation and a fresh observation; provider loss/restart becomes RECOVERING/LOST/AMBIGUOUS without replaying stale actions; consent is revocable and profile secrets are not copied.
+- **Acceptance:** AC-002, AC-003, AC-004, AC-007, AC-008. On the declared OS/build, a real version-pinned browser provider launches/attaches only under approved profile policy; live view and provider session identities are distinct; exact session/tab generation, principal, control epoch and lease are checked at every action; Takeover fences/discards queued agent inputs atomically; Return requires explicit confirmation and a fresh observation; provider loss/restart becomes RECOVERING/LOST/AMBIGUOUS without replaying stale actions; consent is revocable, the managed profile is isolated and profile secrets are not copied; ambient-CDP discovery and profile-copy stay disabled.
 - **Command:** `cargo test -p litecoworkd --locked browser_epoch`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -36,7 +36,7 @@
 - **Allowed paths:** pty host
 - **Contract:** V1-INTEGRATED-TERMINAL-LLD
 - **Change intent:** Discovery without startup execution; one process tree per tab.
-- **Acceptance:** Real PTY/ConPTY process is spawned under the admitted Environment with exact shell/profile/argv/cwd/allowlisted environment, process identity and containment receipt; stdout/stderr framing, resize, bounded scrollback/backpressure and stdin are connected to Tauri; tab switch/detach/reattach does not respawn or kill the process; explicit Stop terminates its owned process tree; UI close, Runtime stop and crash yield exact QUIESCENT or LOST/UNKNOWN evidence; no UI claim of continuation without a surviving process.
+- **Acceptance:** AC-005, AC-006, AC-009, AC-010, AC-012. Real PTY/ConPTY process is spawned under the admitted Environment with exact shell/profile/argv/cwd/allowlisted environment, process identity and containment receipt; stdout/stderr framing, resize, bounded scrollback/backpressure and stdin are connected to Tauri; ordered command receipts carry the exact exit status with no fabricated exit code; tab switch/detach/reattach does not respawn or kill the process; explicit Stop terminates its owned process tree; UI close, Runtime stop and crash yield exact QUIESCENT or LOST/UNKNOWN evidence; no UI claim of continuation without a surviving process.
 - **Command:** `cargo test -p litecoworkd --locked terminal_environment_bind`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -48,6 +48,6 @@
 - **Allowed paths:** right workbench
 - **Contract:** DESKTOP-SHELL-LLD and ui-behavior
 - **Change intent:** Show real availability only.
-- **Acceptance:** Browser availability is distinct from mode/session/view; iframe preview is never labeled as a qualified Chrome/agent browser. Terminal shows only provider-backed shell/process state and never prints fabricated exit codes, containment or quotas. Files are explicit Resource/authorized filesystem objects. Diffs are derived from actual immutable revisions or VCS change sets; Activity is sourced from committed events/attempt/process observations or is clearly deferred. Computer-use controls exist only when B-32 provider and permissions are qualified; otherwise no simulated buttons/cursor.
+- **Acceptance:** AC-001, AC-011. Browser availability is distinct from mode/session/view; iframe preview is never labeled as a qualified Chrome/agent browser. Terminal shows only provider-backed shell/process state and never prints fabricated exit codes, containment or quotas. Files are explicit Resource/authorized filesystem objects. Diffs are derived from actual immutable revisions or VCS change sets; Activity is sourced from committed events/attempt/process observations or is clearly deferred. Availability is keyboard- and screen-reader-accessible. Computer-use controls exist only when B-32 provider and permissions are qualified; while B-32 is deferred no simulated buttons/cursor are rendered.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.

@@ -46,11 +46,11 @@ Each package is a DRAFT (README, SPEC, PLAN, TASKS, DATA-MODEL, RESEARCH, WIRING
 | 004 | P3 | UC relay A→B→A | B-15, B-16 (PROPOSED resolutions in specs/004 §5, still open pending owner) |
 | 005 | P4 | UC one safe task edit | B-17, B-18 (PROPOSED resolutions in specs/005 §5, still open pending owner) |
 | 006 | P5 | UC one connection write | B-19, B-20 (PROPOSED resolutions in specs/006 §5, still open pending owner) |
-| 007 | P6 | UC one professional format, Artifact create and export | B-21, B-30, B-31 |
-| 008 | P7 | UC browser, terminal and optional Computer use | B-22, B-23, B-32 |
-| 009 | P8 | UC optional coworker chat and scoped memory | T01 B-24/B-25; T02 Coworker origin + owner-scoped ContextDocument; T03 retrieval/restart fence; T04 optional New Chat/first Coworker chat |
-| 010 | P9 | UC schedule exactly once; future provider-owned workflow mapping | B-26, B-27; T05 depends on qualified Features 005/006; T06 deferred |
-| 011 | P0–P11 shell | UC settings honesty and health | B-28, B-29 |
+| 007 | P6 | UC one professional format, Artifact create and export | B-21, B-30, B-31 (PROPOSED resolutions in specs/007 §5, still open pending owner) |
+| 008 | P7 | UC browser, terminal and optional Computer use | B-22, B-23, B-32 (PROPOSED resolutions in specs/008 §5, still open pending owner; managed-Chromium adapter disables ambient-CDP/profile-copy) |
+| 009 | P8 | UC optional coworker chat and scoped memory | B-24, B-25 (PROPOSED resolutions in specs/009 §5, still open pending owner, aligned to the single A-34 learning vocabulary); T02 Coworker origin + owner-scoped ContextDocument; T03 retrieval/restart fence; T04 optional New Chat/first Coworker chat |
+| 010 | P9 | UC schedule exactly once; future provider-owned workflow mapping | B-26, B-27 (PROPOSED resolutions in specs/010 §5, still open pending owner; 010 owns the A-35 quiet-hours surface); T05 depends on qualified Features 005/006; T06 deferred |
+| 011 | P0–P11 shell | UC settings honesty and health | B-28, B-29, B-33 (PROPOSED resolutions in specs/011 §5, still open pending owner; 011 owns the A-35 Settings->Agents screen and links 010 for quiet-hours) |
 
 When an owner resolves a blocker, edit that SPEC and leave status DRAFT until explicit acceptance.
 

@@ -24,7 +24,7 @@
 - **Allowed paths:** artifact store
 - **Contract:** ARTIFACTS-EVIDENCE
 - **Change intent:** Immutable versions and provenance.
-- **Acceptance:** A new Artifact can be created from the selected authorized source (user-authored/imported/Task-generated path as accepted) through a served owner command. One SQLite transaction commits the Artifact, ARTIFACT Resource, ResourceRevision, immutable version 1, provenance/input dependency edges, snapshots, canonical creation events and owner-scoped idempotency receipt. Identical replay returns that receipt; changed payload conflicts. Existing direct-SQL test fixtures are not production create support.
+- **Acceptance:** AC-006, AC-009, AC-010, AC-012. A new Artifact can be created from the selected authorized source (user-authored/imported/Task-generated path as accepted) through a served owner command. One SQLite transaction commits the Artifact, ARTIFACT Resource, ResourceRevision, immutable version 1, provenance/input dependency edges, snapshots, canonical creation events and owner-scoped idempotency receipt. Identical replay returns that receipt; changed payload conflicts; an uploaded Resource is never relabelled an Artifact; the export receipt stays distinct from the version commit. Existing direct-SQL test fixtures are not production create support.
 - **Command:** `cargo test -p storage-sqlite --locked artifact_versions`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -36,7 +36,7 @@
 - **Allowed paths:** format adapter
 - **Contract:** SPEC LLD
 - **Change intent:** Real edit and export for the chosen format.
-- **Acceptance:** The selected professional format can be opened, edited with the selected engine, validated, saved as a new immutable version, exported through the accepted export flow, closed and reopened after application/runtime restart. Independent format validation and a content digest confirm the round trip. Unsupported formats remain explicitly read-only/unsupported.
+- **Acceptance:** AC-001, AC-002, AC-003, AC-007, AC-008. The selected professional format can be opened, edited with the selected engine, validated, saved as a new immutable version, exported through the accepted export flow, closed and reopened after application/runtime restart. Independent format validation and a content digest confirm the round trip; over-bound input/export is rejected with a typed error; a crash during save/export leaves the current version pointer unchanged. Unsupported formats remain explicitly read-only/unsupported.
 - **Command:** `cargo test -p litecoworkd --locked artifact_one_format`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -48,6 +48,6 @@
 - **Allowed paths:** library
 - **Contract:** ui-behavior and PRESENTATION-RUNTIME
 - **Change intent:** Unsupported actions stay honest; semantic fallback remains.
-- **Acceptance:** Library has an explicit supported creation/import/generation entry point only after B-30 is served; version history/compare/provenance identify exact Artifact/ResourceRevision; native Save As is labelled as a local file save and is not confused with an export receipt; format operations are individually enabled/disabled based on the accepted engine; semantic source remains readable if rendering fails.
+- **Acceptance:** AC-004, AC-005, AC-011. Library has an explicit supported creation/import/generation entry point only after B-30 is served; version history/compare/provenance identify exact Artifact/ResourceRevision; native Save As is labelled as a local file save and is not confused with an export receipt; format operations are individually enabled/disabled based on the accepted engine; embedded HTML/scriptable SVG/model JavaScript is never executed and no raw local path reaches a shared event; semantic source remains readable if rendering fails.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.

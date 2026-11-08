@@ -58,9 +58,76 @@ The active source tree is present in apps/ and crates/. The behavior below is th
 - B-26: first trigger type and misfire policy for GA.
 - B-27: notification channel (local only in this slice).
 
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
+
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. B-26 and B-27 remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md).
+
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-26 | First Automation trigger type and misfire policy for GA | **RECOMMENDED: Cron-in-a-named-timezone as the first qualified trigger type, with `MisfirePolicy = RUN_ONCE_WHEN_AVAILABLE` as the GA default, over the already-running local `AutomationTriggerHostWorker` (30s cursor poll).** The next fire is computed from the stored timezone (not a baked UTC offset); `ambiguous_local_time`/`nonexistent_local_time` follow the AUTOMATION.md DST rules (EARLIER/LATER, SKIP/NEXT_VALID). A missed fire during sleep records a single misfire-recovered occurrence, never a silent success or an unbounded catch-up storm. Local file-poll triggers stay a later, separately qualified type. One occurrence identity maps to exactly one Task. | [AUTOMATION.md](../../docs/AUTOMATION.md), [ROUTINES.md](../../docs/ROUTINES.md). The exact cron grammar and catch-up bound must land in the owner contract before this leaves PROPOSED. |
+| B-27 | Local notification channel and delivery guarantees | **PROPOSED: A single LOCAL_POLL notification channel in this slice, where occurrence/Task settlement inserts a `PENDING` delivery row transactionally and notification status is tracked distinctly from Task outcome; no public webhook listener and no delivery guarantee beyond best-effort local presentation.** A `PENDING` row is not a delivered notification; when delivery is unknown the status stays distinct from Task settlement (a Task can COMPLETE while notification delivery is UNKNOWN). Free-text channel names do not route delivery; the producer uses Workspace event-class policy and the quiet-hours contract this feature owns (see Notifications-surface ownership below). The quiet-hours control surface and its normative semantics are owned here. | [AUTOMATION.md](../../docs/AUTOMATION.md), [CHANNELS.md](../../docs/CHANNELS.md). A real OS delivery provider and `SENDING/SENT/FAILED/AMBIGUOUS/SUPPRESSED` transitions remain future work before this leaves PROPOSED. |
+
+Both rows are declared design positions only. This package stays DRAFT; owner acceptance and the exact cron grammar / delivery provider are not complete. Do not infer owner sign-off from the presence of a decision row.
+
+### Notifications surface ownership (A-35, PROPOSED, pending owner)
+
+Per the A-35 PROPOSED resolution in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md), the normative **notification quiet-hours control surface** (quiet-hours start/end, timezone, selected notification classes and their semantics) is owned by **Feature 010** (delivery). Feature 011 owns only the Settings shell entry point and LINKS to this feature's quiet-hours contract rather than republishing the control semantics. The quiet-hours normative table below is the owner definition; other packages link to it.
+
+#### Quiet-hours normative control table (owned here)
+
+| Control | Scope | Saved state class | Semantics |
+|---|---|---|---|
+| Quiet-hours enabled | Workspace | OPERATOR_CAS | When enabled, selected notification classes are suppressed during the window; Task settlement is unaffected. |
+| Quiet-hours start/end | Workspace | OPERATOR_CAS | Stored with an explicit timezone; DST handling follows AUTOMATION.md local-time rules. |
+| Quiet-hours timezone | Workspace | OPERATOR_CAS | Named timezone; never a baked UTC offset. |
+| Suppressed notification classes | Workspace | OPERATOR_CAS | Only the selected classes are suppressed; others still present. A suppressed delivery row is SUPPRESSED, not a silent drop. |
+
 ## 6. High-level design
 
 UI saves a Routine revision. TriggerHost commits an occurrence once. TaskService materializes one Task linked to that occurrence. A second observation with the same identity returns the original Task id. Notifications update a separate status row.
+
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  UI[Automations/Routines + quiet-hours editor] --> OP[Authenticated Operator]
+  OP --> HOST[AutomationTriggerHostWorker cron B-26]
+  OP --> ROUT[Routine revision store]
+  HOST --> OCC[Occurrence identity commit once]
+  OCC --> TASK[TaskService one READY Task per occurrence]
+  OCC --> DB[(SQLite occurrence/cursor/receipt)]
+  TASK --> DB
+  SETTLE[Occurrence/Task settlement] --> NOTE[Notification delivery row PENDING B-27]
+  NOTE --> QH[Quiet-hours contract owned here]
+  NOTE --> DB
+  DB --> UI
+```
+
+Trigger hosting, occurrence identity, Task materialization and notification status are separate axes; quiet-hours is owned by this feature and consulted by the notification producer.
+
+### Trust boundaries
+
+The desktop UI is untrusted; the authenticated Operator is the only command path. Triggers cannot widen grants; event payloads are untrusted; secrets are never stored in the automation revision. The TriggerHost observes and commits occurrence identity but never runs the Task body. No public inbound port is opened. SQLite transactions make no network or process call; notification delivery rows commit transactionally with settlement but transport runs outside the transaction.
+
+### Actor sequence (target)
+
+1. Owner saves an Automation; it is created PAUSED and admits no Task.
+2. Owner resumes; the cron trigger becomes locally reconcilable and the TriggerHost begins observing (no fire at enable time).
+3. A scheduled occurrence is observed once; the TriggerHost commits exactly one occurrence identity.
+4. TaskService materializes exactly one READY Task linked to that occurrence; a second observation returns the original Task id.
+5. On settlement a `PENDING` notification delivery row is inserted, consulting the quiet-hours contract owned here; status is distinct from Task outcome.
+6. After sleep/restart the cursor replays and records a single misfire-recovered occurrence per the locked policy, never a silent success.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop UI | Automation/Routine editor, quiet-hours controls, honest history | Executing the Task body or routing delivery by free text |
+| Operator | Auth, Workspace scope, version/idempotency | Running the Task inside TriggerHost |
+| AutomationTriggerHostWorker | Cursor poll, occurrence identity, misfire/overlap | Task execution or machine wake |
+| TaskService | One READY Task per occurrence, dedupe by occurrence id | Starting planning/agent execution |
+| Notification producer | `PENDING` delivery row, quiet-hours suppression, status distinct from Task | Claiming transport delivery |
+| Storage | Atomic occurrence/cursor/receipt/notification commits | External process/network calls |
 
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
@@ -69,6 +136,47 @@ Trust boundary: the desktop UI is untrusted; the authenticated Operator is the o
 Follow AUTOMATION.md occurrence lifecycle, cursor durability and concurrency rules. Manual run and scheduled run share idempotency rules. Execution still uses feature 005 admission once that package exists; until then this spec's acceptance is the occurrence-to-Task identity contract.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
+
+### 7.1 Existing signatures (CODE)
+
+Observed in the active source; existence is CODE evidence, not SYSTEM/USER qualification.
+
+- Served: `createAutomation`, `updateAutomation`, `pauseAutomation`, `resumeAutomation`, `runAutomationNow`, `settleAutomationTriggers`, `runRoutine`; `listOccurrences` (returns `next_cursor`). Events: `automation.occurrence.created.v1`, `automation.occurrence.claimed.v1`, `automation.occurrence.settled.v1`, `automation.cursor.changed.v1`, `notification.delivery.changed.v1`.
+- Running: `AutomationTriggerHostWorker` started by `OperatorServer::start`, polls local trigger cursors every 30s. Occurrence/Task settlement inserts `PENDING` delivery rows.
+- Not present: no production delivery worker/consumer or `SENDING/SENT/FAILED/AMBIGUOUS/SUPPRESSED` status writer; no quiet-hours editor controls (currently read/preserve-only); `retry_policy`/`wake_policy` have no production consumer; `preferred_channels` is not read by the producer; no WorkflowBackendAdapter.
+
+### 7.2 PROPOSED signatures (not yet served)
+
+Every signature below is PROPOSED and is not promotable until AUTOMATION.md / CHANNELS.md and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: first qualified trigger type (B-26) - cron in a named timezone.
+pub struct CronTrigger {
+    pub cron_expr: String,            // exact grammar owner-pinned
+    pub timezone: String,             // IANA name, never a baked UTC offset
+    pub misfire_policy: MisfirePolicy, // PROPOSED default RUN_ONCE_WHEN_AVAILABLE
+    pub catch_up_bound: u16,          // bounded; no unbounded storm
+}
+
+// PROPOSED: local notification delivery row (B-27), status distinct from Task outcome.
+pub struct NotificationDelivery {
+    pub occurrence_id: String,
+    pub channel: NotificationChannel, // LOCAL_POLL in this slice
+    pub status: NotificationStatus,   // PENDING | SENDING | SENT | FAILED | AMBIGUOUS | SUPPRESSED
+    pub suppressed_by_quiet_hours: bool,
+}
+
+// PROPOSED: quiet-hours contract owned by this feature (A-35).
+pub struct QuietHours {
+    pub enabled: bool,
+    pub start_local: LocalTime,
+    pub end_local: LocalTime,
+    pub timezone: String,             // IANA name
+    pub suppressed_classes: Vec<NotificationClass>,
+}
+```
+
+Typed errors (PROPOSED): `OccurrenceError::{Conflict, LeaseExpired}` (a stable delivery id reused with a different payload digest is `OCCURRENCE_CONFLICT`); `NotificationError::{ChannelUnavailable, QuietHoursSuppressed}`.
 
 ## 8. Data
 
@@ -108,12 +216,33 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN a scheduled occurrence is observed once, THE SYSTEM SHALL create exactly one Task linked to that occurrence id.
-- **AC-002:** WHEN the same occurrence is observed again, THE SYSTEM SHALL return the original Task and SHALL NOT create another.
-- **AC-003:** IF the machine was asleep across a fire time, THEN THE SYSTEM SHALL record misfire or skip according to the locked policy and SHALL NOT claim the run succeeded.
-- **AC-004:** WHEN DST or timezone changes, THE SYSTEM SHALL compute the next fire from the stored timezone, not from a fixed UTC offset baked into the revision.
-- **AC-005:** WHEN the desktop window closes and the Runtime remains up, THE SYSTEM SHALL still observe; WHEN the Runtime stops, THE SYSTEM SHALL not claim runs that did not start.
-- **AC-006:** WHEN notification delivery is unknown, THE SYSTEM SHALL keep Task settlement and notification status distinct.
+Positive:
+- **AC-001:** WHEN a scheduled occurrence is observed once, THE SYSTEM SHALL create exactly one Task linked to that occurrence id. Verify: occurrence-to-Task identity test.
+- **AC-004:** WHEN DST or timezone changes, THE SYSTEM SHALL compute the next fire from the stored timezone, not from a fixed UTC offset baked into the revision. Verify: DST/timezone next-fire test.
+
+Concurrency / idempotency:
+- **AC-002:** WHEN the same occurrence is observed again, THE SYSTEM SHALL return the original Task and SHALL NOT create another. Verify: duplicate-observation dedupe test.
+- **AC-009:** WHEN a stable delivery id is reused with a different payload digest, THE SYSTEM SHALL return `OCCURRENCE_CONFLICT` and SHALL NOT create a second occurrence. Verify: occurrence-conflict test.
+
+Recovery:
+- **AC-003:** IF the machine was asleep across a fire time, THEN THE SYSTEM SHALL record misfire or skip according to the locked policy and SHALL NOT claim the run succeeded. Verify: sleep-misfire recovery test.
+- **AC-005:** WHEN the desktop window closes and the Runtime remains up, THE SYSTEM SHALL still observe; WHEN the Runtime stops, THE SYSTEM SHALL not claim runs that did not start. Verify: window-close vs Runtime-stop matrix.
+
+Boundary:
+- **AC-010:** WHEN an Automation is saved, THE SYSTEM SHALL create it PAUSED and admit no Task, and resume SHALL NOT fire a trigger at enable time. Verify: saved-paused / resume-no-fire test.
+
+Security:
+- **AC-011:** WHEN a trigger or routine text is saved, THE SYSTEM SHALL NOT grant a capability, weaken an approval or open an inbound public port. Verify: no-grant / no-inbound-port test.
+
+Notifications:
+- **AC-006:** WHEN notification delivery is unknown, THE SYSTEM SHALL keep Task settlement and notification status distinct. Verify: status-separation test.
+- **AC-007:** WHEN quiet hours are active for a selected class, THE SYSTEM SHALL mark the delivery SUPPRESSED using the quiet-hours contract owned here and SHALL NOT silently drop it. Verify: quiet-hours suppression test.
+
+UI and accessibility:
+- **AC-008:** WHEN the Automation history renders, THE SYSTEM SHALL show occurrence, Task and notification status separately as keyboard- and screen-reader-accessible states and SHALL NOT present a `PENDING` row as a delivered notification. Verify: history render + a11y test.
+
+Performance:
+- **AC-012:** WHEN many occurrences are due, THE SYSTEM SHALL bound catch-up per the locked misfire policy and SHALL NOT create an unbounded occurrence storm. Verify: catch-up bound test.
 
 ## 16. Executable acceptance command
 
@@ -223,13 +352,19 @@ The following distinctions are source-verified and must remain explicit in downs
 
 ## 20. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 010-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 010-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 010-T03 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 010-T02 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 010-T03 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 010-T03 | AC-006 |
+| One Task per occurrence | AUTOMATION | 010-T02 | AC-001 | Occurrence-to-Task identity test |
+| Duplicate observation dedupe | AUTOMATION, STORAGE | 010-T02 | AC-002 | Duplicate-observation dedupe test |
+| Sleep misfire recovery (B-26) | AUTOMATION, RUNTIME-LIFECYCLE | 010-T03 | AC-003 | Sleep-misfire recovery test |
+| DST/timezone next fire (B-26) | AUTOMATION | 010-T02 | AC-004 | DST/timezone next-fire test |
+| Window-close vs Runtime-stop | RUNTIME-LIFECYCLE, AUTOMATION | 010-T03 | AC-005 | Window-close vs Runtime-stop matrix |
+| Notification status separation (B-27) | AUTOMATION, CHANNELS | 010-T03 | AC-006 | Status-separation test |
+| Quiet-hours suppression (A-35, B-27) | AUTOMATION, CHANNELS | 010-T03 | AC-007 | Quiet-hours suppression test |
+| Accessible separate history | ui-behavior; AUTOMATION | 010-T04 | AC-008 | History render + a11y test |
+| Occurrence conflict | AUTOMATION, STORAGE | 010-T02 | AC-009 | Occurrence-conflict test |
+| Saved-paused / resume-no-fire | AUTOMATION | 010-T01 | AC-010 | Saved-paused / resume-no-fire test |
+| No grant / no inbound port | TRUST, AUTOMATION | 010-T01 | AC-011 | No-grant / no-inbound-port test |
+| Bounded catch-up | AUTOMATION | 010-T03 | AC-012 | Catch-up bound test |
 
 

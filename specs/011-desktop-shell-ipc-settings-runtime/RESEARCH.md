@@ -6,6 +6,16 @@
 
 Authorities: docs/RUNTIME-LIFECYCLE.md, docs/LOCAL-OPERATOR-IPC.md, docs/DESKTOP-SHELL-LLD.md, docs/V1-SETTINGS-CONTRACT-LEDGER.md, docs/V1-UI-SCREEN-CONTRACT.md, docs/SEMANTIC-SERVED-UI-MAP.md, docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md, docs/V1-TELEMETRY-USAGE-RESILIENCE-LLD.md, docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md. The Settings control ledger is normative target, not evidence of all controls being served.
 
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs this feature | Verdict |
+|---|---|---|---|---|
+| ZCode thin-shell / Host / CLI ownership split (`zai-org/ZCode`) | https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9 | Apache-2.0 + NOTICE | `packages/desktop` Main/Renderer/Host/CLI ownership split and plugin guest sandbox inform keeping the Tauri shell (untrusted renderer) strictly separate from the Runtime-local Host, so the shell is never the security boundary and native handles/credentials never cross into the WebView. | PORT the ownership-split pattern only; do not drop in React or the ZCode Host runtime. Read-first paths in REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX §ZCode. |
+| DeepSeek Harness typed IPC with sender assert (`deepseek-ai/deepseek-harness`) | https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159 | MIT at checked root | `apps/desktop` typed IPC with sender assertion, contextBridge preloads and host lifecycle/deadlines inform the authenticated local IPC boundary (AC-001/AC-002), the no-bearer-fallback rule and the quit-with-active-work UNKNOWN UX for drain (AC-012). | PROTOTYPE the typed-IPC/sender-assert and quit-drain patterns against LOCAL-OPERATOR-IPC and RUNTIME-LIFECYCLE; do not vendor the Electron host. |
+| OpenLoomi Tauri capability/permission manifests (`melandlabs/openloomi`) | https://github.com/melandlabs/openloomi/tree/2aca1016fa3065e2fee912afd0e94576d0483c66 | Apache-2.0 at checked root | Same Tauri + Rust stack as LiteCowork; its `apps/web/src-tauri` Tauri capability/permission manifests and lifecycle/close-behavior/launch-mode modules are the closest same-stack reference for scoping shell-to-Host capabilities and honest Runtime close/drain behavior. | PROTOTYPE the Tauri capability/permission manifest scoping and close-behavior patterns; same-stack so they port cleanly. Flag screen-understanding/audio capture as out-of-scope consent-gated RESEARCH. |
+
+No ZCode, DeepSeek Harness or OpenLoomi code is imported; all are read at the pinned SHAs. OpenBot (PolyForm Noncommercial) is not cited here and would be reference/UX only with no code reuse if it were.
+
 ## External comparison
 
 The supplied NeuralAgent screenshots demonstrate: persistent Settings category navigation beside a focused settings panel; Installed and Available agent groupings; notification sound/delivery choices; keep-awake and restart-resume policies; an Agents work overview with Needs You / Working / Done summary filters; and a usage dashboard with time range, per-agent limits, token types and model cost breakdown.

@@ -23,7 +23,7 @@
 - **Allowed paths:** IPC adapters and tests
 - **Contract:** LOCAL-OPERATOR-IPC
 - **Change intent:** Reject unauthenticated peers on each qualified OS.
-- **Acceptance:** AC-001/002, no bearer fallback, redacted frames, OS security tests.
+- **Acceptance:** AC-001, AC-002, AC-009, AC-010; no bearer fallback, a failed Windows DACL does not open an unauthenticated pipe, remote peers are rejected, redacted frames, OS security tests.
 - **Command:** `cargo test -p operator-ipc --locked ipc_peer_auth`
 
 ## 011-T03 - Runtime health and power/recovery observation
@@ -33,7 +33,7 @@
 - **Allowed paths:** runtime lifecycle, Tauri OS adapters, tests
 - **Contract:** RUNTIME-LIFECYCLE and SPEC Notifications/Advanced sections
 - **Change intent:** Expose separate process incarnation/readiness/drain and qualified keep-awake assertion state; keep startup policy independent from resume policy.
-- **Acceptance:** AC-005/006 plus native power assertion tests on declared OS; unsupported battery/power modes are unavailable; resume only for durable LiteCowork-owned work and never all CLI process state.
+- **Acceptance:** AC-005, AC-006, AC-012 plus native power assertion tests on declared OS; graceful drain stops admission before DRAINING and does not claim STOPPED before admitted handlers finish; unsupported battery/power modes are unavailable; resume only for durable LiteCowork-owned work and never all CLI process state.
 - **Current gap:** Lifecycle reads/start/refresh exist; no evidenced keep-awake power provider or generic native-agent resume implementation.
 - **Stop:** never report an OS assertion or resumed child process from UI-only state.
 **Command:** `python3 .specify/scripts/validate_feature_package.py`
@@ -45,7 +45,7 @@
 - **Allowed paths:** Settings shell and panel components
 - **Contract:** V1-UI-SCREEN-CONTRACT.md, V1-SETTINGS-CONTRACT-LEDGER.md, SEMANTIC-SERVED-UI-MAP
 - **Change intent:** Align actual SettingsView with the chosen IA and render each control according to its owner class.
-- **Acceptance:** AC-003/004/007/008; the mounted four-category SettingsView is mapped control-by-control; local preferences actually apply and persist or remain unavailable; shortcut labels match registered handlers; no target-only category/control is presented as active; Runtime transport/readiness copy is accurate; all visible panels have empty/stale/offline/denied/error states. Do not count the unmounted SettingsPage or passed-but-unused props as controls.
+- **Acceptance:** AC-003, AC-004, AC-007, AC-008, AC-011; the mounted four-category SettingsView is mapped control-by-control (B-33 acceptance surface); local preferences actually apply and persist or remain unavailable; shortcut labels match registered handlers; no target-only category/control is presented as active; categories and disabled-control explanations are keyboard- and screen-reader-accessible; the Notifications entry links to Feature 010's quiet-hours contract and does not republish it; Runtime transport/readiness copy is accurate; all visible panels have empty/stale/offline/denied/error states. Do not count the unmounted SettingsPage or passed-but-unused props as controls.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py specs/011-desktop-shell-ipc-settings-runtime`
 - **Stop:** no target-only button is rendered active.
 
