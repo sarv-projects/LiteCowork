@@ -253,9 +253,9 @@ Validation evidence from the connected Windows development machine:
 | Cross-owner consistency guard | Passed **36 assertions** | Checks only the explicit design invariants encoded in the script |
 | V1 contract/route/UI audit | Passed **0 findings** | Structural crosswalk only |
 | Design-depth audit | Passed **0 structural findings** | Inventory and ownership structure only |
-| Feature package validator | Passed **11/11 packages** | SDD structure, not owner acceptance |
+| Feature package validator | Passed **12/12 packages** | SDD structure, not owner acceptance |
 | Markdown link audit | Passed; **0 broken relative links** | Limited literal Markdown-link parser; excludes archives, derived reading notes and reference repositories |
-| Active documentation corpus | **260 files / 55,534 lines** at the generated manifest | First-party Markdown/MDX inventory excluding archives, reading digests, repo_take, plan files and generated audit output; separate Markdown audit scanned 257 files / 55,448 lines and found 0 broken relative links |
+| Active documentation corpus | **270 files / 57,485 lines** at the generated manifest | First-party Markdown/MDX inventory excluding archives, reading digests, repo_take, plan files and generated audit output; separate Markdown audit scanned 267 files / 57,409 lines and found 0 broken relative links |
 | Frontend production build | Passed; API type check, TypeScript and Vite completed | Main JS bundle 1.05 MB minified / 287 KB gzip; Vite warns over 500 KB |
 | Focused Conversation + responsive tests | **24 passed, 0 failed** | Includes list cursor pagination, pending-create journal retry affordance, repeated-cursor protection, drawer semantics and responsive navigation/canvas assertions |
 | WorkspaceRoot route filter on Windows | **6 passed, 0 failed** | Real SQLite route fixture now uses canonical platform-specific locator and file identity data; no production locator validation was relaxed |
