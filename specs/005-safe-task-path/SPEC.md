@@ -63,25 +63,113 @@ Feature 005 remains DRAFT. The code has useful domain/storage primitives and a t
 - Module file layout and private helper names, provided the transactions and secret boundaries stay intact.
 - Presentation copy, provided state distinctions remain visible.
 
-### Open decisions
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
 
-- B-17: the first V1 Environment provider must be selected for the declared GA OS and exact Windows build/provider version (or another explicitly selected OS). Decide whether the first target is the Windows Job Object-backed local provider or a separately qualified container/OS sandbox provider. The current `probe_environment_provider()` output is discovery evidence only: Windows reports process-tree lifetime capability; it does not prove filesystem confinement, network enforcement or budget enforcement. On Linux, bubblewrap presence is not a qualification result.
-- B-18: choose the one write primitive for the first vertical slice: atomic replacement of one exact approved file, or a bounded patch against a pinned base revision. The choice must define the input/base digest, maximum bytes, allowed path/root, temporary-file semantics, atomic commit, rollback/reconciliation behavior, and independent post-write verifier. Do not accept arbitrary shell commands or general workspace writes as an equivalent first slice.
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. Both blockers remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md).
 
-### Blockers
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-17 | First Environment provider for safe Task execution | **RECOMMENDED: The first Environment provider is the Linux bubblewrap-backed local provider, qualified for all four isolation dimensions, not the Windows Job Object provider.** Admission accepts only a current-incarnation `IsolationAttestation` whose filesystem roots, process-tree lifetime/quiescence, network policy (default deny) and resource-limit fields are all `ENFORCED`. A Windows Job Object proves process-tree containment only; by itself it is `NOT_ENFORCED` for filesystem-root confinement and network denial and therefore fails admission closed. `probe_environment_provider()` output is discovery evidence, not an attestation. | [ENVIRONMENTS.md](../../docs/ENVIRONMENTS.md), [TRUST.md](../../docs/TRUST.md). A partial OS capability is never promoted to a full sandbox; the exact bubblewrap version/profile is the owner's to pin before this leaves PROPOSED. |
+| B-18 | First mediated file-operation class | **PROPOSED: The one write primitive is atomic whole-file replacement of exactly one approved file.** Contract: input is a new-content blob bound to the approved plan digest; the base is the pinned prior revision digest; maximum 1 MiB; the path must resolve inside the admitted WorkspaceRoot with no symlink escape; the provider writes to a temporary file, fsyncs, then atomically renames over the target; on an `INTEGRITY_FAILURE` or ambiguous result it rolls back and reconciles before any retry; an independent post-write verifier recomputes the digest against the approved content. Arbitrary shell commands and general workspace writes are not an equivalent first slice. | [TASK-RUNTIME.md](../../docs/TASK-RUNTIME.md), [ENVIRONMENTS.md](../../docs/ENVIRONMENTS.md), [TRUST.md](../../docs/TRUST.md). The write runs outside SQLite after the Attempt/lease/grant/receipt commit; the verifier makes success independently provable. |
 
-- B-17: Product, Environments and Trust must name the first GA OS/build, exact Environment provider/version, and evidence for all enforced isolation dimensions: filesystem roots, process-tree lifetime/quiescence, network policy and resource limits. Provider capability probes and Job Object presence alone do not close this blocker.
-- B-18: Product, Environments and Trust must accept one exact file-write class and its digest/path/size/atomicity/recovery/verifier contract. No implementation should infer the allowed write class from an available OS API.
+Both rows are declared design positions only. This package stays DRAFT; owner acceptance, the exact provider version and the enforced-dimension evidence are not complete. Do not infer owner sign-off from the presence of a decision row.
 
 ## 6. High-level design
 
 UI promotes work with an explicit command. TaskService commits Task and TaskSpecRevision. Planning uses a native lead session. Acceptance commits PlanRevision. Attempt admission is a separate transaction that never contains the filesystem call. Effect reconciler and verifier run after the external write returns.
 
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  UI[Desktop Work UI: promote, accept plan, approve] --> OP[Authenticated Operator]
+  OP --> TS[TaskService]
+  TS --> DB[(SQLite Task/Plan/Attempt/Effect store)]
+  TS --> PL[Planner session Feature 001 native lead]
+  OP --> AA[Attempt Admission transaction]
+  AA --> DB
+  AA --> ENV[Environment Provider + IsolationAttestation]
+  ENV -. attestation .-> AA
+  ENV --> FW[Atomic file write outside SQLite]
+  FW --> REC[Effect Reconciler]
+  REC --> VER[Independent Verifier digest compare]
+  REC --> DB
+  VER --> DB
+```
+
+The Attempt-admission transaction, the Environment provider attestation gate, the reconciler and the independent verifier are the feature-specific components; Task/Plan records and Trust decisions remain owned by TASK-RUNTIME/TRUST and are not redefined.
+
+### Trust boundaries
+
+The desktop UI is untrusted; the authenticated Operator is the only command path. The Environment cannot widen roots; network defaults to deny unless the plan's grant allows it; secret material never enters the TaskPacket. Admission accepts only a Runtime-held attestation whose four dimensions are `ENFORCED`; a caller-supplied or `UNKNOWN` attestation fails closed. The filesystem write runs outside SQLite; the transaction performs no process or network call.
+
+### Actor sequence (target)
+
+1. Owner explicitly promotes a Conversation outcome or submits a standalone objective; TaskService commits Task + TaskSpecRevision (no Attempt).
+2. Planner admission revalidates a current-incarnation `IsolationAttestation`; without it, planning returns `DEPENDENCY_UNAVAILABLE`.
+3. Owner accepts an immutable PlanRevision and Steps atomically (If-Match on TaskSpec head).
+4. Attempt admission commits Attempt + ExecutionLease + grant + idempotency receipt in one transaction; the Environment is attached before that commit.
+5. The provider performs the atomic whole-file replace outside SQLite.
+6. The reconciler settles the Effect; the independent verifier recomputes the digest; cancel/restart fence the lease and never report success without verification.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop UI | Promote command, plan acceptance, approval, durable receipt display | Starting execution on its own |
+| Operator | Auth, Workspace scope, plan-acceptance and attempt validation | Running the filesystem write |
+| TaskService | Task/spec/plan commits, lead resolution | Isolation enforcement |
+| Environment Provider | Attestation, confined roots, process-tree/network/limits | Task outcome authority |
+| Attempt Admission | Atomic Attempt/lease/grant/receipt commit | External call inside the transaction |
+| Effect Reconciler + Verifier | Reconcile ambiguous writes, independent digest verify | Inferring success from intent |
+| Storage | Atomic commits, fences, receipts | External process/network calls |
+
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
-## 7. Low-level design
+## 7. Low-level design and interfaces
 
 CreateTaskRequest fields follow TASK-RUNTIME. Plan acceptance is atomic. Attempt, lease, grant, invocation intent and idempotency receipt commit together before the Environment is invoked. The write happens outside SQLite. Reconciliation updates Effect and Evidence after the external result is known.
+
+### 7.1 Existing signatures (CODE)
+
+- Served: `POST /v1/tasks` (Task + TaskSpecRevision + receipt), `POST /v1/tasks/{task_id}/spec-revisions`, Task/plan/Step/artifact read routes, `GET /v1/tasks/{task_id}/planning-readiness` (hardcodes dispatch/planning/session/plan booleans false), `POST /v1/tasks/{task_id}/lead-agent`, `POST /v1/capability-grants` (bounded `workspace.resource.read`).
+- Domain/storage primitives with unit tests: `admit_step_attempt`, Attempt/lease admission types, `IsolationAttestation` and enforcement dimensions in `environment_isolation.rs`, process-scope journal types (compiled `allow(dead_code)`), `probe_environment_provider`.
+
+### 7.2 PROPOSED signatures (not yet wired)
+
+Every signature below is PROPOSED and is not promotable until its canonical owner document and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: atomic Attempt admission; external call stays outside.
+pub struct AdmitFileWriteAttempt {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub task_id: String,
+    pub plan_revision_id: String,
+    pub step_id: String,
+    pub attestation: IsolationAttestation,   // all four dimensions ENFORCED
+    pub lease: ExecutionLeaseRequest,
+    pub grant: FileWriteGrant,               // one path, base digest, max 1 MiB
+    pub idempotency_key: String,             // 1..=200 printable ASCII
+}
+
+// PROPOSED: one write class = atomic whole-file replacement.
+pub struct ApprovedFileReplacement {
+    pub target_path: WorkspaceConfinedPath,
+    pub base_revision_digest: ContentDigest,
+    pub new_content: BoundedBlob,            // <= 1 MiB
+    pub plan_action_digest: ActionDigest,
+}
+
+// PROPOSED: independent post-write verification.
+pub trait FileWriteVerifier: Send + Sync {
+    fn verify(
+        &self, target: &WorkspaceConfinedPath, expected: &ContentDigest,
+    ) -> Result<VerificationEvidence, VerifyError>;
+}
+```
+
+Typed errors (PROPOSED): `AttemptAdmissionError::{AttestationNotEnforced, StalePlanVersion, StaleFence, LeaseConflict}`; `FileWriteError::{IntegrityFailure, PathEscape, OverBound, AmbiguousResult}`.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
 
@@ -119,13 +207,31 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN the owner sends an ordinary Conversation message, THE SYSTEM SHALL NOT create a Task.
-- **AC-002:** WHEN the owner explicitly promotes an outcome, THE SYSTEM SHALL commit Task and TaskSpecRevision without an Attempt.
-- **AC-003:** IF the preferred lead binding is unavailable, THEN THE SYSTEM SHALL return AGENT_UNAVAILABLE and create no Task.
-- **AC-004:** WHEN the owner accepts a plan, THE SYSTEM SHALL commit an immutable PlanRevision and Steps before any Effect.
-- **AC-005:** WHEN the Attempt runs, THE SYSTEM SHALL invoke the Environment only after lease, grant and idempotency receipt are committed, and the external call SHALL stay outside that transaction.
-- **AC-006:** IF the external write result is unknown, THEN THE SYSTEM SHALL reconcile before any retry.
-- **AC-007:** WHEN the Runtime restarts after cancel or timeout, THE SYSTEM SHALL show a durable receipt and SHALL NOT report success without independent verification.
+Positive:
+- **AC-002:** WHEN the owner explicitly promotes an outcome, THE SYSTEM SHALL commit Task and TaskSpecRevision without an Attempt. Verify: Task-creation storage test.
+- **AC-004:** WHEN the owner accepts a plan, THE SYSTEM SHALL commit an immutable PlanRevision and Steps before any Effect. Verify: plan-acceptance atomicity test.
+- **AC-005:** WHEN the Attempt runs, THE SYSTEM SHALL invoke the Environment only after lease, grant and idempotency receipt are committed, and the external call SHALL stay outside that transaction. Verify: admission-ordering test.
+
+Negative:
+- **AC-001:** WHEN the owner sends an ordinary Conversation message, THE SYSTEM SHALL NOT create a Task. Verify: no-Task assertion.
+- **AC-003:** IF the preferred lead binding is unavailable, THEN THE SYSTEM SHALL return AGENT_UNAVAILABLE and create no Task. Verify: lead-unavailable negative test.
+
+Security:
+- **AC-008:** WHEN an Attempt is admitted, THE SYSTEM SHALL accept only a current-incarnation `IsolationAttestation` whose filesystem, process-tree, network and resource-limit dimensions are all `ENFORCED` and SHALL fail closed otherwise. Verify: attestation-gate matrix.
+- **AC-009:** WHEN the approved write resolves a path, THE SYSTEM SHALL confine it to the admitted WorkspaceRoot with no symlink escape and reject writes over the 1 MiB bound. Verify: path-escape and over-bound tests.
+
+Recovery:
+- **AC-006:** IF the external write result is unknown, THEN THE SYSTEM SHALL reconcile before any retry. Verify: ambiguous-result reconciliation test.
+- **AC-007:** WHEN the Runtime restarts after cancel or timeout, THE SYSTEM SHALL show a durable receipt and SHALL NOT report success without independent verification. Verify: restart + verifier test.
+
+Concurrency:
+- **AC-010:** WHILE an Attempt holds a writer lease, THE SYSTEM SHALL require `QUIESCENT` before releasing the lease or destroying the Environment and SHALL fence a stale fence with `STALE_FENCE`. Verify: lease/quiescence race test.
+
+UI and accessibility:
+- **AC-011:** WHEN execution controls are shown, THE SYSTEM SHALL present planning readiness, plan acceptance and approval distinctly and SHALL NOT present a saved record as live execution proof. Verify: Work-surface render test.
+
+Performance:
+- **AC-012:** WHEN a bounded plan is accepted, THE SYSTEM SHALL build the planning preflight packet within a finite budget and SHALL NOT scan unbounded Task history. Verify: bounded-preflight test.
 
 ## 16. Executable acceptance command
 
@@ -176,12 +282,17 @@ Read from TASK-RUNTIME, ENVIRONMENTS, DELEGATION, and STATE-MACHINES.
 - The current Windows Job Object process-tree observation is not an attestation of filesystem root enforcement, network deny or every resource limit. Do not show it as a full Environment isolation badge.
 ## 19. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 005-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 005-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 005-T02 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 005-T02 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 005-T03 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 005-T03 | AC-006 |
-| AC-007 | EARS acceptance | canonical owner docs cited in this SPEC | 005-T03 | AC-007 |
+| Ordinary chat is not a Task | TASK-RUNTIME, PRODUCT | 005-T01 | AC-001 | No-Task assertion |
+| Explicit promote without Attempt | TASK-RUNTIME, STORAGE | 005-T01 | AC-002 | Task-creation test |
+| Unavailable lead fails, no Task | DELEGATION, AGENT-CONTROL | 005-T02 | AC-003 | Lead-unavailable test |
+| Atomic plan acceptance | TASK-RUNTIME, STATE-MACHINES | 005-T02 | AC-004 | Plan atomicity test |
+| Attempt admission before external call | TASK-RUNTIME, STORAGE | 005-T03 | AC-005 | Admission-ordering test |
+| Reconcile unknown write | TRUST, ENVIRONMENTS | 005-T03 | AC-006 | Reconciliation test |
+| Restart + independent verify | FAILURE-RECOVERY, TASK-RUNTIME | 005-T03 | AC-007 | Restart + verifier test |
+| Enforced attestation gate | ENVIRONMENTS, TRUST | 005-T03 | AC-008 | Attestation matrix |
+| Confined path + byte bound | ENVIRONMENTS, STORAGE | 005-T03 | AC-009 | Path-escape + bound tests |
+| Lease quiescence + stale fence | ENVIRONMENTS, STATE-MACHINES | 005-T03 | AC-010 | Lease/quiescence race test |
+| Distinct execution controls | PRESENTATION-RUNTIME, contracts/ui-behavior.md | 005-T04 | AC-011 | Render test |
+| Bounded preflight build | TASK-RUNTIME | 005-T02 | AC-012 | Bounded-preflight test |

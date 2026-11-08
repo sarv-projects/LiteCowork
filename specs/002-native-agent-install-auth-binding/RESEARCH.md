@@ -5,6 +5,15 @@
 ## Primary authority
 Canonical design and state ownership: docs/AGENT-CONTROL.md, docs/AGENT-FABRIC.md, docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md, docs/V1-SETTINGS-CONTRACT-LEDGER.md, docs/V1-UI-SCREEN-CONTRACT.md and root ARCHITECTURE.md. Feature 002 owns native AgentModule/profile/install/auth/binding boundaries. LiteSPM owns MCP/skill/plugin/capability-package lifecycle. Feature 001 owns Conversation admission/session execution. Feature 011 owns Settings shell/control authority. The agent catalogue LLD is normative target, not current implementation proof.
 
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs install/probe/auth | Verdict |
+|---|---|---|---|---|
+| DeepSeek Harness `apps/desktop` typed IPC with sender assert | https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159 | MIT | Typed IPC with sender assertion, contextBridge preloads and host lifecycle/deadlines inform the authenticated Operator boundary for install/probe/auth commands and the quit-with-active-work UNKNOWN UX for an in-flight probe. | Prototype the quit-drain against RUNTIME-LIFECYCLE and port the typed-IPC/sender-assert pattern; do not vendor the Electron host. |
+| ZCode `packages/desktop` thin-shell / Host / CLI split | https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9 | Apache-2.0 + NOTICE | The Host/shell ownership split informs keeping the Settings catalogue UI (shell) separate from the Runtime-local lifecycle/probe Host, so native handles and credentials never cross into the WebView. | Port the ownership-split pattern only; do not drop in React or the ZCode Host runtime. |
+
+No DeepSeek Harness or ZCode code is imported; both are prototype/reference inputs. OpenBot (PolyForm Noncommercial) is cited below for model/effort-picker UX only and is explicitly reference/UX with no code reuse.
+
 ## External comparison and adoption
 NeuralAgent public material describes a desktop workflow around discovering/using agents, configured/installed state, persistent agent work views, model routing, local voice, scheduling and computer-use. Its historic public repository describes a different Electron/React + Python/FastAPI architecture and plugin-like agent roles; current public product pages now describe a later computer-use product. Do not treat those web pages and the old code repository as one versioned implementation or copy either architecture wholesale. NeuralAgent's Settings screenshots are useful information-hierarchy references: persistent category navigation, installed vs available agents, notification preference, advanced runtime behavior and a separate cost/usage surface. Its Agents overview uses three summary filters (Needs You, Working, Done) and a grouped work list rather than separate permanent sidebar pages. Those counts/statuses must be real owner projections in LiteCowork.
 

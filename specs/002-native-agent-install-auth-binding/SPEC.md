@@ -70,15 +70,68 @@ Code or a route alone does not qualify the feature. This package remains DRAFT u
 - Which exact OS/harness/version/auth tuple is the first GA route (P0 exit, shared with 001 B-02).
 - Which credential slots on the first qualified module use NATIVE_AGENT versus LITECOWORK_SECRET_STORE. The closed rules are already locked: a NATIVE_AGENT slot is never a SecretRef; a LITECOWORK_SECRET_STORE slot stores bytes only in SecretStore.
 
-### Blockers
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
 
-- B-02 shared with 001: first provider handshake version.
-- B-11: which additional AgentModules are in the V1 matrix after the first route.
-- B-12: descriptor TTL and probe budget per module.
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. Both blockers remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md). B-02 is shared with Feature 001 and stays owned there.
+
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-11 | Additional V1 AgentModules after the first qualified native route | **RECOMMENDED: Qualify exactly one additional module after the first route, matching the Feature 001 B-02 pair (if OpenCode is first, Claude Code CLI is the second), and no more in V1.** Each additional module repeats the full independent lifecycle (installation, auth, descriptor freshness, binding, session readiness); none inherits qualification from the first route. The V1 matrix is therefore two modules, each separately qualified on the declared OS/Runtime. | [AGENT-CONTROL.md](../../docs/AGENT-CONTROL.md), [AGENT-ACCOUNT-ROUTE-MATRIX.md](../../docs/AGENT-ACCOUNT-ROUTE-MATRIX.md). Prevents catalog-wide claims from one route; the exact second module stays owner-pinned (and aligns with Feature 004 B-16 relay). |
+| B-12 | Descriptor freshness TTL and probe budget by AgentModule | **PROPOSED: A per-module `AgentControlDescriptor` TTL of 15 minutes with a bounded probe budget of at most 3 descriptor refresh probes per minute per module, both module-overridable downward in the conformance fixture.** A descriptor older than its TTL is stale: it blocks new binding admission and new session readiness and offers refresh while preserving the composer draft. The TTL and probe budget are pinned per module in its conformance fixture; a generic value is never inferred from a brand. | [AGENT-CONTROL.md](../../docs/AGENT-CONTROL.md) §12, [V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md](../../docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md). Any promoted TTL/budget value must land in the owner doc and conformance fixture together before this leaves PROPOSED. |
+
+Both rows are declared design positions only. This package stays DRAFT; owner acceptance and the exact first/second route are not complete. Do not infer owner sign-off from the presence of a decision row.
+
+### Settings surface ownership (A-35, PROPOSED, pending owner)
+
+Per the A-35 PROPOSED resolution in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md), the normative **Settings -> Agents screen surface** (control table, layout, categories, shell wiring) is owned by **Feature 011**. Feature 002 owns only the agent install/auth/binding **operations** that the screen invokes. The §18 UI and lifecycle material below is feature-specific operation/lifecycle design that LINKS to Feature 011's normative control table; it does not republish or compete with that owner. Where this SPEC lists control rows, treat them as the operations Feature 002 supplies, not the screen's normative control contract.
 
 ## 6. High-level design
 
 Desktop UI talks only to the authenticated Operator. AgentRegistryService caches distribution metadata. AgentLifecycleService records Runtime-local installation observations. AgentBindingService commits Workspace-scoped bindings. Native sign-in stays outside SQLite. Session start is feature 001, not this package.
+
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  UI[Settings Agents UI: Feature 011 screen, 002 operations] --> OP[Authenticated Operator]
+  OP --> REG[AgentRegistryService cached metadata]
+  OP --> LIFE[AgentLifecycleService Runtime-local observations]
+  OP --> DESC[AgentControlDescriptor producer]
+  OP --> CRED[Credential broker -> SecretStore]
+  OP --> BIND[AgentBindingService Workspace-scoped]
+  LIFE --> NATIVE[Native install/auth outside SQLite]
+  BIND --> DB[(SQLite bindings/receipts/audit)]
+  DESC --> DB
+  BIND -. enables future turn .-> F1[Feature 001 session start]
+```
+
+Install, auth, descriptor freshness and session readiness are four independent axes; the diagram keeps each on its own service so no single connected flag collapses them. Session start is Feature 001.
+
+### Trust boundaries
+
+The desktop UI is untrusted; the authenticated Operator is the only command path. Native credential material stays in the harness or SecretStore; descriptors store non-secret digests only; the opaque native handle stays in the Runtime-local host binding. Registry metadata never generates a shell command. SQLite transactions make no network or process call; install/auth/probe run outside the transaction and then persist a Runtime-local observation.
+
+### Actor sequence (target)
+
+1. Owner searches the registry; results are discoverable distributions, not installed/authenticated/ready.
+2. A lifecycle probe records a Runtime-local installation observation (not a binding).
+3. Owner completes the module's own native sign-in; a cancelled/failed sign-in persists no secret bytes and leaves any prior binding unchanged.
+4. The descriptor producer returns a fresh non-secret `AgentControlDescriptor` for that exact module version.
+5. Owner creates a disabled binding, then enables it as a separate CAS step that requires the fresh descriptor.
+6. A fresh descriptor and enabled binding still do not enable Send; session start and Send remain Feature 001 and fail closed without a qualified supervisor.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop UI (screen owned by Feature 011) | Independent status axes, honest unavailable states, real actions | Executing native installs/auth itself |
+| Operator | Auth, Workspace scope, route validation | Native process/credential custody |
+| AgentRegistryService | Cached distribution metadata | Treating metadata as installability |
+| AgentLifecycleService | Runtime-local install/update/probe observations | Creating bindings or profiles |
+| Descriptor producer | Fresh non-secret descriptor per module version | Storing secret bytes |
+| Credential broker | SecretStore custody, replay-safe submit | Echoing secrets to UI/events |
+| AgentBindingService | Disabled-create then CAS enable with fresh descriptor | Starting a Conversation session |
+| Storage | Atomic binding/receipt/audit commits | External process/network calls |
 
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
@@ -87,6 +140,45 @@ Trust boundary: the desktop UI is untrusted; the authenticated Operator is the o
 Operator routes in docs/AGENT-CONTROL.md §12 and docs/API.md are the authority. This package does not invent operationIds. The active checkout already mounts partial registry, inventory, profile-probe and binding routes. Proposed work must close the missing install/update/auth-begin/native-config operations and the unavailable descriptor/credential producers without duplicating existing routes. Any new field is PROPOSED until promoted into AGENT-CONTROL and the OpenAPI document in the same reviewed change.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
+
+### 7.1 Existing signatures (CODE)
+
+- Served: `GET /v1/agent-registry`, `POST /v1/agent-registry/refresh`, `GET /v1/agent-installations`, `GET /v1/agent-profiles`, `POST /v1/agent-profiles/probe` (Codex/OpenCode), binding list/get/create/enable/disable.
+- Mounted but fail-closed: `GET`/`POST` AgentControlDescriptor and credential-slot routes return `503 DEPENDENCY_UNAVAILABLE`.
+- Target-only: `POST /agent-registry/{id}/install`, `/update`, native-config open, native auth-begin.
+
+### 7.2 PROPOSED signatures (not yet served)
+
+Every signature below is PROPOSED and is not promotable until AGENT-CONTROL and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: fresh descriptor gate for enable (AC-004).
+pub struct EnableBindingWithDescriptor {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub binding_id: String,
+    pub expected_binding_version: u64,
+    pub descriptor_revision: DescriptorRevision,   // must be fresh per B-12 TTL
+    pub idempotency_key: String,                   // 1..=200 printable ASCII
+}
+
+// PROPOSED: replay-safe credential submission into SecretStore.
+pub trait CredentialBroker: Send + Sync {
+    fn submit_slot(
+        &self, slot_id: &str, bytes: SecretBytes, idempotency_key: &str,
+    ) -> Result<SecretRef, CredentialError>;   // same key + changed body => conflict
+}
+
+// PROPOSED: per-module descriptor freshness (B-12).
+pub struct AgentControlDescriptorFreshness {
+    pub module_version: String,
+    pub issued_at: Timestamp,
+    pub ttl_seconds: u32,                       // PROPOSED default 900
+    pub probe_budget_per_minute: u8,            // PROPOSED default 3
+}
+```
+
+Typed errors (PROPOSED): `BindingError::{DescriptorStale, OfferIncompatible, NotLeadEligible}`; `CredentialError::{DescriptorStale, ReplayConflict, Unsupported}`.
 
 ## 8. Data
 
@@ -122,13 +214,33 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN the owner requests an agent registry search, THE SYSTEM SHALL return discoverable distributions without marking them installed, authenticated or session-ready.
-- **AC-002:** WHEN a lifecycle probe observes an installed binary, THE SYSTEM SHALL record a Runtime-local installation observation that is not by itself an AgentBinding.
-- **AC-003:** IF native sign-in is cancelled or fails, THEN THE SYSTEM SHALL leave any existing binding unchanged and SHALL NOT persist secret bytes.
-- **AC-004:** WHEN the owner enables a binding, THE SYSTEM SHALL require a fresh non-secret AgentControlDescriptor for that exact module version.
-- **AC-005:** IF a previously selected model or session option is no longer in the fresh descriptor, THEN THE SYSTEM SHALL reject new admission and preserve the composer draft.
-- **AC-006:** WHEN the desktop restarts, THE SYSTEM SHALL revalidate install, auth and descriptor freshness independently before showing the binding as usable.
-- **AC-007:** IF the module reports native-only MCP or hooks outside LiteSPM, THEN THE SYSTEM SHALL label them as native harness state and SHALL NOT claim a Core Effect.
+Positive:
+- **AC-001:** WHEN the owner requests an agent registry search, THE SYSTEM SHALL return discoverable distributions without marking them installed, authenticated or session-ready. Verify: registry projection test.
+- **AC-002:** WHEN a lifecycle probe observes an installed binary, THE SYSTEM SHALL record a Runtime-local installation observation that is not by itself an AgentBinding. Verify: inventory observation test.
+- **AC-004:** WHEN the owner enables a binding, THE SYSTEM SHALL require a fresh non-secret AgentControlDescriptor for that exact module version. Verify: enable-gate test.
+
+Negative:
+- **AC-003:** IF native sign-in is cancelled or fails, THEN THE SYSTEM SHALL leave any existing binding unchanged and SHALL NOT persist secret bytes. Verify: cancelled-auth negative test.
+- **AC-005:** IF a previously selected model or session option is no longer in the fresh descriptor, THEN THE SYSTEM SHALL reject new admission and preserve the composer draft. Verify: stale-option rejection test.
+
+Recovery:
+- **AC-006:** WHEN the desktop restarts, THE SYSTEM SHALL revalidate install, auth and descriptor freshness independently before showing the binding as usable. Verify: restart revalidation matrix.
+
+Boundary:
+- **AC-007:** IF the module reports native-only MCP or hooks outside LiteSPM, THEN THE SYSTEM SHALL label them as native harness state and SHALL NOT claim a Core Effect. Verify: native-state labeling test.
+- **AC-008:** WHEN a descriptor is older than its per-module TTL (PROPOSED 15 minutes), THE SYSTEM SHALL treat it as stale, block new binding admission and offer refresh while preserving the draft. Verify: TTL-boundary test.
+
+Security:
+- **AC-009:** WHEN a credential slot is submitted, THE SYSTEM SHALL store bytes only in SecretStore for a `LITECOWORK_SECRET_STORE` slot, never echo them, and a `NATIVE_AGENT` slot SHALL never become a SecretRef. Verify: secret-custody and redaction tests.
+
+Concurrency:
+- **AC-010:** WHEN the same credential idempotency key replays with an unchanged body, THE SYSTEM SHALL return the original SecretRef, and a changed body with the same key SHALL conflict. Verify: replay/conflict test.
+
+UI and accessibility:
+- **AC-011:** WHEN the Settings Agents surface renders, THE SYSTEM SHALL present detection, installation, configuration, authentication and readiness as independent keyboard- and screen-reader-accessible states and SHALL NOT show a fake Install/Sign in/Test/Ready. Verify: Feature 011 screen render + a11y test linking 002 operations.
+
+Performance:
+- **AC-012:** WHEN one module's probe is slow, THE SYSTEM SHALL bound it to the per-module probe budget and SHALL NOT block other cards or the page. Verify: per-section probe-budget test.
 
 ## 16. Executable acceptance command
 
@@ -186,15 +298,20 @@ Read from AGENT-CONTROL, AGENT-FABRIC, AGENT-ACCOUNT-ROUTE-MATRIX, V1-AGENT-DISC
 
 ## 19. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 002-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 002-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 002-T03 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 002-T03 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 002-T04 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 002-T03 | AC-006 |
-| AC-007 | EARS acceptance | canonical owner docs cited in this SPEC | 002-T04 | AC-007 |
+| Registry discovery not readiness | AGENT-CONTROL, V1-AGENT-DISCOVERY-AND-CATALOG-LLD | 002-T02 | AC-001 | Registry projection test |
+| Install observation not a binding | AGENT-CONTROL | 002-T02 | AC-002 | Inventory observation test |
+| Cancelled auth preserves state | AGENT-CONTROL, SECURITY | 002-T03 | AC-003 | Cancelled-auth test |
+| Enable requires fresh descriptor | AGENT-CONTROL | 002-T03 | AC-004 | Enable-gate test |
+| Stale option rejects admission | AGENT-CONTROL, STATE-MACHINES | 002-T04 | AC-005 | Stale-option test |
+| Independent restart revalidation | AGENT-CONTROL | 002-T03 | AC-006 | Restart matrix |
+| Native state not a Core Effect | AGENT-CONTROL, CAPABILITY-FABRIC | 002-T04 | AC-007 | Native-state labeling test |
+| Descriptor TTL freshness (B-12) | AGENT-CONTROL | 002-T03 | AC-008 | TTL boundary test |
+| Secret custody and redaction | SECURITY, AGENT-CONTROL | 002-T03 | AC-009 | Secret-custody tests |
+| Credential replay/conflict | AGENT-CONTROL, STORAGE | 002-T03 | AC-010 | Replay/conflict test |
+| Independent Settings status axes | Feature 011 screen contract; contracts/ui-behavior.md | 002-T05 | AC-011 | Screen render + a11y test |
+| Bounded per-module probe budget | AGENT-CONTROL | 002-T02 | AC-012 | Probe-budget test |
 
 
 ## V1 model and effort picker details — 2026-11-06

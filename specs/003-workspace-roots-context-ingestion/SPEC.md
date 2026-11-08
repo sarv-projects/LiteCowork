@@ -63,25 +63,111 @@ Code or a route alone does not qualify the feature. This package remains DRAFT u
 - Module file layout and private helper names, provided the transactions and secret boundaries stay intact.
 - Presentation copy, provided state distinctions remain visible.
 
-### Open decisions
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
 
-- Which content types are in the first qualified ingestion set.
-- Watcher versus explicit rescan for the first GA OS.
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. Both blockers remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md).
 
-### Blockers
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-13 | First supported Workspace ingestion formats | **PROPOSED: Qualify exactly the already-allowlisted UTF-8 lexical text set first.** The first GA ingestion formats are the formats the local text index already bounds: TXT, Markdown, CSV, JSON, JSONL, NDJSON, Rust, Python, TOML, YAML, JavaScript, TypeScript and CSS, each capped at 1 MiB with the existing control-character and term-count bounds. PDF, Office, archive, image, audio and video stay opaque stored originals (no extraction/index) in this slice. ZIP contents remain unexpanded. Every ingested revision carries a content digest; a format outside the set is stored opaque and fails retrieval indexing, not the whole root. | [WORLD-RESOURCES.md](../../docs/WORLD-RESOURCES.md), [CONTEXT.md](../../docs/CONTEXT.md). Keeps ingestion bounded and qualifiable per format; this is a local lexical index, not embeddings/vector retrieval, until an owner promotes a second provider. |
+| B-14 | Watcher versus explicit rescan behavior | **RECOMMENDED: Explicit manual rescan is the GA default; no filesystem watcher ships in V1.** A rescan is an owner-initiated bounded metadata census (1,000 entries, depth 32, 1 MiB relative-locator budget, 8s deadline stopping traversal at 7s, two concurrent jobs); it commits FILE membership only and never silently tombstones unseen Resources. A watcher is target-only and deferred until OS notification semantics and invalidation are owned in WORLD-RESOURCES. Scan stays Linux-only; non-Linux returns `SCAN_UNSUPPORTED_PLATFORM`. | [WORLD-RESOURCES.md](../../docs/WORLD-RESOURCES.md), [STATE-MACHINES.md](../../docs/STATE-MACHINES.md). Avoids an unowned notification/invalidation contract; manual rescan is deterministic and already bounded in source. |
 
-- B-13: first qualified ingestion formats.
-- B-14: watcher default versus manual rescan on the GA OS.
+Both rows are declared design positions only. This package stays DRAFT; owner acceptance and the exact GA OS are not complete. Do not infer owner sign-off from the presence of a decision row.
 
 ## 6. High-level design
 
 UI picker returns a candidate path to the Operator. ResourceService commits root status, location availability and private bindings in one SQLite transaction. Context assembly reads only ACTIVE roots and pinned revisions. Conversation send remains feature 001 and only consumes an already built package.
 
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  UI[Desktop folders UI: Add/pause/resume/revoke, Context Used] --> OP[Authenticated Operator]
+  OP --> RS[ResourceService]
+  RS --> DB[(SQLite roots/locations/private bindings)]
+  RS --> SC[Metadata Scanner Linux-only]
+  SC --> DB
+  RS --> IX[Local Lexical Index allowlisted UTF-8 text]
+  IX --> DB
+  OP --> RET[Grounded Retrieval read-only]
+  RET --> IX
+  RET --> CA[ContextAttachment + retrieval receipt]
+  CA --> DB
+  DB --> F1[Feature 001 context package consumer]
+```
+
+The metadata scanner, local lexical index and the ContextAttachment/retrieval-receipt path are the feature-specific components; root identity and locator custody remain WORLD-RESOURCES-owned and are not redefined here.
+
+### Trust boundaries
+
+The desktop UI is untrusted; the authenticated Operator is the only command path. Canonical paths and OS directory handles stay Runtime-local and never enter events or public error bodies. Context instructions and folder contents are untrusted input, not capability grants. A root being ACTIVE is not an implicit attachment. SQLite transactions perform no filesystem traversal, network or process calls; the scanner and index workers run outside the admission transaction.
+
+### Actor sequence (target)
+
+1. Owner picks a folder; Tauri calls the authenticated local-only selection route; the daemon commits Resource + root + location + private binding in one transaction (Linux/macOS; Windows fails closed with 503).
+2. Owner runs a bounded metadata rescan (Linux); the scanner commits FILE membership only.
+3. Owner uploads or the index ingests an allowlisted text revision with a content digest.
+4. Owner asks a grounded question; retrieval returns exact revision/digest citations or explicit insufficient evidence.
+5. A grounded answer lists Context Used only from committed ContextAttachments and retrieval receipts.
+6. Owner revokes the root; the transaction fences future retrieval and keeps provenance without re-exposing bytes.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop UI | Folder lifecycle controls, Context Used surface, distinct status labels | Reading contents, following symlinks |
+| Operator | Auth, Workspace version checks, selection route | Locator bytes in error bodies |
+| ResourceService | Root/location/binding transactions, revocation fencing | Content traversal inside SQLite |
+| Metadata Scanner | Bounded census, FILE membership | Content reads, revision creation |
+| Local Lexical Index | Allowlisted UTF-8 text index, rebuild | PDF/Office/binary indexing |
+| Grounded Retrieval | Revision/digest citations, insufficient-evidence signal | Committing attachments on its own |
+| Storage | Atomic commits, private-binding deletion on revoke | External process/network calls |
+
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
-## 7. Low-level design
+## 7. Low-level design and interfaces
 
 Follow WORLD-RESOURCES root creation, pause, resume and revoke transactions. ContextAttachments are explicit. Retrieval receipts record resource revision ids. Proposed indexing workers stay outside the admission transaction.
+
+### 7.1 Existing signatures (CODE)
+
+- Served root routes: `GET` list, pause, resume, revoke, scan, observations (scan Linux-only).
+- Desktop selection: authenticated local-only `POST /__litecowork_local/workspace-root-selection`; the daemon commits Resource/root/location/private binding transactionally on Linux/macOS, Windows returns `503 UNAVAILABLE`.
+- Scanner bounds in source: 1,000 entries, depth 32, 1 MiB relative-locator budget, 8s deadline (traversal stops at 7s), two concurrent jobs.
+- Local text index: rebuild and index-state routes over the allowlisted UTF-8 formats at max 1 MiB with control-character and term-count bounds.
+- Grounded retrieval: `POST /v1/resources/retrieval` returns revision/digest-bound citations or explicit insufficient evidence; read-only, commits no attachment.
+- Events: `workspace.root.created.v1`, `workspace.root.status.changed.v1`.
+
+### 7.2 PROPOSED signatures (not yet in source)
+
+Every signature below is PROPOSED and is not promotable until its canonical owner document and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: commit an explicit ContextAttachment with a retrieval receipt.
+pub struct CommitContextAttachment {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub resource_refs: Vec<PinnedResourceRef>,   // exact revision + content_digest
+    pub retrieval_receipt_id: String,
+    pub expected_conversation_version: u64,
+}
+
+pub trait ContextAttachmentStore: Send + Sync {
+    fn commit_context_attachment(
+        &self, commit: CommitContextAttachment,
+    ) -> Result<CommittedContextAttachment, StoreError>;
+}
+
+// PROPOSED: Context Used projection for a grounded answer.
+pub struct ContextUsedEntry {
+    pub resource_ref: PinnedResourceRef,
+    pub root_id: String,
+    pub citation_span: Option<CitationSpan>,
+}
+```
+
+Typed errors (PROPOSED): `ContextAttachmentError::{RootNotActive, RevisionConflicted, IntegrityFailure, OverBound}` reusing the existing `RESOURCE_CONFLICT`/`INTEGRITY_FAILURE` codes; `CONTEXT_ATTACHMENT`-specific codes stay PROPOSED until promoted into SCHEMAS.md and the error registry together.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
 
@@ -119,13 +205,35 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN the owner adds a folder root, THE SYSTEM SHALL commit root, location and private binding in one transaction or leave no partial current-incarnation binding.
-- **AC-002:** IF the proposed root overlaps an existing non-revoked root, THEN THE SYSTEM SHALL reject it without revealing the other root's private path.
-- **AC-003:** WHEN startup reopens a saved root, THE SYSTEM SHALL bind it only on exact OS identity match. IF that check fails for an ACTIVE root, THEN THE SYSTEM SHALL mark the root UNAVAILABLE. IF the root is PAUSED, THEN THE SYSTEM SHALL leave it PAUSED and mark the location UNAVAILABLE. IF the root is REVOKED, THEN THE SYSTEM SHALL NOT reopen it.
-- **AC-004:** WHILE a root is PAUSED or UNAVAILABLE, THE SYSTEM SHALL exclude it from search and context assembly.
-- **AC-005:** WHEN the owner revokes a root, THE SYSTEM SHALL fence future retrieval and SHALL NOT reactivate that root id.
-- **AC-006:** WHEN a grounded answer is shown, THE SYSTEM SHALL list Context Used only from committed attachments and retrieval receipts, not from bare search snippets.
-- **AC-007:** IF ingestion exceeds the configured byte or file bound, THEN THE SYSTEM SHALL fail that resource and continue unrelated roots.
+Positive:
+- **AC-001:** WHEN the owner adds a folder root, THE SYSTEM SHALL commit root, location and private binding in one transaction or leave no partial current-incarnation binding. Verify: SQLite atomicity test.
+- **AC-006:** WHEN a grounded answer is shown, THE SYSTEM SHALL list Context Used only from committed attachments and retrieval receipts, not from bare search snippets. Verify: Context Used projection test.
+
+Negative:
+- **AC-002:** IF the proposed root overlaps an existing non-revoked root, THEN THE SYSTEM SHALL reject it without revealing the other root's private path. Verify: overlap rejection test asserting no locator in the error body.
+- **AC-005:** WHEN the owner revokes a root, THE SYSTEM SHALL fence future retrieval and SHALL NOT reactivate that root id. Verify: revoke fencing + reactivation-refusal test.
+
+Boundary:
+- **AC-004:** WHILE a root is PAUSED or UNAVAILABLE, THE SYSTEM SHALL exclude it from search and context assembly. Verify: status-gating assembly test.
+- **AC-007:** IF ingestion exceeds the configured byte or file bound, THEN THE SYSTEM SHALL fail that resource and continue unrelated roots. Verify: per-resource bound test.
+
+Recovery:
+- **AC-003:** WHEN startup reopens a saved root, THE SYSTEM SHALL bind it only on exact OS identity match. IF that check fails for an ACTIVE root, THEN THE SYSTEM SHALL mark the root UNAVAILABLE. IF the root is PAUSED, THEN THE SYSTEM SHALL leave it PAUSED and mark the location UNAVAILABLE. IF the root is REVOKED, THEN THE SYSTEM SHALL NOT reopen it. Verify: startup identity-revalidation matrix.
+
+Security:
+- **AC-008:** WHEN any root mutation or scan runs, THE SYSTEM SHALL not follow symlinks and SHALL keep canonical paths out of events and public errors. Verify: symlink and locator-redaction tests.
+
+Concurrency:
+- **AC-009:** WHILE two scans are in flight, THE SYSTEM SHALL bound concurrency to two jobs and settle each with compare-and-swap on the Workspace version. Verify: concurrent-scan test.
+
+UI and accessibility:
+- **AC-010:** WHEN a root is UNAVAILABLE, PAUSED or REVOKED, THE SYSTEM SHALL present each state distinctly and SHALL NOT present PAUSED as REVOKED or UNAVAILABLE as a successful scan. Verify: desktop status-label render test.
+
+Performance:
+- **AC-011:** WHEN a metadata rescan runs, THE SYSTEM SHALL stop traversal at the bounded deadline and commit a partial census without tombstoning unseen Resources. Verify: deadline-bound census test.
+
+Integrity:
+- **AC-012:** IF a pinned ResourceRef digest no longer matches the committed content, THEN THE SYSTEM SHALL return `INTEGRITY_FAILURE` and SHALL NOT serve the stale bytes as a citation. Verify: digest-mismatch test.
 
 ## 16. Executable acceptance command
 
@@ -168,12 +276,17 @@ Read from WORLD-RESOURCES, CONTEXT, and STATE-MACHINES.
 
 ## 19. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 003-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 003-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 003-T02 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 003-T02 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 003-T02 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 003-T03 | AC-006 |
-| AC-007 | EARS acceptance | canonical owner docs cited in this SPEC | 003-T03 | AC-007 |
+| Atomic root/location/binding commit | WORLD-RESOURCES, STORAGE | 003-T02 | AC-001 | SQLite atomicity test |
+| Overlap rejection, no locator leak | WORLD-RESOURCES, TRUST | 003-T02 | AC-002 | Overlap rejection test |
+| Startup identity revalidation | WORLD-RESOURCES, STATE-MACHINES | 003-T02 | AC-003 | Startup matrix test |
+| Exclude PAUSED/UNAVAILABLE | CONTEXT, WORLD-RESOURCES | 003-T02 | AC-004 | Status-gating test |
+| Revoke fencing, no reactivation | WORLD-RESOURCES | 003-T02 | AC-005 | Revoke fencing test |
+| Context Used from receipts only | CONTEXT, STORAGE | 003-T03 | AC-006 | Projection test |
+| Per-resource ingestion bound | WORLD-RESOURCES, STORAGE | 003-T03 | AC-007 | Bound test |
+| No symlink follow, locator redaction | TRUST, WORLD-RESOURCES | 003-T02 | AC-008 | Symlink + redaction tests |
+| Bounded scan concurrency | WORLD-RESOURCES | 003-T02 | AC-009 | Concurrent-scan test |
+| Distinct status labels | PRESENTATION-RUNTIME, contracts/ui-behavior.md | 003-T04 | AC-010 | Render test |
+| Deadline-bounded census | WORLD-RESOURCES | 003-T02 | AC-011 | Deadline census test |
+| Digest-mismatch integrity failure | STORAGE, CONTEXT | 003-T03 | AC-012 | Digest-mismatch test |

@@ -12,6 +12,15 @@ Authorities: docs/DELEGATION.md (to avoid collapsing relay into HOST_DELEGATED),
 - Hosted competitors often collapse connection, permission and execution into one toggle. LiteCowork forbids that collapse.
 - Reference desktop repositories are architecture comparisons, not code to vendor. Pins and paths: [REFERENCE-IMPLEMENTATIONS.md](../../docs/REFERENCE-IMPLEMENTATIONS.md), [REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](../../docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md).
 
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs relay | Verdict |
+|---|---|---|---|---|
+| OpenWork lazy capability gateway (`search_capabilities`/`execute_capability`) | https://github.com/different-ai/openwork/tree/5493b18a6af64d56454658a53da00eabbc6e033d | MIT except `/ee` (Enterprise Edition License) | The lazy gateway pattern shows admission of a named operation without holding provider state in the caller; it maps to building each relay turn's input from committed records rather than a live A session. | Prototype the admission shape; do not import `/ee` paths or adopt the OpenCode loop as a second authority. |
+| OpenWork `packages/automations` engine/ports doctrine (`engine.ts`, `ports.ts`, `contracts.ts`) | https://github.com/different-ai/openwork/blob/5493b18a6af64d56454658a53da00eabbc6e033d/packages/automations/src/engine.ts | MIT except `/ee` | Receipts/events/results stay readable after the admitting process stops. This validates relay reloading only committed turns and rebuilding B's input from durable state, never a cached A handle. | Prototype the durable-readable doctrine against STATE-MACHINES; do not vendor the TypeScript runtime. |
+
+These confirm that a second agent's input can be a pure function of durable committed state, which is exactly the portable-context contract B-15 proposes. No OpenWork code is imported; the patterns are prototype/reference inputs only.
+
 ## Source and route audit (2026-11-06)
 
 Inspected the composed Conversation route in `apps/litecoworkd/src/conversation_operator.rs`, `apps/litecoworkd/src/agents/supervisor.rs`, `agents/codex_app_server.rs`, `agents/codex_profile_probe.rs`, `agents/conversation_prompt.rs`, the context package builder and reader in `crates/storage-core/src/conversation.rs` and `crates/storage-sqlite/src/conversations.rs`, `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `conversation-agent-selection.ts`, `conversation-agent-surface.ts`, and the generated `operator-api.ts` contract.

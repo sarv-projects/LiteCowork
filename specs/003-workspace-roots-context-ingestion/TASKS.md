@@ -12,7 +12,7 @@
 - **Allowed paths:** this package
 - **Contract:** SPEC §5
 - **Change intent:** Resolve B-13 and B-14.
-- **Acceptance:** Owner decision recorded. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** Product and Resource owners record the first qualified ingestion format set (B-13) and the watcher-versus-manual-rescan GA default (B-14) in this SPEC; no format or watcher behavior is inferred from current implementation constants. Gates AC-007 and AC-011 bounds follow from the recorded decision.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -24,7 +24,7 @@
 - **Allowed paths:** resource service and sqlite root tests
 - **Contract:** WORLD-RESOURCES Workspace roots
 - **Change intent:** Implement create, pause, resume, revoke and startup rebind as specified.
-- **Acceptance:** AC-001, AC-002, AC-003, AC-004, AC-005. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-001, AC-002, AC-003, AC-004, AC-005, AC-008, AC-009, AC-011; atomic root/location/binding commit, overlap rejection without locator leak, startup identity revalidation, PAUSED/UNAVAILABLE exclusion, revoke fencing, no symlink follow, bounded scan concurrency and a deadline-bounded census.
 - **Command:** `cargo test -p storage-sqlite --locked workspace_root_lifecycle`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -36,7 +36,7 @@
 - **Allowed paths:** context assembly
 - **Contract:** CONTEXT.md and WORLD-RESOURCES indexing
 - **Change intent:** Attach only explicit revisions under ACTIVE roots.
-- **Acceptance:** AC-006 and AC-007. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-006, AC-007, AC-012; Context Used lists only committed attachments and retrieval receipts, over-bound resources fail without stopping unrelated roots, and a digest mismatch returns `INTEGRITY_FAILURE`.
 - **Command:** `cargo test -p litecoworkd --locked context_attachment_receipts`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -48,6 +48,6 @@
 - **Allowed paths:** desktop roots and context used
 - **Contract:** contracts/ui-behavior.md
 - **Change intent:** Show unavailable, paused and revoked distinctly.
-- **Acceptance:** UI states match root status. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-010; the desktop renders UNAVAILABLE, PAUSED and REVOKED as distinct states and never presents PAUSED as REVOKED or UNAVAILABLE as a successful scan.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.

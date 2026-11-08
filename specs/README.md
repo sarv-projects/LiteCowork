@@ -10,11 +10,11 @@ DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package
 | ID | Feature | Status | Package |
 |---|---|---|---|
 | 001 | Conversation Session Supervisor and Native Turn Execution | IN_REVIEW — decisions B-01–B-10 declared, owner acceptance not yet evidenced; API/UI/error subcontracts remain DRAFT | [001-conversation-session-supervisor](001-conversation-session-supervisor/README.md) |
-| 002 | Native agent installation, authentication and binding | DRAFT | [002-native-agent-install-auth-binding](002-native-agent-install-auth-binding/README.md) |
-| 003 | Workspace roots and context ingestion | DRAFT | [003-workspace-roots-context-ingestion](003-workspace-roots-context-ingestion/README.md) |
-| 004 | Agent relay | DRAFT | [004-agent-relay](004-agent-relay/README.md) |
-| 005 | Safe Task path | DRAFT | [005-safe-task-path](005-safe-task-path/README.md) |
-| 006 | Golden Connection and one capability write | DRAFT | [006-golden-connection-capability-write](006-golden-connection-capability-write/README.md) |
+| 002 | Native agent installation, authentication and binding | DRAFT — deepened to the specs/001 bar; B-11/B-12 PROPOSED, pending owner; links A-35 Settings-screen owner (011) | [002-native-agent-install-auth-binding](002-native-agent-install-auth-binding/README.md) |
+| 003 | Workspace roots and context ingestion | DRAFT — deepened; B-13/B-14 PROPOSED, pending owner | [003-workspace-roots-context-ingestion](003-workspace-roots-context-ingestion/README.md) |
+| 004 | Agent relay | DRAFT — deepened; B-15/B-16 PROPOSED, pending owner | [004-agent-relay](004-agent-relay/README.md) |
+| 005 | Safe Task path | DRAFT — deepened; B-17/B-18 PROPOSED, pending owner | [005-safe-task-path](005-safe-task-path/README.md) |
+| 006 | Golden Connection and one capability write | DRAFT — deepened; B-19/B-20 PROPOSED, pending owner | [006-golden-connection-capability-write](006-golden-connection-capability-write/README.md) |
 | 007 | Professional Artifacts, one format | DRAFT | [007-professional-artifacts](007-professional-artifacts/README.md) |
 | 008 | Workbench browser, terminal and computer | DRAFT | [008-workbench-browser-terminal-computer](008-workbench-browser-terminal-computer/README.md) |
 | 009 | Coworkers and scoped memory | DRAFT | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |

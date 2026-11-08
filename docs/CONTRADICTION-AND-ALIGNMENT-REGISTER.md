@@ -70,11 +70,11 @@ The package lifecycle and its supporting contracts must agree. Feature 001 decla
 | Feature | Current package status | Source-backed implementation note |
 |---|---|---|
 | 001 Conversation supervisor | IN_REVIEW; core decisions declared but not owner-accepted, supporting contracts pending | Persisted Conversation flows and OpenCode dispatch branch; crash-recovery gap and exact-provider qualification remain |
-| 002 Agent install/auth/binding | DRAFT | Profile discovery/probe and binding operations exist; install/auth/adapter matrix not generally qualified; model/effort picker remains descriptor-bound target because descriptor reads and exact dispatch path are unqualified |
-| 003 Roots and context ingestion | DRAFT | Workspace/resource upload, search, index and root scan operations exist; OS/path/format qualification remains |
-| 004 Agent relay | DRAFT | Binding selection exists; private-session continuity and complete A→B→A semantics need owner tests |
-| 005 Safe Task path | DRAFT | Task records/spec revision/readiness exist; plan/Attempt admission and mediated execution unavailable |
-| 006 Connection/capability write | DRAFT | Skill/host discovery exists; LiteSPM lifecycle and Connection operation qualification unavailable |
+| 002 Agent install/auth/binding | DRAFT; SPEC deepened to the specs/001 bar with PROPOSED B-11/B-12 resolutions (pending owner) and links to the A-35 Settings-screen owner (Feature 011) | Profile discovery/probe and binding operations exist; install/auth/adapter matrix not generally qualified; model/effort picker remains descriptor-bound target because descriptor reads and exact dispatch path are unqualified |
+| 003 Roots and context ingestion | DRAFT; SPEC deepened with PROPOSED B-13/B-14 resolutions (pending owner) | Workspace/resource upload, search, index and root scan operations exist; OS/path/format qualification remains |
+| 004 Agent relay | DRAFT; SPEC deepened with PROPOSED B-15/B-16 resolutions (pending owner), respecting the A-37 delegation decision | Binding selection exists; private-session continuity and complete A→B→A semantics need owner tests |
+| 005 Safe Task path | DRAFT; SPEC deepened with PROPOSED B-17/B-18 resolutions (pending owner) | Task records/spec revision/readiness exist; plan/Attempt admission and mediated execution unavailable |
+| 006 Connection/capability write | DRAFT; SPEC deepened with PROPOSED B-19/B-20 resolutions (pending owner) | Skill/host discovery exists; LiteSPM lifecycle and Connection operation qualification unavailable |
 | 007 Professional Artifacts | DRAFT | Artifact/resource views exist; one complete professional format workflow needs qualification |
 | 008 Workbench browser/terminal/computer | DRAFT | Files/resource preview exists; terminal is simulated, browser is iframe preview, computer use unavailable |
 | 009 Coworkers/memory | DRAFT | Coworker records/revisions exist; memory learning and full Coworker chat/responsibility path remain incomplete |
@@ -91,16 +91,16 @@ These choices remain in the respective feature SPEC blockers. They must be decid
 
 | ID | Topic | Why it remains open |
 |---|---|---|
-| B-11 | Additional V1 AgentModules after the first qualified native route | Each harness has separate installation, auth, command, model, session and OS semantics. |
-| B-12 | Descriptor freshness TTL and probe budget by AgentModule | A generic TTL may misstate auth or capability freshness. |
-| B-13 | First supported Workspace ingestion formats | Upload/parser/index behavior must be bounded and qualified by format. |
-| B-14 | Watcher versus explicit rescan behavior | Resource invalidation and OS notification behavior need a single owner contract. |
-| B-15 | Portable context size and reduction rules for relay | Private transcripts cannot be migrated or inferred. |
-| B-16 | Second qualified native route and exact relay semantics | Switching a LiteCowork binding is not transfer of provider-private state. |
-| B-17 | First Environment provider for safe Task execution | Worktree, Job Object or container is not automatically a full sandbox. |
-| B-18 | First mediated file-operation class | Scope, staging, diff, rollback and Effect reconciliation must be proven together. |
-| B-19 | First Connection/provider | API/schema/auth/scope must be pinned as one golden vertical slice. |
-| B-20 | First capability write operation | Requires plan digest, approval, idempotency, receipt and UNKNOWN recovery. |
+| B-11 | Additional V1 AgentModules after the first qualified native route | Each harness has separate installation, auth, command, model, session and OS semantics. A PROPOSED resolution (qualify exactly one additional module matching the Feature 001 B-02 pair) is recorded in specs/002 §5; still open, pending owner. |
+| B-12 | Descriptor freshness TTL and probe budget by AgentModule | A generic TTL may misstate auth or capability freshness. A PROPOSED resolution (15-minute per-module TTL, probe budget 3/min, module-overridable) is recorded in specs/002 §5; still open, pending owner. |
+| B-13 | First supported Workspace ingestion formats | Upload/parser/index behavior must be bounded and qualified by format. A PROPOSED resolution (qualify the already-allowlisted UTF-8 lexical text set first) is recorded in specs/003 §5; still open, pending owner. |
+| B-14 | Watcher versus explicit rescan behavior | Resource invalidation and OS notification behavior need a single owner contract. A PROPOSED resolution (manual rescan GA default, no V1 watcher) is recorded in specs/003 §5; still open, pending owner. |
+| B-15 | Portable context size and reduction rules for relay | Private transcripts cannot be migrated or inferred. A PROPOSED resolution (reuse the Feature 001 package bounds with a portability filter and audited truncation) is recorded in specs/004 §5; still open, pending owner. |
+| B-16 | Second qualified native route and exact relay semantics | Switching a LiteCowork binding is not transfer of provider-private state. A PROPOSED resolution (second module is the B-02 pair complement, fresh session per turn) is recorded in specs/004 §5; still open, pending owner. |
+| B-17 | First Environment provider for safe Task execution | Worktree, Job Object or container is not automatically a full sandbox. A PROPOSED resolution (Linux bubblewrap provider with all four dimensions ENFORCED) is recorded in specs/005 §5; still open, pending owner. |
+| B-18 | First mediated file-operation class | Scope, staging, diff, rollback and Effect reconciliation must be proven together. A PROPOSED resolution (atomic whole-file replacement, <=1 MiB, confined path, temp-rename, verifier) is recorded in specs/005 §5; still open, pending owner. |
+| B-19 | First Connection/provider | API/schema/auth/scope must be pinned as one golden vertical slice. A PROPOSED resolution (GitHub public PKCE loopback client, `api.github.com` allowlist) is recorded in specs/006 §5; still open, pending owner. |
+| B-20 | First capability write operation | Requires plan digest, approval, idempotency, receipt and UNKNOWN recovery. A PROPOSED resolution (create an issue comment, WRITE class, UNKNOWN idempotency blocks and reconciles) is recorded in specs/006 §5; still open, pending owner. |
 | B-21 | First professional Artifact format | Preview, edit, save, export and validation must be qualified for one format. |
 | B-22 | First real browser mode | Separate isolated profile, existing profile attach, policy, consent and takeover. |
 | B-23 | First real terminal provider | Pin the PTY/ConPTY implementation, shell profile, Environment binding, process-tree containment, streaming and stop/recovery contract. |

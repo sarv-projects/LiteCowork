@@ -62,25 +62,109 @@ Feature 006 remains DRAFT. There is no served golden account Connection, no prov
 - Module file layout and private helper names, provided the transactions and secret boundaries stay intact.
 - Presentation copy, provided state distinctions remain visible.
 
-### Open decisions
+### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
 
-- B-19: select exactly one provider (candidate set: GitHub, Google Workspace or Microsoft 365) and freeze its public-client authentication recipe, redirect/loopback behavior, PKCE/state/nonce requirements, exact minimum scopes, token expiry/refresh/revocation semantics, API host/version allowlist, provider rate limits and supported OS. Do not pick based on a catalog row or an undocumented OAuth assumption.
-- B-20: select exactly one golden provider operation by its provider API operation ID, HTTP method/path/version, request/response schema, ConnectorActionDescriptor operation class, exact grant scope and Approval target. Decide the provider idempotency mechanism (`PROVIDER_KEY`, `CLIENT_KEY`, `READ_ONLY` or `UNKNOWN`) and a deterministic reconciliation observation. `UNKNOWN` idempotency is not permission to retry: the operation must block until the exact target is reconciled. Bind approval to the immutable plan/action digest, not just the display name.
+These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. Both blockers remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md).
 
-### Blockers
+| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+|---|---|---|---|
+| B-19 | First Connection/provider | **RECOMMENDED: GitHub as the first golden Connection, using a public OAuth client with PKCE and a loopback redirect.** Recipe: authorization-code + PKCE (S256), single-use `state`, loopback listener bound to `127.0.0.1` on an OS-chosen port, callback body carries no token, tokens stored in SecretStore before `status` becomes `CONNECTED`, host allowlist `api.github.com` only, refresh/revoke follow CONNECTORS-WORKFLOWS (`invalid_grant` -> `REAUTH_REQUIRED`, other refresh errors -> `DEGRADED`), minimum read scope `repo:status`/`read:user` for the read and the single write scope needed for B-20. GitHub supports a public desktop client with loopback PKCE, so no confidential client secret ships in the binary. If the chosen provider ever requires a confidential secret or hosted broker, the slice stays blocked. | [CONNECTORS-WORKFLOWS.md](../../docs/CONNECTORS-WORKFLOWS.md), [NETWORK-SECURITY.md](../../docs/NETWORK-SECURITY.md). `REVOKED` must be promoted into the OpenAPI Connection status enum and the schema owner together before implementation. |
+| B-20 | First capability write operation | **PROPOSED: the one golden write is "create an issue comment" (`POST /repos/{owner}/{repo}/issues/{number}/comments`, GitHub REST v3).** `ConnectorActionDescriptor.operation_class = WRITE`; grant scope is the single comment-write scope distinct from the read grant; approval binds to the immutable plan/action digest (comment target + body hash), not a display name. Provider idempotency is `UNKNOWN` for this endpoint, so the operation blocks and reconciles by listing the issue's comments for a matching client-tagged body before any second call; `UNKNOWN` is never permission to retry. Success evidence is the reconciled comment id. | [CAPABILITY-FABRIC.md](../../docs/CAPABILITY-FABRIC.md), [CAPABILITY-INVOCATIONS.md](../../docs/CAPABILITY-INVOCATIONS.md), [TRUST.md](../../docs/TRUST.md). No generic write permission or model-selected endpoint is acceptable; the golden write operationId must be promoted into the OpenAPI and schema owner together. |
 
-- B-19: Connectors and Security must select one provider and document the public OAuth/PKCE recipe, minimum scopes, host allowlist, refresh/revoke rules, and OS support. If the provider requires a confidential client secret or hosted callback broker, the slice remains blocked until an approved architecture exists; do not embed a client secret in the desktop binary.
-- B-20: Capability Fabric, Trust and Product must select one exact consequential write operation and document operation class, input/target digest binding, required scopes/grant, action approval digest, provider/client idempotency key, reconciliation read and evidence of success. No generic “write” permission or arbitrary model-selected endpoint is acceptable.
+Both rows are declared design positions only. This package stays DRAFT; owner acceptance, the exact OAuth recipe sign-off and the promoted schema values are not complete. Do not infer owner sign-off from the presence of a decision row.
 
 ## 6. High-level design
 
 UI starts connect. ConnectionService holds the OAuth dance outside SQLite. SecretStore writes tokens. CapabilityBroker loads only a grant-scoped invocation. The provider HTTP call is outside the invocation transaction. Effect settlement records the reconciled receipt.
 
+### Feature-specific component diagram
+
+```mermaid
+flowchart TD
+  UI[Desktop Discover/Needs You UI] --> OP[Authenticated Operator]
+  OP --> CN[ConnectionService OAuth outside SQLite]
+  CN --> LB[Loopback PKCE listener 127.0.0.1]
+  CN --> SS[(SecretStore tokens only)]
+  CN --> DB[(SQLite Connection/grant/approval/invocation)]
+  OP --> BR[CapabilityBroker grant-scoped invocation]
+  BR --> TR[Trust evaluator + ApprovalUse]
+  BR --> DB
+  BR --> HTTP[Provider HTTP call outside invocation txn]
+  HTTP --> RC[Reconciler read-back]
+  RC --> DB
+```
+
+The ConnectionService OAuth/loopback path, the CapabilityBroker dispatch transaction and the reconciler read-back are the feature-specific components; Connection records, operation classes and Trust decisions remain owned by CONNECTORS-WORKFLOWS/CAPABILITY-FABRIC/TRUST and are not redefined.
+
+### Trust boundaries
+
+The desktop UI is untrusted; the authenticated Operator is the only command path. Provider token bytes live only in SecretStore and never enter Conversation, events, logs or the agent-visible context; only an opaque Connection id is visible. TLS verification stays on; SSRF, redirect, timeout and byte limits apply; worker egress rejects loopback, private, link-local, multicast and cloud-metadata destinations even if a grant names them. External dispatch waits until one transaction rechecks owner, lease, grant, activation, Trust decision and exact ApprovalUse. SQLite transactions make no network or process call.
+
+### Actor sequence (target)
+
+1. Owner starts connect; ConnectionService runs PKCE OAuth over the loopback listener outside SQLite.
+2. Tokens are written to SecretStore; only then does `status` become `CONNECTED`; a failed commit purges the new secrets.
+3. Owner performs one scoped read requiring an explicit grant distinct from the Connection record.
+4. Owner requests the golden write; a fresh approval binds to the exact plan/action digest.
+5. The broker commits the invocation admission transaction, then makes the provider HTTP call outside the transaction.
+6. On `UNKNOWN`, the reconciler reads back before any retry; on revoke, later reads/writes fail closed.
+
+### Ownership
+
+| Owner | Responsibility | Excluded responsibility |
+|---|---|---|
+| Desktop UI | Connect flow, read/write chooser, approval decision | Executing the provider operation |
+| Operator | Auth, Workspace scope, route validation | Holding token bytes |
+| ConnectionService | OAuth/PKCE, loopback, SecretStore custody, refresh/revoke | Capability invocation authority |
+| SecretStore | Token custody write-only | Echoing secret bytes |
+| CapabilityBroker | Grant-scoped invocation admission, dispatch, reconcile | Self-approval |
+| Trust evaluator | ApprovalUse and operation-class decision | UI boolean shortcuts |
+| Storage | Atomic Connection/grant/approval/invocation commits | External process/network calls |
+
 Trust boundary: the desktop UI is untrusted; the authenticated Operator is the only command path; native credentials and OS handles stay outside public events; SQLite transactions do not perform network or process calls.
 
-## 7. Low-level design
+## 7. Low-level design and interfaces
 
 Follow CONNECTORS-WORKFLOWS Connection record and ConnectionService. One read operation and one write operation are named only after B-20. Approval is a Trust decision, not a UI boolean. LiteSPM may supply the package; it does not grant use.
+
+### 7.1 Existing signatures (CODE)
+
+- Served: `GET /v1/discover/search`, `GET /v1/discover/items/{item_id}`, `POST /v1/capabilities/{capability_id}/connect-or-install` (returns 503 `LITESPM_PACKAGE_SERVICE_NOT_QUALIFIED`), `POST /v1/capabilities/{capability_id}/test` (returns `health=UNKNOWN`), Approval list/get/`POST /v1/approvals/{approval_id}/resolve`, `POST /v1/capability-grants` + revoke (`workspace.resource.read` only), `GET /v1/tasks/{task_id}/invocations`, `GET /v1/capability-invocations/{invocation_id}`.
+- `OsSecretStore` + write-only `SecretStore` trait. Trust evaluator compiled `allow(dead_code)`; SQLite invocation store rejects transition to `DISPATCHED` with `INVOCATION_DISPATCH_ADMISSION_UNAVAILABLE`.
+- Event: `connection.state.changed.v1`. Connection list/get/disconnect are target-only.
+
+### 7.2 PROPOSED signatures (not yet served)
+
+Every signature below is PROPOSED and is not promotable until its canonical owner document and the OpenAPI/schema change together.
+
+```rust
+// PROPOSED: PKCE loopback OAuth; tokens to SecretStore before CONNECTED.
+pub struct BeginConnection {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub provider_id: String,                 // e.g. "github"
+    pub pkce_challenge: PkceChallenge,        // S256
+    pub state: SingleUseState,
+    pub minimum_scopes: Vec<String>,
+}
+
+pub trait ConnectionService: Send + Sync {
+    fn begin_connection(&self, begin: BeginConnection) -> Result<ConnectionPending, ConnectError>;
+    fn finish_connection(&self, callback: LoopbackCallback) -> Result<CommittedConnection, ConnectError>;
+    fn disconnect(&self, principal_id: &str, connection_id: &str) -> Result<(), ConnectError>;
+}
+
+// PROPOSED: one golden write, approval bound to the action digest.
+pub struct GoldenWriteInvocation {
+    pub connection_id: String,               // opaque
+    pub operation_class: OperationClass,      // WRITE
+    pub action_digest: ActionDigest,          // target + body hash
+    pub idempotency: ProviderIdempotency,     // UNKNOWN for this endpoint
+    pub approval_use: ApprovalUse,
+}
+```
+
+Typed errors (PROPOSED): `ConnectError::{Cancelled, StateReplay, SecretCommitFailed, HostNotAllowlisted}`; `InvocationError::{SelfApprovalDenied, UnknownResultBlocked, GrantMissing, ConnectionRevoked}`.
 
 Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
 
@@ -118,13 +202,33 @@ Log ids, versions, statuses and denial reasons. Do not log secret bytes, native 
 
 ## 15. EARS acceptance
 
-- **AC-001:** WHEN the owner starts connect, THE SYSTEM SHALL keep provider token bytes out of Conversation, events and logs.
-- **AC-002:** IF the owner cancels auth, THEN THE SYSTEM SHALL persist no usable Connection.
-- **AC-003:** WHEN a read runs, THE SYSTEM SHALL require an explicit grant distinct from the Connection record.
-- **AC-004:** WHEN a write is requested, THE SYSTEM SHALL require a fresh approval bound to the exact plan digest before invocation.
-- **AC-005:** IF the provider result is UNKNOWN, THEN THE SYSTEM SHALL reconcile before retry and SHALL NOT emit a second consequential call meanwhile.
-- **AC-006:** WHEN the owner revokes the Connection, THE SYSTEM SHALL fail later reads and writes for that Connection id.
-- **AC-007:** IF an agent requests install or approval of its own write, THEN THE SYSTEM SHALL deny self-approval.
+Positive:
+- **AC-003:** WHEN a read runs, THE SYSTEM SHALL require an explicit grant distinct from the Connection record. Verify: grant-required read test.
+- **AC-004:** WHEN a write is requested, THE SYSTEM SHALL require a fresh approval bound to the exact plan digest before invocation. Verify: approval-digest binding test.
+
+Security:
+- **AC-001:** WHEN the owner starts connect, THE SYSTEM SHALL keep provider token bytes out of Conversation, events and logs. Verify: token-redaction assertion across events/logs/prompt.
+- **AC-007:** IF an agent requests install or approval of its own write, THEN THE SYSTEM SHALL deny self-approval. Verify: self-approval denial test.
+- **AC-008:** WHEN a worker egress target is loopback, private, link-local, multicast or cloud-metadata, THE SYSTEM SHALL reject it and SHALL NOT let a grant exempt those classes; TLS downgrade is refused and every redirect is revalidated. Verify: SSRF/redirect/TLS egress matrix.
+
+Negative:
+- **AC-002:** IF the owner cancels auth, THEN THE SYSTEM SHALL persist no usable Connection. Verify: cancelled-OAuth negative test (AuthAttempt CANCELLED, no Connection).
+- **AC-006:** WHEN the owner revokes the Connection, THE SYSTEM SHALL fail later reads and writes for that Connection id. Verify: revoke-fencing test.
+
+Recovery:
+- **AC-005:** IF the provider result is UNKNOWN, THEN THE SYSTEM SHALL reconcile before retry and SHALL NOT emit a second consequential call meanwhile. Verify: UNKNOWN reconcile-before-retry test.
+
+Concurrency:
+- **AC-009:** WHILE a token refresh is in flight, THE SYSTEM SHALL hold a per-connection lock so concurrent refreshes do not stampede the provider, mapping `invalid_grant` to `REAUTH_REQUIRED` and other failures to `DEGRADED`. Verify: concurrent-refresh lock test.
+
+Boundary:
+- **AC-010:** WHEN the golden write body or target exceeds the declared bound, THE SYSTEM SHALL reject the invocation before any provider call. Verify: payload-bound test.
+
+UI and accessibility:
+- **AC-011:** WHEN connection and capability states are shown, THE SYSTEM SHALL present connected, granted, approved and invoked as distinct states and SHALL NOT present a catalog row or `health=UNKNOWN` as connected or healthy. Verify: Discover/Needs You render test.
+
+Performance:
+- **AC-012:** WHEN the OAuth callback arrives, THE SYSTEM SHALL honor a finite listener deadline and single-use state so a late or replayed callback is refused. Verify: callback deadline/replay test.
 
 ## 16. Executable acceptance command
 
@@ -175,12 +279,17 @@ Read from CONNECTORS-WORKFLOWS, CAPABILITY-INVOCATIONS, CAPABILITY-FABRIC, and N
 - No provider-backed connector read or write was executed in this audit. No Connection was created, no OAuth was started, no token was stored through a Connection flow, no CapabilityInvocation was dispatched, and no external Effect was reconciled.
 ## 19. Requirement traceability
 
-| Requirement | Spec | Canonical contract | Task | Acceptance |
+| Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| AC-001 | EARS acceptance | canonical owner docs cited in this SPEC | 006-T01 | AC-001 |
-| AC-002 | EARS acceptance | canonical owner docs cited in this SPEC | 006-T01 | AC-002 |
-| AC-003 | EARS acceptance | canonical owner docs cited in this SPEC | 006-T03 | AC-003 |
-| AC-004 | EARS acceptance | canonical owner docs cited in this SPEC | 006-T03 | AC-004 |
-| AC-005 | EARS acceptance | canonical owner docs cited in this SPEC | 006-T03 | AC-005 |
-| AC-006 | EARS acceptance | canonical owner docs cited in this SPEC | 006-T02 | AC-006 |
-| AC-007 | EARS acceptance | canonical owner docs cited in this SPEC | 006-T03 | AC-007 |
+| Tokens out of chat/events/logs | NETWORK-SECURITY, CONNECTORS-WORKFLOWS | 006-T01 | AC-001 | Token-redaction assertion |
+| Cancelled auth persists no Connection | CONNECTORS-WORKFLOWS | 006-T01 | AC-002 | Cancelled-OAuth test |
+| Read requires explicit grant | CAPABILITY-FABRIC, TRUST | 006-T03 | AC-003 | Grant-required read test |
+| Write requires fresh digest approval | TRUST, CAPABILITY-INVOCATIONS | 006-T03 | AC-004 | Approval-digest test |
+| UNKNOWN reconcile before retry | CAPABILITY-INVOCATIONS, TRUST | 006-T03 | AC-005 | Reconcile-before-retry test |
+| Revoke fences later use | CONNECTORS-WORKFLOWS | 006-T02 | AC-006 | Revoke-fencing test |
+| Deny self-approval | TRUST | 006-T03 | AC-007 | Self-approval denial test |
+| SSRF/redirect/TLS egress guard | NETWORK-SECURITY | 006-T03 | AC-008 | Egress matrix |
+| Per-connection refresh lock | CONNECTORS-WORKFLOWS | 006-T02 | AC-009 | Concurrent-refresh test |
+| Golden write payload bound | CAPABILITY-FABRIC | 006-T03 | AC-010 | Payload-bound test |
+| Distinct connection/capability states | PRESENTATION-RUNTIME, contracts/ui-behavior.md | 006-T04 | AC-011 | Render test |
+| Callback deadline + single-use state | CONNECTORS-WORKFLOWS, NETWORK-SECURITY | 006-T01 | AC-012 | Callback deadline/replay test |

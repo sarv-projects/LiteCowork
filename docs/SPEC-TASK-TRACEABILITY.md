@@ -41,11 +41,11 @@ Each package is a DRAFT (README, SPEC, PLAN, TASKS, DATA-MODEL, RESEARCH, WIRING
 
 | SDD | Build phase | USER themes | Blockers to close before lock |
 |---|---|---|---|
-| 002 | BT agent matrix | UC agent install/auth | B-11, B-12, shared first route |
-| 003 | P2 / BT roots | UC files and citations | B-13, B-14 |
-| 004 | P3 | UC relay A→B→A | B-15, B-16 |
-| 005 | P4 | UC one safe task edit | B-17, B-18 |
-| 006 | P5 | UC one connection write | B-19, B-20 |
+| 002 | BT agent matrix | UC agent install/auth | B-11, B-12, shared first route (B-11/B-12 have PROPOSED resolutions in specs/002 §5, still open pending owner) |
+| 003 | P2 / BT roots | UC files and citations | B-13, B-14 (PROPOSED resolutions in specs/003 §5, still open pending owner) |
+| 004 | P3 | UC relay A→B→A | B-15, B-16 (PROPOSED resolutions in specs/004 §5, still open pending owner) |
+| 005 | P4 | UC one safe task edit | B-17, B-18 (PROPOSED resolutions in specs/005 §5, still open pending owner) |
+| 006 | P5 | UC one connection write | B-19, B-20 (PROPOSED resolutions in specs/006 §5, still open pending owner) |
 | 007 | P6 | UC one professional format, Artifact create and export | B-21, B-30, B-31 |
 | 008 | P7 | UC browser, terminal and optional Computer use | B-22, B-23, B-32 |
 | 009 | P8 | UC optional coworker chat and scoped memory | T01 B-24/B-25; T02 Coworker origin + owner-scoped ContextDocument; T03 retrieval/restart fence; T04 optional New Chat/first Coworker chat |

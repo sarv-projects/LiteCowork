@@ -24,7 +24,7 @@
 - **Allowed paths:** connection service and secret store
 - **Contract:** CONNECTORS-WORKFLOWS §4–§6
 - **Change intent:** OAuth and revoke without token leakage.
-- **Acceptance:** Cancelled OAuth persists no usable Connection; loopback/PKCE state is single-use and callback carries no token; provider secrets are written only to the OS SecretStore and never appear in logs/events/prompts; Connection becomes CONNECTED only after token custody and durable Connection commit; refresh is serialized; `invalid_grant` becomes REAUTH_REQUIRED; revoke fences future refresh/invocation; lost responses replay the original idempotent receipt.
+- **Acceptance:** Cancelled OAuth persists no usable Connection; loopback/PKCE state is single-use and callback carries no token; provider secrets are written only to the OS SecretStore and never appear in logs/events/prompts; Connection becomes CONNECTED only after token custody and durable Connection commit; refresh is serialized; `invalid_grant` becomes REAUTH_REQUIRED; revoke fences future refresh/invocation; lost responses replay the original idempotent receipt. Delivers AC-001, AC-002, AC-006, AC-009 and AC-012 (token redaction, cancelled-auth, revoke fencing, per-connection refresh lock and single-use callback deadline).
 - **Command:** `cargo test -p litecoworkd --locked golden_connection_custody`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -36,7 +36,7 @@
 - **Allowed paths:** broker and reconciler
 - **Contract:** CAPABILITY-FABRIC and NETWORK-SECURITY
 - **Change intent:** Approval, idempotency and UNKNOWN reconciliation.
-- **Acceptance:** One provider-backed READ requires an explicit exact-scope CapabilityGrant. One selected WRITE/SEND/DELETE-class operation requires a fresh Approval bound to the exact immutable plan/action digest; one atomic admission transaction rechecks owner, lease, grant, activation, Trust decision and exact ApprovalUse before the provider call. Provider dispatch occurs outside SQLite. Timeout/UNKNOWN becomes AMBIGUOUS and must reconcile before retry; revoke blocks later invocations; agent/package cannot self-approve or grant itself authority.
+- **Acceptance:** One provider-backed READ requires an explicit exact-scope CapabilityGrant. One selected WRITE/SEND/DELETE-class operation requires a fresh Approval bound to the exact immutable plan/action digest; one atomic admission transaction rechecks owner, lease, grant, activation, Trust decision and exact ApprovalUse before the provider call. Provider dispatch occurs outside SQLite. Timeout/UNKNOWN becomes AMBIGUOUS and must reconcile before retry; revoke blocks later invocations; agent/package cannot self-approve or grant itself authority. Delivers AC-003, AC-004, AC-005, AC-007, AC-008 and AC-010 (granted read, digest-bound approval, UNKNOWN reconcile, self-approval denial, SSRF/redirect/TLS egress guard and payload bound).
 - **Command:** `cargo test -p litecoworkd --locked golden_capability_write`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -48,6 +48,6 @@
 - **Allowed paths:** discover and needs-you
 - **Contract:** ui-behavior
 - **Change intent:** Separate connected from granted from invoked.
-- **Acceptance:** UI states match the six-way distinction. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-011; the UI presents connected, granted, approved and invoked as distinct states and never presents a catalog row or `health=UNKNOWN` as connected or healthy.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.

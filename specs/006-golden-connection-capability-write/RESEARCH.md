@@ -16,6 +16,16 @@ Authorities: docs/CONNECTORS-WORKFLOWS.md, docs/CAPABILITY-FABRIC.md, docs/NETWO
 - Hosted competitors often collapse connection, permission and execution into one toggle. LiteCowork forbids that collapse.
 - Reference desktop repositories are architecture comparisons, not code to vendor. Pins and paths: [REFERENCE-IMPLEMENTATIONS.md](../../docs/REFERENCE-IMPLEMENTATIONS.md), [REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](../../docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md).
 
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs the golden connection/write | Verdict |
+|---|---|---|---|---|
+| OpenWork lazy capability gateway (`search_capabilities`/`execute_capability`) | https://github.com/different-ai/openwork/tree/5493b18a6af64d56454658a53da00eabbc6e033d | MIT except `/ee` (Enterprise Edition License) | The lazy gateway admits a named capability only on demand, which maps to the broker loading only a grant-scoped invocation rather than exposing a standing provider surface. | Prototype the lazy-admission shape against CAPABILITY-FABRIC; do not import `/ee` paths or adopt the OpenCode loop. |
+| LiteSPM published package/host contract | https://github.com/sarv-projects/LiteSPM/tree/9f42b25ddfb1acedce0f2dbf9964f4a7724d622e | Apache-2.0 at checked root LICENSE | LiteSPM is the selected package lifecycle authority; its published package/host contract is the boundary LiteCowork links to for install, not reimplements. The checked root does not yet settle the LiteCowork-facing wire contract, so no API is inferred. | Reference/boundary only; use the published contract when available, do not invent or duplicate its API. |
+| Arcade MCP authorized tool declarations | https://github.com/ArcadeAI/arcade-mcp/blob/79a2dc90d347e4cd1a96366a2d94c8ddc356f1c3/README.md | MIT | Study authorized MCP tool declarations and secret-injection boundaries: tokens are injected by the host, never exposed to the model, which matches the SecretStore custody and token-redaction requirement (AC-001). | Reference only; Arcade MCP is an optional provider, not a required dependency of this slice. |
+
+No OpenWork, LiteSPM or Arcade MCP code is imported; all three are prototype/reference/boundary inputs. OpenBot is not cited here; if it were, it would be reference/UX only with no code reuse under its PolyForm Noncommercial license.
+
 ## Source, composed-route and UI audit (2026-11-06)
 
 Inspected `apps/litecoworkd/src/discover_operator.rs`, `capability_invocations_operator.rs`, `approval_operator.rs`, `trust_operator.rs`, `trust.rs`, `agent_credentials_routes.rs`, `main.rs`, `crates/storage-sqlite/src/invocations.rs`, `crates/storage-sqlite/src/trust.rs`, `apps/litecowork-ui/src/discover/DiscoverPage.tsx`, `discover-api.ts`, `discover-state.ts`, `needs-you/ApprovalDetail.tsx`, `needs-you/approval-state.ts`, and the composed `docs/schemas/served-route-inventory.json`.

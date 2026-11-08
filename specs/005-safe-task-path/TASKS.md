@@ -24,7 +24,7 @@
 - **Allowed paths:** task service
 - **Contract:** TASK-RUNTIME create and plan acceptance
 - **Change intent:** Commit Task without Attempt; accept plan atomically.
-- **Acceptance:** Task creation from the current Home composer remains an envelope only (AC-001–AC-003); plan submission is exposed only after owner-authorized producer-scope validation and immutable TaskSpec-head checks; accepted PlanRevision and Steps commit atomically before any Attempt (AC-004). Rendered UI must show accepted vs absent/stale plan without implying execution.
+- **Acceptance:** Task creation from the current Home composer remains an envelope only (AC-001–AC-003); plan submission is exposed only after owner-authorized producer-scope validation and immutable TaskSpec-head checks; accepted PlanRevision and Steps commit atomically before any Attempt (AC-004); the planning preflight packet builds within a finite bounded budget (AC-012). Rendered UI must show accepted vs absent/stale plan without implying execution.
 - **Command:** `cargo test -p litecoworkd --locked task_explicit_plan`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -36,7 +36,7 @@
 - **Allowed paths:** environment provider and effect reconciler
 - **Contract:** TRUST and ENVIRONMENTS
 - **Change intent:** Attest isolation; reconcile unknown writes.
-- **Acceptance:** Exact provider attestation and scoped lease/grant/idempotency receipt commit before the external file operation; the operation runs outside SQLite; ambiguous writes reconcile before retry; quiescence is proven before releasing writer authority; independent verification evidence is persisted; restart/cancel cannot claim success without that evidence (AC-005–AC-007).
+- **Acceptance:** Exact provider attestation and scoped lease/grant/idempotency receipt commit before the external file operation; the operation runs outside SQLite; ambiguous writes reconcile before retry; quiescence is proven before releasing writer authority; independent verification evidence is persisted; restart/cancel cannot claim success without that evidence (AC-005, AC-006, AC-007, AC-008, AC-009, AC-010). Admission accepts only a fully ENFORCED current-incarnation attestation, confines the path with no symlink escape under the 1 MiB bound, and requires QUIESCENT before releasing the writer lease.
 - **Command:** `cargo test -p litecoworkd --locked task_one_edit_reconcile`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -48,6 +48,6 @@
 - **Allowed paths:** work task surfaces
 - **Contract:** ui-behavior
 - **Change intent:** Promotion is explicit; receipt shows verified versus unknown.
-- **Acceptance:** Home “New task” remains explicit and distinct from Conversation send; any future Conversation promotion is a separate reviewed action. Work shows Task envelope, accepted plan, Attempt/Effect/Environment and verification as distinct owner-backed states. The first file change is visible only after its committed receipt and independent verification; UNKNOWN/AMBIGUOUS stays unresolved and is never rendered as success.
+- **Acceptance:** Home “New task” remains explicit and distinct from Conversation send; any future Conversation promotion is a separate reviewed action. Work shows Task envelope, accepted plan, Attempt/Effect/Environment and verification as distinct owner-backed states. The first file change is visible only after its committed receipt and independent verification; UNKNOWN/AMBIGUOUS stays unresolved and is never rendered as success. Planning readiness, plan acceptance and approval are presented distinctly and a saved record is never shown as live execution (AC-011).
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.

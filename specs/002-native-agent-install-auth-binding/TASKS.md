@@ -22,7 +22,7 @@
 - **Allowed paths:** registry/lifecycle service, OpenAPI, schemas, tests
 - **Contract:** docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md and AGENT-CONTROL
 - **Change intent:** Keep distribution metadata separate from module authority; complete bounded Runtime-local detection and trusted install preview/receipt/reconcile.
-- **Acceptance:** AC-001, AC-002 and bounded discovery test matrix; exact candidate path identity, source/license/digest, OS/arch and Runtime incarnation; preserve old working version; no arbitrary shell command.
+- **Acceptance:** AC-001, AC-002, AC-012 and bounded discovery test matrix; exact candidate path identity, source/license/digest, OS/arch and Runtime incarnation; per-module probe budget keeps one slow probe from blocking others; preserve old working version; no arbitrary shell command.
 - **Current gap:** Registry and inventory observations exist; install/update/repair handlers do not. ACP metadata is read-only.
 - **Stop:** no installation action until exact module-owned installer and signature/source policy are qualified.
 **Command:** `python3 .specify/scripts/validate_feature_package.py`
@@ -34,7 +34,7 @@
 - **Allowed paths:** AgentModule adapter, credential broker, descriptor service, storage/tests
 - **Contract:** AGENT-CONTROL, SECURITY, SPEC AC-003/004/006
 - **Change intent:** Implement native auth observations and secure slots, exact descriptor producer, native config target allowlist and readiness handshake.
-- **Acceptance:** AC-003, AC-004, AC-006; secrets never enter WebView/logs/events; cancelled auth preserves previous state; stale descriptor blocks new binding admission.
+- **Acceptance:** AC-003, AC-004, AC-006, AC-008, AC-009, AC-010; secrets never enter WebView/logs/events; cancelled auth preserves previous state; a stale (over-TTL) descriptor blocks new binding admission; secret custody is SecretStore-only; and a credential idempotency-key replay returns the original SecretRef while a changed body conflicts.
 - **Current gap:** Control-descriptor and credential routes return 503; native auth-begin and native-config open target-only.
 - **Stop:** no SecretStore mutation absent exact replay-safe credential contract.
 **Command:** `python3 .specify/scripts/validate_feature_package.py`
@@ -46,7 +46,7 @@
 - **Allowed paths:** binding/admission and exact adapter tests
 - **Contract:** AGENT-CONTROL, Feature 001, STATE-MACHINES
 - **Change intent:** Make binding enablement require fresh descriptor and qualify the exact end-to-end Send route.
-- **Acceptance:** AC-004/005/006; one native user journey including install/detect, auth, descriptor, binding, Send, stream, stop, retry and restart.
+- **Acceptance:** AC-004, AC-005, AC-006, AC-007; one native user journey including install/detect, auth, descriptor, binding, Send, stream, stop, retry and restart; native-only MCP/hooks are labeled native harness state and never a Core Effect.
 - **Current gap:** Codex binding is not dispatched by current supervisor; OpenCode profile offer is intentionally incompatible. Current Conversation execution is not generally agent-ready.
 - **Stop:** a profile or enabled binding alone never enables Send.
 **Command:** `python3 .specify/scripts/validate_feature_package.py`
@@ -58,7 +58,7 @@
 - **Allowed paths:** agent catalog/profile components and tests
 - **Contract:** SPEC V1 UI lifecycle contract; contracts/ui-behavior.md
 - **Change intent:** Deliver catalogue, installed list, detail sections, independent chips, real actions and honest unavailable states.
-- **Acceptance:** all listed control states, responsive list/detail navigation, keyboard/screen-reader tests, state-race tests, actual receipt/observation binding.
+- **Acceptance:** AC-011; all listed control states, responsive list/detail navigation, keyboard/screen-reader tests, state-race tests, actual receipt/observation binding. The Settings -> Agents screen surface is owned by Feature 011 per A-35; this task wires 002's operations into that owner's control table and does not republish it.
 - **Current gap:** Current UI is catalogue/probe/binding screen, not complete install/auth/profile experience.
 - **Stop:** no fake Install/Sign in/Test/Ready, and no dead action.
 

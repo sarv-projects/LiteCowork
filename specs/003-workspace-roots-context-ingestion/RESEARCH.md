@@ -12,6 +12,15 @@ Authorities: docs/WORLD-RESOURCES.md, docs/CONTEXT.md, docs/STORAGE.md, docs/API
 - Hosted competitors often collapse connection, permission and execution into one toggle. LiteCowork forbids that collapse.
 - Reference desktop repositories are architecture comparisons, not code to vendor. Pins and paths: [REFERENCE-IMPLEMENTATIONS.md](../../docs/REFERENCE-IMPLEMENTATIONS.md), [REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](../../docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md).
 
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs ingestion | Verdict |
+|---|---|---|---|---|
+| ZCode `packages/desktop` thin-shell / Host / CLI split | https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9 | Apache-2.0 + NOTICE | The Host/shell ownership split informs keeping the folder-selection picker (shell) separate from the daemon root/location commit and the metadata scanner (Host), so OS handles and canonical paths stay Runtime-local. | Port the ownership-split pattern only; do not drop in React or the ZCode Host runtime. |
+| DeepSeek Harness `apps/desktop` typed IPC with sender assert | https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159 | MIT | Typed IPC with sender assertion and contextBridge preloads informs the authenticated local-only `workspace-root-selection` route boundary: the untrusted WebView never passes a raw path that bypasses validation. | Prototype the typed-IPC/sender-assert pattern against LOCAL-OPERATOR-IPC; port the pattern, not the code. |
+
+No ZCode or DeepSeek Harness code is imported; both are prototype/reference inputs that reinforce the shell/Host trust boundary this slice already requires.
+
 ## Source and UI audit (2026-11-06)
 
 Inspected `apps/litecoworkd/src/operator.rs`, `workspace_root_scan_operator.rs`, `resource_archive_operator.rs`, `rag_retrieval_operator.rs`, `apps/litecowork-ui/src-tauri/src/lib.rs`, `apps/litecowork-ui/src/App.tsx`, `workspaces/WorkspaceRootObservations.tsx`, `workspaces/workspace-root-mutations.ts`, `workspace-root-scan.ts`, `resources/retrieval-grounding.ts`, `presentation/rich-presentation.ts`, and `crates/storage-sqlite/src/{resource_index.rs,rag_retrieval.rs}`. Cross-checked the composed route inventory and the Feature 003 API/UI contracts.

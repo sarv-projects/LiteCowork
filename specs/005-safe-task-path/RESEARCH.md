@@ -12,6 +12,16 @@ Authorities: docs/TASK-RUNTIME.md, docs/ENVIRONMENTS.md, docs/TRUST.md, docs/DEL
 - Hosted competitors often collapse connection, permission and execution into one toggle. LiteCowork forbids that collapse.
 - Reference desktop repositories are architecture comparisons, not code to vendor. Pins and paths: [REFERENCE-IMPLEMENTATIONS.md](../../docs/REFERENCE-IMPLEMENTATIONS.md), [REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](../../docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md).
 
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs the safe task path | Verdict |
+|---|---|---|---|---|
+| OpenWork `packages/automations` engine/ports doctrine (`engine.ts`, `ports.ts`, `contracts.ts`) | https://github.com/different-ai/openwork/blob/5493b18a6af64d56454658a53da00eabbc6e033d/packages/automations/src/engine.ts | MIT except `/ee` (Enterprise Edition License) | Receipts/events/results stay readable after the admitting process stops. This supports the restart-reload-receipt and independent-verification requirement (AC-007) and the reconcile-before-retry doctrine (AC-006). | Prototype the durable-readable engine/ports pattern against TASK-RUNTIME/FAILURE-RECOVERY; do not vendor the runtime or import `/ee` paths. |
+| OpenCowork agent-runner loop guard (`src/main/agent/agent-runner-loop-guard.ts`) | https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/agent/agent-runner-loop-guard.ts | MIT at checked root LICENSE | Non-progress/loop guarding informs bounded Attempt admission and the refusal to retry blindly on an ambiguous result. | Prototype the guard logic; LiteCowork keeps TRUST/TASK-RUNTIME as the admission authority, not the loop guard. |
+| OpenCowork path guard + VM bridges (`src/main/sandbox/path-guard.ts`, `lima-bridge.ts`, `wsl-bridge.ts`) | https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/sandbox/path-guard.ts | MIT at checked root LICENSE | Path-traversal/zip-slip guarding and VM isolation map directly to the ENFORCED filesystem-root dimension of `IsolationAttestation` and the confined-path write (AC-008/AC-009). | Prototype the path-guard checks against ENVIRONMENTS attestation; do not adopt the Electron sandbox as a second authority. |
+
+No OpenWork or OpenCowork code is imported; all three are prototype/reference inputs that reinforce the isolation-attestation and reconcile-before-retry contracts this slice already requires.
+
 ## Source, route and UI audit (2026-11-06)
 
 Inspected `apps/litecoworkd/src/operator.rs`, `agents/planning.rs`, `task_lead_handoff_operator.rs`, `environment_provider.rs`, `environment_isolation.rs`, `attempt_process_scope.rs`, `trust_operator.rs`, `presentation_operator.rs`, `verification_runs_operator.rs`, `crates/domain-task/src/{lib.rs,planning.rs,execution.rs}`, `crates/storage-core/src/execution.rs`, `crates/storage-sqlite/src/execution.rs`, the composed route inventory, `apps/litecowork-ui/src/App.tsx`, `presentation/TaskPresentationPanel.tsx`, `artifacts/TaskArtifactOutputs.tsx`, `tasks/TaskSpecRevisionHistory.tsx`, `needs-you/TaskAttentionPage.tsx`, and `routines/RoutinesPage.tsx`.

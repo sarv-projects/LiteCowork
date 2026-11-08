@@ -23,8 +23,8 @@
 - **Owner:** Conversation
 - **Allowed paths:** context export
 - **Contract:** SPEC LLD
-- **Change intent:** Build the export filter and tests for secret exclusion.
-- **Acceptance:** AC-002. Criteria discussed include AC-001 AC-002.
+- **Change intent:** Build the export filter and tests for secret exclusion and budget handling.
+- **Acceptance:** AC-002, AC-007, AC-008, AC-011; the export excludes native handles, private transcripts, credentials and cross-Workspace refs, refuses or receipts an over-budget prefix, and builds within a bounded budget.
 - **Command:** `cargo test -p litecoworkd --locked portable_context_export`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -36,7 +36,7 @@
 - **Allowed paths:** supervisor turn admission
 - **Contract:** 001 supervisor plus this SPEC
 - **Change intent:** After T01 is accepted, execute A→B→A on one Conversation using a new durable Conversation AgentSession per turn and a distinct qualified native adapter for B; reconcile Feature 001 admission/settlement dependencies first.
-- **Acceptance:** AC-001, AC-003, AC-004, AC-006. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-001, AC-003, AC-004, AC-006, AC-009, AC-010; A→B→A admits each turn with fresh revalidation and a new session, rejects concurrent submits, keeps the draft on stale B, creates no Task/Attempt/lease/grant, and reloads only committed turns after restart.
 - **Command:** `cargo test -p litecoworkd --locked conversation_agent_relay`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
 
@@ -48,6 +48,6 @@
 - **Allowed paths:** conversation transcript
 - **Contract:** ui-behavior
 - **Change intent:** Render producer without implying shared native memory.
-- **Acceptance:** AC-005. Criteria discussed include AC-001 AC-002.
+- **Acceptance:** AC-005, AC-012; each committed turn resolves and displays its `source_agent_binding_id` and earlier-turn provenance is preserved.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
