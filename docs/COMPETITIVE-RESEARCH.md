@@ -4,6 +4,8 @@ This is dated product research, not a normative competitor dependency. Product b
 changes quickly; cited vendor pages are the evidence, while LiteCowork contracts are owned
 by `ARCHITECTURE.md` and the domain documents.
 
+**Cross-cutting gap view:** the per-rival evidence in this document is read across LiteCowork's real state and doc accuracy in the [superset gap matrix](SUPERSET-GAP-MATRIX.md) (one feature × {LiteCowork done? / doc-accuracy / each resolved rival has it?} matrix plus the three-way gap lists). Parity verdicts stay in [VIABILITY-VS-COMPETITORS.md](VIABILITY-VS-COMPETITORS.md); the matrix duplicates neither that authority nor these evidence rows.
+
 ## Earlier snapshot (2026-10-10): verified patterns and corrections
 
 | Product | Verified behavior | LiteCowork implication |

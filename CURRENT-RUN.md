@@ -83,9 +83,9 @@ Current validation on the working tree:
 - Architecture/schema validator: passed active checks; one warning because the optional `openapi-spec-validator` package is not installed. JSON Schema, 148 event schemas, errors, OpenAPI structure, SQL, Gateway naming, concept and active Markdown checks passed.
 - Cross-owner consistency guard: **36 assertions passed, 0 issues**.
 - V1 contract/route/UI audit: **0 errors** (229 OpenAPI operations; 173 served, 1 outside OpenAPI, 56 target-only).
-- Design-depth audit: **0 findings**; 259 files, 55,322 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 11 packages.
+- Design-depth audit: **0 findings**; 260 files, 55,526 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 11 packages.
 - Feature SDD validator: **11/11 packages passed**.
-- Markdown audit: **0 broken relative links** across 256 files / 55,235 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 259 files / 55,322 lines.
+- Markdown audit: **0 broken relative links** across 257 files / 55,440 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 260 files / 55,526 lines.
 - Sandbox note: on this Linux sandbox, cargo and Python `uv` commands require the prefix `TMPDIR=/tmp PKG_CONFIG_SYSROOT_DIR=/tmp/sysroot PKG_CONFIG_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig LIBRARY_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu`.
 - Frontend production build: passed API type check, TypeScript and Vite. Main JS bundle is 1.05 MB minified (287 KB gzip), above Vite's 500 KB advisory.
 - Focused Conversation + responsive tests: **24/24 passed**, including journal retry, cursor pagination, drawer semantics and mobile canvas sizing.
@@ -154,9 +154,9 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 - Feature package validator: **11/11 passed**; structural checks only, not owner approval or runtime qualification.
 - Cross-owner consistency: **36 assertions passed, 0 issues**.
 - V1 contract audit: **0 errors**; 229 OpenAPI operations, 173 served, 1 authenticated local-only route and 56 target-only.
-- Design-depth audit: **0 findings**; 259 files, 55,322 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 11 packages.
-- Markdown audit: **0 broken relative links** across 256 files and 55,235 lines.
-- Active-corpus manifest: **259 files and 55,322 lines** (manifest excludes itself).
+- Design-depth audit: **0 findings**; 260 files, 55,526 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 11 packages.
+- Markdown audit: **0 broken relative links** across 257 files and 55,440 lines.
+- Active-corpus manifest: **260 files and 55,526 lines** (manifest excludes itself).
 - Architecture/schema validator: passed with one warning because optional openapi-spec-validator is not installed; JSON Schema, 148 typed events, errors, OpenAPI structure, SQLite, Gateway naming, canonical concepts and active Markdown checks passed.
 - Rust workspace: lint gate (`clippy --all-targets -- -D warnings`) **0 diagnostics**; `check --all-targets` **0 errors**; `fmt --all --check` clean; test counts as listed under "Current validation on the working tree".
 - Whitespace check: **passed** (`check.sh` whitespace stage, exit 0).
@@ -181,6 +181,13 @@ The full-corpus re-audit verdict table is [docs/DOCS-REAUDIT-2026.md](docs/DOCS-
 - **A-40** (sqlite-v28 unreachable): v28 is recorded as defined-but-not-yet-wired (`SCHEMA_VERSION` is 27); STORAGE.md ("current schema version is 28" corrected to 27), EVENTS.md, DELEGATION.md and COVERAGE-MATRIX.md are corrected to stop presenting v28 as active.
 - **Line-count drift**: CURRENT-RUN.md and IMPLEMENTATION-STATUS.md now cite the live generator output; the corpus audits/generators exclude `.agents/` plan files so plan-file churn no longer inflates corpus counts.
 - **A-51 (new)**: the Workbench Terminal/Diff/Browser status docs were stale after the UI was remediated; IMPLEMENTATION-STATUS.md and rows A-08/A-09/A-10/A-30 are corrected to the current source.
+
+### Phase 3 superset matrix + three-way gap analysis resolved (FEAT-004)
+
+The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUPERSET-GAP-MATRIX.md): one feature × {LiteCowork done? (TARGET/CODE/SERVED/INTEGRATED/QUALIFIED) / doc-claims? / doc-accuracy (linked to DOCS-REAUDIT-2026 + A-xx) / each resolved rival has it?} matrix whose feature axis is the union of LiteCowork's capability set and every Phase 2 resolved rival's first-release surface (max superset). It derives the three lists the audit asked for — ✓ Done / ✗ Not-done (real state), 📝 doc errors, 🎯 missing-to-be-a-superset. It **reads** the owners and holds no authority: parity verdicts stay in docs/VIABILITY-VS-COMPETITORS.md, concern→owner in docs/COVERAGE-MATRIX.md, verdicts in docs/DOCS-REAUDIT-2026.md, real state in docs/IMPLEMENTATION-STATUS.md. Cross-linked from VIABILITY-VS-COMPETITORS.md, COMPETITIVE-RESEARCH.md and the docs/README.md index.
+
+- **Headline gap count:** **14** capability gaps to reach a max superset (8 already TARGET-owned via allocated B-xx/RV-xx; 6 RESEARCH/owner-decision gates — RV-06, RV-07, RV-08, RV-13, RV-14, plus the consent-gated screen/audio decision); **~18** doc-accuracy findings (2 still-open code defects: A-24 Send gate, A-26 empty-canvas branding); **0** LiteCowork rows reach Done as a qualified product journey (the lone "Done (pattern)" is the runtime-split invariant), consistent with the pre-release posture.
+- No new tracker ids were invented: every missing/owner-decision item reuses an allocated B-xx / RV-xx.
 
 ### Pending research (recorded 2026-11-07)
 

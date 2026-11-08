@@ -9,9 +9,9 @@ This is an inventory, not proof that every sentence is correct, implemented,
 integrated or qualified. The authority chain is in docs/README.md. Current source
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
-- Included files: 259
-- Included lines: 55322
-- Included bytes: 4360050
+- Included files: 260
+- Included lines: 55526
+- Included bytes: 4391577
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,8 +25,8 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 129 | 46643 |
-| repository root | 6 | 1542 |
+| docs/ | 130 | 46840 |
+| repository root | 6 | 1549 |
 | scripts/ | 1 | 14 |
 | specs/ | 111 | 6343 |
 
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 60 | 3726 | aa800aa8fda07635 |
-| CURRENT-RUN.md | 194 | 24755 | a55e9ff1566b9644 |
+| CURRENT-RUN.md | 201 | 26331 | 78b41ee3e3f0ffb0 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 75 | 6169 | 3ecd058f34d1ee80 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -65,7 +65,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CHANNELS.md | 280 | 17363 | ebf5c54dff8e2c6d |
 | docs/CHROME-BROWSER-LLD.md | 181 | 19891 | ba9613ca8f253f76 |
 | docs/CODING-COCKPIT-UI-SPEC.md | 113 | 8662 | 51e4f0bbc4a51dc2 |
-| docs/COMPETITIVE-RESEARCH.md | 989 | 114232 | d2bffb1b98873bad |
+| docs/COMPETITIVE-RESEARCH.md | 991 | 114678 | 229caf87e54be05c |
 | docs/COMPETITOR-PROMOTED-USE-CASES.md | 147 | 12601 | 2c0af44925d380a5 |
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
@@ -107,7 +107,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/PRODUCT-STRATEGY.md | 113 | 10724 | 8e39b7022710cfef |
 | docs/PRODUCT.md | 254 | 16913 | 76a270f4af39c91c |
 | docs/PROTOCOLS.md | 187 | 9391 | de2062d24c901037 |
-| docs/README.md | 83 | 7467 | e9dcdc1d130b3cfd |
+| docs/README.md | 84 | 7785 | cefd690ce33fd77a |
 | docs/REFERENCE-IMPLEMENTATIONS.md | 779 | 89019 | 4aa2d72c2b1baa7c |
 | docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md | 264 | 24873 | f1d7303606da51da |
 | docs/RENDERING-CONFORMANCE-LLD.md | 271 | 16026 | c99abd47adbeda47 |
@@ -128,6 +128,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/SPECIFICATION-STANDARD.md | 134 | 10792 | f2cf584a47acdda7 |
 | docs/STATE-MACHINES.md | 1442 | 91664 | e1f21b64f369d001 |
 | docs/STORAGE.md | 1342 | 99381 | 1dcf08c1a7f4e620 |
+| docs/SUPERSET-GAP-MATRIX.md | 192 | 28844 | 267d293370307bd3 |
 | docs/TASK-RUNTIME.md | 760 | 44849 | d8b8237e3a772882 |
 | docs/TESTING.md | 534 | 46687 | 67c04dde69e438be |
 | docs/TRUST.md | 322 | 16569 | 04bebf938f0e49cf |
@@ -148,7 +149,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/V1-UI-ACTION-STATE-LEDGER.md | 62 | 12248 | d80a0bb4134daaea |
 | docs/V1-UI-SCREEN-CONTRACT.md | 351 | 48366 | 53fdb3870090db3a |
 | docs/V1-WORKFLOW-EVENT-LLD.md | 139 | 14813 | aa20f0e960080e6e |
-| docs/VIABILITY-VS-COMPETITORS.md | 237 | 23540 | 83066b001c841626 |
+| docs/VIABILITY-VS-COMPETITORS.md | 239 | 23883 | 331bbf5eefe76b33 |
 | docs/WORLD-RESOURCES.md | 529 | 38043 | bef06f6e6dd86d16 |
 | docs/ZCODE-UI-INSPIRATION-AUDIT.md | 265 | 34660 | 84bc346175de6632 |
 | docs/adr/0001-durable-task-core.md | 23 | 922 | be124ace88b60190 |

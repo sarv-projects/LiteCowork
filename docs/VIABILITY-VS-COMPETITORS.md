@@ -6,6 +6,8 @@
 
 **Related:** [V1-PRODUCT-RELEASE-CONTRACT.md](V1-PRODUCT-RELEASE-CONTRACT.md), [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), [COMPETITOR-PROMOTED-USE-CASES.md](COMPETITOR-PROMOTED-USE-CASES.md), [IMPLEMENTATION-MASTER-PLAN.md](IMPLEMENTATION-MASTER-PLAN.md).
 
+**Cross-cutting gap view:** for a single feature × {LiteCowork done? / doc-accuracy / each resolved rival has it?} matrix and the derived three-way gap lists, see the [superset gap matrix](SUPERSET-GAP-MATRIX.md). That view **reads** the verdicts and RV gates owned here; parity authority stays in this document and is not duplicated there.
+
 Legend:
 
 | Verdict | Meaning |
