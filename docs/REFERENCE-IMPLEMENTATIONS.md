@@ -1,6 +1,6 @@
 # Reference Implementations and Upstream Design Sources
 
-**Baseline checked:** 2026-10-10. ACP Registry and OpenIntelligentUI references were reviewed on 2026-10-16; OpenBot was added at pinned commit 6759fa3ee857f4f4966865e12de99ae84ab6de07 on 2026-11-06.
+**Baseline checked:** 2026-10-10. ACP Registry and OpenIntelligentUI references were reviewed on 2026-10-16; OpenBot was added at pinned commit 6759fa3ee857f4f4966865e12de99ae84ab6de07 on 2026-11-06. A 2026-11-08 Phase 2 re-verification found OpenBot HEAD now at `3ec318ef791bf3259d84c3dc326d7c66545bc1ec` (package version 0.65.0, license unchanged); the REF-OPENBOT entries below stay anchored to the historical 2026-11-06 pin for reproducibility, with the newer HEAD recorded for a future re-pin — see [OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md](OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md) and the [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md) disambiguation table.
 
 Phase 2 competitor re-verification added REF-OPENWORK, REF-OPENCOWORK, REF-ZCODE,
 REF-DEEPSEEK-HARNESS, REF-ROWBOAT and REF-OPENLOOMI with 2026-11-08 shallow clones at the
@@ -724,6 +724,8 @@ The clones are local ignored research material under `litecowork/repo_take/`; ne
 Repository: [nightly-labs/openbot](https://github.com/nightly-labs/openbot)
 
 Pinned revision: [6759fa3ee857f4f4966865e12de99ae84ab6de07](https://github.com/nightly-labs/openbot/tree/6759fa3ee857f4f4966865e12de99ae84ab6de07), package version 0.62.0 at the inspected package.json. Declared license: PolyForm Noncommercial 1.0.0. The README labels the product a development preview and documents danger-full-access / approvalPolicy never behavior. This is architecture/UI research only; do not reuse code or permission defaults without separate license and security review.
+
+> **2026-11-08 re-pin pointer:** the exact-file links below remain anchored to the historical 2026-11-06 pin `6759fa3…` (v0.62.0) for reproducibility. A Phase 2 re-verification recorded OpenBot HEAD at `3ec318ef791bf3259d84c3dc326d7c66545bc1ec` (v0.65.0, license unchanged); see the re-pin note in [OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md](OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md). Re-resolve the blob links to the newer SHA before any future reuse review.
 
 | File | Exact pinned link | What to study | LiteCowork decision |
 |---|---|---|---|

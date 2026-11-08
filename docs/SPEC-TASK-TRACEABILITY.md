@@ -16,6 +16,8 @@
 | BT-1.4 | 001-T08 | AC-012 | FL01–FL05 |
 | BT-1.5, BT-12.* | 001-T09 | AC-001–019 all | UC-CHAT-01 + full 001 EARS |
 
+> The `UIV1-016–022` citation above is a provenance pointer to the archived legacy catalog only; the legacy `UIV1-xxx` namespace is retired as an active acceptance authority (register [A-39](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)). The live acceptance obligation is the referenced flow/AC IDs, per [V1-UI-ACTION-STATE-LEDGER.md](V1-UI-ACTION-STATE-LEDGER.md).
+
 **Spec package files (all required for lock):**
 
 | File | Lines (approx) | Role |

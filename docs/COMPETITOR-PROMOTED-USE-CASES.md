@@ -24,12 +24,14 @@ Sources: [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), vendor pages cited 
 | UC-CHAT-02 | Claude chat/Cowork, ChatGPT | Same composer for quick Q&A and larger work | P1 | No forced Task wrapper |
 | UC-CHAT-03 | OpenWork | Chat home; tool activity compact; no auto side-panel on background result | P7 Workbench | UX policy |
 | UC-CHAT-04 | Grok, Dots, Muse | Named persistent assistant optional; ordinary chat without persona | P8 Coworkers | Coworker optional |
-| UC-CHAT-05 | ZCode/DSH (ref) | Switch agent/model mid-draft; draft preserved; invalid options cleared | P1 | UIV1-023–036 |
+| UC-CHAT-05 | ZCode/DSH (ref) | Switch agent/model mid-draft; draft preserved; invalid options cleared | P1 | UIV1-023–036 (provenance pointer only — see note) |
 | UC-CHAT-06 | Open Cowork | Rich attachments (files/images) in chat | P2 context | Agent-dependent |
 | UC-CHAT-07 | Claude Cowork | Native slash/commands where harness supports | P1 BYO agent | Descriptor-driven |
 | UC-CHAT-08 | OpenHands (ref) | A conversation whose execution runtime is gone still shows its full history, read-only, with the reason visible | P1/P7 | **PROPOSAL:** runtime-availability projection; see index §OpenHands |
 | UC-CHAT-09 | Claude Code Desktop | Ask a side question that uses the session's context without derailing the main session | P1/P7 | **Research:** scoped side-conversation; not locked |
 | UC-CHAT-10 | Claude Duet | Synchronous human+Claude co-edit / take-control on an ordinary conversation | **Research gate RV-14** | Co-edit UX, not a durable Task type; source URL unresolved 2026-11-08 |
+
+> The `UIV1-023–036` citation in UC-CHAT-05 is a provenance pointer to the archived legacy catalog only; the legacy `UIV1-xxx` namespace is retired as an active acceptance authority (register [A-39](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)). The live acceptance obligation is the referenced flow/AC IDs, per [V1-UI-ACTION-STATE-LEDGER.md](V1-UI-ACTION-STATE-LEDGER.md).
 
 ## Long-running and delegated work
 

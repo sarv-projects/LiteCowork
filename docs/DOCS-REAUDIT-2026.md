@@ -34,7 +34,7 @@ Evidence vocabulary (TARGET / CODE / SERVED / INTEGRATED / QUALIFIED) is defined
 | [ARCHITECTURE.md](../ARCHITECTURE.md) execution model | Exactly one real native agent execution path exists and other harnesses are not turn-capable merely because discovery/probe/binding exist. | One `provider_key=opencode` branch in `apps/litecoworkd/src/agents/opencode_server.rs` (enum `V2_0_32`) and `opencode_profile_probe.rs` (pins `"2.0.32"`); other providers fail closed. | true | A-04 |
 | [PRODUCT.md](PRODUCT.md) / [V1-PRODUCT-RELEASE-CONTRACT.md](V1-PRODUCT-RELEASE-CONTRACT.md) release posture | V1 is pre-release and not release-qualified; a route/mock/tile is not a shipped journey. | Matches IMPLEMENTATION-STATUS.md "Release posture" and the 12 release blockers. | true | A-02, A-03 |
 | [adr/](adr/) decisions vs current authority | ADRs explain rationale and never override current authority. | COVERAGE-MATRIX.md authority order §7 states the same; no ADR redefines an owner. | true | — |
-| [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) "Active documentation corpus" | 258 files / 54,473 lines; Markdown audit 255 / 54,385. | Generators now report 258 / 54,701 (design-depth, manifest) and 255 / 54,613 (markdown). | stale | — (corrected in place) |
+| [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) "Active documentation corpus" | 258 files / 54,473 lines; Markdown audit 255 / 54,385. | Branch-tip generators report 260 files / 55,534 lines (design-depth, manifest) and 257 / 55,448 (markdown); the corpus grew as Phase 2/3 added docs. | stale | — (corrected in place) |
 
 ## Cluster B — Domain contracts (DATA-MODEL, STATE-MACHINES, SCHEMAS, TASK-RUNTIME, TRUST, ENVIRONMENTS, DELEGATION, LEARNING)
 

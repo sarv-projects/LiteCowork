@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 260
-- Included lines: 55526
-- Included bytes: 4391577
+- Included lines: 55534
+- Included bytes: 4393761
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,7 +25,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 130 | 46840 |
+| docs/ | 130 | 46848 |
 | repository root | 6 | 1549 |
 | scripts/ | 1 | 14 |
 | specs/ | 111 | 6343 |
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 60 | 3726 | aa800aa8fda07635 |
-| CURRENT-RUN.md | 201 | 26331 | 78b41ee3e3f0ffb0 |
+| CURRENT-RUN.md | 201 | 26331 | b50cc62dff79b75c |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 75 | 6169 | 3ecd058f34d1ee80 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -66,11 +66,11 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CHROME-BROWSER-LLD.md | 181 | 19891 | ba9613ca8f253f76 |
 | docs/CODING-COCKPIT-UI-SPEC.md | 113 | 8662 | 51e4f0bbc4a51dc2 |
 | docs/COMPETITIVE-RESEARCH.md | 991 | 114678 | 229caf87e54be05c |
-| docs/COMPETITOR-PROMOTED-USE-CASES.md | 147 | 12601 | 2c0af44925d380a5 |
+| docs/COMPETITOR-PROMOTED-USE-CASES.md | 149 | 13015 | 9a641a7bb366904f |
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
 | docs/CONTEXT.md | 272 | 19955 | f80c31cda1a4c7aa |
-| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 127 | 47998 | 85d1fc9884d62c18 |
+| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 127 | 47998 | 7fa00eb97da35426 |
 | docs/COVERAGE-MATRIX.md | 174 | 25367 | 64c4380d1987ee75 |
 | docs/COWORKER-FLOWS.md | 166 | 20076 | 309015aa4fe4a14a |
 | docs/COWORKERS-TARGET.md | 456 | 58061 | 3afdfb6005644afe |
@@ -79,7 +79,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13119 | 24bffd6743bceea3 |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13179 | 927654c3ec9db132 |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 927 | 69198 | f6753a21cfcfe5eb |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
@@ -88,7 +88,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 297 | 57827 | e2852f1bdccbf805 |
+| docs/IMPLEMENTATION-STATUS.md | 297 | 57827 | 94a36293115d1453 |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -108,7 +108,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/PRODUCT.md | 254 | 16913 | 76a270f4af39c91c |
 | docs/PROTOCOLS.md | 187 | 9391 | de2062d24c901037 |
 | docs/README.md | 84 | 7785 | cefd690ce33fd77a |
-| docs/REFERENCE-IMPLEMENTATIONS.md | 779 | 89019 | 4aa2d72c2b1baa7c |
+| docs/REFERENCE-IMPLEMENTATIONS.md | 781 | 89959 | df5aa1b7462607c0 |
 | docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md | 264 | 24873 | f1d7303606da51da |
 | docs/RENDERING-CONFORMANCE-LLD.md | 271 | 16026 | c99abd47adbeda47 |
 | docs/REPOSITORY-DOCUMENTATION-AUDIT.md | 65 | 5253 | 2ce16d7805706cf8 |
@@ -124,7 +124,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/SERVICES.md | 1582 | 101551 | 43c93b0fb23f464f |
 | docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md | 111 | 18984 | e5d28f0061fcff69 |
 | docs/SOURCE-RECONCILIATION.md | 179 | 16220 | 5567fad3a3b603ea |
-| docs/SPEC-TASK-TRACEABILITY.md | 61 | 4408 | a7990f9033e83979 |
+| docs/SPEC-TASK-TRACEABILITY.md | 63 | 4775 | d9e9ef2252391fb4 |
 | docs/SPECIFICATION-STANDARD.md | 134 | 10792 | f2cf584a47acdda7 |
 | docs/STATE-MACHINES.md | 1442 | 91664 | e1f21b64f369d001 |
 | docs/STORAGE.md | 1342 | 99381 | 1dcf08c1a7f4e620 |
@@ -132,7 +132,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/TASK-RUNTIME.md | 760 | 44849 | d8b8237e3a772882 |
 | docs/TESTING.md | 534 | 46687 | 67c04dde69e438be |
 | docs/TRUST.md | 322 | 16569 | 04bebf938f0e49cf |
-| docs/UI-CORE-TYPED-CONTRACTS.md | 78 | 4968 | b5506750a33206a6 |
+| docs/UI-CORE-TYPED-CONTRACTS.md | 80 | 5371 | 6c5d71eca3083a28 |
 | docs/USER-EXPERIENCE-RESEARCH-AND-MAGNETIC-USE-CASES.md | 243 | 22769 | a52bb38efaeeb7d2 |
 | docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md | 150 | 18757 | a0a8dc909d4e831c |
 | docs/V1-AGENT-MEMORY-FAST-PATH-LLD.md | 104 | 10314 | 095643b94c54af62 |

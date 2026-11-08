@@ -59,7 +59,9 @@ Each `specs/NNN-*/contracts/ui-behavior.md` must list:
 3. Validation and typed failure presentation  
 4. Table: control → reducer action → `operationId`  
 5. Stream/projection usage  
-6. Test IDs (`UIV1-*`, feature AC-*)
+6. Test IDs (feature AC-*; a `UIV1-*` citation is a provenance pointer to the archived legacy catalog only)
+
+> The legacy `UIV1-xxx` namespace is retired as an active acceptance authority (register [A-39](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)); the live acceptance obligation is the referenced flow IDs in [FLOWS.md](FLOWS.md) (F00–F143) and the feature EARS AC IDs, per [V1-UI-ACTION-STATE-LEDGER.md](V1-UI-ACTION-STATE-LEDGER.md).
 
 Template: [.specify/templates/contracts/ui-behavior.md](../.specify/templates/contracts/ui-behavior.md). Example: [specs/001-conversation-session-supervisor/contracts/ui-behavior.md](../specs/001-conversation-session-supervisor/contracts/ui-behavior.md).
 
