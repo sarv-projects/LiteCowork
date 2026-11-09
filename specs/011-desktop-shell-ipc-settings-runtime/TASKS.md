@@ -327,7 +327,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T19 - Shell reachability and truthfulness (P-05)
 
-- **Status:** PARTIAL (CODE): all 13 Page values already have navigation entries and `tests/shell-reachability.test.mjs` (3 tests) now guards that; non-functional Back/Forward buttons removed. NOT done: unavailable-vs-empty fallback audit, Recent Chats loading/error states, real Needs You count (depends on Feature 010 and 014 prerequisites)
+- **Status:** PARTIAL (CODE). CORRECTION to the earlier claim: `navigation` was a dead array that the sidebar did not render, so Goals, Notifications, Ideas and Home had no navigation path and the earlier reachability test passed falsely. Now the sidebar renders a "More" group from `navigation` (Home as "New task", Goals, Notifications, Ideas), and `tests/shell-reachability.test.mjs` (4 tests) checks the rendered `<aside>` block, with Routines reached from the Automations page. Back/Forward are removed. NOT done: unavailable-vs-empty fallback audit, Recent Chats loading and error states, real Needs You count (Features 010 and 014 prerequisites)
 - **Depends on:** T06
 - **Cross-package prerequisites:** Feature 010 local-poll notification delivery for the Needs You count source; Feature 014 Recent Chats read path.
 - **Owner:** Desktop UI.
@@ -361,7 +361,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T21 - Merge SettingsPage into SettingsView with precedence notes (P-08)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-08 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 (findings S-05, S-06) into this LOCKED package.
+- **Status:** DONE (CODE). `SettingsPage`, `SettingsPageProps` and `localServiceCopy` are deleted from `App.tsx`; `SettingsView` is the one Settings authority (guarded by `tests/settings-merge.test.mjs`, 4 tests). Merged into `SettingsView`: instruction-conflict recovery ("Use this version", `workspaces-instructions-use-latest`), revision history with source provenance, and the Runtime enrollment card (`runtime-enroll`, `runtime-enrollment-refresh`), all mapped in `settings-control-map.ts`; the archive checklist already existed there. Precedence notes (`data-precedence-note`) on Workspace instructions and the default lead agent. The `navigation` array is not unused any more: the sidebar More group renders from it (see T19), so it was kept instead of deleted.
 - **Depends on:** T06, T20
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI.
@@ -369,9 +369,9 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §12; AC-023; register A-35; V1-SETTINGS-CONTRACT-LEDGER.
 - **Change intent:** merge the unmounted `SettingsPage` features (instruction-conflict recovery "Use this version", revision history, the Runtime enrollment card, the archive checklist) into the mounted `SettingsView`, delete `SettingsPage` and the unused `navigation` array, and add a precedence note on each surface where a setting has a Coworker or Automation override. Cross-reference register A-35 for screen ownership; do not restate the ownership rule here.
 - **Acceptance:**
-  - [ ] One Settings authority remains; conflict recovery and Runtime enrollment are reachable; `SettingsPage` and the unused `navigation` array are deleted (AC-023).
-  - [ ] Each setting with a Coworker or Automation override shows a precedence note (AC-023).
-  - [ ] Negative: no second settings surface or duplicate navigation array remains in the source.
+  - [x] One Settings authority remains; conflict recovery and Runtime enrollment are reachable; `SettingsPage` and the unused `navigation` array are deleted (AC-023).
+  - [x] Each setting with a Coworker or Automation override shows a precedence note (AC-023).
+  - [x] Negative: no second settings surface or duplicate navigation array remains in the source.
 - **Command:** `pnpm --dir apps/litecowork-ui test`
 - **Evidence:** merged-view test output in Completion evidence.
 - **Stop:** a merged feature has no served owner operation; render it unavailable rather than inert.

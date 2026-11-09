@@ -28,6 +28,7 @@ export const SETTINGS_CONTROL_MAP: Readonly<Record<string, SettingsControlEntry>
   "workspaces-create-submit": { class: "OperatorServed", effect: "createWorkspace" },
   "workspaces-instructions-text": { class: "OperatorServed", effect: "Workspace instructions draft" },
   "workspaces-instructions-save": { class: "OperatorServed", effect: "createWorkspaceInstructionRevision" },
+  "workspaces-instructions-use-latest": { class: "LocalOnly", effect: "replace the instruction draft with the latest saved revision after a conflict" },
   "workspaces-archive-cancel": { class: "LocalOnly", effect: "dismiss archive confirmation" },
   "workspaces-archive-confirm": { class: "OperatorServed", effect: "archive_workspace" },
   "workspaces-archive-begin": { class: "LocalOnly", effect: "open two-step archive confirmation" },
@@ -35,6 +36,8 @@ export const SETTINGS_CONTROL_MAP: Readonly<Record<string, SettingsControlEntry>
   "workspaces-rename-submit": { class: "OperatorServed", effect: "renameWorkspace" },
   "runtime-start": { class: "Native", effect: "start_local_runtime desktop bridge" },
   "runtime-refresh": { class: "OperatorServed", effect: "getLocalRuntimeLifecycle" },
+  "runtime-enroll": { class: "OperatorServed", effect: "enroll_local_runtime desktop bridge (Workspace runtime binding)" },
+  "runtime-enrollment-refresh": { class: "OperatorServed", effect: "list_workspace_runtime_bindings desktop bridge" },
   "runtime-stop-preview": { class: "OperatorServed", effect: "previewLocalRuntimeStop (read-only; Stop safely renders as text until requestLocalRuntimeStop is mounted)" },
 };
 

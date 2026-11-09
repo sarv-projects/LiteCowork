@@ -25,7 +25,6 @@ import { desktopAutomationApi } from "./automations/desktop-automation-api";
 import type { AutomationStarterId, AutomationTemplateFlow } from "./automations/automation-starters";
 import { RoutinesPage } from "./routines/RoutinesPage";
 import { desktopRoutineApi } from "./routines/desktop-routine-api";
-import { AgentCatalogSettings } from "./agents/AgentCatalogSettings";
 import type { AgentProviderKey } from "./agents/agent-catalog-api";
 import { desktopAgentCatalogApi } from "./agents/desktop-agent-catalog-api";
 import {
@@ -470,6 +469,9 @@ export const navigation: { label: Page; displayLabel?: string; group?: string }[
   { label: "Ideas", displayLabel: "Ideas" },
   { label: "Settings", displayLabel: "Settings", group: "SYSTEM" },
 ];
+
+/** Pages that have no dedicated primary button; the sidebar renders them from `navigation`. */
+const SIDEBAR_MORE_PAGES: Page[] = ["Home", "Goals", "Notifications", "Ideas"];
 
 const UPLOAD_RESUME_KEY = "litecowork.resourceUploadResume.v1";
 const TASK_STATUSES: TaskStatus[] = [
@@ -2560,6 +2562,24 @@ function App() {
             <span className="sidebar-nav-icon">✧</span>
             <span className="sidebar-nav-text">Discover</span>
           </button>
+
+          <div className="sidebar-section-header">
+            <span className="sidebar-section-label">More</span>
+          </div>
+          {navigation.filter((item) => SIDEBAR_MORE_PAGES.includes(item.label)).map((item) => (
+            <button
+              key={item.label}
+              className={`sidebar-nav-btn ${page === item.label ? "selected" : ""}`}
+              type="button"
+              onClick={() => {
+                requestPageNavigation(item.label);
+                if (navigationOpen) closeNavigation(true);
+              }}
+            >
+              <span className="sidebar-nav-icon" aria-hidden="true">•</span>
+              <span className="sidebar-nav-text">{item.displayLabel ?? item.label}</span>
+            </button>
+          ))}
         </nav>
 
         {/* 5. Settings: Local runtime, agent harnesses, diagnostics */}
@@ -3556,69 +3576,6 @@ function TaskDetailPanel({ workspaceId, taskId, resourceNameCache, artifactApi, 
   );
 }
 
-type SettingsPageProps = {
-  runtime: RuntimeStatus | null;
-  runtimeLifecycle: RuntimeLifecycleView | null;
-  runtimeLifecycleLoading: boolean;
-  runtimeLifecycleError: string | null;
-  runtimeError: string | null;
-  runtimeBusy: boolean;
-  startRuntime: () => Promise<void>;
-  refreshRuntime: () => Promise<void>;
-  agents: AgentInstallationView[];
-  agentError: string | null;
-  refreshAgents: () => Promise<void>;
-  agentProfiles: AgentProfileView[];
-  agentProfileError: string | null;
-  runtimeInventoryStreamStatus: RuntimeInventoryStreamStatus | "UNAVAILABLE";
-  agentBindings: AgentBindingView[];
-  agentBindingError: string | null;
-  agentActionMessage: string | null;
-  agentActionError: string | null;
-  agentActionBusy: string | null;
-  runtimeBindings: RuntimeWorkspaceBindingView[];
-  runtimeBindingError: string | null;
-  runtimeBindingsLoading: boolean;
-  runtimeEnrollmentBusy: boolean;
-  runtimeEnrollmentMessage: string | null;
-  runtimeEnrollmentError: string | null;
-  onEnrollLocalRuntime: () => Promise<void>;
-  onRefreshRuntimeBindings: () => Promise<void>;
-  onProbeCodex: () => Promise<void>;
-  onProbeOpenCode: () => Promise<void>;
-  onRefreshAgentProfiles: () => Promise<void>;
-  onRefreshAgentBindings: () => Promise<void>;
-  onCreateAgentBinding: (profile: AgentProfileView, leadEligible: boolean) => Promise<void>;
-  onEnableAgentBinding: (binding: AgentBindingView) => Promise<void>;
-  onDisableAgentBinding: (binding: AgentBindingView) => Promise<void>;
-  workspaces: WorkspaceView[];
-  workspaceListState: WorkspaceListState;
-  workspaceError: string | null;
-  refreshWorkspaces: () => Promise<boolean>;
-  workspaceName: string;
-  setWorkspaceName: (name: string) => void;
-  createWorkspace: () => Promise<void>;
-  workspaceCreateBusy: boolean;
-  workspaceCreatePending: boolean;
-  selectedWorkspaceId: string;
-  onSelectWorkspace: (id: string) => void;
-  onUpdatePolicy: (policy: string) => Promise<void>;
-  policyBusy: boolean;
-  policyRetryPending: boolean;
-  onArchiveWorkspace: () => Promise<void>;
-  archiveBusy: boolean;
-  onSetDefaultAgentBinding: (agentBindingId: string | null) => Promise<void>;
-  defaultAgentBusy: boolean;
-  instructions: string;
-  onInstructionsChange: (value: string) => void;
-  instructionHistory: WorkspaceInstructionView[];
-  instructionMessage: string | null;
-  instructionBusy: boolean;
-  onSaveInstructions: () => Promise<void>;
-  latestInstructionsAfterConflict: string | null;
-  onUseLatestInstructions: () => void;
-};
-
 function profileHasFreshAdmissionOffer(profile: AgentProfileView): boolean {
   const latest = [...profile.observations].sort((left, right) => Date.parse(right.observedAt) - Date.parse(left.observedAt))[0];
   return !!latest
@@ -3626,192 +3583,6 @@ function profileHasFreshAdmissionOffer(profile: AgentProfileView): boolean {
     && Number.isFinite(Date.parse(latest.offerExpiresAt))
     && Date.parse(latest.offerExpiresAt) > Date.now()
     && (latest.readiness === "AVAILABLE" || latest.readiness === "STARTABLE" || latest.readiness === "READY");
-}
-
-function localServiceCopy(runtime: RuntimeStatus | null, runtimeError: string | null, canStart: boolean) {
-  if (runtimeError) return { status: "Connection issue", message: "LiteCowork could not check its local service. Refresh status to try again." };
-  if (runtime?.operatorReady) return { status: "Connected", message: "LiteCowork is connected on this computer. Task execution is not available yet." };
-  if (!runtime) return { status: "Checking…", message: "Checking LiteCowork’s local service." };
-  switch (runtime.state) {
-    case "STOPPED":
-    case "NOT_RUNNING":
-    case "NOT_STARTED":
-      return {
-        status: "Not running",
-        message: canStart
-          ? "LiteCowork is not running on this computer. Start it here to reconnect."
-          : "LiteCowork is not running on this computer. Refresh status to check again.",
-      };
-    case "UNAVAILABLE":
-      return { status: "Unavailable", message: "LiteCowork’s local service is unavailable. Refresh status to try again." };
-    case "DEGRADED":
-      return { status: "Limited availability", message: "LiteCowork is running with limited availability. Review Advanced details or refresh status." };
-    case "DRAINING":
-    case "STOPPING":
-      return { status: "Stopping", message: "LiteCowork is stopping. Refresh status to check again." };
-    case "FAILED":
-      return { status: "Needs attention", message: "LiteCowork needs attention. Refresh status to try again." };
-    default:
-      return { status: "Connecting", message: "LiteCowork is reconnecting on this computer." };
-  }
-}
-
-export function SettingsPage({ runtime, runtimeLifecycle, runtimeLifecycleLoading, runtimeLifecycleError, runtimeError, runtimeBusy, startRuntime, refreshRuntime, agents, agentError, refreshAgents, agentProfiles, agentProfileError, runtimeInventoryStreamStatus, agentBindings, agentBindingError, agentActionMessage, agentActionError, agentActionBusy, onProbeCodex, onProbeOpenCode, onRefreshAgentProfiles, onRefreshAgentBindings, onCreateAgentBinding, onEnableAgentBinding, onDisableAgentBinding, runtimeBindings, runtimeBindingError, runtimeBindingsLoading, runtimeEnrollmentBusy, runtimeEnrollmentMessage, runtimeEnrollmentError, onEnrollLocalRuntime, onRefreshRuntimeBindings, workspaces, workspaceListState, workspaceError, refreshWorkspaces, workspaceName, setWorkspaceName, createWorkspace, workspaceCreateBusy, workspaceCreatePending, selectedWorkspaceId, onSelectWorkspace, onUpdatePolicy, policyBusy, policyRetryPending, onArchiveWorkspace, archiveBusy, onSetDefaultAgentBinding, defaultAgentBusy, instructions, onInstructionsChange, instructionHistory, instructionMessage, instructionBusy, onSaveInstructions, latestInstructionsAfterConflict, onUseLatestInstructions }: SettingsPageProps) {
-  const [archiveConfirmationFor, setArchiveConfirmationFor] = useState<string | null>(null);
-  useEffect(() => setArchiveConfirmationFor(null), [selectedWorkspaceId]);
-  const selectedWorkspace = workspaces.find((workspace) => workspace.workspaceId === selectedWorkspaceId);
-  const currentRuntimeBinding = runtimeBindings.find((binding) => binding.workspaceId === selectedWorkspaceId && binding.runtimeId === runtime?.runtimeId && binding.status === "ACTIVE")
-    ?? runtimeBindings.find((binding) => binding.workspaceId === selectedWorkspaceId && binding.runtimeId === runtime?.runtimeId);
-  const currentRuntimeEnrolled = currentRuntimeBinding?.status === "ACTIVE";
-  const runtimeEnrollmentStatus = runtimeBindingsLoading ? "Checking…" : runtimeBindingError ? "Could not check" : !runtime?.runtimeId ? "Runtime unavailable" : currentRuntimeEnrolled ? "Active on this computer" : currentRuntimeBinding?.status === "PENDING" ? "Enrollment pending" : "Not enrolled";
-  const canStartLocalRuntime = canOfferLocalRuntimeStart(runtime);
-  const localService = localServiceCopy(runtime, runtimeError, canStartLocalRuntime);
-  return (
-    <div className="page-content subpage-content">
-      <div className="eyebrow">LOCAL DESKTOP</div>
-      <h1>Settings</h1>
-      <section className="runtime-card" aria-labelledby="runtime-title">
-        <div className="section-heading">
-          <div><h2 id="runtime-title">Local connection</h2><p className="runtime-status-copy">{localService.message}</p></div>
-          <span className={`status-pill ${runtime?.operatorReady && !runtimeError ? "success" : "muted"}`}>{localService.status}</span>
-        </div>
-        {runtimeError && <p className="inline-error" role="alert">{runtimeError}</p>}
-        {!!(runtimeLifecycle?.blockers.length ?? runtime?.blockers.length) && <div className="blocker-list"><strong>Unavailable services</strong><ul>{runtimeLifecycle ? runtimeLifecycle.blockers.map((blocker) => <li key={blocker.blockerId}><span>{blocker.safeMessage}</span><small>{blocker.resolutionHint}</small></li>) : runtime?.blockers.map((blocker) => <li key={blocker}>{blocker.replaceAll("_", " ").toLowerCase()}</li>)}</ul></div>}
-        <div className="button-row">
-          {canStartLocalRuntime && <button className="primary-button" type="button" onClick={() => void startRuntime()} disabled={runtimeBusy}>{runtimeBusy ? "Starting…" : "Start local Runtime"}</button>}
-          <button className="quiet-button" type="button" onClick={() => void refreshRuntime()}>Refresh status</button>
-        </div>
-        <details className="runtime-advanced-details">
-          <summary>Advanced details</summary>
-          {runtime?.runtimeId && <dl className="runtime-details"><div><dt>Runtime ID</dt><dd>{runtime.runtimeId}</dd></div><div><dt>Incarnation ID</dt><dd>{runtime.localIncarnationId}</dd></div></dl>}
-          {runtimeLifecycle && <dl className="runtime-details"><div><dt>Startup policy</dt><dd>{runtimeLifecycle.startupPolicy}</dd></div><div><dt>Persisted availability</dt><dd>{runtimeLifecycle.availability}</dd></div><div><dt>Recovery state</dt><dd>{runtimeLifecycle.incarnation.recoveryState}</dd></div></dl>}
-          {runtimeLifecycleLoading && runtime?.operatorReady && <p className="composer-hint" role="status">Loading persisted lifecycle details…</p>}
-          {runtimeLifecycleError && runtime?.operatorReady && <p className="inline-error" role="status">{runtimeLifecycleError}</p>}
-        </details>
-      </section>
-      <section className="workspace-list-card" aria-labelledby="workspace-title">
-        <div className="section-heading">
-          <div><h2 id="workspace-title">Workspaces</h2><p>Local Workspaces returned by the authenticated Operator API.</p></div>
-          <button className="quiet-button" type="button" onClick={() => void refreshWorkspaces()}>Refresh</button>
-        </div>
-        <form className="workspace-create-form" onSubmit={(event) => { event.preventDefault(); void createWorkspace(); }}>
-          <label className="sr-only" htmlFor="workspace-name">Workspace name</label>
-          <input id="workspace-name" type="text" value={workspaceName} maxLength={160} disabled={workspaceCreateBusy || workspaceCreatePending || workspaceListState !== "READY"} onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Name a Workspace" />
-          <button className="primary-button" type="submit" disabled={workspaceCreateBusy || workspaceCreatePending || workspaceListState !== "READY" || !workspaceName.trim() || runtime?.operatorReady !== true}>
-            {workspaceCreateBusy ? "Creating…" : workspaceCreatePending ? "Retry Workspace creation" : "Create Workspace"}
-          </button>
-        </form>
-        {workspaceListState === "LOADING" && <p className="composer-hint" role="status">Checking local Workspaces before enabling creation…</p>}
-        {workspaceCreatePending && <p className="composer-hint" role="status">Retry the original Workspace name to confirm the same idempotent request.</p>}
-        {workspaceError && <p className="inline-error" role="status">{workspaceError}</p>}
-        {workspaces.length === 0 ? <p className="empty-inline">Create a local Workspace to organize resources and future work.</p> : (
-          <ul className="workspace-list">{workspaces.map((workspace) => <li key={workspace.workspaceId} className={selectedWorkspaceId === workspace.workspaceId ? "selected" : ""}><button type="button" onClick={() => onSelectWorkspace(workspace.workspaceId)} aria-pressed={selectedWorkspaceId === workspace.workspaceId}><strong>{workspace.name}</strong><span>{workspace.status} · {workspace.replicationPolicy === "LOCAL_ONLY" ? "this computer only" : "saved sync policy · inactive"}</span></button>{selectedWorkspaceId === workspace.workspaceId && <small>Selected</small>}</li>)}</ul>
-        )}
-        {selectedWorkspace && <div className="workspace-policy-form">
-          <strong>Workspace storage</strong>
-          {selectedWorkspace.replicationPolicy === "LOCAL_ONLY"
-            ? <><span className="status-pill muted">This computer only</span><small>V1 keeps this Workspace on this computer. Cloud continuation and remote Runtimes are not active.</small></>
-            : <><span className="status-pill muted">Saved policy · {selectedWorkspace.replicationPolicy.replaceAll("_", " ")} · inactive</span><small>This local V1 build does not transfer Workspace data to cloud or remote Runtimes. The saved policy is not being applied.</small>{policyRetryPending && <small role="status">The last update was not confirmed. Retry it to reuse the same request, or refresh Workspaces to check its status.</small>}<button className="quiet-button" type="button" disabled={policyBusy || selectedWorkspace.status !== "ACTIVE"} onClick={() => void onUpdatePolicy("LOCAL_ONLY")}>{policyBusy ? "Updating…" : policyRetryPending ? "Retry exact update" : "Set this computer only"}</button></>}
-        </div>}
-        {selectedWorkspace && <section className="workspace-policy-form" aria-labelledby="workspace-archive-title">
-          <div className="section-heading">
-            <div><h3 id="workspace-archive-title">Workspace lifecycle</h3><p>Archiving makes this Workspace and its history read-only. It does not delete local files or records.</p></div>
-            <span className={`status-pill ${selectedWorkspace.status === "ARCHIVED" ? "muted" : "warning"}`}>{selectedWorkspace.status}</span>
-          </div>
-          {selectedWorkspace.status === "ACTIVE" ? <>
-            <small>Before archiving, finish active Tasks and Conversation turns, disable Automations, settle approvals and effects, revoke active grants, stop persistent workloads, and pause or revoke selected roots. The local Runtime will check again atomically.</small>
-            {archiveConfirmationFor === selectedWorkspace.workspaceId ? <div className="button-row" role="group" aria-label="Confirm Workspace archive">
-              <span>This is a terminal, read-only transition. You can keep the Workspace instead.</span>
-              <button className="quiet-button" type="button" onClick={() => setArchiveConfirmationFor(null)} disabled={archiveBusy}>Keep Workspace</button>
-              <button className="danger-button" type="button" onClick={() => void onArchiveWorkspace()} disabled={archiveBusy}>{archiveBusy ? "Archiving…" : "Confirm archive"}</button>
-            </div> : <button className="quiet-button" type="button" onClick={() => setArchiveConfirmationFor(selectedWorkspace.workspaceId)} disabled={archiveBusy || runtime?.operatorReady !== true}>Review archive</button>}
-          </> : <p className="inline-status" role="status">This Workspace is archived and read-only.</p>}
-        </section>}
-        {selectedWorkspace && <div className="workspace-instructions-form">
-          <div className="section-heading">
-            <div><h3>Workspace instructions</h3><p>Shared guidance for future work in this Workspace.</p></div>
-            <span className="status-pill muted">{instructionHistory.length > 0 ? `Revision ${instructionHistory[instructionHistory.length - 1].revision}` : "Not set"}</span>
-          </div>
-          <label htmlFor="workspace-instructions">Instructions</label>
-          <textarea
-            id="workspace-instructions"
-            rows={7}
-            value={instructions}
-            maxLength={65536}
-            disabled={instructionBusy || selectedWorkspace.status !== "ACTIVE"}
-            onChange={(event) => onInstructionsChange(event.target.value)}
-            placeholder="Add project conventions, preferred workflows, and context that should guide future Tasks."
-            aria-describedby="workspace-instructions-help"
-          />
-          <small id="workspace-instructions-help">Saved as an immutable revision from a local text Resource. Limit: 64 KiB UTF-8. Instructions do not grant permissions and do not change existing Tasks.</small>
-          <div className="button-row">
-            <button className="primary-button" type="button" onClick={() => void onSaveInstructions()} disabled={instructionBusy || selectedWorkspace.status !== "ACTIVE"}>
-              {instructionBusy ? "Saving…" : "Save new revision"}
-            </button>
-            <span className="resource-search-hint">{new TextEncoder().encode(instructions).byteLength.toLocaleString()} / 65,536 bytes</span>
-          </div>
-          {instructionMessage && <p className={instructionMessage.includes("could not") || instructionMessage.includes("unavailable") || instructionMessage.includes("limited") ? "inline-error" : "inline-status"} role="status">{instructionMessage}</p>}
-          {latestInstructionsAfterConflict !== null && <section className="instruction-conflict" aria-label="Latest saved Workspace instructions">
-            <div className="section-heading"><div><h4>Latest saved version</h4><p>Your unsaved draft remains in the editor above.</p></div><button className="quiet-button" type="button" onClick={onUseLatestInstructions}>Use this version</button></div>
-            <pre>{latestInstructionsAfterConflict || "(This revision is empty.)"}</pre>
-          </section>}
-          {instructionHistory.length > 0 && <details className="instruction-history">
-            <summary>Revision history and source provenance ({instructionHistory.length})</summary>
-            <p className="resource-search-hint">These are the immutable Workspace instruction sources returned by the authenticated Operator. They describe saved Workspace guidance; they do not claim which sources a Task or agent actually consumed.</p>
-            <ol>{[...instructionHistory].reverse().map((revision) => <li key={`${revision.workspaceId}-${revision.revision}`}>
-              <strong>Revision {revision.revision}</strong>
-              <small>{new Date(revision.createdAt).toLocaleString()} · {revision.contentDigest.slice(0, 19)}…</small>
-              <small>Source Resource: {revision.contentRef.resource_id ?? "Unavailable"} · revision: {revision.contentRef.revision_id ?? "Unavailable"}</small>
-              <small>Parent instruction revisions: {revision.parentRevisions.length ? revision.parentRevisions.join(", ") : "None (initial revision)"}</small>
-            </li>)}</ol>
-          </details>}
-        </div>}
-      </section>
-      <section className="workspace-list-card runtime-enrollment-card" aria-labelledby="runtime-enrollment-title">
-        <div className="section-heading">
-          <div><h2 id="runtime-enrollment-title">This computer’s Workspace access</h2><p>Enrollment authorizes this local Runtime installation for the selected Workspace.</p></div>
-          <button className="quiet-button" type="button" onClick={() => void onRefreshRuntimeBindings()} disabled={runtime?.operatorReady !== true || !selectedWorkspaceId}>Refresh</button>
-        </div>
-        {!selectedWorkspace ? <p className="agent-empty-note">Select a Workspace above to check this computer’s enrollment.</p> : <>
-          <div className="runtime-enrollment-status">
-            <span className={`status-pill ${currentRuntimeEnrolled ? "success" : currentRuntimeBinding?.status === "PENDING" ? "warning" : "muted"}`}>{runtimeEnrollmentStatus}</span>
-            <span>{selectedWorkspace.name}</span>
-          </div>
-          {currentRuntimeBinding && <dl className="agent-observation-details runtime-enrollment-details"><div><dt>Enrollment</dt><dd>{currentRuntimeBinding.enrollmentMode.replaceAll("_", " ").toLowerCase()}</dd></div><div><dt>Roles</dt><dd>{currentRuntimeBinding.roles.map((role) => role.replaceAll("_", " ").toLowerCase()).join(", ") || "None reported"}</dd></div></dl>}
-          <p className="runtime-enrollment-copy">This grants this installation its authorized local execution role in the Workspace. It does not pair another computer, start an agent, or execute a Task.</p>
-          {runtimeBindingError && <p className="inline-error" role="status">{runtimeBindingError}</p>}
-          {runtimeEnrollmentError && <p className="inline-error" role="alert">{runtimeEnrollmentError}</p>}
-          {runtimeEnrollmentMessage && <p className="inline-status" role="status">{runtimeEnrollmentMessage}</p>}
-          {!currentRuntimeEnrolled && <div className="button-row"><button className="primary-button" type="button" onClick={() => void onEnrollLocalRuntime()} disabled={runtimeEnrollmentBusy || runtimeBindingsLoading || runtimeBindingError !== null || runtime?.operatorReady !== true || !runtime?.runtimeId || selectedWorkspace.status !== "ACTIVE"}>{runtimeEnrollmentBusy ? "Enrolling this computer…" : "Enroll this computer"}</button></div>}
-        </>}
-      </section>
-      <AgentCatalogSettings
-        workspaceId={selectedWorkspaceId || null}
-        workspaceName={selectedWorkspace?.name}
-        workspaceActive={selectedWorkspace?.status === "ACTIVE"}
-        runtimeReady={runtime?.operatorReady === true}
-        runtimeEnrolled={currentRuntimeEnrolled === true}
-        selectedDefaultLeadBindingId={selectedWorkspace?.defaultAgentBindingId ?? null}
-        installations={agents}
-        profiles={agentProfiles}
-        runtimeInventoryStreamStatus={runtimeInventoryStreamStatus === "STOPPED" ? "UNAVAILABLE" : runtimeInventoryStreamStatus}
-        bindings={agentBindings}
-        error={[agentError, agentProfileError, agentBindingError].filter(Boolean).join(" ") || null}
-        actionMessage={agentActionMessage}
-        actionError={agentActionError}
-        busyAction={agentActionBusy}
-        defaultAgentBusy={defaultAgentBusy}
-        registryApi={desktopAgentCatalogApi}
-        onRefresh={() => { void refreshAgents(); void onRefreshAgentProfiles(); void onRefreshAgentBindings(); }}
-        onProbeCodex={() => { void onProbeCodex(); }}
-        onProbeOpenCode={() => { void onProbeOpenCode(); }}
-        onCreateBinding={(profile, leadEligible) => { void onCreateAgentBinding(profile, leadEligible); }}
-        onEnableBinding={(binding) => { void onEnableAgentBinding(binding); }}
-        onDisableBinding={(binding) => { void onDisableAgentBinding(binding); }}
-        onSetDefaultLead={(agentBindingId) => { void onSetDefaultAgentBinding(agentBindingId); }}
-      />
-    </div>
-  );
 }
 
 function PlaceholderPage({ page, onSettings }: { page: Page; onSettings: () => void }) {

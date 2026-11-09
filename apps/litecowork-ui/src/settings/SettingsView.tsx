@@ -481,8 +481,91 @@ export function SettingsView(props: SettingsViewProps) {
                     </button>
                   </div>
                   {props.instructionMessage && <p className="settings-badge">{props.instructionMessage}</p>}
+                  {props.latestInstructionsAfterConflict !== null && (
+                    <section className="instruction-conflict" aria-label="Latest saved Workspace instructions">
+                      <div className="settings-card-header">
+                        <div>
+                          <h3 className="settings-card-title">Latest saved version</h3>
+                          <p className="settings-card-subtitle">Another save won. Your unsaved draft remains in the editor above.</p>
+                        </div>
+                        <button data-control-id="workspaces-instructions-use-latest" className="settings-btn" type="button" onClick={props.onUseLatestInstructions}>
+                          Use this version
+                        </button>
+                      </div>
+                      <pre>{props.latestInstructionsAfterConflict || "(This revision is empty.)"}</pre>
+                    </section>
+                  )}
+                  {props.instructionHistory.length > 0 && (
+                    <details className="instruction-history">
+                      <summary>Revision history and source provenance ({props.instructionHistory.length})</summary>
+                      <p className="settings-card-subtitle">
+                        These are the immutable Workspace instruction sources returned by the authenticated Operator. They describe saved Workspace guidance; they do not claim which sources a Task or agent actually consumed.
+                      </p>
+                      <ol>
+                        {[...props.instructionHistory].reverse().map(revision => (
+                          <li key={`${revision.workspaceId}-${revision.revision}`}>
+                            <strong>Revision {revision.revision}</strong>
+                            <small> {new Date(revision.createdAt).toLocaleString()} · {revision.contentDigest.slice(0, 19)}…</small>
+                            <small> Source Resource: {revision.contentRef.resource_id ?? "Unavailable"} · revision: {revision.contentRef.revision_id ?? "Unavailable"}</small>
+                            <small> Parent instruction revisions: {revision.parentRevisions.length ? revision.parentRevisions.join(", ") : "None (initial revision)"}</small>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+                  <p className="settings-card-subtitle" data-precedence-note="workspace-instructions">
+                    Precedence: an Automation or Coworker instruction applies to its own runs in addition to these Workspace instructions; it never replaces or silently overrides them.
+                  </p>
                 </section>
               )}
+
+              <section className="settings-card runtime-enrollment-card" aria-labelledby="runtime-enrollment-title">
+                <div className="settings-card-header">
+                  <div>
+                    <h2 id="runtime-enrollment-title" className="settings-card-title">This computer’s Workspace access</h2>
+                    <p className="settings-card-subtitle">Enrollment authorizes this local Runtime installation for the selected Workspace.</p>
+                  </div>
+                  <button data-control-id="runtime-enrollment-refresh" className="settings-btn" type="button"
+                    onClick={() => void props.onRefreshRuntimeBindings()}
+                    disabled={props.runtime?.operatorReady !== true || !props.selectedWorkspaceId}>
+                    Refresh
+                  </button>
+                </div>
+                {!selectedWorkspace ? (
+                  <p className="settings-card-subtitle">Select a Workspace above to check this computer’s enrollment.</p>
+                ) : (
+                  <>
+                    <p role="status" data-enrollment-state={currentRuntimeEnrolled ? "ENROLLED" : currentRuntimeBinding?.status ?? "NOT_ENROLLED"}>
+                      {props.runtimeBindingsLoading ? "Checking…"
+                        : props.runtimeBindingError ? "Could not check"
+                        : !props.runtime?.runtimeId ? "Runtime unavailable"
+                        : currentRuntimeEnrolled ? "Active on this computer"
+                        : currentRuntimeBinding?.status === "PENDING" ? "Enrollment pending"
+                        : "Not enrolled"}
+                      {" "}for {selectedWorkspace.name}
+                    </p>
+                    {currentRuntimeBinding && (
+                      <dl className="settings-details-grid">
+                        <div><dt>Enrollment</dt><dd>{currentRuntimeBinding.enrollmentMode.replaceAll("_", " ").toLowerCase()}</dd></div>
+                        <div><dt>Roles</dt><dd>{currentRuntimeBinding.roles.map(role => role.replaceAll("_", " ").toLowerCase()).join(", ") || "None reported"}</dd></div>
+                      </dl>
+                    )}
+                    <p className="settings-card-subtitle">
+                      This grants this installation its authorized local execution role in the Workspace. It does not pair another computer, start an agent, or execute a Task.
+                    </p>
+                    {props.runtimeBindingError && <p role="status" className="settings-badge danger">{props.runtimeBindingError}</p>}
+                    {props.runtimeEnrollmentError && <p role="alert" className="settings-badge danger">{props.runtimeEnrollmentError}</p>}
+                    {props.runtimeEnrollmentMessage && <p role="status" className="settings-badge">{props.runtimeEnrollmentMessage}</p>}
+                    {!currentRuntimeEnrolled && (
+                      <button data-control-id="runtime-enroll" className="settings-btn primary" type="button"
+                        onClick={() => void props.onEnrollLocalRuntime()}
+                        disabled={props.runtimeEnrollmentBusy || props.runtimeBindingsLoading || props.runtimeBindingError !== null || props.runtime?.operatorReady !== true || !props.runtime?.runtimeId || selectedWorkspace.status !== "ACTIVE"}>
+                        {props.runtimeEnrollmentBusy ? "Enrolling this computer…" : "Enroll this computer"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </section>
 
               {selectedWorkspace && (
                 <section className="settings-card">
@@ -572,6 +655,9 @@ export function SettingsView(props: SettingsViewProps) {
                   {agentSettingsDescription(props.agentProfiles)}
                 </p>
               </header>
+              <p className="settings-card-subtitle" data-precedence-note="default-agent">
+                Precedence: the Workspace default lead agent applies to new Conversations. A Coworker or Automation that names its own agent uses that agent for its own runs and does not change this default.
+              </p>
 
               <AgentCatalogSettings
                 workspaceId={props.selectedWorkspaceId || null}
