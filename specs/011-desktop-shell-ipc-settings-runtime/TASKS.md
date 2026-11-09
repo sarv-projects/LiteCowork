@@ -34,7 +34,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T02 - Qualify the Windows named-pipe DACL profile (B-28 first row)
 
-- **Status:** PARTIAL (`crates/operator-ipc/src/windows.rs` endpoint/listener and `crates/windows-local-security/src/lib.rs` `create_operator_pipe`, `current_logon_sid` exist with unit tests; missing: DACL-failure no-fallback, remote-client rejection and packaged-peer tests on native Windows)
+- **Status:** DEFERRED (needs a native Windows 11 or 10 x64 runner; WSL2 does not count). Prior partial state kept: PARTIAL (`crates/operator-ipc/src/windows.rs` endpoint/listener and `crates/windows-local-security/src/lib.rs` `create_operator_pipe`, `current_logon_sid` exist with unit tests; missing: DACL-failure no-fallback, remote-client rejection and packaged-peer tests on native Windows)
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 019 Windows CI runner (native, not WSL2).
 - **Owner:** Operator IPC, Security
@@ -52,7 +52,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T03 - Qualify the Linux 0600/0700 socket profile (second row)
 
-- **Status:** PARTIAL (`crates/operator-ipc/src/unix.rs` enforces directory/socket modes and peer credentials; `crates/operator-ipc/tests/unix_endpoint_lifecycle.rs` exists; missing: native Linux desktop packaged-peer and foreign-UID evidence)
+- **Status:** DEFERRED to the second-user Linux qualification run (needs a second OS user and the packaged build). Prior partial state kept: PARTIAL (`crates/operator-ipc/src/unix.rs` enforces directory/socket modes and peer credentials; `crates/operator-ipc/tests/unix_endpoint_lifecycle.rs` exists; missing: native Linux desktop packaged-peer and foreign-UID evidence)
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 019 Linux CI runner.
 - **Owner:** Operator IPC, Security
@@ -207,7 +207,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T12 - Keep-awake power assertion
 
-- **Status:** NOT STARTED (no power-assertion code in `apps/` or `crates/`)
+- **Status:** NOT STARTED, deferred in Wave 0: the definition of "work runs" depends on Feature 001 admitted turns and Feature 005 admitted Attempts (cross-package prerequisites), and this Linux container has no logind or session bus, so HELD could not be verified by an OS observation; the Windows provider needs a native runner
 - **Depends on:** T01
 - **Cross-package prerequisites:** Feature 001 admitted-turn state and Feature 005 admitted-Attempt state (definition of "work runs").
 - **Owner:** Runtime, native desktop bridge
@@ -294,7 +294,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T17 - Packaged qualification on Windows x64 then Linux x64
 
-- **Status:** NOT STARTED
+- **Status:** DEFERRED (packaged qualification needs native Windows x64 then Linux x64 hosts and the packaged installers from Feature 019). NOT STARTED
 - **Depends on:** T02, T03, T15, T16
 - **Cross-package prerequisites:** Feature 019 release matrix, installer and signing; Feature 001 qualified OpenCode v2.0.32 route (E2E-01 shell portion).
 - **Owner:** QA, Product (owner USER evidence)

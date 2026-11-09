@@ -275,7 +275,7 @@ The structural validators and focused frontend coverage are useful evidence, not
 4. Connect Task planning, accepted PlanRevision, Attempt admission, Environment, Trust, Effects, worker execution, reconciliation and verification as one recoverable vertical slice.
 5. Remove the simulated Terminal and generated sample Diffs; implement real process-backed terminal sessions and actual diffs.
 6. Replace the iframe preview label/behavior with an honest preview surface until a real browser Environment/controller exists; design Computer use separately.
-7. Disable or implement the inert Settings controls and cache-clearing notices.
+7. Disable or implement the inert Settings controls and cache-clearing notices. (Partly done in Feature 011 Wave 0: the General appearance controls are applied and persisted locally, the shortcut labels are removed, every SettingsView control is mapped and audited, and Workspace rename is served. The `AgentCatalogSettings` controls are not yet in the control map.)
 8. Qualify LiteSPM's versioned service integration; preserve one package manager and separate installation, connection, assignment and invocation authority.
 9. Complete one professional Artifact format and one declarative Intelligent UI path with schema validation, fallback semantics and evidence.
 10. Align every screen with the release contract: no visual state may imply a Task, approval, Effect, process, browser, progress or completion that the owner service has not established.
