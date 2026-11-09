@@ -87,3 +87,37 @@ These are source-grounded observations recorded for the implementer. Each is fol
 ## ACP client SDK pin (P-11, owner approval 2026-11-09)
 
 Task 002-T17 defines the native-agent adapter as an Agent Client Protocol (ACP) client (register A-54). The ACP SDK version and the exact protocol revision must be pinned here from the published ACP SDK at implementation time, not inferred from CLI output or a marketplace listing. Record: the SDK package name and exact version, the ACP protocol revision it implements, the per-provider launch catalog entries (command, args, working-directory policy) for each enrolled provider, and the mapping from ACP `session/update` kinds to the internal normalizer events shared with Feature 001. The borrowable mapping and rationale are in [../../docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](../../docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md) section 1 and register row A-54 in [../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md); they are not restated here. Pin status until the published SDK is fetched on the implementation host: TARGET-pending-published-ACP-SDK.
+
+### ACP client spine implementation note (task 001-T04/002-T17, 2026-11)
+
+The ACP client spine is implemented as native LiteCowork Rust in
+`apps/litecoworkd/src/agents/adapter.rs` (no external paseo code imported).
+Pinned values used by that spine:
+
+- ACP protocol revision: `1` (constant `ACP_PROTOCOL_VERSION`), matching the
+  `ACP_PROTOCOL_VERSION = 1` of the two independent production ACP clients
+  surveyed (paseo and open-design) in
+  `../../docs/OPEN-DESIGN-CAPABILITY-DEEP-DIVE-2026-11.md`.
+- Method names: `initialize`, `session/new`, `session/prompt`,
+  `session/cancel` (client to agent); `session/update`,
+  `session/request_permission`, `fs/read_text_file`, `fs/write_text_file`,
+  `terminal/create`, `terminal/output`, `terminal/kill`, `terminal/release`
+  (agent to client, owned by the LiteCowork Client).
+- Per-provider launch catalog (`acp_launch_catalog`): Claude Code
+  (`claude-code-acp --acp`) and Codex (`codex acp`), each selected by exact
+  provider identity, never a brand substring. OpenCode v2 HTTP is deliberately
+  NOT an ACP launch target: it stays the one non-ACP adapter
+  (`OpenCodeAdapter`) until its own ACP route qualifies.
+- `session/update` kind mapping: `agent_message_chunk` -> answer text,
+  `agent_thought_chunk` -> reasoning (kept separate), `tool_call` /
+  `tool_call_update` -> tool activity, `plan` -> todo/plan. Correlation is on
+  the `sessionId` in the update envelope; a foreign session update cannot
+  mutate another session's state.
+
+No published external ACP SDK crate was fetched or vendored in this sandbox
+(no external registry access); the pin above is the protocol revision and
+method surface the native spine speaks. When a published ACP SDK is adopted on
+the implementation host, replace the `TARGET-pending-published-ACP-SDK` status
+with the exact SDK package name and version and reconcile it against this
+protocol revision.
+
