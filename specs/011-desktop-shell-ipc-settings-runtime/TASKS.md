@@ -69,7 +69,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T04 - IPC admission bounds and frame isolation
 
-- **Status:** PARTIAL (limit constants in `crates/operator-ipc/src/lib.rs`; eight-slot limit in both transports; missing: combined in-flight body bound and interleaving tests under concurrency)
+- **Status:** DONE (CODE, Linux unix transport; Windows transport shares the same `InFlightBodyBudget` and eight-slot semaphore but the Windows concurrency test is deferred to a native Windows runner, see T02). `crates/operator-ipc/tests/ipc_admission_bounds.rs` added; `connection_admission_is_bounded_and_releases_capacity_after_disconnect` covers the ninth peer.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Operator IPC
@@ -77,9 +77,9 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §7a IPC limits; AC-013
 - **Change intent:** Enforce `DEFAULT_MAX_IN_FLIGHT_BODY_BYTES` across connections with a typed backpressure error; test nine concurrent peers and bodies summing past 128 MiB; assert response frames never interleave.
 - **Acceptance:**
-  - [ ] Ninth concurrent request is held or rejected with the typed error, never accepted (AC-013).
-  - [ ] Combined bodies over 128 MiB are refused; memory stays bounded (AC-013).
-  - [ ] Each response correlates to its request_id with no interleaved bytes under 8 concurrent peers.
+  - [x] Ninth concurrent request is held or rejected with the typed error, never accepted (AC-013).
+  - [x] Combined bodies over 128 MiB are refused; memory stays bounded (AC-013).
+  - [x] Each response correlates to its request_id with no interleaved bytes under 8 concurrent peers.
 - **Command:** `cargo test -p operator-ipc --locked ipc_admission_bounds` (filter to be added by this task)
 - **Evidence:** test output in CURRENT-RUN.md.
 - **Stop:** stop if a bound can be exceeded under any interleaving.
