@@ -6,7 +6,7 @@ semantic correctness, implementation, integration or release qualification.
 
 - Files read: 352
 - Lines read: 71953
-- Bytes read: 6269019
+- Bytes read: 6269158
 - Broken relative targets: 0
 - Excluded: archives, reference clones, generated audit outputs, dependency/build/cache directories and local run worktrees.
 - Per-file SHA-256 values: V1-MARKDOWN-INVENTORY.csv
@@ -48,7 +48,7 @@ semantic correctness, implementation, integration or release qualification.
 | docs/CODING-COCKPIT-UI-SPEC.md | 113 | 51e4f0bbc4a5 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
 | docs/COMPETITIVE-RESEARCH.md | 991 | 229caf87e54b | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/COMPETITOR-PROMOTED-USE-CASES.md | 149 | 9a641a7bb366 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
-| docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md | 399 | 628f12ef42aa | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
+| docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md | 399 | 4911ce998d75 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 6212797fb13b | shell/settings/motion;workflow/recovery;trust/security |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 61c945321250 | agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security |
 | docs/CONTEXT.md | 272 | f80c31cda1a4 | agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security |
@@ -288,7 +288,7 @@ semantic correctness, implementation, integration or release qualification.
 | specs/012-conversation-coedit-take-control/contracts/ui-behavior.md | 42 | 77e97387ecc3 | agent/composer;shell/settings/motion;workflow/recovery;trust/security |
 | specs/013-litespm-package-lifecycle-bridge/DATA-MODEL.md | 60 | acb1bd00d771 | trust/security |
 | specs/013-litespm-package-lifecycle-bridge/PLAN.md | 105 | 119700441488 | shell/settings/motion;workflow/recovery;trust/security |
-| specs/013-litespm-package-lifecycle-bridge/README.md | 29 | 1f90e3ff3e6c | workflow/recovery;trust/security |
+| specs/013-litespm-package-lifecycle-bridge/README.md | 29 | f77ca03f6253 | workflow/recovery;trust/security |
 | specs/013-litespm-package-lifecycle-bridge/RESEARCH.md | 55 | 093934986fa5 | workflow/recovery;trust/security |
 | specs/013-litespm-package-lifecycle-bridge/SPEC.md | 323 | f62a5308f95a | agent/composer;shell/settings/motion;rendering;workflow/recovery;trust/security |
 | specs/013-litespm-package-lifecycle-bridge/TASKS.md | 418 | bf7327c36f93 | shell/settings/motion;workflow/recovery;trust/security |

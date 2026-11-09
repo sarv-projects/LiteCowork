@@ -32,7 +32,7 @@ docs/CHROME-BROWSER-LLD.md,181,19891,ba9613ca8f253f76a411a133b2ebfee7b6984e98a19
 docs/CODING-COCKPIT-UI-SPEC.md,113,8662,51e4f0bbc4a51dc24855fa1087e57b6d1e5a2aa084340de16ae5415ef7ebbd64,agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security,True
 docs/COMPETITIVE-RESEARCH.md,991,114678,229caf87e54be05cf9e84a155aafea61af422972528a839a502d881020c82b8f,agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security,True
 docs/COMPETITOR-PROMOTED-USE-CASES.md,149,13015,9a641a7bb366904f64b460b0c60bdf7bad2b5d2b6125ca32590c4135d42b925d,agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security,True
-docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md,399,30520,628f12ef42aa741f8106042e2e3993173f2103530057da930b3f1c6793efd204,agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security,True
+docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md,399,30520,4911ce998d754308ec3cbb07565d82369d3393c8c8aba2d3030d1d0b6dead447,agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security,True
 docs/CONNECTOR-FACTORY-DESIGN.md,139,10873,6212797fb13b160f0903abc4de79e18ea31f1ac2b2288db909191fcbe9459de5,shell/settings/motion;workflow/recovery;trust/security,True
 docs/CONNECTORS-WORKFLOWS.md,1020,50069,61c9453212502f757169fc1b9c7d9da0984ce9449cdd58c3260f5007eec1d026,agent/composer;browser/computer;shell/settings/motion;workflow/recovery;trust/security,True
 docs/CONTEXT.md,272,19955,f80c31cda1a4c7aa39031dd1bdf4f63c41bd33825b18ad43c3ef66684a593645,agent/composer;browser/computer;shell/settings/motion;rendering;workflow/recovery;trust/security,True
@@ -272,7 +272,7 @@ specs/012-conversation-coedit-take-control/contracts/errors-recovery.md,35,3311,
 specs/012-conversation-coedit-take-control/contracts/ui-behavior.md,42,4991,77e97387ecc31b984f01715f117daed95a9d601bba31c291133698e0cdfb37ac,agent/composer;shell/settings/motion;workflow/recovery;trust/security,True
 specs/013-litespm-package-lifecycle-bridge/DATA-MODEL.md,60,4391,acb1bd00d771d34d6e4db4b846a832ec4ffb67ef10a62d7e62fb6bc9fa946e84,trust/security,True
 specs/013-litespm-package-lifecycle-bridge/PLAN.md,105,6895,1197004414881e83ebd3d55d71eaee97195bd5dcd292ac0ad51510d3cd809496,shell/settings/motion;workflow/recovery;trust/security,True
-specs/013-litespm-package-lifecycle-bridge/README.md,29,3553,1f90e3ff3e6cb9837238db3e8f1cc9051f5c0505d3de6ec47129112ba0091777,workflow/recovery;trust/security,True
+specs/013-litespm-package-lifecycle-bridge/README.md,29,3692,f77ca03f625339531431e9ba944124bd4b9995a7cb3934d93cd8d842674d1bd0,workflow/recovery;trust/security,True
 specs/013-litespm-package-lifecycle-bridge/RESEARCH.md,55,8195,093934986fa58d96109d16088129112d79228dba391b62c8d870c91be61a1bdd,workflow/recovery;trust/security,True
 specs/013-litespm-package-lifecycle-bridge/SPEC.md,323,39818,f62a5308f95ae908920fa7c0c925cc5c9f095f86d925439af18ba867634c623a,agent/composer;shell/settings/motion;rendering;workflow/recovery;trust/security,True
 specs/013-litespm-package-lifecycle-bridge/TASKS.md,418,40168,bf7327c36f9346cca893081cc824ba04dcffe370817133bf9ee18292aac68568,shell/settings/motion;workflow/recovery;trust/security,True

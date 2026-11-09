@@ -11,7 +11,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 355
 - Included lines: 71944
-- Included bytes: 6265167
+- Included bytes: 6265306
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -310,7 +310,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/012-conversation-coedit-take-control/contracts/ui-behavior.md | 42 | 4991 | 77e97387ecc31b98 |
 | specs/013-litespm-package-lifecycle-bridge/DATA-MODEL.md | 60 | 4391 | acb1bd00d771d34d |
 | specs/013-litespm-package-lifecycle-bridge/PLAN.md | 105 | 6895 | 1197004414881e83 |
-| specs/013-litespm-package-lifecycle-bridge/README.md | 29 | 3553 | 1f90e3ff3e6cb983 |
+| specs/013-litespm-package-lifecycle-bridge/README.md | 29 | 3692 | f77ca03f62533953 |
 | specs/013-litespm-package-lifecycle-bridge/RESEARCH.md | 55 | 8195 | 093934986fa58d96 |
 | specs/013-litespm-package-lifecycle-bridge/SPEC.md | 323 | 39818 | f62a5308f95ae908 |
 | specs/013-litespm-package-lifecycle-bridge/TASKS.md | 418 | 40168 | bf7327c36f9346cc |

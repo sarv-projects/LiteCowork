@@ -275,7 +275,7 @@ specs/012-conversation-coedit-take-control/contracts/errors-recovery.md,35,3311,
 specs/012-conversation-coedit-take-control/contracts/ui-behavior.md,42,4991,77e97387ecc31b984f01715f117daed95a9d601bba31c291133698e0cdfb37ac
 specs/013-litespm-package-lifecycle-bridge/DATA-MODEL.md,60,4391,acb1bd00d771d34d6e4db4b846a832ec4ffb67ef10a62d7e62fb6bc9fa946e84
 specs/013-litespm-package-lifecycle-bridge/PLAN.md,105,6895,1197004414881e83ebd3d55d71eaee97195bd5dcd292ac0ad51510d3cd809496
-specs/013-litespm-package-lifecycle-bridge/README.md,29,3553,1f90e3ff3e6cb9837238db3e8f1cc9051f5c0505d3de6ec47129112ba0091777
+specs/013-litespm-package-lifecycle-bridge/README.md,29,3692,f77ca03f625339531431e9ba944124bd4b9995a7cb3934d93cd8d842674d1bd0
 specs/013-litespm-package-lifecycle-bridge/RESEARCH.md,55,8195,093934986fa58d96109d16088129112d79228dba391b62c8d870c91be61a1bdd
 specs/013-litespm-package-lifecycle-bridge/SPEC.md,323,39818,f62a5308f95ae908920fa7c0c925cc5c9f095f86d925439af18ba867634c623a
 specs/013-litespm-package-lifecycle-bridge/TASKS.md,418,40168,bf7327c36f9346cca893081cc824ba04dcffe370817133bf9ee18292aac68568
