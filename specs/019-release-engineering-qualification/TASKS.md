@@ -176,7 +176,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T10 - Linux x64 deb package with signed checksums
 
-- **Status:** PARTIAL - `run-tauri.mjs` defaults Linux to `deb` and refuses AppImage; `scripts/packaging/systemd/litecoworkd.service` exists (0700 StateDirectoryMode, UMask 0077) and is checked by `v1_packaging_check.py`; no checksum signing.
+- **Status:** PARTIAL (CODE): `bundle.linux.deb` in `tauri.conf.json` now declares `libwebkit2gtk-4.1-0` and `libgtk-3-0` dependencies and installs `litecoworkd.service` to `/usr/lib/systemd/system` with no maintainer script (so it ships disabled); `scripts/linux-release-checksums.sh` signs and verifies `SHA256SUMS` with a detached GPG signature; `scripts/qualify-linux-package.sh` has `inspect` (dpkg-deb static checks, harness-bundling refusal) and `install` (native root host only, container/WSL2 exit 3 BLOCKED); `tests/test_linux_package_scripts.py`. NOT verified here: no `dpkg-deb`, no `gpg-agent` and no built deb on this host, so the five signing tests are skipped and the qualify script was only run for its missing-file and shell paths; the `release.yml` signing job is not written (needs the B-43 key and T01). Install, READY, upgrade and remove on a native Ubuntu 24.04 desktop remain USER steps.
 - **Depends on:** T01, T02, T03
 - **Cross-package prerequisites:** Feature 011 Linux socket profile (see T07).
 - **Owner:** Release Engineering.
