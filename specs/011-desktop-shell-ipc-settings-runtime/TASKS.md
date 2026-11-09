@@ -344,7 +344,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T20 - Decompose App.tsx and the Rust god files behind existing boundaries (P-07 and P-19)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed tasks P-07 and P-19 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 (findings U-09, X-02) and docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package. No behavior change.
+- **Status:** PARTIAL (UI slice only; no behavior change; all UI tests unchanged except two source-string pins updated in earlier commits). DONE: one shared `src/shell/OperatorUnavailablePanel.tsx` replaces the six duplicated "Local Operator unavailable" page bodies (Coworkers, Notifications, Ideas, Routines, Discover, Automations); `LibraryPage` (752 lines) moved to `src/library/LibraryPage.tsx` with its helpers in `src/library/library-format.ts`; App.tsx went from 4,619 to 3,585 lines together with the SettingsPage deletion (T21). Guarded by two tests in `tests/shell-reachability.test.mjs`. NOT done: the HomePage and WorkPage extractions, the shell/ module, and the Rust decompositions of `operator.rs` (9.7k lines), `crates/storage-sqlite/src/lib.rs` (24k lines) and `src-tauri/src/lib.rs`: these are large mechanical moves whose verification needs the full Rust test suites and the src-tauri build (not possible here), so they were deliberately not started
 - **Depends on:** T06
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI, Agent Runtime, Storage.

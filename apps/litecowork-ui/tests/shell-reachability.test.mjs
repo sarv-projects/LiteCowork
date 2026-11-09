@@ -57,3 +57,13 @@ test("every Page is reachable from the rendered sidebar or a documented in-page 
     assert.ok(direct.has(page) || inPage.has(page), `${page} is not reachable from the sidebar`);
   }
 });
+
+test("App.tsx has no duplicated Operator-unavailable page bodies; one shared panel is used (011-T20)", () => {
+  assert.doesNotMatch(app, /<h2>Local Operator unavailable<\/h2>/);
+  assert.ok((app.match(/<OperatorUnavailablePanel\b/g) ?? []).length >= 6);
+});
+
+test("LibraryPage lives in its own module and App imports it", () => {
+  assert.doesNotMatch(app, /\nfunction LibraryPage\(/);
+  assert.match(app, /import \{ LibraryPage \} from "\.\/library\/LibraryPage"/);
+});
