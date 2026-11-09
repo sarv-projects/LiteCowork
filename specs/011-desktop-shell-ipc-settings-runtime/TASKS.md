@@ -207,7 +207,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T12 - Keep-awake power assertion
 
-- **Status:** PARTIAL (CODE, not wired). The prerequisite definition of "work runs" now exists (admitted Conversation turns and non-terminal Attempts from `RuntimeLifecycleStore::read_runtime_stop_observation`, 011-T13 prerequisite). DONE: `apps/litecoworkd/src/power_assertion.rs` state machine (HELD only after the backend confirms; an OS refusal or failed release is UNKNOWN; selecting a mode never reports HELD; `WHILE_WORK_RUNS_ON_POWER` is UNSUPPORTED and unselectable when the power source cannot be read; an unavailable provider is UNSUPPORTED; drain clears the mode and releases before STOPPING) with 9 unit tests (8 over a fake backend, 1 over the real Linux `systemd-inhibit` backend which accepts Held or Unknown), and the Linux `systemd-inhibit` child backend. NOT done: wiring the poll and drain hook into `runtime.rs`, publishing `RuntimeLifecycleView.power_assertion`, the Settings Advanced UI and `tests/keep-awake.test.mjs`, the Windows `PowerCreateRequest` backend (native Windows runner), and any `systemd-inhibit --list` capture (this container has no logind, so HELD was never observed on a real OS)
+- **Status:** PARTIAL (CODE, not wired). The prerequisite definition of "work runs" now exists (admitted Conversation turns and non-terminal Attempts from `RuntimeLifecycleStore::read_runtime_stop_observation`, T13 prerequisite). DONE: `apps/litecoworkd/src/power_assertion.rs` state machine (HELD only after the backend confirms; an OS refusal or failed release is UNKNOWN; selecting a mode never reports HELD; `WHILE_WORK_RUNS_ON_POWER` is UNSUPPORTED and unselectable when the power source cannot be read; an unavailable provider is UNSUPPORTED; drain clears the mode and releases before STOPPING) with 9 unit tests (8 over a fake backend, 1 over the real Linux `systemd-inhibit` backend which accepts Held or Unknown), and the Linux `systemd-inhibit` child backend. NOT done: wiring the poll and drain hook into `runtime.rs`, publishing `RuntimeLifecycleView.power_assertion`, the Settings Advanced UI and `tests/keep-awake.test.mjs`, the Windows `PowerCreateRequest` backend (native Windows runner), and any `systemd-inhibit --list` capture (this container has no logind, so HELD was never observed on a real OS)
 - **Depends on:** T01
 - **Cross-package prerequisites:** Feature 001 admitted-turn state and Feature 005 admitted-Attempt state (definition of "work runs").
 - **Owner:** Runtime, native desktop bridge
@@ -278,7 +278,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T16 - Cross-layer traces for shell and Settings operations
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL. The trace table is in `contracts/ui-behavior.md` ("Cross-layer traces (T16)") with symbols checked against source on 2026-11-10; it lists three gaps instead of documenting them as present (keep-awake wiring and UI, Stop safely, update check and install commands). The Settings controls of SettingsView and AgentCatalogSettings each map to a Tauri command or a local effect. Not done: WIRING.yaml edge updates and `docs/SEMANTIC-SERVED-UI-MAP.md` rows for the new stop-preview and dashboard sources
 - **Depends on:** T07-T12, T14
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI, Runtime, Operator IPC

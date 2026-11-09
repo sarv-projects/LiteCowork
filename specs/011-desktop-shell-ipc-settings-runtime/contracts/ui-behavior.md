@@ -46,3 +46,27 @@ Cover empty, stale, offline, denied, stale version, unsupported OS, unqualified 
 | Transport status | Settings > Runtime | Always | "Local IPC (named pipe)" on Windows, "Local IPC (socket)" on Linux; never "Localhost" |
 
 Keyboard baseline (app-wide): primary navigation, New Chat, Conversation composer, Workbench and Settings are reachable with Tab/Shift+Tab; drawers and dialogs trap focus and return it on close; Escape closes the topmost drawer or dialog; focus is always visible.
+
+## Cross-layer traces (011-T16)
+
+Symbols below were checked against the source on 2026-11-10. "Unverified Tauri" means the command exists in `apps/litecowork-ui/src-tauri/src` but `src-tauri` cannot be compiled in the Linux container (gdk-3.0 missing), so only its pure decoder or its source text was reviewed. A control row without an evidence test is a gap, listed in the last section.
+
+| Operation | Control (`data-control-id`) | Tauri command | Operator route | Authorization and fence | Receipt and recovery | Evidence |
+|---|---|---|---|---|---|---|
+| Start Runtime | `runtime-start` | `start_local_runtime` (`lib.rs`) | none (spawns `litecoworkd`) | OS user; single-instance lock in the daemon | `get_runtime_status` observation; restart yields a new incarnation | `tests/runtime-start-readiness.test.ts`, daemon `runtime_process_tests` |
+| Refresh health | `runtime-refresh` | `get_runtime_status`, `get_runtime_lifecycle` (`runtime_lifecycle_bridge.rs`) | `GET /v1/runtime-lifecycle` | authenticated IPC peer; exact current incarnation or 503 | decoder rejects foreign identity | `tests/settings-runtime-health.test.mjs`, bridge decoder tests, `operator_ipc_tests` |
+| Rename Workspace | `workspaces-rename-submit` | `rename_workspace` (unverified Tauri) | `PUT /v1/workspaces/{workspace_id}/name` | `If-Match` workspace version, `Idempotency-Key` | `workspace.renamed.v1`; conflict shows latest | `workspace_rename_operator_tests`, `workspace-rename` UI tests |
+| Archive Workspace | `workspaces-archive-confirm` | `archive_workspace` (`lib.rs`) | Workspace archive route (`workspace_archive_routes`) | two-step confirm; expected version | read-only after receipt | `workspace_archive` storage tests, `settings-accessibility.test.mjs` |
+| Change a local preference | `pref-theme`, `pref-density`, `pref-text-scale`, `pref-reduced-motion` | none (local) | none | webview localStorage, validated | applied at document root; corrupt value falls back | `tests/local-preferences.test.mjs` |
+| Keep-awake | none yet | none yet | none yet (`RuntimeLifecycleView.power_assertion` not published) | n/a | `apps/litecoworkd/src/power_assertion.rs` state machine only | 9 unit tests; GAP: not wired |
+| Preview stop | `runtime-stop-preview` | `get_runtime_stop_preview` (unverified Tauri) | `GET /v1/runtime-lifecycle/stop-preview` | authenticated IPC; exact incarnation | verdict BLOCKED or UNKNOWN today, never QUIESCENT | `runtime_stop_operator` tests, IPC test, `tests/runtime-stop-update.test.mjs` |
+| Stop safely | none (text only) | none | `POST /v1/runtime-lifecycle/stop` is NOT mounted | n/a | n/a | GAP: 011-T13 request half blocked by 001/005/008 hooks |
+| Check update quiescence | none (called by Feature 019 `install_update`) | `check_update_quiescence` (unverified Tauri) | `GET /v1/runtime-lifecycle/stop-preview` | same | `PositiveQuiescence` only on a clean QUIESCENT preview | bridge decoder tests |
+| Update check and install | `UpdatePanel` (not mounted) | `check_for_update`, `install_update` do not exist | none | n/a | n/a | GAP: Feature 019 T11, B-43 |
+| Agents: refresh, probe, bind, enable, disable, set default | `agent-catalog-refresh`, `agent-probe-codex`, `agent-probe-opencode`, `agent-binding-create`, `agent-binding-enable`, `agent-binding-disable`, `agent-binding-set-default`, `agent-default-clear-confirm` | `list_agent_installations`, `probe_agent_profile`, `create_agent_binding`, `enable_agent_binding`, `disable_agent_binding`, `set_workspace_default_agent_binding` (`lib.rs`) | `/v1/agent-profiles/probe` and the agent binding routes in `operator.rs` | Feature 002 owns authorization and versions | pending/receipt/error states | `tests/agent-catalog-control-map.test.mjs`, `agent-catalog-action-states.test.mjs`, `agent-catalog-settings.test.mjs` |
+| Agents: registry | `agent-registry-refresh`, `agent-registry-search-submit`, `agent-registry-load-more` | `refresh_agent_registry`, `list_agent_registry` (`agent_registry_bridge.rs`) | Agent registry routes | Feature 002 | stale cache labelled | `agent-catalog-settings.test.mjs` |
+| Runtime enrollment | `runtime-enroll`, `runtime-enrollment-refresh` | `enroll_local_runtime`, `list_workspace_runtime_bindings` (`lib.rs`) | `.../runtime-bindings/local-enrollment`, `.../runtime-bindings` | local principal | binding status shown | `tests/settings-merge.test.mjs` |
+| Workspace instructions | `workspaces-instructions-save`, `workspaces-instructions-use-latest` | `create_workspace_instruction_revision` (`lib.rs`) | workspace instruction revision routes | expected revision; conflict returns latest | "Use this version" | `tests/settings-merge.test.mjs`, `workspace_instruction_bridge_tests` |
+| Notifications link | `notifications-open` | none | none | n/a | navigates to the Notifications page | `settings-inert-control-audit.test.mjs` |
+
+Open gaps recorded instead of documented as present: keep-awake wiring and UI, Stop safely, update check and install commands, and a browser run of any control above.
