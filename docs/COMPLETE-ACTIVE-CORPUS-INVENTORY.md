@@ -9,9 +9,9 @@ This is an inventory, not proof that every sentence is correct, implemented,
 integrated or qualified. The authority chain is in docs/README.md. Current source
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
-- Included files: 270
-- Included lines: 57519
-- Included bytes: 4609845
+- Included files: 271
+- Included lines: 57604
+- Included bytes: 4623954
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,7 +25,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 130 | 46934 |
+| docs/ | 131 | 47019 |
 | repository root | 6 | 1549 |
 | scripts/ | 1 | 14 |
 | specs/ | 121 | 8242 |
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 60 | 3726 | aa800aa8fda07635 |
-| CURRENT-RUN.md | 201 | 26331 | e04a2a62b5d146f3 |
+| CURRENT-RUN.md | 201 | 26331 | 11e72afdc952378d |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 75 | 6169 | 3ecd058f34d1ee80 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -79,7 +79,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13592 | ee72608328aca956 |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13592 | 5267b44edb084b30 |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 927 | 69198 | f6753a21cfcfe5eb |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
@@ -88,7 +88,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 297 | 58573 | 19135097bfba6229 |
+| docs/IMPLEMENTATION-STATUS.md | 297 | 58573 | e92bc9aa5d93f68a |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -102,6 +102,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/NETWORK-SECURITY.md | 312 | 21908 | 03145de8b91e6486 |
 | docs/OBSERVABILITY.md | 262 | 12291 | 3192bfcda6340d0a |
 | docs/OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md | 279 | 29919 | 2bf520dce2718a2e |
+| docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md | 85 | 14109 | 56ee31bcc4f4b872 |
 | docs/PRESENTATION-RUNTIME.md | 533 | 31633 | 4003073b58c690de |
 | docs/PRODUCT-CONTRACT-INDEX.md | 38 | 6373 | 265eef23bbd47c0f |
 | docs/PRODUCT-STRATEGY.md | 113 | 10724 | 8e39b7022710cfef |
