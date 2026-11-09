@@ -188,12 +188,12 @@ Folded tasks (owner-accepted 2026-11-09, register A-55) land in the wave of thei
 
 ## Migration allocation (provisional)
 
-The wired schema is v27 and `docs/schemas/sqlite-v28.sql` exists but is unwired (register A-40). Many packages wrote "sqlite-v29.sql or the next free number" and Feature 012 named v30, so the numbers collide. This table assigns numbers in wave merge order. Rules: the first package to bump `SCHEMA_VERSION` also wires v28, because migrations apply in order; a package that merges out of order takes the next free number and updates this table in the same change; a merged migration is never renumbered or edited.
+The wired schema is v29: v28 (register A-40) and v29 (Feature 001 durable turn) are applied by `crates/storage-sqlite/src/lib.rs`. Many packages wrote "sqlite-v29.sql or the next free number" and Feature 012 named v30, so the numbers collide. This table assigns numbers in wave merge order. Rules: the first package to bump `SCHEMA_VERSION` also wires v28, because migrations apply in order; a package that merges out of order takes the next free number and updates this table in the same change; a merged migration is never renumbered or edited.
 
 | Migration | Package and task | Content (from the package DATA-MODEL) |
 |---|---|---|
-| v28 (existing) | first migration-bearing merge, planned 001 | Workspace delegation settings revisions (A-40) |
-| v29 | 001 (W1) | Dispatch outbox, single-flight index, commit identity fields, usage records |
+| v28 (existing) | wired by 001 (done) | Workspace delegation settings revisions (A-40) |
+| v29 (wired) | 001 (W1, done) | Dispatch outbox, single-flight triggers, commit identity table, usage records |
 | v30, v31 | 002-T04, 002-T07 (W1) | Runtime-local descriptor store; auth observations |
 | v32 | 003-T09 (W1) | `context_attachments`, `retrieval_receipts` |
 | v33 | 014 (W1) | Conversation status columns, search index, deletion tombstone and purge manifest |

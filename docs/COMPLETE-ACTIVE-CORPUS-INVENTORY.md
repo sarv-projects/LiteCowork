@@ -11,7 +11,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 364
 - Included lines: 72586
-- Included bytes: 6385596
+- Included bytes: 6385626
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -124,7 +124,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/ROUTINES.md | 255 | 14453 | 8666756d7d03ddad |
 | docs/RUNTIME-LIFECYCLE.md | 616 | 46153 | 5acb500a4dfdaf31 |
 | docs/RUNTIME-MESH.md | 744 | 36915 | 5df0580b7369d59d |
-| docs/SCHEMAS.md | 1631 | 73970 | 4f37f8f538768078 |
+| docs/SCHEMAS.md | 1631 | 74000 | b33cf6312eae963e |
 | docs/SECURITY.md | 299 | 17184 | 77bdfeb2b19ebbfa |
 | docs/SEMANTIC-SERVED-UI-MAP.md | 184 | 30911 | 9c7a8da909e9a75c |
 | docs/SERVICES.md | 1582 | 101551 | 43c93b0fb23f464f |

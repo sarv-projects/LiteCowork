@@ -1592,3 +1592,75 @@ async fn conversation_turn_submit_returns_accepted_receipt_with_active_session_s
     assert_eq!(replay_receipt.conversation_id, receipt.conversation_id);
     assert_eq!(replay_receipt.user_message_id, receipt.user_message_id);
 }
+
+fn single_flight_rows(connection: &rusqlite::Connection) -> (i64, i64, i64, i64) {
+    connection
+        .query_row(
+            "SELECT (SELECT COUNT(*) FROM conversation_messages),(SELECT COUNT(*) FROM conversation_turns),(SELECT COUNT(*) FROM domain_events),(SELECT COUNT(*) FROM request_dedup)",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .expect("read single-flight row counts")
+}
+
+#[tokio::test]
+async fn conversation_turn_submit_returns_409_while_another_turn_is_in_flight_and_writes_nothing() {
+    let directory = tempfile::tempdir().expect("temporary single-flight directory");
+    #[cfg(unix)]
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+        .expect("private test directory");
+    let database = directory.path().join("state.sqlite3");
+    let store = SqliteWorkspaceStore::open(
+        database.clone(),
+        Arc::new(FileBlobStore::new(
+            directory.path().join("blobs"),
+            PaginationTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("real temporary SQLite store opens");
+    create_workspace(&store, WORKSPACE_A, "turn-single-flight-workspace");
+    let conversation_id = "a06-conversation-single-flight";
+    let binding_id = "single-flight-binding";
+    seed_conversation(
+        &store,
+        WORKSPACE_A,
+        conversation_id,
+        "Single flight",
+        "2026-10-15T12:00:00.000000000Z",
+    );
+    bind_conversation_agent(&database, WORKSPACE_A, conversation_id, binding_id);
+    seed_ready_runtime_for_conversation(&database, WORKSPACE_A, binding_id);
+    let connection = rusqlite::Connection::open(&database).expect("open seeded database");
+    connection
+        .execute(
+            "INSERT INTO conversation_messages(message_id,conversation_id,author_json,role,agent_session_id,agent_binding_id,turn_id,content_json,resource_refs_json,source_channel_ref_json,created_at) VALUES('seeded-user-message',?1,'{\"kind\":\"USER\"}','USER',NULL,NULL,NULL,'[]','[]',NULL,'2026-10-15T12:00:01Z')",
+            [conversation_id],
+        )
+        .expect("seed the in-flight turn message");
+    connection
+        .execute(
+            "INSERT INTO conversation_turns(turn_id,conversation_id,user_message_id,agent_session_id,status,retry_ordinal,created_at,settled_at,version) VALUES('seeded-turn',?1,'seeded-user-message',NULL,'WAITING_USER',0,'2026-10-15T12:00:01Z',NULL,1)",
+            [conversation_id],
+        )
+        .expect("seed the in-flight turn");
+    let before = single_flight_rows(&connection);
+
+    let router = test_router(store.clone(), OWNER.to_owned(), RUNTIME.to_owned());
+    let response = submit_turn_body_with_key(
+        &router,
+        WORKSPACE_A,
+        conversation_id,
+        "single-flight-second-submit",
+        r#"{"content":[{"kind":"TEXT","text":"A second message while one is running."}],"resource_refs":[],"agent_binding_id":null,"presentation_preference":"AUTO"}"#,
+    )
+    .await;
+    let (status, error) = read_operator_error(response).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(error["code"], "CONVERSATION_TURN_IN_PROGRESS");
+    let after = single_flight_rows(&connection);
+    assert_eq!(after, before, "the rejected submit writes nothing");
+}

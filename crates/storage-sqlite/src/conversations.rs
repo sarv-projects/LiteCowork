@@ -454,6 +454,18 @@ impl ConversationTurnStore for SqliteConversationStore {
             let Some((title, version, created_at, conversation_binding)) = conversation else {
                 return Err(StoreError::NotFound);
             };
+            // Strict single-flight lane (B-01): the receipt lookup above already replayed an
+            // exact repeat, so any nonterminal turn here belongs to a different request.
+            let turn_in_flight: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversation_turns WHERE conversation_id=?1 AND status IN ('OPEN','RUNNING','WAITING_USER','WAITING_DEPENDENCY','CANCEL_REQUESTED'))",
+                    params![commit.turn.conversation_id],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if turn_in_flight {
+                return Err(StoreError::Invalid(CONVERSATION_TURN_IN_PROGRESS.to_owned()));
+            }
             // The Conversation's admitted AgentBinding selection is resolved inside
             // this authoritative transaction: the explicit Conversation override
             // first, then the Workspace default. The first configured selection is
@@ -519,6 +531,13 @@ impl ConversationTurnStore for SqliteConversationStore {
                         .and_then(|v| v.as_str().map(str::to_owned))
                         .ok_or_else(|| StoreError::Invalid("invalid presentation preference".to_owned()))?
                 ],
+            )
+            .map_err(map_database_error)?;
+            // The dispatch intent commits atomically with the turn so a crash between
+            // admission and dispatch leaves a durable UNCLAIMED row for the startup sweep.
+            tx.execute(
+                "INSERT INTO conversation_dispatch_intents(turn_id,retry_ordinal,conversation_id,state,created_at) VALUES(?1,0,?2,'UNCLAIMED',?3)",
+                params![commit.turn.turn_id, commit.turn.conversation_id, commit.turn.created_at],
             )
             .map_err(map_database_error)?;
             tx.execute(
@@ -595,6 +614,86 @@ impl ConversationTurnStore for SqliteConversationStore {
         })
     }
 
+    fn claim_conversation_dispatch_intent(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+        runtime_incarnation_id: &str,
+        claimed_at: &str,
+    ) -> Result<bool, StoreError> {
+        if turn_id.trim().is_empty() || runtime_incarnation_id.trim().is_empty() {
+            return Err(StoreError::Invalid(
+                "Conversation dispatch claim identity is invalid".to_owned(),
+            ));
+        }
+        let claimed_at = canonicalize_utc_timestamp(claimed_at)?;
+        let (turn_id, incarnation) = (turn_id.to_owned(), runtime_incarnation_id.to_owned());
+        self.run(move |connection| {
+            let changed = connection
+                .execute(
+                    "UPDATE conversation_dispatch_intents SET state='CLAIMED', claimed_by_runtime_incarnation=?1, claimed_at=?2, version=version+1 WHERE turn_id=?3 AND retry_ordinal=?4 AND state='UNCLAIMED'",
+                    params![incarnation, claimed_at, turn_id, i64::from(retry_ordinal)],
+                )
+                .map_err(map_database_error)?;
+            Ok(changed == 1)
+        })
+    }
+
+    fn release_conversation_dispatch_intent(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+    ) -> Result<bool, StoreError> {
+        if turn_id.trim().is_empty() {
+            return Err(StoreError::Invalid(
+                "Conversation dispatch release identity is invalid".to_owned(),
+            ));
+        }
+        let turn_id = turn_id.to_owned();
+        self.run(move |connection| {
+            let changed = connection
+                .execute(
+                    "UPDATE conversation_dispatch_intents SET state='UNCLAIMED', claimed_by_runtime_incarnation=NULL, claimed_at=NULL, version=version+1 WHERE turn_id=?1 AND retry_ordinal=?2 AND state='CLAIMED'",
+                    params![turn_id, i64::from(retry_ordinal)],
+                )
+                .map_err(map_database_error)?;
+            Ok(changed == 1)
+        })
+    }
+
+    fn list_conversation_dispatch_intents(
+        &self,
+        state: ConversationDispatchState,
+        limit: usize,
+    ) -> Result<Vec<ConversationDispatchIntent>, StoreError> {
+        if !(1..=1024).contains(&limit) {
+            return Err(StoreError::Invalid(
+                "Conversation dispatch intent page size is invalid".to_owned(),
+            ));
+        }
+        self.run(move |connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT c.workspace_id,i.conversation_id,i.turn_id,i.retry_ordinal,i.state,i.claimed_by_runtime_incarnation,i.created_at FROM conversation_dispatch_intents i JOIN conversations c ON c.conversation_id=i.conversation_id WHERE i.state=?1 ORDER BY i.created_at,i.turn_id,i.retry_ordinal LIMIT ?2",
+                )
+                .map_err(map_database_error)?;
+            let rows = statement
+                .query_map(params![state.as_str(), limit as i64], |row| {
+                    Ok(ConversationDispatchIntent {
+                        workspace_id: row.get(0)?,
+                        conversation_id: row.get(1)?,
+                        turn_id: row.get(2)?,
+                        retry_ordinal: u32::try_from(row.get::<_, i64>(3)?).unwrap_or(u32::MAX),
+                        state,
+                        claimed_by_runtime_incarnation: row.get(5)?,
+                        created_at: row.get(6)?,
+                    })
+                })
+                .map_err(map_database_error)?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(map_database_error)
+        })
+    }
+
     fn commit_conversation_agent_response(
         &self,
         mut commit: CommitConversationAgentResponse,
@@ -608,6 +707,7 @@ impl ConversationTurnStore for SqliteConversationStore {
             || !valid_identity(&commit.turn_id)
             || !valid_identity(&commit.agent_session_id)
             || !valid_identity(&commit.message.message_id)
+            || !valid_identity(&commit.provider_response_id)
             || commit.expected_turn_version == 0
             || commit.expected_session_version == 0
         {
@@ -689,6 +789,39 @@ impl ConversationTurnStore for SqliteConversationStore {
                 return Err(StoreError::NotFound);
             };
 
+            // 2b. Final-response identity (B-04): (turn, retry ordinal, provider response).
+            // An exact repeat replays the stored receipt even after the turn has moved on;
+            // any other repeat of the same (turn, retry ordinal) is rejected before any write.
+            let content_digest = digest(&canonical_json(&commit.message.content)?);
+            let stored_identity: Option<(String, String, String)> = tx
+                .query_row(
+                    "SELECT provider_response_id,content_digest,receipt_request_id FROM conversation_response_commits WHERE turn_id=?1 AND retry_ordinal=?2",
+                    params![commit.turn_id, i64::from(commit.retry_ordinal)],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .optional()
+                .map_err(map_database_error)?;
+            if let Some((stored_response_id, stored_digest, stored_request_id)) = stored_identity {
+                if stored_response_id != commit.provider_response_id || stored_digest != content_digest {
+                    return Err(StoreError::Invalid(CONVERSATION_RESPONSE_IDENTITY_CONFLICT.to_owned()));
+                }
+                let stored: Option<String> = tx
+                    .query_row(
+                        "SELECT response_json FROM request_dedup WHERE principal_id=?1 AND request_id=?2",
+                        params![principal, stored_request_id],
+                        |row| row.get(0),
+                    )
+                    .optional()
+                    .map_err(map_database_error)?;
+                let stored = stored.ok_or_else(|| {
+                    StoreError::Integrity("Conversation response commit has no stored receipt".to_owned())
+                })?;
+                let replay: CommittedConversationAgentResponse = serde_json::from_str(&stored)
+                    .map_err(|error| StoreError::Integrity(error.to_string()))?;
+                tx.commit().map_err(map_database_error)?;
+                return Ok(replay);
+            }
+
             // 3. Verify turn exists and is RUNNING with expected_turn_version
             let current_turn = load_turn(&tx, &commit.workspace_id, &commit.conversation_id, &commit.turn_id)?
                 .ok_or(StoreError::NotFound)?;
@@ -701,6 +834,11 @@ impl ConversationTurnStore for SqliteConversationStore {
             if current_turn.status != ConversationTurnStatus::Running {
                 return Err(StoreError::Invalid(
                     format!("ConversationTurn is not RUNNING (status: {:?})", current_turn.status),
+                ));
+            }
+            if current_turn.retry_ordinal != commit.retry_ordinal {
+                return Err(StoreError::Invalid(
+                    "ConversationTurn retry ordinal does not match commit".to_owned(),
                 ));
             }
             if current_turn.agent_session_id.as_deref() != Some(commit.agent_session_id.as_str()) {
@@ -729,6 +867,20 @@ impl ConversationTurnStore for SqliteConversationStore {
             {
                 return Err(StoreError::Invalid(
                     "AgentSession scope does not match committed turn".to_owned(),
+                ));
+            }
+
+            // 4b. The final message must be authored by the AgentBinding this session
+            // was pinned to, in this Conversation; the caller cannot attribute it elsewhere.
+            let expected_author = serde_json::json!({
+                "kind": "AGENT",
+                "agent_binding_id": current_session.agent_binding_id,
+            });
+            if commit.message.author != expected_author
+                || commit.message.conversation_id != commit.conversation_id
+            {
+                return Err(StoreError::Invalid(
+                    "Conversation response author does not match the turn-pinned AgentBinding".to_owned(),
                 ));
             }
 
@@ -772,6 +924,20 @@ impl ConversationTurnStore for SqliteConversationStore {
             )
             .map_err(map_database_error)?;
 
+            tx.execute(
+                "INSERT INTO conversation_response_commits(turn_id,retry_ordinal,provider_response_id,content_digest,message_id,receipt_request_id,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+                params![
+                    commit.turn_id,
+                    i64::from(commit.retry_ordinal),
+                    commit.provider_response_id,
+                    content_digest,
+                    commit.message.message_id,
+                    commit.request.request_id,
+                    commit.message.created_at,
+                ],
+            )
+            .map_err(map_database_error)?;
+
             // 8. Settle conversation turn
             let turn_status_db_str = match commit.turn_status {
                 ConversationTurnStatus::Completed => "COMPLETED",
@@ -799,6 +965,38 @@ impl ConversationTurnStore for SqliteConversationStore {
                     actual: None,
                 });
             }
+
+            // 8b. Settle the dispatch intent and record the turn usage (B-10).
+            tx.execute(
+                "UPDATE conversation_dispatch_intents SET state='SETTLED', settled_at=?1, version=version+1 WHERE turn_id=?2 AND retry_ordinal=?3 AND state<>'SETTLED'",
+                params![commit.message.created_at, commit.turn_id, i64::from(commit.retry_ordinal)],
+            )
+            .map_err(map_database_error)?;
+            let (attribution, input_tokens, output_tokens) = match commit.usage {
+                Some(usage) => (
+                    match usage.attribution_source {
+                        storage_core::conversation::UsageAttributionSource::ProviderReported => "PROVIDER_REPORTED",
+                        storage_core::conversation::UsageAttributionSource::EstimatedLocal => "ESTIMATED_LOCAL",
+                    },
+                    Some(to_sql_i64(usage.input_tokens, "input tokens")?),
+                    Some(to_sql_i64(usage.output_tokens, "output tokens")?),
+                ),
+                None => ("UNKNOWN", None, None),
+            };
+            tx.execute(
+                "INSERT INTO conversation_turn_usage_records(usage_id,turn_id,retry_ordinal,conversation_id,attribution_source,input_tokens,output_tokens,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+                params![
+                    format!("usage-{}-{}", commit.turn_id, commit.retry_ordinal),
+                    commit.turn_id,
+                    i64::from(commit.retry_ordinal),
+                    commit.conversation_id,
+                    attribution,
+                    input_tokens,
+                    output_tokens,
+                    commit.message.created_at,
+                ],
+            )
+            .map_err(map_database_error)?;
 
             // 9. Close agent session
             let session_closed = tx.execute(
@@ -1183,6 +1381,13 @@ impl ConversationTurnStore for SqliteConversationStore {
             ).map_err(map_database_error)?;
             if updated != 1 {
                 return Err(StoreError::Conflict { expected: Some(expected_version), actual: None });
+            }
+            if next.status.is_terminal() {
+                // A settled attempt owes no further dispatch (outbox state SETTLED).
+                tx.execute(
+                    "UPDATE conversation_dispatch_intents SET state='SETTLED', settled_at=?1, version=version+1 WHERE turn_id=?2 AND retry_ordinal=?3 AND state<>'SETTLED'",
+                    params![next.settled_at, id, i64::from(current.retry_ordinal)],
+                ).map_err(map_database_error)?;
             }
             insert_domain_event(&tx, &event, &state_ref)?;
             tx.commit().map_err(map_database_error)?;

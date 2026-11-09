@@ -1088,31 +1088,39 @@ Artifact reference becomes visible. Expired temporary chunks are garbage-collect
   Task once and then becomes immutable. No AutomationOccurrence or AutomationCursor is
   written, and the database triggers refuse a test Task that also carries occurrence
   provenance or points at an unlinked reservation with different Workspace/Routine pins.
-- migration 28 is **defined but not yet wired** (register A-40): `schemas/sqlite-v28.sql`
-  exists, but `crates/storage-sqlite/src/lib.rs` keeps `SCHEMA_VERSION = 27` and includes
-  migrations only through `sqlite-v27.sql`, so v28 never applies and a database already at
-  `user_version` 28 is rejected as unsupported. Until v28 is wired (`include_str!` plus
-  `SCHEMA_VERSION = 28`), the delegation-settings persistence it describes does not exist
-  and the delegation-settings route family remains target-only. The target shape, when
-  wired, adds immutable `workspace_delegation_settings_revisions`, the Workspace
-  settings head, Coworker `delegation_policy_source`, exact per-profile
-  `worker_model_selection_policy`, and nullable `task_spec_revisions.delegation_policy_snapshot_json`.
-  Existing Workspaces receive deterministic revision 1 with `NATIVE_DEFAULT` and
-  `AGENT_DEFAULT`; its worker-profile ceiling captures the then-enabled profiles at
-  exact immutable revisions so existing Coworker overrides remain bounded. Existing
-  Coworker revisions migrate as `COWORKER_OVERRIDE`, preserving their current strategy
-  and profile IDs. Legacy TaskSpec rows stay NULL; no past policy is invented. New Task
-  admissions and new TaskSpec revisions must write a server-resolved immutable snapshot
-  and a matching `task.delegation.policy.pinned.v1` event. The migration does not append
-  fabricated user-authored setting events or change active Attempts. Its source file is
-  `schemas/sqlite-v28.sql`, which remains unwired per the note above.
+- migration 28 is wired (register A-40, resolved). `schemas/sqlite-v28.sql` adds immutable
+  `workspace_delegation_settings_revisions`, the Workspace settings head, Coworker
+  `delegation_policy_source`, exact per-profile `worker_model_selection_policy`, and
+  `task_spec_revisions.delegation_policy_snapshot_json`. Existing Workspaces receive
+  deterministic revision 1 with `NATIVE_DEFAULT` and `AGENT_DEFAULT`; its worker-profile
+  ceiling captures the then-enabled profiles at exact immutable revisions so existing
+  Coworker overrides remain bounded. Existing Coworker revisions migrate as
+  `COWORKER_OVERRIDE`, preserving their current strategy and profile IDs. Legacy TaskSpec
+  rows stay NULL; no past policy is invented. A database trigger now refuses a new
+  TaskSpec revision without a valid snapshot, and the TaskSpec writers in
+  `crates/storage-sqlite/src/lib.rs` resolve it server-side from the Workspace's current
+  settings revision. The migration does not append fabricated user-authored setting events
+  or change active Attempts. The delegation-settings route family and the matching
+  `task.delegation.policy.pinned.v1` event are still target-only.
+- migration 29 (`schemas/sqlite-v29.sql`, Feature 001) adds the Conversation durable turn
+  tables: `conversation_dispatch_intents` (the dispatch outbox; states UNCLAIMED, CLAIMED,
+  SETTLED; claimed by compare-and-swap; never deleted), `conversation_response_commits`
+  (the final-response identity `(turn_id, retry_ordinal)` with provider response id, content
+  digest, message id and the receipt request id; immutable) and
+  `conversation_turn_usage_records` (attribution `PROVIDER_REPORTED`, `ESTIMATED_LOCAL` or
+  `UNKNOWN`; immutable). It also adds triggers that enforce the strict single-flight lane:
+  a new turn, or a terminal turn re-opened by Retry, is refused with
+  `CONVERSATION_TURN_IN_PROGRESS` while another turn of the Conversation is OPEN, RUNNING,
+  WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED. Triggers are used instead of a
+  partial unique index so a database holding legacy duplicate nonterminal turns still
+  migrates. OPEN turns without a session at migration time receive an UNCLAIMED intent.
 - each applied migration records a SHA-256 checksum of its exact embedded SQL bytes and
   the schema-object fingerprint at that migration boundary. Reopening verifies every
   recorded migration name/source checksum and compares the active schema version's
   fingerprint with the current non-internal `sqlite_master` objects; historical
   fingerprints are retained because later migrations intentionally add schema objects.
-  The current wired schema version is 27, so the v27 fingerprint is checked against the full
-  current schema; v28 is not yet applied (register A-40). Missing migration records, changed
+  The current wired schema version is 29, so the v29 fingerprint is checked against the full
+  current schema. Missing migration records, changed
   source checksums, or changed current schema fail closed.
 - a clean install applies migration 1, writes its migration row, and advances
   `PRAGMA user_version` in one transaction. A crash leaves either the old schema/version

@@ -1001,8 +1001,8 @@ fn seed_environment_dependencies(store: &SqliteWorkspaceStore, directory: &tempf
          VALUES ('task-env','workspace-env',1,'READY','binding-env','NORMAL','{}',?1,?1,1)", [AT],
     ).unwrap();
     tx.execute(
-        "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,lead_failover_policy_json,placement_preference,authored_by_json,created_at)
-         VALUES ('task-env','workspace-env',1,'Environment test','{\"mode\":\"DISABLED\",\"triggers\":[],\"fallback_agent_binding_ids\":[],\"max_lead_changes\":0}','\"AUTO\"','{}',?1)", [AT],
+        "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,lead_failover_policy_json,placement_preference,authored_by_json,created_at,delegation_policy_snapshot_json)
+         VALUES ('task-env','workspace-env',1,'Environment test','{\"mode\":\"DISABLED\",\"triggers\":[],\"fallback_agent_binding_ids\":[],\"max_lead_changes\":0}','\"AUTO\"','{}',?1,'{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}')", [AT],
     ).unwrap();
     tx.commit().unwrap();
 }

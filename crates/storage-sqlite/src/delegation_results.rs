@@ -1137,10 +1137,10 @@ mod tests {
                  INSERT INTO task_spec_revisions(task_id, workspace_id, revision, parent_revisions_json,
                    objective, constraints_json, non_goals_json, input_refs_json, required_outputs_json,
                    acceptance_criteria_json, approvals_required_json, lead_failover_policy_json,
-                   source_message_refs_json, placement_preference, authored_by_json, created_at)
+                   source_message_refs_json, placement_preference, authored_by_json, created_at, delegation_policy_snapshot_json)
                    VALUES ('task-1', 'workspace-1', 1, '[]', 'Test objective', '[]', '[]', '[]', '[]',
                    '[]', '[]', '{"mode":"DISABLED","triggers":[],"fallback_agent_binding_ids":[],"max_lead_changes":0}',
-                   '[]', 'AUTO', '{"kind":"USER","principal_id":"owner-1"}', '2026-10-17T11:00:00Z');
+                   '[]', 'AUTO', '{"kind":"USER","principal_id":"owner-1"}', '2026-10-17T11:00:00Z', '{"source":"WORKSPACE_DEFAULT","strategy":"NATIVE_DEFAULT","native_child_model_policy":"AGENT_DEFAULT","worker_profiles":[],"workspace_settings_revision":1}');
                  INSERT INTO agent_sessions(agent_session_id, workspace_id, scope_kind, task_id,
                    task_spec_revision, attempt_id, agent_binding_id, endpoint_id, runtime_id,
                    runtime_incarnation_id, status, started_at, last_event_at, closed_at, version)

@@ -969,7 +969,7 @@ fn resource_dependents_page_derives_freshness_from_revision_heads_and_paginates_
         [],
     ).expect("verification Task");
     transaction.execute(
-        "INSERT INTO task_spec_revisions(task_id, workspace_id, revision, objective, lead_failover_policy_json, placement_preference, authored_by_json, created_at) VALUES ('dependents-verification-task', 'workspace-artifact', 1, 'Verify dependencies', '{\"mode\":\"DISABLED\",\"triggers\":[],\"fallback_agent_binding_ids\":[],\"max_lead_changes\":0}', '{}', '{}', '2026-10-08T00:00:00Z')",
+        "INSERT INTO task_spec_revisions(task_id, workspace_id, revision, objective, lead_failover_policy_json, placement_preference, authored_by_json, created_at, delegation_policy_snapshot_json) VALUES ('dependents-verification-task', 'workspace-artifact', 1, 'Verify dependencies', '{\"mode\":\"DISABLED\",\"triggers\":[],\"fallback_agent_binding_ids\":[],\"max_lead_changes\":0}', '{}', '{}', '2026-10-08T00:00:00Z', '{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}')",
         [],
     ).expect("verification TaskSpecRevision");
     transaction.execute(
@@ -1355,9 +1355,9 @@ fn task_presentation_read_returns_task_and_resolvable_artifact_head_together() {
     ).expect("fixture Task");
     transaction.execute(
         r#"INSERT INTO task_spec_revisions(task_id, workspace_id, revision, objective, lead_failover_policy_json,
-                                         placement_preference, authored_by_json, created_at)
+                                         placement_preference, authored_by_json, created_at, delegation_policy_snapshot_json)
          VALUES ('presentation-task', 'workspace-artifact', 1, 'Inspect a report', '{"mode":"DISABLED","triggers":[],"fallback_agent_binding_ids":[],"max_lead_changes":0}', '{}', '{}',
-                 '2026-10-08T00:00:00Z')"#,
+                 '2026-10-08T00:00:00Z', '{"source":"WORKSPACE_DEFAULT","strategy":"NATIVE_DEFAULT","native_child_model_policy":"AGENT_DEFAULT","worker_profiles":[],"workspace_settings_revision":1}')"#,
         [],
     ).expect("fixture TaskSpecRevision");
     transaction.commit().expect("fixture Task commits");

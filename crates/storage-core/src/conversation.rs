@@ -20,6 +20,14 @@ pub const CONVERSATION_SESSION_ADMISSION_UNAVAILABLE: &str =
 pub const CONVERSATION_TURN_EVENT_REVISION_MISMATCH: &str =
     "ConversationTurn event revision mismatch";
 
+/// Strict single-flight lane (B-01): another turn of the Conversation is OPEN, RUNNING,
+/// WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED. Surfaces as HTTP 409.
+pub const CONVERSATION_TURN_IN_PROGRESS: &str = "CONVERSATION_TURN_IN_PROGRESS";
+
+/// Another response with a different provider identity, content or author was already
+/// committed for this turn and retry ordinal (B-04).
+pub const CONVERSATION_RESPONSE_IDENTITY_CONFLICT: &str = "CONVERSATION_RESPONSE_IDENTITY_CONFLICT";
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConversationRecord {
@@ -151,11 +159,34 @@ pub struct CommitConversationAgentResponse {
     pub agent_session_id: String,
     pub expected_turn_version: u64,
     pub expected_session_version: u64,
+    /// Retry ordinal of the turn this response answers (B-04). Must equal the turn's
+    /// current ordinal inside the commit transaction.
+    pub retry_ordinal: u32,
+    /// Provider-side identity of the final response. Together with the turn id and
+    /// retry ordinal it is the commit identity: an exact repeat replays the stored
+    /// receipt, any differing repeat is rejected without a partial write.
+    pub provider_response_id: String,
     pub turn_status: ConversationTurnStatus,
     pub message: ConversationMessageRecord,
+    /// Token usage reported for this turn (B-10); `None` records an UNKNOWN attribution.
+    pub usage: Option<ConversationTurnUsage>,
     pub message_event: EventDraft,
     pub turn_event: EventDraft,
     pub session_event: EventDraft,
+}
+
+/// Token usage attributed to one settled turn (B-10).
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum UsageAttributionSource {
+    ProviderReported,
+    EstimatedLocal,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ConversationTurnUsage {
+    pub attribution_source: UsageAttributionSource,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -233,6 +264,63 @@ pub trait ConversationTurnStore: Send + Sync {
         command: TurnCommand,
         event: EventDraft,
     ) -> Result<ConversationTurn, StoreError>;
+
+    /// Compare-and-swap claim of the durable dispatch intent for one admitted turn
+    /// attempt (UNCLAIMED to CLAIMED). Returns `false` when another dispatcher already
+    /// holds the claim or the intent is SETTLED. Must precede the STARTING reservation.
+    fn claim_conversation_dispatch_intent(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+        runtime_incarnation_id: &str,
+        claimed_at: &str,
+    ) -> Result<bool, StoreError>;
+
+    /// Returns a CLAIMED intent to UNCLAIMED when the claiming incarnation is gone and no
+    /// AgentSession was reserved for it. Returns `false` when the intent is not CLAIMED.
+    fn release_conversation_dispatch_intent(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+    ) -> Result<bool, StoreError>;
+
+    /// Bounded, ordered read of dispatch intents in one state (oldest first). Used by the
+    /// startup sweep and the dispatcher; never exposes provider-private handles.
+    fn list_conversation_dispatch_intents(
+        &self,
+        state: ConversationDispatchState,
+        limit: usize,
+    ) -> Result<Vec<ConversationDispatchIntent>, StoreError>;
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ConversationDispatchState {
+    Unclaimed,
+    Claimed,
+    Settled,
+}
+
+impl ConversationDispatchState {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Unclaimed => "UNCLAIMED",
+            Self::Claimed => "CLAIMED",
+            Self::Settled => "SETTLED",
+        }
+    }
+}
+
+/// Durable record that dispatch is owed for one admitted turn attempt.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ConversationDispatchIntent {
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub turn_id: String,
+    pub retry_ordinal: u32,
+    pub state: ConversationDispatchState,
+    pub claimed_by_runtime_incarnation: Option<String>,
+    pub created_at: String,
 }
 
 /// The live host a Conversation-scoped session must use, resolved authoritatively.

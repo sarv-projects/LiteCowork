@@ -688,9 +688,10 @@ mod tests {
                         '2026-10-20T09:00:00Z', 1);
                      INSERT INTO task_spec_revisions(task_id, workspace_id, revision, objective,
                         lead_failover_policy_json, placement_preference, preferred_lead_agent_binding_id,
-                        authored_by_json, created_at)
+                        authored_by_json, created_at, delegation_policy_snapshot_json)
                      VALUES ('task-ask', 'workspace-ask', 1, 'Ask objective', '{}', '\"AUTO\"', 'binding-lead',
-                        '{{\"kind\":\"USER\",\"principal_id\":\"owner-ask\"}}', '2026-10-20T09:00:00Z');
+                        '{{\"kind\":\"USER\",\"principal_id\":\"owner-ask\"}}', '2026-10-20T09:00:00Z',
+                        '{{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}}');
                      COMMIT;",
                     policy
                 ))
@@ -731,10 +732,11 @@ mod tests {
                         '2026-10-20T09:00:00Z', 1);
                      INSERT INTO task_spec_revisions(task_id, workspace_id, revision, objective,
                         lead_failover_policy_json, placement_preference, preferred_lead_agent_binding_id,
-                        authored_by_json, created_at)
+                        authored_by_json, created_at, delegation_policy_snapshot_json)
                      VALUES ('task-ask-2', 'workspace-ask', 1, 'Second Ask objective', '{}', '\"AUTO\"',
                         'binding-lead', '{{\"kind\":\"USER\",\"principal_id\":\"owner-ask\"}}',
-                        '2026-10-20T09:00:00Z');
+                        '2026-10-20T09:00:00Z',
+                        '{{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}}');
                      COMMIT;",
                     policy
                 ))

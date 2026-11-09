@@ -223,6 +223,20 @@ impl AgentSessionSupervisor {
                 });
             }
 
+            // 3b. Claim the durable dispatch intent (compare-and-swap) before the STARTING
+            // reservation. A losing dispatcher owns nothing and must not reserve a session.
+            let claimed = conv_store
+                .claim_conversation_dispatch_intent(
+                    &turn_id,
+                    turn.retry_ordinal,
+                    &host.runtime_incarnation_id,
+                    &now,
+                )
+                .map_err(|e| format!("Claim dispatch intent error: {e:?}"))?;
+            if !claimed {
+                return Ok(());
+            }
+
             // 4. Reserve STARTING session
             let session_id = generate_id("ses");
             let start = ConversationAgentSessionStart {
@@ -296,6 +310,7 @@ impl AgentSessionSupervisor {
                 &conversation,
                 &turn_id,
                 turn.version,
+                turn.retry_ordinal,
                 &session_id,
                 &host_instance_id,
                 &host.agent_binding_id,
@@ -409,6 +424,7 @@ fn execute_agent_turn(
     conversation_id: &str,
     turn_id: &str,
     turn_version: u64,
+    retry_ordinal: u32,
     session_id: &str,
     host_instance_id: &str,
     agent_binding_id: &str,
@@ -551,7 +567,7 @@ fn execute_agent_turn(
                 },
             };
 
-            store
+            let activated = store
                 .activate_conversation_agent_session(activation)
                 .map_err(|e| format!("Activate session error: {e:?}"))?;
 
@@ -598,21 +614,32 @@ fn execute_agent_turn(
                 }
             };
 
-            let final_message_id = format!("msg-agent-{}", generate_id("m"));
+            // The commit identity is deterministic in (turn, retry ordinal, native
+            // message) so a repeated commit attempt replays the stored receipt instead
+            // of writing a second answer (B-04).
+            let final_message_id = format!("msg-agent-{turn_id}-{retry_ordinal}");
+            let provider_response_id = format!("{native_session}/{native_msg_id}");
             let now = now_utc_rfc3339();
             let commit_resp = CommitConversationAgentResponse {
                 request: WorkspaceCreateRequest {
                     principal_id: principal_id.to_owned(),
-                    request_id: format!("req-commit-{}", final_message_id),
-                    request_payload: json!({ "turn_id": turn_id }),
+                    request_id: format!("req-commit-{turn_id}-{retry_ordinal}"),
+                    request_payload: json!({
+                        "turn_id": turn_id,
+                        "retry_ordinal": retry_ordinal,
+                        "provider_response_id": provider_response_id,
+                    }),
                 },
                 principal_id: principal_id.to_owned(),
                 workspace_id: workspace_id.to_owned(),
                 conversation_id: conversation_id.to_owned(),
                 turn_id: turn_id.to_owned(),
                 agent_session_id: session_id.to_owned(),
-                expected_turn_version: turn_version + 1,
-                expected_session_version: 2,
+                expected_turn_version: activated.turn.version,
+                expected_session_version: activated.session.version,
+                retry_ordinal,
+                provider_response_id,
+                usage: None,
                 turn_status: ConversationTurnStatus::Completed,
                 message: ConversationMessageRecord {
                     message_id: final_message_id.clone(),
@@ -652,7 +679,7 @@ fn execute_agent_turn(
                     entity_type: "ConversationTurn".to_owned(),
                     entity_id: turn_id.to_owned(),
                     origin_runtime_id: runtime_id.to_owned(),
-                    entity_revision: turn_version + 2,
+                    entity_revision: activated.turn.version + 1,
                     hlc_timestamp: now.clone(),
                     correlation_id: correlation_id.to_owned(),
                     causation_id: None,
@@ -662,7 +689,7 @@ fn execute_agent_turn(
                         "turn_id": turn_id,
                         "from": "RUNNING",
                         "to": "COMPLETED",
-                        "aggregate_version": turn_version + 2,
+                        "aggregate_version": activated.turn.version + 1,
                     }),
                     recorded_at: now.clone(),
                 },
@@ -672,7 +699,7 @@ fn execute_agent_turn(
                     entity_type: "AgentSession".to_owned(),
                     entity_id: session_id.to_owned(),
                     origin_runtime_id: runtime_id.to_owned(),
-                    entity_revision: 3,
+                    entity_revision: activated.session.version + 1,
                     hlc_timestamp: now.clone(),
                     correlation_id: correlation_id.to_owned(),
                     causation_id: None,
@@ -682,7 +709,7 @@ fn execute_agent_turn(
                         "agent_session_id": session_id,
                         "from": "ACTIVE",
                         "to": "CLOSED",
-                        "aggregate_version": 3,
+                        "aggregate_version": activated.session.version + 1,
                     }),
                     recorded_at: now.clone(),
                 },

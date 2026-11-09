@@ -1010,8 +1010,8 @@ fn seed_running_task_and_planner(fixture: &Fixture, session_status: &str) {
     )
     .expect("Task with the admitted lead is present");
     tx.execute(
-        "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,lead_failover_policy_json,placement_preference,preferred_lead_agent_binding_id,authored_by_json,created_at)
-         VALUES('task-pinned-planner',?1,1,'Keep planning session pinned',?2,'{}',?3,?4,?5)",
+        "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,lead_failover_policy_json,placement_preference,preferred_lead_agent_binding_id,authored_by_json,created_at,delegation_policy_snapshot_json)
+         VALUES('task-pinned-planner',?1,1,'Keep planning session pinned',?2,'{}',?3,?4,?5,'{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}')",
         params![
             WORKSPACE_ID,
             r#"{"mode":"DISABLED","triggers":[],"fallback_agent_binding_ids":[],"max_lead_changes":0}"#,
@@ -2263,6 +2263,13 @@ fn conversation_agent_response_commit_settles_turn_and_session_atomically() {
             agent_session_id: session_id.clone(),
             expected_turn_version: expected_turn_v,
             expected_session_version: expected_sess_v,
+            retry_ordinal: 0,
+            provider_response_id: "provider-response-1".to_owned(),
+            usage: Some(storage_core::conversation::ConversationTurnUsage {
+                attribution_source: storage_core::conversation::UsageAttributionSource::ProviderReported,
+                input_tokens: 11,
+                output_tokens: 7,
+            }),
             turn_status: ConversationTurnStatus::Completed,
             message: ConversationMessageRecord {
                 message_id: msg_id.to_owned(),
@@ -2405,6 +2412,56 @@ fn conversation_agent_response_commit_settles_turn_and_session_atomically() {
     assert_eq!(replay.message.message_id, "msg-agent-1");
     assert_eq!(replay.turn.version, 3);
     assert_eq!(replay.session.status, "CLOSED");
+
+    // The same response identity under a fresh request id replays the stored receipt
+    // (AC-026) even though the turn and session have moved on.
+    let same_identity = conv_store
+        .commit_conversation_agent_response(make_commit(
+            "req-ok-retried",
+            "msg-agent-other-id",
+            2,
+            2,
+            OWNER_ID,
+        ))
+        .expect("same provider response identity replays the stored receipt");
+    assert_eq!(same_identity.message.message_id, "msg-agent-1");
+
+    // A different provider response for the same turn and retry ordinal is rejected
+    // and writes nothing.
+    let mut different = make_commit("req-different", "msg-agent-2", 2, 2, OWNER_ID);
+    different.provider_response_id = "provider-response-2".to_owned();
+    assert!(conv_store.commit_conversation_agent_response(different).is_err());
+    let conn = Connection::open(database_path(&fixture.directory)).expect("open db");
+    let (messages, identities, usage): (i64, i64, (String, i64, i64)) = (
+        conn.query_row(
+            "SELECT COUNT(*) FROM conversation_messages WHERE role='AGENT' AND turn_id=?1",
+            params![turn_id],
+            |row| row.get(0),
+        )
+        .expect("count agent messages"),
+        conn.query_row(
+            "SELECT COUNT(*) FROM conversation_response_commits WHERE turn_id=?1",
+            params![turn_id],
+            |row| row.get(0),
+        )
+        .expect("count commit identities"),
+        conn.query_row(
+            "SELECT attribution_source,input_tokens,output_tokens FROM conversation_turn_usage_records WHERE turn_id=?1",
+            params![turn_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("usage record"),
+    );
+    assert_eq!((messages, identities), (1, 1));
+    assert_eq!(usage, ("PROVIDER_REPORTED".to_owned(), 11, 7));
+    let intent_state: String = conn
+        .query_row(
+            "SELECT state FROM conversation_dispatch_intents WHERE turn_id=?1 AND retry_ordinal=0",
+            params![turn_id],
+            |row| row.get(0),
+        )
+        .expect("dispatch intent");
+    assert_eq!(intent_state, "SETTLED");
 }
 
 #[test]
@@ -3276,3 +3333,6 @@ fn conversation_host_resolution_uses_turn_pinned_binding_after_selection_changes
         Err(StoreError::Integrity(_))
     ));
 }
+
+#[path = "conversation_durable_turn_tests.rs"]
+mod conversation_durable_turn_tests;

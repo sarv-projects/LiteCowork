@@ -20,7 +20,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T01 - Record owner acceptance and promote accepted contracts into owner docs and schemas
 
-- **Status:** PARTIAL - owner acceptance of B-01 to B-10 recorded 2026-11-09 (this revision); no accepted interface is promoted yet (`CONVERSATION_TURN_IN_PROGRESS` absent from `docs/schemas/error-codes.schema.json`; no dispatch-intent or usage tables after `sqlite-v28.sql`).
+- **Status:** PARTIAL - owner acceptance of B-01 to B-10 recorded 2026-11-09. Promoted and implemented in this slice: `CONVERSATION_TURN_IN_PROGRESS` (error-codes and domain-event schemas, SCHEMAS.md, API.md), migration `docs/schemas/sqlite-v29.sql` (dispatch intents, response commit identity, usage records, single-flight triggers; STORAGE.md migrations), v28 wired with it. Still not promoted: `retry_ordinal`/`provider_response_id` on the receipt schema, `active_turn.version`/`retry_ordinal` in the presentation snapshot, `turn.delta` correlation fields, Adapter 1.0 handshake names (T13/T16 own those).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE (Feature 018 must agree the usage record shape it will read; record its review in the PR).
 - **Owner:** Conversation, Storage, API, Events owners; Product for B-02 rider.
@@ -30,7 +30,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Acceptance:**
   - [x] B-01 to B-10 owner acceptance recorded with the B-02 rider and B-04/B-07/B-09 caveats (SPEC section 5).
   - [ ] Every promoted name exists exactly once in its owner doc and machine schema; no parallel definition in this package.
-  - [ ] The new migration is the next immutable `sqlite-vNN.sql`, older migrations are byte-identical, and the schema fingerprint test passes.
+  - [x] The new migration is the next immutable `sqlite-vNN.sql`, older migrations are byte-identical, and the schema fingerprint test passes.
   - [ ] Negative: schema validators reject a commit receipt missing `retry_ordinal` and a frame missing turn/retry/session correlation.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py` and `python3 scripts/validate_architecture.py` and `cargo test -p storage-sqlite --locked schema` (filter to be added by this task for the fingerprint check)
 - **Evidence:** PR link and command output in Completion evidence below; register rows for B-01 to B-10 closed by the orchestrator.
@@ -38,7 +38,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T02 - Harden the atomic final Agent response commit (B-04 caveat)
 
-- **Status:** PARTIAL - `CommitConversationAgentResponse` / `CommittedConversationAgentResponse` in `crates/storage-core/src/conversation.rs` and the IMMEDIATE transaction in `crates/storage-sqlite/src/conversations.rs` exist and are called by the supervisor; test `conversation_agent_response_commit_settles_turn_and_session_atomically` covers stale turn/session versions, foreign principal, success and exact replay. Missing: retry ordinal, provider-response identity, author validation, wrong-Workspace/session and fault-injection coverage.
+- **Status:** DONE (storage) - `CommitConversationAgentResponse` now carries `retry_ordinal`, `provider_response_id` and optional usage; the IMMEDIATE transaction verifies the ordinal, the AGENT author pinned to the session binding, derives the receipt identity from `(turn_id, retry_ordinal)` with a content digest (exact repeat replays the stored receipt under a different request id, any other repeat is `CONVERSATION_RESPONSE_IDENTITY_CONFLICT`), settles the dispatch intent and writes the usage record. Evidence: `conversation_agent_response_commit_*` tests in `crates/storage-sqlite/src/agent_binding_tests.rs` and `conversation_durable_turn_tests.rs`.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Storage, Conversation.
@@ -47,11 +47,11 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Change intent:** add `retry_ordinal: u32` and `provider_response_id: String` to `CommitConversationAgentResponse`; verify `retry_ordinal` equals the turn's current ordinal inside the transaction; derive the receipt identity from (turn_id, retry_ordinal, provider_response_id) instead of a caller-generated message id; validate `message.author` is `{kind: AGENT, agent_binding_id}` matching the turn-pinned binding; derive event revisions from loaded aggregate versions rather than trusting caller-supplied `entity_revision`.
 - **Acceptance:**
   - [x] Typed request/result and SQLite operation exist and are invoked by the OpenCode supervisor.
-  - [ ] Exact replay with the same turn, retry ordinal and provider-response id returns the stored receipt and message (AC-026).
-  - [ ] Same identity with different content digest, different retry ordinal or different author fails with no partial write (AC-026).
-  - [ ] Foreign owner, wrong Workspace, wrong or non-ACTIVE session and stale versions fail with no partial write (AC-009).
-  - [ ] Fault injection after each insert (message, turn, session, host binding delete, events, receipt) rolls back everything.
-  - [ ] Two concurrent commits for one turn: exactly one wins, the other gets a conflict or the stored receipt.
+  - [x] Exact replay with the same turn, retry ordinal and provider-response id returns the stored receipt and message (AC-026).
+  - [x] Same identity with different content digest, different retry ordinal or different author fails with no partial write (AC-026).
+  - [x] Foreign owner, wrong Workspace, wrong or non-ACTIVE session and stale versions fail with no partial write (AC-009).
+  - [x] Fault injection after each insert (message, turn, session, host binding delete, events, receipt) rolls back everything.
+  - [x] Two concurrent commits for one turn: exactly one wins, the other gets a conflict or the stored receipt.
 - **Command:** `cargo test -p storage-sqlite --locked conversation_agent_response_commit`
 - **Evidence:** test names and output recorded below; IMPLEMENTATION-STATUS.md Conversation final-commit row.
 - **Stop:** any path exposes a final answer as complete without the commit receipt.
@@ -79,7 +79,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T04 - Qualify the OpenCode v2.0.32 AgentAdapter behind the Adapter 1.0 contract
 
-- **Status:** PARTIAL - OpenCode Server v2.0.32 helper (`OpenCodeServer`, `OpenCodeServerProtocol::V2_0_32`) and the supervisor call path exist; no Adapter 1.0 wrapper, `abort_session` has no caller, the read loop uses a hard-coded 60 s deadline, and no Windows or USER evidence exists.
+- **Status:** PARTIAL - the provider-neutral `AgentAdapter` trait (probe_version, create_session, send_context, drive_turn, interrupt, shutdown), the OpenCode v2.0.32 `OpenCodeAdapter` (wraps `OpenCodeServer`, `interrupt` calls `abort_session`), the ACP client spine and per-provider launch catalog exist in `apps/litecoworkd/src/agents/adapter.rs`; the supervisor drives the OpenCode turn through them with a line-resetting idle watchdog instead of the old 60 s cap, and tests `selected_adapter_conversation_*` pass. Not done: the Stop route does not yet call `interrupt` (T07), a timeout after dispatch is not yet reconciled from native session state, and no Windows or USER evidence exists.
 - **Depends on:** T01, T03
 - **Cross-package prerequisites:** Feature 002 OpenCode probe fix so the binding is creatable (probe currently records `compatible=false`).
 - **Owner:** Agent Runtime.
@@ -189,7 +189,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T10 - Add a durable dispatch outbox for admitted turns
 
-- **Status:** NOT STARTED - submit commits USER + OPEN + receipt, then `tokio::spawn`; nothing durable records that dispatch is owed or claimed, and exact replay returns the 202 receipt without re-admitting dispatch.
+- **Status:** DONE - `conversation_dispatch_intents` (v29) is written in the same transaction as the turn by `create_conversation_turn`, claimed by compare-and-swap (`claim_conversation_dispatch_intent`) before the STARTING reservation in `AgentSessionSupervisor::dispatch_turn`, settled by the final-response commit and by any terminal turn transition, never deleted. Exact replay inserts no second intent and a losing dispatcher (including the replay re-spawn) returns without reserving a session. The Retry path inserting a new-ordinal intent and the startup sweep over UNCLAIMED/CLAIMED intents belong to T07 and T08.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Storage, Conversation.
@@ -197,17 +197,17 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Contract:** SPEC DATA-MODEL section 6; AC-022; STORAGE; FAILURE-RECOVERY.
 - **Change intent:** insert one dispatch-intent row (turn id, retry ordinal, UNCLAIMED) in the same transaction as `create_conversation_turn` and as the Retry transition; the dispatcher claims it by CAS (UNCLAIMED to CLAIMED with Runtime incarnation) before `start_conversation_agent_session`; settlement marks it SETTLED. Submit and retry both enqueue instead of spawning ad hoc.
 - **Acceptance:**
-  - [ ] Intent row commits atomically with the turn; rollback test removes both.
-  - [ ] Two dispatchers racing on one intent: exactly one claim wins.
+  - [x] Intent row commits atomically with the turn; rollback test removes both.
+  - [x] Two dispatchers racing on one intent: exactly one claim wins.
   - [ ] Crash after admission and before claim leaves an UNCLAIMED intent that the T08 sweep handles (AC-022).
-  - [ ] Exact submit replay does not create a second intent.
+  - [x] Exact submit replay does not create a second intent.
 - **Command:** `cargo test -p storage-sqlite --locked conversation_dispatch_intent` (filter to be added by this task)
 - **Evidence:** test output; migration checksum recorded.
 - **Stop:** the claim cannot be made atomic with STARTING reservation ordering.
 
 ## 001-T11 - Enforce single-flight admission in storage (B-01)
 
-- **Status:** NOT STARTED - `create_conversation_turn` has no nonterminal-turn check; the UI fence alone is not authority.
+- **Status:** DONE - `create_conversation_turn` rejects a second turn while another is OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED with `CONVERSATION_TURN_IN_PROGRESS` after the receipt replay check; v29 triggers back it at the database level (triggers rather than a partial unique index so legacy duplicate rows still migrate). The Operator maps it to 409. Tests: `conversation_turn_creation_rejects_a_second_nonterminal_turn_and_admits_after_settlement`, `conversation_turn_creation_two_concurrent_submits_admit_exactly_one`, `conversation_turn_submit_returns_409_while_another_turn_is_in_flight_and_writes_nothing`.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Storage, Conversation, API.
@@ -215,10 +215,10 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Contract:** SPEC B-01; AC-023; STATE-MACHINES; API.
 - **Change intent:** inside the IMMEDIATE transaction reject when any turn of the Conversation is OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED, backed by a partial unique index on nonterminal turns per Conversation; map to `CONVERSATION_TURN_IN_PROGRESS` 409; update `conversation_turn_creation_serializes_appends_from_the_same_stale_snapshot` to assert one admission and one rejection.
 - **Acceptance:**
-  - [ ] Second submit during an active turn returns 409 and writes no message, turn, event or receipt (AC-023).
-  - [ ] Two concurrent submits from the same stale snapshot: one 202, one 409.
-  - [ ] Exact replay of the admitted submit still returns its receipt (receipt check runs before the single-flight check).
-  - [ ] Submit after the active turn settles succeeds.
+  - [x] Second submit during an active turn returns 409 and writes no message, turn, event or receipt (AC-023).
+  - [x] Two concurrent submits from the same stale snapshot: one 202, one 409.
+  - [x] Exact replay of the admitted submit still returns its receipt (receipt check runs before the single-flight check).
+  - [x] Submit after the active turn settles succeeds.
 - **Command:** `cargo test -p storage-sqlite --locked conversation_turn_creation` and `cargo test -p litecoworkd --locked conversation_turn_submit`
 - **Evidence:** test output in Completion evidence.
 - **Stop:** the index conflicts with existing turn rows during migration; repair forward, never delete user messages.
@@ -414,7 +414,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T23 - Capture a redacted OpenCode v2.0.32 turn fixture (P-00)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-00 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 into this LOCKED package.
+- **Status:** PARTIAL - `apps/litecoworkd/src/agents/fixtures/opencode_v2_0_32_turn.jsonl` replays deterministically and `opencode_turn_fixture_*` tests assert no handle, credential or prompt body survives. R-01 is not yet confirmed or refuted in RESEARCH.md and no OpenCode binary exists in this environment to re-capture a live v2.0.32 turn, so a live capture is BLOCKED here (owner: run on a machine with the pinned OpenCode and record the envelope keys).
 - **Depends on:** T04
 - **Cross-package prerequisites:** Feature 002 OpenCode probe fix so a live binding is creatable for the capture.
 - **Owner:** Agent Runtime.
@@ -431,7 +431,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T24 - OpenCodeEventNormalizer with correlated internal events (P-01)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-01 (audit section 7 and 9; findings R-01, R-04, X-01) into this LOCKED package.
+- **Status:** DONE (fixture-driven) - `apps/litecoworkd/src/agents/normalizer.rs` (`OpenCodeEventNormalizer`) maps events to correlated internal events, counts and drops unknown, foreign-session and uncorrelated frames, never stores reasoning in the answer, and the supervisor consumes it through `drive_turn` with an idle/heartbeat budget. Evidence: `opencode_event_normalizer_*` (11) and `normalizer::` (10) tests pass. Live-capture confirmation remains with T23.
 - **Depends on:** T04, T23
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime.

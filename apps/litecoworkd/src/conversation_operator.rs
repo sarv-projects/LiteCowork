@@ -1,11 +1,13 @@
-//! Authenticated local Conversation catalog lifecycle. Turn dispatch is intentionally
-//! absent here until the native AgentSession/runtime admission path is integrated.
+//! Authenticated local Conversation catalog lifecycle and turn routes (submit, retry,
+//! cancel). Submit commits the USER message, OPEN turn and dispatch intent atomically and
+//! then hands the turn to the `AgentSessionSupervisor`; without a supervisor the turn is
+//! settled FAILED and the Operator reports the dependency as unavailable.
 // Route handlers intentionally return full Axum Responses to preserve status, body, and headers.
 #![allow(clippy::result_large_err)]
 
 use super::*;
 use storage_core::conversation::{
-    CONVERSATION_SESSION_ADMISSION_UNAVAILABLE, ConversationTurn, ConversationTurnStatus,
+    CONVERSATION_SESSION_ADMISSION_UNAVAILABLE, CONVERSATION_TURN_IN_PROGRESS, ConversationTurn, ConversationTurnStatus,
     PresentationPreference, TurnCommand, request_payload_value,
 };
 use storage_core::{
@@ -1347,6 +1349,11 @@ fn map_store_error(error_value: StoreError) -> Response {
             StatusCode::CONFLICT,
             "STALE_CONVERSATION_VERSION",
             "Conversation changed; refresh before saving",
+        ),
+        StoreError::Invalid(message) if message == CONVERSATION_TURN_IN_PROGRESS => error(
+            StatusCode::CONFLICT,
+            CONVERSATION_TURN_IN_PROGRESS,
+            "Another message in this Conversation is still being answered; wait for it to finish or stop it",
         ),
         StoreError::Invalid(message) if message == "AGENT_UNAVAILABLE" => agent_unavailable(),
         StoreError::Invalid(message) if message == "AGENT_NOT_LEAD_ELIGIBLE" => error(

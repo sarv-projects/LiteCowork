@@ -562,8 +562,12 @@ not yet wire them into a Conversation startup recovery sweep.
 
 `POST /v1/conversations/{id}/turns` first resolves and checks the Conversation override or
 Workspace default AgentBinding/endpoint. If none is eligible, it returns
-`AGENT_UNAVAILABLE` and persists no message or turn. Otherwise it atomically appends the
-user message and creates the ConversationTurn, then starts a fresh Conversation-scoped
+`AGENT_UNAVAILABLE` and persists no message or turn. A Conversation admits one turn at a
+time: while another turn is OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY or
+CANCEL_REQUESTED the route returns `409 CONVERSATION_TURN_IN_PROGRESS` and writes nothing
+(an exact replay of the admitted request is still answered from its receipt first).
+Otherwise it atomically appends the
+user message, creates the ConversationTurn and its UNCLAIMED dispatch intent, then starts a fresh Conversation-scoped
 AgentSession. It returns `202` with the turn ID and command receipt;
 the agent response is appended with AgentSession/AgentBinding provenance. This path does
 not create a Task unless ordinary product materialization rules determine the request

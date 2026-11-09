@@ -440,8 +440,8 @@ fn seed_performance_projection_attempt(
         .expect("insert performance task");
     connection
         .execute(
-            "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,task_category,lead_failover_policy_json,placement_preference,authored_by_json,created_at)
-             VALUES (?1,'workspace-profile',1,'bounded performance fixture',?2,?3,'LOCAL','{}',?4)",
+            "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,task_category,lead_failover_policy_json,placement_preference,authored_by_json,created_at,delegation_policy_snapshot_json)
+             VALUES (?1,'workspace-profile',1,'bounded performance fixture',?2,?3,'LOCAL','{}',?4,'{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}')",
             rusqlite::params![task_id, category, revision, created_at],
         )
         .expect("insert pinned task spec");
