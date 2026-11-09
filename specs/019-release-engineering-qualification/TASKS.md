@@ -105,7 +105,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T06 - CSP and Tauri capability hardening audit
 
-- **Status:** PARTIAL - CSP and `capabilities/default.json` exist; `v1_packaging_check.py` only checks that a CSP string is present.
+- **Status:** PARTIAL (CODE): CSP now carries `object-src`, `base-uri`, `frame-ancestors` and `form-action` set to `'none'`; `scripts/v1_csp_audit.py` and `tests/test_csp_audit.py` (8 tests, fixtures for unsafe-eval, remote script origin, shell/fs permission, removed object-src) pass, and `v1_packaging_check.py` calls the audit. `style-src 'unsafe-inline'` remains because React inline `style` props need it; hash-based replacement is an open follow-up. NOT done: packaged-app console capture on both rows and the E2E-11 fallback check (need a built app).
 - **Depends on:** T01, T02, T05
 - **Cross-package prerequisites:** Feature 008 decision on any iframe preview origin (O-04); Feature 016 server-side presentation validation stays the content boundary.
 - **Owner:** Security, Desktop Shell.

@@ -84,6 +84,11 @@ def check_bundle_configuration(report: Report) -> None:
     security = configuration.get("app", {}).get("security", {})
     if not security.get("csp"):
         problems.append("app.security.csp is missing")
+    else:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import v1_csp_audit
+
+        problems.extend(v1_csp_audit.audit_directory(TAURI_DIRECTORY))
     report.add(
         "bundle configuration",
         not problems,
