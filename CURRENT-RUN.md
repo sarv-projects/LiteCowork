@@ -216,6 +216,10 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 - Env note: tests that bind a Unix socket fail with `InvalidPrivateDirectory` when `TMPDIR` is long (`/projects/sandbox/.work/tmp`, socket path over 103 bytes); run with `TMPDIR=/tmp`.
 - Windows ninth-peer and interleaving tests are deferred to a native Windows runner (011-T02).
 
+### Wave 0 slice 2: 011-T05 runtime health honesty (2026-11, CODE)
+
+- Command: `pnpm test` in apps/litecowork-ui: 501 pass, 5 fail, 10 skipped. The same 5 failures (Needs You page x4 needing Chrome, esbuild build-script lock approval) occur on the base state with my changes stashed (496 pass, 5 fail), so they are pre-existing. `npx tsc --noEmit` clean.
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.

@@ -15,6 +15,7 @@ import type {
 } from "../App";
 import type { WorkspaceListState } from "../workspaces/WorkspaceFirstRun";
 import type { RuntimeInventoryStreamStatus } from "../runtime/runtime-inventory-stream";
+import { deriveRuntimeHealthRows } from "../runtime/runtime-health";
 import "./settings-view.css";
 
 export type SettingsCategory =
@@ -89,6 +90,13 @@ export type SettingsViewProps = {
 export function SettingsView(props: SettingsViewProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("workspaces");
   const [archiveConfirmationFor, setArchiveConfirmationFor] = useState<string | null>(null);
+  const runtimeHealth = deriveRuntimeHealthRows(
+    {
+      operatorReady: props.runtime?.operatorReady ?? false,
+      recoveryState: props.runtimeLifecycle?.incarnation?.recoveryState ?? null,
+    },
+    typeof navigator === "undefined" ? "" : navigator.platform,
+  );
 
   // General Preferences (component-local state; not persisted or applied globally)
   const [theme, setTheme] = useState<"system" | "light" | "dark">("light");
@@ -557,7 +565,11 @@ export function SettingsView(props: SettingsViewProps) {
                   </div>
                   <div>
                     <dt>Operator API</dt>
-                    <dd>{props.runtime?.operatorReady ? "Connected (Localhost)" : "Not Serving"}</dd>
+                    <dd>{runtimeHealth.operator}</dd>
+                  </div>
+                  <div>
+                    <dt>Execution</dt>
+                    <dd>{runtimeHealth.execution}</dd>
                   </div>
                   <div>
                     <dt>Runtime ID</dt>
@@ -575,11 +587,27 @@ export function SettingsView(props: SettingsViewProps) {
                       </div>
                       <div>
                         <dt>Recovery State</dt>
-                        <dd>{props.runtimeLifecycle.incarnation.recoveryState}</dd>
+                        <dd>{runtimeHealth.recoveryState}</dd>
                       </div>
                     </>
                   )}
                 </dl>
+
+                <div aria-live="polite">
+                  {props.runtimeLifecycleLoading && (
+                    <p role="status" style={{ fontSize: "12.5px", color: "#4b5563" }}>Checking Runtime lifecycle…</p>
+                  )}
+                </div>
+                {props.runtimeLifecycleError && (
+                  <p role="alert" style={{ fontSize: "12.5px", color: "#b91c1c" }}>
+                    Runtime lifecycle unavailable: {props.runtimeLifecycleError}
+                  </p>
+                )}
+                {props.runtimeError && (
+                  <p role="alert" style={{ fontSize: "12.5px", color: "#b91c1c" }}>
+                    Runtime error: {props.runtimeError}
+                  </p>
+                )}
 
                 {props.runtimeLifecycle?.blockers && props.runtimeLifecycle.blockers.length > 0 && (
                   <div style={{ marginTop: "12px" }}>

@@ -86,7 +86,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T05 - Runtime health honesty in the shell
 
-- **Status:** PARTIAL (`runtime_lifecycle_bridge.rs` decodes lifecycle; `SettingsView.tsx` shows start/refresh; missing: loading/error props unrendered, "Connected (Localhost)" copy, incarnation matrix test)
+- **Status:** DONE for the UI (CODE): `src/runtime/runtime-health.ts` derives transport, Operator, recovery_state and execution rows from observations; `SettingsView.tsx` renders loading/error states in live regions and no longer says "Localhost"; `tests/settings-runtime-health.test.mjs` added (5 tests). The Tauri-side `cargo test -p litecowork-ui runtime_lifecycle` command was not run in this slice.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI, Runtime
@@ -94,10 +94,10 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §7a recovery states; RUNTIME-LIFECYCLE; AC-005
 - **Change intent:** Render `runtimeLifecycleLoading`, `runtimeLifecycleError` and `runtimeError`; replace "Connected (Localhost)" with the actual transport ("Local IPC (named pipe)" / "Local IPC (socket)"); show recovery_state, Operator readiness and execution readiness as separate rows; DEGRADED keeps Operator commands but shows execution closed.
 - **Acceptance:**
-  - [ ] STOPPED, STARTING and RECOVERING never show execution ready (AC-005).
-  - [ ] DEGRADED with readiness SERVING shows commands available and execution closed (AC-005).
-  - [ ] No string "Localhost" remains in Settings.
-  - [ ] Error and loading states render with accessible live-region announcements.
+  - [x] STOPPED, STARTING and RECOVERING never show execution ready (AC-005).
+  - [x] DEGRADED with readiness SERVING shows commands available and execution closed (AC-005).
+  - [x] No string "Localhost" remains in Settings.
+  - [x] Error and loading states render with accessible live-region announcements.
 - **Command:** `pnpm --dir apps/litecowork-ui test` and `cargo test -p litecowork-ui --locked runtime_lifecycle` 
 - **Evidence:** test names; IMPLEMENTATION-STATUS Settings row.
 - **Stop:** stop if any readiness value is derived from a click rather than an observation.
