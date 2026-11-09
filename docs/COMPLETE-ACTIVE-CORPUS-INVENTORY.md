@@ -9,9 +9,9 @@ This is an inventory, not proof that every sentence is correct, implemented,
 integrated or qualified. The authority chain is in docs/README.md. Current source
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
-- Included files: 357
-- Included lines: 72137
-- Included bytes: 6301260
+- Included files: 359
+- Included lines: 72258
+- Included bytes: 6326915
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,7 +25,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 137 | 47987 |
+| docs/ | 139 | 48108 |
 | repository root | 6 | 1587 |
 | scripts/ | 1 | 14 |
 | specs/ | 201 | 21769 |
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 81 | 6032 | 2fc07511243a861e |
-| CURRENT-RUN.md | 201 | 26387 | f3fe0ce51e2ce85c |
+| CURRENT-RUN.md | 201 | 26387 | 10c74114d504bd28 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 92 | 7389 | 5a5a73e85c542f17 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -70,7 +70,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
 | docs/CONTEXT.md | 272 | 19955 | f80c31cda1a4c7aa |
-| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 167 | 72657 | 83606005f458e9fd |
+| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 170 | 75464 | d980a032743dda2d |
 | docs/COVERAGE-MATRIX.md | 174 | 25367 | 64c4380d1987ee75 |
 | docs/COWORKER-FLOWS.md | 166 | 20076 | 309015aa4fe4a14a |
 | docs/COWORKERS-TARGET.md | 456 | 58061 | 3afdfb6005644afe |
@@ -80,7 +80,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | ce0e3372b3045a98 |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 8a2f18ec3e381484 |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 927 | 69198 | f6753a21cfcfe5eb |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
@@ -89,7 +89,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 299 | 59390 | dcc8ec818ee09ef3 |
+| docs/IMPLEMENTATION-STATUS.md | 299 | 59390 | 17212fb555edc72d |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -103,6 +103,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/NATIVE-COMPOSER-LLD.md | 300 | 27971 | 716852c1e987a5f5 |
 | docs/NETWORK-SECURITY.md | 312 | 21908 | 03145de8b91e6486 |
 | docs/OBSERVABILITY.md | 262 | 12291 | 3192bfcda6340d0a |
+| docs/OPEN-DESIGN-CAPABILITY-DEEP-DIVE-2026-11.md | 66 | 12012 | d734504079895f10 |
 | docs/OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md | 279 | 29919 | 2bf520dce2718a2e |
 | docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md | 136 | 21790 | 33d35c150514dc95 |
 | docs/PRESENTATION-RUNTIME.md | 533 | 31633 | 4003073b58c690de |
@@ -110,7 +111,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/PRODUCT-STRATEGY.md | 113 | 10724 | 8e39b7022710cfef |
 | docs/PRODUCT.md | 254 | 16913 | 76a270f4af39c91c |
 | docs/PROTOCOLS.md | 187 | 9391 | de2062d24c901037 |
-| docs/README.md | 90 | 9963 | a857911f1efd4ce2 |
+| docs/README.md | 92 | 10500 | a14e97b897f92695 |
 | docs/REFERENCE-IMPLEMENTATIONS.md | 801 | 100362 | a1fe82b97a044fc0 |
 | docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md | 264 | 24873 | f1d7303606da51da |
 | docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md | 130 | 23077 | 9568507c45d8ca53 |
@@ -158,6 +159,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/V1-WORKFLOW-EVENT-LLD.md | 139 | 14813 | aa20f0e960080e6e |
 | docs/VIABILITY-VS-COMPETITORS.md | 239 | 24161 | 74be14df4bd7e54b |
 | docs/WORLD-RESOURCES.md | 529 | 38043 | bef06f6e6dd86d16 |
+| docs/ZCODE-PARADEV-CODING-COCKPIT-DEEP-DIVE-2026-11.md | 50 | 10299 | 0ac1decf9309730e |
 | docs/ZCODE-UI-INSPIRATION-AUDIT.md | 265 | 34660 | 84bc346175de6632 |
 | docs/adr/0001-durable-task-core.md | 23 | 922 | be124ace88b60190 |
 | docs/adr/0002-task-and-attempt-identity.md | 21 | 802 | 5c08694009a99c97 |
