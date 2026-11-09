@@ -60,7 +60,7 @@ These are source/route/UI findings. No LiteCowork account Connection was created
 
 ## Limitations
 
-- Rival web pages were not re-fetched on 2026-11-06 for this package; LiteSPM upstream bridge evidence remains pinned to commit `111fd9b8e84573f8fce76b6374b4ff9639502539` as checked on 2026-11-05, not as proof of LiteCowork integration.
+- Rival web pages were not re-fetched on 2026-11-06 for this package; the LiteSPM bridge pin was resolved 2026-11-09 to HEAD `84d5fab` (v0.6.0, [LITESPM-INTEGRATION-STUDY-2026-11.md](../../docs/LITESPM-INTEGRATION-STUDY-2026-11.md)), superseding the earlier `111fd9b8e84573f8fce76b6374b4ff9639502539` as checked on 2026-11-05, not as proof of LiteCowork integration.
 - No LiteCowork runtime or end-to-end bridge integration was executed. The upstream source review is static and commit-pinned; it does not qualify a local LiteCowork process launch, IPC identity, host mutation, or receipt/recovery path.
 
 ## Provider documentation check (2026-11-09)

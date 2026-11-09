@@ -14,7 +14,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` on 2026
 - **Tauri:** `apps/litecowork-ui/src-tauri/src/discover_bridge.rs` `discover_request` supports operations `search` and `item` only (registered in `apps/litecowork-ui/src-tauri/src/lib.rs`).
 - **UI:** `apps/litecowork-ui/src/discover/DiscoverPage.tsx` (tabs Explore, "Installed / native", Managed, Connections; Managed and Connections render "Not available"), `discover-state.ts` (`connectActionOutcome()` disables every row action), `discover-api.ts`, `desktop-discover-api.ts`; test `apps/litecowork-ui/tests/discover-catalog-state.test.ts`.
 - **Reusable:** `crates/operator-ipc` (`BudgetedBody`, `InFlightBodyBudget`, framed `read_response`), `crates/windows-local-security` (`current_logon_sid`, `connect_operator_pipe`).
-- **LiteSPM client:** absent. Upstream pins disagree (`9f42b25d`, `111fd9b8`, `f77a3a3`); upstream lacks a published descriptor, approval-recording method and package `operation.get` per interop LLD Appendix A.
+- **LiteSPM client:** absent. Earlier pins disagreed (`9f42b25d`, `111fd9b8`, `f77a3a3`); resolved 2026-11-09 to HEAD `84d5fab` (v0.6.0) in [LITESPM-INTEGRATION-STUDY-2026-11.md](../../docs/LITESPM-INTEGRATION-STUDY-2026-11.md); upstream lacks a published descriptor, approval-recording method and package `operation.get` per interop LLD Appendix A.
 
 Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/receipt, reconcile, adopt/unmanage, rollback/remove/update/repair, UI) plus CODE/SYSTEM/USER qualification on both rows.
 

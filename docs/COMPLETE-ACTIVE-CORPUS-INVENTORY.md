@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 355
-- Included lines: 71942
-- Included bytes: 6262007
+- Included lines: 71944
+- Included bytes: 6265167
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,7 +25,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 135 | 47792 |
+| docs/ | 135 | 47794 |
 | repository root | 6 | 1587 |
 | scripts/ | 1 | 14 |
 | specs/ | 201 | 21769 |
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 81 | 6032 | 2fc07511243a861e |
-| CURRENT-RUN.md | 201 | 26387 | 9dd948d2ebb538d5 |
+| CURRENT-RUN.md | 201 | 26387 | 7ee306084c722875 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 92 | 7389 | 5a5a73e85c542f17 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -60,7 +60,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/ARTIFACTS-EVIDENCE.md | 378 | 23528 | 578bcdabd6d2a17d |
 | docs/AUTOMATION.md | 705 | 41619 | 015fc6660d91eb00 |
 | docs/BENCHMARKS.md | 754 | 45114 | 42f307511fe0d5ac |
-| docs/CAPABILITY-FABRIC.md | 456 | 29129 | f84255c088a25b9c |
+| docs/CAPABILITY-FABRIC.md | 456 | 29925 | dc29be98a84bf177 |
 | docs/CAPABILITY-INVOCATIONS.md | 467 | 32012 | b735b7652ecf9b30 |
 | docs/CHANNELS.md | 280 | 17363 | ebf5c54dff8e2c6d |
 | docs/CHROME-BROWSER-LLD.md | 181 | 19891 | ba9613ca8f253f76 |
@@ -79,7 +79,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 377a0ba6fbbe1e9a |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 8be498b8b88ee4c1 |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 927 | 69198 | f6753a21cfcfe5eb |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
@@ -88,15 +88,15 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 299 | 59390 | 1ef080aeb6ac7686 |
+| docs/IMPLEMENTATION-STATUS.md | 299 | 59390 | 1249d25c00f876bb |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
 | docs/LEARNING.md | 818 | 37094 | ad064961a3f69b5e |
 | docs/LITECOWORK-BUILD-TASKS.md | 243 | 17725 | c26bc554baa20bc9 |
-| docs/LITESPM-INTEGRATION-PLAN.md | 191 | 16779 | 10f3bd47f887e60f |
+| docs/LITESPM-INTEGRATION-PLAN.md | 191 | 17575 | 6733e01124489db5 |
 | docs/LITESPM-INTEGRATION-STUDY-2026-11.md | 81 | 14288 | 29a0f78ec96dd977 |
-| docs/LITESPM-LITECOWORK-INTEROP-LLD.md | 287 | 31111 | 55dd20fbb201e796 |
+| docs/LITESPM-LITECOWORK-INTEROP-LLD.md | 289 | 32052 | b7d8effeaed325b7 |
 | docs/LOCAL-OPERATOR-IPC.md | 444 | 26885 | 938b6e92d39a029a |
 | docs/MOTION.md | 278 | 23552 | c678188ce4b599c7 |
 | docs/NATIVE-COMPOSER-LLD.md | 300 | 27971 | 716852c1e987a5f5 |
@@ -241,7 +241,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/006-golden-connection-capability-write/DATA-MODEL.md | 41 | 3145 | 9c4c8aeb7d43695d |
 | specs/006-golden-connection-capability-write/PLAN.md | 41 | 2781 | f76fe39bcc992cc3 |
 | specs/006-golden-connection-capability-write/README.md | 31 | 2402 | bbf4a5d13b7e8016 |
-| specs/006-golden-connection-capability-write/RESEARCH.md | 86 | 11549 | a98dec33078a0ad3 |
+| specs/006-golden-connection-capability-write/RESEARCH.md | 86 | 11679 | 5efffcc51d96b968 |
 | specs/006-golden-connection-capability-write/SPEC.md | 328 | 37470 | bb9cbf190ef6d012 |
 | specs/006-golden-connection-capability-write/TASKS.md | 353 | 35687 | 0df1871b9f8f824c |
 | specs/006-golden-connection-capability-write/contracts/README.md | 9 | 351 | 835fa319e3363915 |
@@ -312,8 +312,8 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/013-litespm-package-lifecycle-bridge/PLAN.md | 105 | 6895 | 1197004414881e83 |
 | specs/013-litespm-package-lifecycle-bridge/README.md | 29 | 3553 | 1f90e3ff3e6cb983 |
 | specs/013-litespm-package-lifecycle-bridge/RESEARCH.md | 55 | 8195 | 093934986fa58d96 |
-| specs/013-litespm-package-lifecycle-bridge/SPEC.md | 323 | 39460 | ae63fb3ccf593feb |
-| specs/013-litespm-package-lifecycle-bridge/TASKS.md | 418 | 40029 | acce3135ade6ca4a |
+| specs/013-litespm-package-lifecycle-bridge/SPEC.md | 323 | 39818 | f62a5308f95ae908 |
+| specs/013-litespm-package-lifecycle-bridge/TASKS.md | 418 | 40168 | bf7327c36f9346cc |
 | specs/013-litespm-package-lifecycle-bridge/contracts/README.md | 12 | 807 | 1fe6a14e99e97751 |
 | specs/013-litespm-package-lifecycle-bridge/contracts/api-events.md | 43 | 3831 | ae346d2f848429a4 |
 | specs/013-litespm-package-lifecycle-bridge/contracts/errors-recovery.md | 44 | 3638 | d9138839bfe8a2c2 |
