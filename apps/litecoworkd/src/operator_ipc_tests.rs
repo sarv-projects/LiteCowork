@@ -4617,7 +4617,13 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
             .expect("response frame is correlated")
     }
 
-    let current = send_lifecycle_request(&endpoint, expected_uid, "lifecycle-current", "/v1/runtime-lifecycle").await;
+    let current = send_lifecycle_request(
+        &endpoint,
+        expected_uid,
+        "lifecycle-current",
+        "/v1/runtime-lifecycle",
+    )
+    .await;
     assert_eq!(current.header.request_id, "lifecycle-current");
     assert_eq!(current.header.status, StatusCode::OK.as_u16());
     assert!(
@@ -4650,7 +4656,13 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
     assert!(body.get("dependent_tasks").is_none());
     assert!(body.to_string().find("test-boot-id").is_none());
 
-    let stale = send_lifecycle_request(&endpoint, expected_uid, "lifecycle-stale", "/v1/runtime-lifecycle").await;
+    let stale = send_lifecycle_request(
+        &endpoint,
+        expected_uid,
+        "lifecycle-stale",
+        "/v1/runtime-lifecycle",
+    )
+    .await;
     assert_eq!(stale.header.request_id, "lifecycle-stale");
     assert_eq!(
         stale.header.status,
@@ -4684,9 +4696,7 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
     assert_eq!(body["verdict"], "UNKNOWN");
     assert_eq!(body["blockers"][0]["code"], "RUNTIME_QUIESCENCE_UNKNOWN");
     assert_eq!(body["admitted_turn_ids"], serde_json::json!([]));
-    server
-        .await
-        .expect("server handles all lifecycle requests");
+    server.await.expect("server handles all lifecycle requests");
     let persisted = store
         .read_local_lifecycle_snapshot(runtime_id, incarnation_id)
         .expect("post-request lifecycle read succeeds")
