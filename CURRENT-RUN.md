@@ -226,6 +226,12 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 - Commands: `python3 .specify/scripts/validate_feature_package.py` PASS (20 packages); `python3 scripts/audit_served_routes.py` PASS (173/1/57); `validate_architecture.py`, `audit_v1_contracts.py` (errors=0), `audit_v1_design_depth.py` (findings=0), `validate_design_owner_consistency.py` (issues=[]) pass; `pnpm run api:check` and `npx tsc --noEmit` pass after `api:generate`; `pnpm test` 501 pass / 5 pre-existing failures; `cargo test -p storage-sqlite --lib needs_you` 10 pass.
 - Not done: no handler for any new operation; `openapi-spec-validator` is not installed here so only the repo's structural checks ran.
 
+### Wave 0 slice 4: 011-T07 local display preferences, 011-T06 partial (2026-11, CODE)
+
+- Added src/settings/local-preferences.ts, tests/local-preferences.test.mjs (7 tests), root application in App.tsx, dark theme, density, text scale and reduced-motion CSS. Removed the inert shortcut card from Settings.
+- Commands: `npx tsc --noEmit`, `pnpm run api:check`, `pnpm run build` pass; `pnpm test` 508 pass / 5 pre-existing failures.
+- 011-T06 remains PARTIAL: no control map, inert-control audit test or category modules yet.
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.

@@ -94,7 +94,7 @@ for cat,name,fail in rows:
 out+=["","## Pinned V1 interactive control set (011-T01)","",
 "Only the rows below may be interactive in V1 (AC-020). A control not listed here, or listed as target-only, renders as text with a reason and sends no mutation. The 187-control table above is the authored target, not the V1 acceptance surface (B-33).","",
 "| Category | Control | Class | Owner operation or store | V1 state |","|---|---|---|---|---|",
-"| General | Theme, density, text scale, reduced motion | LOCAL_PREF | desktop LocalPreferenceStore (011-T07) | not interactive until 011-T07 applies and persists them |",
+"| General | Theme, density, text scale, reduced motion | LOCAL_PREF | desktop LocalPreferenceStore (011-T07) | interactive; applied at the document root and persisted locally (011-T07, CODE) |",
 "| General | Keep-awake mode (OFF, WHILE_WORK_RUNS, WHILE_WORK_RUNS_ON_POWER) | NATIVE_MUTATION | RuntimeLifecycleView.power_assertion (target) | read-only text until 011-T12; HELD only after OS confirmation |",
 "| Workspaces | Select Workspace, view status | OPERATOR_READ | getWorkspace, listWorkspaces (served) | interactive |",
 "| Workspaces | Archive Workspace | OPERATOR_CAS | archive_workspace (served) | interactive with two-step confirm |",

@@ -104,7 +104,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T06 - Remove inert Settings controls and gate by owner class (B-29/B-33)
 
-- **Status:** PARTIAL (four categories mounted in `SettingsView.tsx`; inert General controls and display-only shortcut labels remain; the 16-category target is not rendered)
+- **Status:** PARTIAL (four categories mounted in `SettingsView.tsx`; the display-only shortcut card is removed and the General appearance controls are now real via T07; NOT done: `settings-control-map.ts`, the inert-control audit test, per-category modules, unavailable entries for Usage, Storage and About, target-only rendering audit)
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI, Product
@@ -122,7 +122,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T07 - Applied and persisted local display preferences
 
-- **Status:** NOT STARTED (values exist only as `useState` in `SettingsView.tsx`)
+- **Status:** DONE (CODE): `src/settings/local-preferences.ts` validates, persists (webview localStorage under `litecowork.local-preferences.v1`) and applies theme, density, text scale and reduced motion at the document root from `App.tsx`; `tests/local-preferences.test.mjs` (7 tests). Restart survival is proven by reloading from the same storage, not in a packaged app
 - **Depends on:** T06
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI
@@ -130,9 +130,9 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §7.2 `LocalPreferenceStore`; DATA-MODEL; AC-004
 - **Change intent:** Persist theme, density, text scale and reduced motion in a desktop-local store and apply them at the document root (CSS variables and `prefers-reduced-motion` override). Corrupt or unknown stored values fall back to defaults. No preference touches grants, bindings or Operator state.
 - **Acceptance:**
-  - [ ] Changing a value applies immediately and survives app restart (AC-004).
-  - [ ] Corrupt stored JSON resets to defaults without crashing.
-  - [ ] Test proves no Operator call is made by a preference change (AC-004).
+  - [x] Changing a value applies immediately and survives app restart (AC-004).
+  - [x] Corrupt stored JSON resets to defaults without crashing.
+  - [x] Test proves no Operator call is made by a preference change (AC-004).
 - **Command:** `pnpm --dir apps/litecowork-ui test`
 - **Evidence:** test names; ledger rows switch to LOCAL_PREF served.
 - **Stop:** stop if a preference would be synced or replicated.

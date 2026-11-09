@@ -16,6 +16,7 @@ import type {
 import type { WorkspaceListState } from "../workspaces/WorkspaceFirstRun";
 import type { RuntimeInventoryStreamStatus } from "../runtime/runtime-inventory-stream";
 import { deriveRuntimeHealthRows } from "../runtime/runtime-health";
+import type { LocalPreferences } from "./local-preferences";
 import "./settings-view.css";
 
 export type SettingsCategory =
@@ -25,6 +26,8 @@ export type SettingsCategory =
   | "runtime";
 
 export type SettingsViewProps = {
+  localPreferences: LocalPreferences;
+  onChangeLocalPreferences: (next: LocalPreferences) => void;
   runtime: RuntimeStatus | null;
   runtimeLifecycle: RuntimeLifecycleView | null;
   runtimeLifecycleLoading: boolean;
@@ -98,11 +101,10 @@ export function SettingsView(props: SettingsViewProps) {
     typeof navigator === "undefined" ? "" : navigator.platform,
   );
 
-  // General Preferences (component-local state; not persisted or applied globally)
-  const [theme, setTheme] = useState<"system" | "light" | "dark">("light");
-  const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
-  const [textScale, setTextScale] = useState<"100" | "110" | "125">("100");
-  const [reducedMotion, setReducedMotion] = useState(false);
+  // General display preferences are LOCAL_PREF: applied at the document root by App and persisted locally.
+  const { theme, density, textScale, reducedMotion } = props.localPreferences;
+  const updatePreference = (patch: Partial<LocalPreferences>) =>
+    props.onChangeLocalPreferences({ ...props.localPreferences, ...patch });
 
   const selectedWorkspace = props.workspaces.find(ws => ws.workspaceId === props.selectedWorkspaceId);
   const currentRuntimeBinding = props.runtimeBindings.find(
@@ -164,7 +166,7 @@ export function SettingsView(props: SettingsViewProps) {
               <header className="settings-header">
                 <h1 className="settings-title">General &amp; Desktop</h1>
                 <p className="settings-description">
-                  Customize the visual appearance, density, keyboard interaction, and display scaling of your LiteCowork desktop workspace.
+                  Customize the visual appearance, density, motion, and display scaling of your LiteCowork desktop workspace.
                 </p>
               </header>
 
@@ -185,7 +187,7 @@ export function SettingsView(props: SettingsViewProps) {
                     <select
                       className="settings-select"
                       value={theme}
-                      onChange={e => setTheme(e.target.value as "system" | "light" | "dark")}
+                      onChange={e => updatePreference({ theme: e.target.value as LocalPreferences["theme"] })}
                     >
                       <option value="light">Light (Calm Workstation)</option>
                       <option value="dark">Dark (Deep Contrast)</option>
@@ -203,7 +205,7 @@ export function SettingsView(props: SettingsViewProps) {
                     <select
                       className="settings-select"
                       value={density}
-                      onChange={e => setDensity(e.target.value as "comfortable" | "compact")}
+                      onChange={e => updatePreference({ density: e.target.value as LocalPreferences["density"] })}
                     >
                       <option value="comfortable">Comfortable</option>
                       <option value="compact">Compact</option>
@@ -220,7 +222,7 @@ export function SettingsView(props: SettingsViewProps) {
                     <select
                       className="settings-select"
                       value={textScale}
-                      onChange={e => setTextScale(e.target.value as "100" | "110" | "125")}
+                      onChange={e => updatePreference({ textScale: e.target.value as LocalPreferences["textScale"] })}
                     >
                       <option value="100">100% (Default 15px)</option>
                       <option value="110">110% (16.5px)</option>
@@ -239,7 +241,7 @@ export function SettingsView(props: SettingsViewProps) {
                       <input
                         type="checkbox"
                         checked={reducedMotion}
-                        onChange={e => setReducedMotion(e.target.checked)}
+                        onChange={e => updatePreference({ reducedMotion: e.target.checked })}
                       />
                       <span className="settings-toggle-slider" />
                     </label>
@@ -247,35 +249,6 @@ export function SettingsView(props: SettingsViewProps) {
                 </div>
               </section>
 
-              <section className="settings-card">
-                <div className="settings-card-header">
-                  <div>
-                    <h2 className="settings-card-title">Keyboard Shortcuts</h2>
-                    <p className="settings-card-subtitle">Global shortcuts configured for high-speed local workstation navigation.</p>
-                  </div>
-                </div>
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">New Conversation</span>
-                    <span className="settings-row-desc">Clear draft and focus conversation composer</span>
-                  </div>
-                  <kbd className="settings-badge">Ctrl + N</kbd>
-                </div>
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Toggle Side Workbench</span>
-                    <span className="settings-row-desc">Show or hide the right tool workbench panel</span>
-                  </div>
-                  <kbd className="settings-badge">Ctrl + W</kbd>
-                </div>
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Global Search / Library</span>
-                    <span className="settings-row-desc">Quickly find saved files, artifacts, and conversations</span>
-                  </div>
-                  <kbd className="settings-badge">Ctrl + K</kbd>
-                </div>
-              </section>
             </>
           )}
 
