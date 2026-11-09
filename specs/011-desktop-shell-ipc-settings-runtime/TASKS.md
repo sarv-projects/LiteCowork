@@ -378,7 +378,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T22 - Persistent Workspace Dashboard with pinnable widgets (P-16)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-16 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package.
+- **Status:** PARTIAL (CODE). `src/dashboard/dashboard-state.ts` (pure: per-Workspace pins in localStorage `litecowork.dashboard.pins.v1`, validated, corrupt state falls back to all pinned, bounded workspace entries, count summaries that flag first-page truncation), `WorkspaceDashboard.tsx` (pin/unpin with `aria-pressed`, UNAVAILABLE with reason, errors become UNAVAILABLE, stale responses ignored on Workspace switch), a new `Dashboard` Page in the sidebar More group, `tests/workspace-dashboard.test.mjs` (8 tests). Sources: Task status reads `list_tasks` (first 50, counted by status), Automation status reads `automationApi.list`, Coworker activity reads `coworkerApi.list` (a roster count, not live activity), and Recent artifacts is UNAVAILABLE because no Workspace-wide artifact projection is served (artifacts list per Task only). NOT done: a live Coworker activity projection, a recent-artifacts projection, a rendered-browser check of the effect-driven states (no Chrome here), and the ui-behavior.md trace row
 - **Depends on:** T06, T19
 - **Cross-package prerequisites:** Feature 005 Task status, Feature 010 automation status, Feature 009 Coworker activity and Feature 007 recent artifacts as the widget read sources.
 - **Owner:** Desktop UI.
@@ -387,8 +387,8 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Change intent:** add a persistent Workspace Dashboard with pinnable widgets for Task status, automation status, Coworker activity and recent artifacts. Each widget reads a served owner projection; an unavailable source renders the widget as unavailable with its reason, never a fabricated value. Pin state persists locally per Workspace.
 - **Acceptance:**
   - [ ] The dashboard shows pinnable Task-status, automation-status, Coworker-activity and recent-artifacts widgets from served projections (AC-024).
-  - [ ] An unavailable widget source renders unavailable with its reason, not empty or fabricated (AC-024).
-  - [ ] Pin state persists across restart per Workspace.
+  - [x] An unavailable widget source renders unavailable with its reason, not empty or fabricated (AC-024).
+  - [x] Pin state persists across restart per Workspace.
 - **Command:** `pnpm --dir apps/litecowork-ui test`
 - **Evidence:** dashboard render and persistence test output in Completion evidence.
 - **Stop:** a widget would show a value with no served owner source; render it unavailable.

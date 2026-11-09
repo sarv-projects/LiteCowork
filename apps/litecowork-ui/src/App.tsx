@@ -53,6 +53,8 @@ import {
 import { LibraryPage } from "./library/LibraryPage";
 import { formatBytes } from "./library/library-format";
 import { OperatorUnavailablePanel } from "./shell/OperatorUnavailablePanel";
+import { WorkspaceDashboard, type WidgetSource } from "./dashboard/WorkspaceDashboard";
+import { summarizeByStatus, summarizeTotal } from "./dashboard/dashboard-state.ts";
 import { LibraryNavigationDialog, libraryNavigationMainIsInert, useLibraryNavigation } from "./resources/library-navigation";
 import { TaskResourceTextPreview } from "./resources/TaskResourceTextPreview";
 import { validateResourceSourceHighlights, type ResourceSourceMatch, type SourceHighlightResult } from "./resources/source-span-highlights";
@@ -117,7 +119,7 @@ import {
   type PendingRename,
 } from "./settings/workspace-rename.ts";
 
-type Page = "Home" | "Conversations" | "Work" | "Library" | "Discover" | "Needs You" | "Ideas" | "Coworkers" | "Goals" | "Notifications" | "Routines" | "Automations" | "Settings";
+type Page = "Home" | "Conversations" | "Work" | "Library" | "Discover" | "Needs You" | "Ideas" | "Coworkers" | "Goals" | "Notifications" | "Routines" | "Automations" | "Dashboard" | "Settings";
 export type RuntimeStatus = {
   state: string;
   runtimeId: string | null;
@@ -442,11 +444,12 @@ export const navigation: { label: Page; displayLabel?: string; group?: string }[
   { label: "Goals", displayLabel: "Goals", group: "MONITORING" },
   { label: "Notifications", displayLabel: "Notifications" },
   { label: "Ideas", displayLabel: "Ideas" },
+  { label: "Dashboard", displayLabel: "Dashboard" },
   { label: "Settings", displayLabel: "Settings", group: "SYSTEM" },
 ];
 
 /** Pages that have no dedicated primary button; the sidebar renders them from `navigation`. */
-const SIDEBAR_MORE_PAGES: Page[] = ["Home", "Goals", "Notifications", "Ideas"];
+const SIDEBAR_MORE_PAGES: Page[] = ["Home", "Dashboard", "Goals", "Notifications", "Ideas"];
 
 const UPLOAD_RESUME_KEY = "litecowork.resourceUploadResume.v1";
 const TASK_STATUSES: TaskStatus[] = [
@@ -828,6 +831,27 @@ function App() {
   const automationApi = useMemo(() => desktopAutomationApi(selectedWorkspaceId), [selectedWorkspaceId]);
   const routineApi = useMemo(() => desktopRoutineApi(selectedWorkspaceId), [selectedWorkspaceId]);
   const coworkerApi = useMemo(() => desktopCoworkerApi(selectedWorkspaceId), [selectedWorkspaceId]);
+  const dashboardSources = useMemo<Record<"tasks" | "automations" | "coworkers" | "artifacts", WidgetSource>>(() => ({
+    tasks: {
+      load: async () => {
+        const page = await invoke<TaskPageView>("list_tasks", { workspaceId: selectedWorkspaceId, status: null, cursor: null, limit: 50 });
+        return summarizeByStatus(page.items, Object.fromEntries(TASK_STATUSES.map((status) => [status, taskStatusLabel(status)])), page.nextCursor !== null);
+      },
+    },
+    automations: {
+      load: async () => {
+        const page = await automationApi.list(undefined);
+        return summarizeByStatus(page.items, {}, page.next_cursor !== null && page.next_cursor !== undefined);
+      },
+    },
+    coworkers: {
+      load: async () => {
+        const page = await coworkerApi.list(undefined);
+        return summarizeTotal("Coworkers", page.items.length, page.next_cursor !== null);
+      },
+    },
+    artifacts: { unavailable: "No Workspace-wide recent-artifacts projection is served yet; artifacts are only listed per Task." },
+  }), [selectedWorkspaceId, automationApi, coworkerApi]);
   const delegationProfileApi = useMemo(() => desktopDelegationProfileCatalogApi(selectedWorkspaceId), [selectedWorkspaceId]);
   const goalApi = useMemo(() => desktopGoalApi(selectedWorkspaceId), [selectedWorkspaceId]);
   const notificationApi = useMemo(() => maybeDesktopNotificationApi(selectedWorkspaceId), [selectedWorkspaceId]);
@@ -2685,6 +2709,10 @@ function App() {
                 : workspace));
             }}
           />
+        ) : page === "Dashboard" && (!selectedWorkspaceId || runtime?.operatorReady !== true) ? (
+          <OperatorUnavailablePanel eyebrow="WORKSPACE" title="Dashboard" icon="▦" message="Start the local Runtime and select a Workspace to read dashboard projections. No value is cached or invented in this view." onOpenSettings={() => requestPageNavigation("Settings")} />
+        ) : page === "Dashboard" ? (
+          <WorkspaceDashboard key={selectedWorkspaceId} workspaceId={selectedWorkspaceId} storage={window.localStorage} sources={dashboardSources} />
         ) : page === "Goals" ? (
           <GoalsPage key={selectedWorkspaceId} api={goalApi} workspaceId={selectedWorkspaceId} onOpenTask={(taskId) => {
             setOpenedTask({ workspaceId: selectedWorkspaceId, taskId });
@@ -3565,6 +3593,7 @@ function PlaceholderPage({ page, onSettings }: { page: Page; onSettings: () => v
     Notifications: { title: "Notifications", description: "Local delivery history and the policies that decide whether a settled outcome is announced." },
     Routines: { title: "Routines", description: "Reusable work definitions. Saving a Routine does not schedule or run it." },
     Automations: { title: "Automations", description: "Saved trigger definitions. Trigger hosting and Task creation are not available yet." },
+    Dashboard: { title: "Dashboard", description: "Pinnable Workspace status widgets read from served Runtime projections." },
     Settings: { title: "Settings", description: "Local Runtime status and startup are available in the desktop shell." },
   };
   const item = content[page];

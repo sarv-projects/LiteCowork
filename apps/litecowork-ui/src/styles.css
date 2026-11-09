@@ -1312,3 +1312,8 @@ html { font-size: calc(100% * var(--lc-text-scale, 1)); }
 .update-panel-message:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .update-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .update-panel-reason { color: #4b5563; font-size: 13px; margin: 0; }
+
+/* Workspace Dashboard (011-T22) */
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.dashboard-widget-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dashboard-note { color: #4b5563; font-size: 13px; margin: 4px 0 0; }
