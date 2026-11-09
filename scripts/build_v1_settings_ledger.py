@@ -91,6 +91,23 @@ for cat,name,fail in rows:
  else:
   state="durable receipt or reconciled provider observation; uncertain != success"
  out.append(f"| {name} | {cat} | {owner} | {scope} | {kind} | {state}; {fail} | {refs} |")
+out+=["","## Pinned V1 interactive control set (011-T01)","",
+"Only the rows below may be interactive in V1 (AC-020). A control not listed here, or listed as target-only, renders as text with a reason and sends no mutation. The 187-control table above is the authored target, not the V1 acceptance surface (B-33).","",
+"| Category | Control | Class | Owner operation or store | V1 state |","|---|---|---|---|---|",
+"| General | Theme, density, text scale, reduced motion | LOCAL_PREF | desktop LocalPreferenceStore (011-T07) | not interactive until 011-T07 applies and persists them |",
+"| General | Keep-awake mode (OFF, WHILE_WORK_RUNS, WHILE_WORK_RUNS_ON_POWER) | NATIVE_MUTATION | RuntimeLifecycleView.power_assertion (target) | read-only text until 011-T12; HELD only after OS confirmation |",
+"| Workspaces | Select Workspace, view status | OPERATOR_READ | getWorkspace, listWorkspaces (served) | interactive |",
+"| Workspaces | Archive Workspace | OPERATOR_CAS | archive_workspace (served) | interactive with two-step confirm |",
+"| Workspaces | Rename Workspace | OPERATOR_CAS | renameWorkspace (target-only) | not interactive until 011-T08 lands the handler |",
+"| Workspaces | Replication policy | OPERATOR_CAS | updateWorkspacePolicy (served) | interactive where already mounted |",
+"| Agents | Catalog, installation list, profile probe, registry refresh | QUALIFIED_READ / NATIVE_MUTATION | listAgentProfiles, listAgentRegistry, listLocalAgentInstallations, probeLocalAgentProfile, refreshAgentRegistry (served) | interactive; install, update and configure stay target-only text until Feature 002 serves them (011-T09) |",
+"| Runtime | View Runtime lifecycle and Operator readiness | SCOPED_READ/OBSERVATION | getLocalOperatorReadiness, getLocalRuntimeLifecycle (served) | interactive |",
+"| Runtime | Start Runtime | NATIVE_MUTATION | desktop bridge start_local_runtime | interactive; readiness derives from the authenticated observation |",
+"| Runtime | Startup policy | NATIVE_MUTATION | setLocalRuntimeStartupPolicy (target-only) | read-only text |",
+"| Runtime | Preview stop, Stop safely | NATIVE_MUTATION | previewLocalRuntimeStop, requestLocalRuntimeStop (target-only) | not interactive until 011-T13 proves settlement; verdict UNKNOWN never enables stop |",
+"| Notifications | Link to quiet hours | OPERATOR_CAS | Feature 010 owner operations | link only (011-T10) |",
+"| Usage & Monitoring, Storage & Backup, About & Diagnostics | Unavailable entries | none | Features 018 and 017 | rendered as unavailable text with prerequisite, no controls |",
+]
 out+=["","## Cross-category race and handoff invariants","",
 "- Installing an AgentModule is not authenticating it, creating an AgentBinding, making it ready, choosing its model or switching an active Attempt. Use separate owner revisions and native handshake proof.",
 "- Install/activate/authenticate/grant/assign/invoke LiteSPM capabilities are distinct. A per-Coworker revoke must not globally revoke a shared account.",

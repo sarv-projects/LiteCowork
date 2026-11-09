@@ -1501,6 +1501,11 @@
       "method": "PUT",
       "path": "/workspaces/{workspaceId}/delegation-settings",
       "operation_id": "setWorkspaceDelegationSettings"
+    },
+    {
+      "method": "PUT",
+      "path": "/workspaces/{workspaceId}/name",
+      "operation_id": "renameWorkspace"
     }
   ]
 }

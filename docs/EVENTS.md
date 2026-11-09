@@ -161,6 +161,7 @@ workspace.replication_policy.changed.v1
 workspace.default_agent_binding.changed.v1
 workspace.delegation.settings.changed.v1
 workspace.primary_coworker.changed.v1
+workspace.renamed.v1
 workspace.archived.v1
 workspace.instructions.revision.created.v1
 workspace.root.created.v1
@@ -352,6 +353,7 @@ store/forward unknown versions but cannot apply them to projections they do not 
 | `workspace.replication_policy.changed` | `workspace_id`, `from`, `to`, `replication_scope_root_ids[]`, `aggregate_version` |
 | `workspace.default_agent_binding.changed` | `workspace_id`, `from_agent_binding_id`, `to_agent_binding_id`, `changed_by`, `aggregate_version` |
 | `workspace.archived` | `workspace_id`, `archived_by`, `aggregate_version` |
+| `workspace.renamed` | `workspace_id`, `from_name`, `to_name`, `changed_by`, `aggregate_version` |
 | `workspace.instructions.revision.created` | `workspace_id`, `revision`, `parent_revisions[]`, `content_ref`, `content_digest`, `authored_by` |
 | `workspace.root.created` | `workspace_root_id`, `workspace_id`, `resource_id`, `location_id`, `added_by`, `aggregate_version` |
 | `workspace.root.status.changed` | `workspace_root_id`, `from`, `to`, `reason_code`, `aggregate_version` |

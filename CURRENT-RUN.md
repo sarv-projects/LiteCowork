@@ -220,6 +220,12 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 
 - Command: `pnpm test` in apps/litecowork-ui: 501 pass, 5 fail, 10 skipped. The same 5 failures (Needs You page x4 needing Chrome, esbuild build-script lock approval) occur on the base state with my changes stashed (496 pass, 5 fail), so they are pre-existing. `npx tsc --noEmit` clean.
 
+### Wave 0 slice 3: 011-T01 contract promotion (2026-11, CODE, contract level only)
+
+- Changed: operator-api.openapi.yaml (RuntimeStopPreview settlement lists and verdict, If-Match on requestLocalRuntimeStop, PowerAssertion, renameWorkspace + RenameWorkspaceRequest), domain-event.schema.json (`workspace.renamed.v1`, 4 error codes mirrored), error-codes.schema.json, served-route-inventory.json (target_only 56 -> 57), EVENTS.md, SCHEMAS.md, RUNTIME-LIFECYCLE.md (accepted 011 interfaces and update quiescence gate), V1-SETTINGS-CONTRACT-LEDGER.md (pinned V1 interactive control set, via scripts/build_v1_settings_ledger.py), route-count constants in three audit scripts and the docs that quote 56/229.
+- Commands: `python3 .specify/scripts/validate_feature_package.py` PASS (20 packages); `python3 scripts/audit_served_routes.py` PASS (173/1/57); `validate_architecture.py`, `audit_v1_contracts.py` (errors=0), `audit_v1_design_depth.py` (findings=0), `validate_design_owner_consistency.py` (issues=[]) pass; `pnpm run api:check` and `npx tsc --noEmit` pass after `api:generate`; `pnpm test` 501 pass / 5 pre-existing failures; `cargo test -p storage-sqlite --lib needs_you` 10 pass.
+- Not done: no handler for any new operation; `openapi-spec-validator` is not installed here so only the repo's structural checks ran.
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.

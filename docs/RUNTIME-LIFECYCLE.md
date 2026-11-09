@@ -79,6 +79,14 @@ settlement are integrated. The process signal handler is a daemon/supervisor shu
 path, not an Operator lifecycle API and not evidence that those domain dependencies were
 reconciled.
 
+### Accepted 011 interfaces (target-only until handlers land)
+
+- `previewLocalRuntimeStop` returns `RuntimeStopPreview` with admitted turn and Attempt IDs, unresolved Effect IDs, execution and environment-control lease IDs, provider reference IDs, pending cleanup IDs and `verdict` of `QUIESCENT`, `BLOCKED` or `UNKNOWN`. `QUIESCENT` requires every list empty and observed; any item that cannot be observed yields `UNKNOWN`, never `QUIESCENT`.
+- `requestLocalRuntimeStop` is authenticated, idempotent (`Idempotency-Key`) and `If-Match` on the current incarnation version. Admission is fenced before `DRAINING`. `STOPPED` is never reported while any settlement item is unsettled or `UNKNOWN`; refusals use `RUNTIME_STOP_UNSETTLED` or `RUNTIME_QUIESCENCE_UNKNOWN`. The route stays unmounted until settlement is proven.
+- Update quiescence gate: Feature 019 calls the preview for the current incarnation and may proceed with a desktop update or install only on `verdict = QUIESCENT` for that exact incarnation. Any other verdict, a stale incarnation or an unreachable Operator refuses the update and reports what is running or unknown.
+- `PowerAssertion { mode: OFF | WHILE_WORK_RUNS | WHILE_WORK_RUNS_ON_POWER, os_state: HELD | RELEASED | UNSUPPORTED | UNKNOWN, observed_at }` is exposed as optional `RuntimeLifecycleView.power_assertion`. It is held by the daemon process, `HELD` is reported only after the OS confirms the assertion, and it is released on drain, stop or when no admitted work runs. Unsupported providers report `UNSUPPORTED`; a mode change there is refused with `KEEP_AWAKE_UNSUPPORTED`.
+- `renameWorkspace` (`PUT /workspaces/{workspaceId}/name`) is a Workspace owner mutation over `workspaces.name` and `Workspace.version` with `If-Match` and `Idempotency-Key`; it emits `workspace.renamed.v1`, rejects archived Workspaces with `WORKSPACE_ARCHIVED` and invalid names with `WORKSPACE_NAME_INVALID`. No migration is needed.
+
 The desktop transport's OS identity, endpoint lifecycle, frame bounds, and reconnection
 contract are specified in [`LOCAL-OPERATOR-IPC.md`](LOCAL-OPERATOR-IPC.md). The daemon
 and Tauri source use Unix IPC on Linux/macOS and now include a Windows named-pipe path

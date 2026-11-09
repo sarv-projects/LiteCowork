@@ -676,6 +676,37 @@
         },
         "additionalProperties": false
       },
+      "workspace_renamed": {
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "from_name",
+          "to_name",
+          "changed_by",
+          "aggregate_version"
+        ],
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from_name": {
+            "type": "string"
+          },
+          "to_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "changed_by": {
+            "$ref": "#/$defs/principal_ref"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
       "workspace_archived": {
         "type": "object",
         "required": [
@@ -9374,6 +9405,7 @@
         "INVALID_TRIGGER",
         "INVOCATION_AMBIGUOUS",
         "INVOCATION_NOT_FOUND",
+        "KEEP_AWAKE_UNSUPPORTED",
         "LEAD_FAILOVER_POLICY_INVALID",
         "LEASE_CONFLICT",
         "LIMIT_EXCEEDED",
@@ -9409,8 +9441,10 @@
         "ROUTINE_REVISION_DRIFTED",
         "ROUTINE_REVISION_NOT_FOUND",
         "RUNTIME_MISMATCH",
+        "RUNTIME_QUIESCENCE_UNKNOWN",
         "RUNTIME_STARTUP_UNAVAILABLE",
         "RUNTIME_STOP_BLOCKED",
+        "RUNTIME_STOP_UNSETTLED",
         "RUNTIME_UNAVAILABLE",
         "SCAN_UNAVAILABLE",
         "SCAN_UNSUPPORTED_PLATFORM",
@@ -9448,6 +9482,7 @@
         "WORKER_BUDGET_EXCEEDED",
         "WORKER_QUALITY_FLOOR_UNMET",
         "WORKSPACE_ARCHIVED",
+        "WORKSPACE_NAME_INVALID",
         "WORKSPACE_NOT_QUIESCENT"
       ]
     },
@@ -9564,6 +9599,25 @@
         "properties": {
           "payload": {
             "$ref": "#/$defs/payloads/workspace_default_agent_binding_changed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "workspace.renamed.v1"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/payloads/workspace_renamed"
           }
         }
       }

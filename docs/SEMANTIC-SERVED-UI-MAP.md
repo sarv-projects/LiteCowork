@@ -12,7 +12,7 @@ The machine inventory is docs/schemas/served-route-inventory.json, generated fro
 |---|---:|---|
 | OpenAPI operations registered in the composed production Operator router | 173 | Method/path is registered by the composed router |
 | Authenticated local-only operation outside OpenAPI | 1 | POST /v1/stream; local Operator stream transport |
-| OpenAPI operations not registered in the composed production router | 56 | Target contract only; do not call as live operations |
+| OpenAPI operations not registered in the composed production router | 57 | Target contract only; do not call as live operations |
 
 A registered route is not proof that a handler performs a consequential operation. Some routes are read-only projections; some intentionally fail closed; some persist a definition but do not dispatch a provider. Assess three separate layers:
 

@@ -183,6 +183,24 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/Workspace'}
         default: {$ref: '#/components/responses/Error'}
+  /workspaces/{workspaceId}/name:
+    put:
+      tags: [workspaces]
+      operationId: renameWorkspace
+      description: Target-only until the handler lands. Renames an ACTIVE Workspace over the existing workspaces.name column; bumps Workspace.version and emits workspace.renamed.v1. Archived Workspaces are read-only.
+      parameters: [{$ref: '#/components/parameters/WorkspaceId'}, {$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RenameWorkspaceRequest'}
+      responses:
+        '200':
+          description: Workspace renamed; the response carries the new version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Workspace'}
+        default: {$ref: '#/components/responses/Error'}
   /workspaces/{workspaceId}/delegation-settings:
     get:
       tags: [delegation]
@@ -1711,8 +1729,9 @@ paths:
     post:
       tags: [runtime-lifecycle]
       operationId: requestLocalRuntimeStop
+      description: Target-only until Task/Attempt, Effect, lease and local service-reference settlement is proven. Authenticated, idempotent, If-Match on the current incarnation version. Admission is fenced before DRAINING; STOPPED is never reported while any settlement item is unsettled or UNKNOWN.
       security: [{operatorAuth: []}]
-      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
       requestBody:
         required: true
         content:
@@ -4763,6 +4782,12 @@ components:
           type: array
           description: Required and non-empty when replication_policy is SELECTED_FOLDERS; every ID must be an active root in this Workspace.
           items: {type: string, minLength: 1}
+    RenameWorkspaceRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 200, description: Trimmed, non-empty display name; control characters are rejected.}
     SetWorkspaceDefaultAgentBindingRequest:
       type: object
       additionalProperties: false
@@ -6223,6 +6248,16 @@ components:
         blockers: {type: array, items: {$ref: '#/components/schemas/Blocker'}}
         dependent_tasks: {type: array, items: {$ref: '#/components/schemas/TaskSummary'}}
         dependent_automations: {type: array, items: {$ref: '#/components/schemas/AutomationSummary'}}
+        power_assertion: {$ref: '#/components/schemas/PowerAssertion'}
+    PowerAssertion:
+      type: object
+      additionalProperties: false
+      description: Keep-awake observation held by the daemon process and read from the OS; HELD is reported only after the OS confirms the assertion, and it is released on drain.
+      required: [mode, os_state, observed_at]
+      properties:
+        mode: {type: string, enum: [OFF, WHILE_WORK_RUNS, WHILE_WORK_RUNS_ON_POWER]}
+        os_state: {type: string, enum: [HELD, RELEASED, UNSUPPORTED, UNKNOWN]}
+        observed_at: {type: string, format: date-time}
     LocalOperatorReadiness:
       type: object
       additionalProperties: false
@@ -6241,11 +6276,19 @@ components:
     RuntimeStopPreview:
       type: object
       additionalProperties: false
-      required: [runtime_id, runtime_incarnation_id, observed_at, dependent_task_ids, dependent_automation_ids, workspace_root_ids, shared_service_refs, eligible_handoff_task_ids, blockers]
+      required: [runtime_id, runtime_incarnation_id, observed_at, dependent_task_ids, dependent_automation_ids, workspace_root_ids, shared_service_refs, eligible_handoff_task_ids, blockers, admitted_turn_ids, admitted_attempt_ids, unresolved_effect_ids, execution_lease_ids, environment_control_lease_ids, provider_reference_ids, pending_cleanup_ids, verdict]
       properties:
         runtime_id: {type: string}
         runtime_incarnation_id: {type: string}
         observed_at: {type: string, format: date-time}
+        admitted_turn_ids: {type: array, items: {type: string}}
+        admitted_attempt_ids: {type: array, items: {type: string}}
+        unresolved_effect_ids: {type: array, items: {type: string}}
+        execution_lease_ids: {type: array, items: {type: string}}
+        environment_control_lease_ids: {type: array, items: {type: string}}
+        provider_reference_ids: {type: array, items: {type: string}}
+        pending_cleanup_ids: {type: array, items: {type: string}}
+        verdict: {type: string, enum: [QUIESCENT, BLOCKED, UNKNOWN], description: QUIESCENT only when every list above is empty and observed; any unobservable item makes the verdict UNKNOWN, never QUIESCENT.}
         dependent_task_ids: {type: array, items: {type: string}}
         dependent_automation_ids: {type: array, items: {type: string}}
         workspace_root_ids: {type: array, items: {type: string}}

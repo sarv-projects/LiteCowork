@@ -17,7 +17,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T01 - Promote accepted 011 interfaces into owner docs and schemas
 
-- **Status:** NOT STARTED
+- **Status:** DONE (CODE, contract level): `RuntimeStopPreview` gained settlement lists and `verdict`; `requestLocalRuntimeStop` gained `If-Match`; `PowerAssertion` added as optional `RuntimeLifecycleView.power_assertion`; `renameWorkspace` (PUT /workspaces/{workspaceId}/name) added target-only with `workspace.renamed.v1`; error codes `RUNTIME_STOP_UNSETTLED`, `RUNTIME_QUIESCENCE_UNKNOWN`, `KEEP_AWAKE_UNSUPPORTED`, `WORKSPACE_NAME_INVALID` added; V1 control set pinned in the Settings ledger. No handlers exist; every new operation stays target-only (57 target-only now)
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Runtime, Operator IPC, Workspace owner, Desktop UI (contract owners)
@@ -25,9 +25,9 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §5, §7.2; AC-014, AC-015, AC-016, AC-017, AC-019, AC-020
 - **Change intent:** In one change: define the `previewLocalRuntimeStop` response (`StopPreview` item lists and verdict) and the `requestLocalRuntimeStop` idempotency/If-Match semantics; add `renameWorkspace` over the existing `workspaces.name` and `Workspace.version`; define the update quiescence gate contract that Feature 019 calls; define the `PowerAssertion` observation and keep-awake modes; pin the exact V1 Settings control set (B-33) in the ledger with each control's owner operation or LOCAL_PREF class; add a Workspace renamed event and the stop/rename/keep-awake error codes. All new operations stay target-only in the route inventory until handlers land.
 - **Acceptance:**
-  - [ ] OpenAPI, event and error-code schemas validate and match owner prose.
-  - [ ] Ledger lists every control that will be interactive in V1 and nothing else (AC-020).
-  - [ ] `api:check` passes after regeneration.
+  - [x] OpenAPI, event and error-code schemas validate and match owner prose.
+  - [x] Ledger lists every control that will be interactive in V1 and nothing else (AC-020).
+  - [x] `api:check` passes after regeneration.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py` and `pnpm --dir apps/litecowork-ui run api:check` and `python3 scripts/audit_served_routes.py`
 - **Evidence:** schema validation output in CURRENT-RUN.md.
 - **Stop:** stop if a promoted field duplicates another owner's schema.
