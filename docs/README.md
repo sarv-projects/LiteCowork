@@ -47,6 +47,7 @@ Do not create a second schema authority. Promote machine contracts in schemas/ a
 - SEMANTIC-SERVED-UI-MAP.md: user-visible controls mapped to their actual owner operations and evidence state.
 - SETTINGS-AND-SHELL-SURFACE-AUDIT.md: source-level inventory of mounted Settings controls, unused props, unmounted alternate page and shell-surface boundaries.
 - [UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md](UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md): 2026-11-09 audit of agent-output rendering, Intelligent UI, every screen, every Settings control and architecture, with cowork-style recommendations and proposed tasks.
+- [REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md): 2026-11-09 synthesis of nine reference repos, the LiteSPM service model, ACP, and alignment of all 17 Final Product Feature List capabilities to the 20 packages, with proposed tasks P-11..P-19.
 - V1-FUNCTION-CONTRACT-LEDGER.md: user-facing function contracts.
 - V1-SETTINGS-CONTRACT-LEDGER.md: individual settings behavior and persistence.
 - V1-UI-ACTION-STATE-LEDGER.md: UI actions, eligibility, loading, empty, failure and recovery states.
