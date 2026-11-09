@@ -212,7 +212,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T12 - Update panel UI states hosted in the Feature 011 Advanced tab
 
-- **Status:** NOT STARTED.
+- **Status:** PARTIAL (CODE): `src/updates/update-state.ts` (pure reducer, state descriptions, single-flight controller), `desktop-update-api.ts` (typed parsing of `check_for_update` / `install_update` results), `UpdatePanel.tsx` (aria-live status, focus moves to the result message, disabled install exposes its reason, no animation), `tests/update-state.test.ts`, `tests/update-panel.test.mjs` (16 tests). The panel is NOT mounted in Settings > Advanced and the Tauri commands do not exist yet (T11 BLOCKED on B-43 and the 011 gate), so no user can reach it. Not done: per-state screenshots, keyboard run in a real browser, mounting by Feature 011.
 - **Depends on:** T01, T11
 - **Cross-package prerequisites:** Feature 011 desktop stop and update UI task (host surface); Feature 018 About and Diagnostics (version display).
 - **Owner:** Desktop UI.
