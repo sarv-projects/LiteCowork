@@ -1,0 +1,289 @@
+{
+  "host_class": "CONTAINER",
+  "host_system": "linux",
+  "later_rows": [
+    {
+      "reason": "Claude Code row is declared after the first two rows qualify",
+      "row_id": "windows-x64-claude-code",
+      "state": "NOT_RUN"
+    },
+    {
+      "reason": "Claude Code row is declared after the first two rows qualify",
+      "row_id": "linux-x64-claude-code",
+      "state": "NOT_RUN"
+    }
+  ],
+  "rows": [
+    {
+      "agent": "opencode",
+      "agent_version": "2.0.32",
+      "arch": "x86_64",
+      "auth_mode": "user-configured",
+      "cells": {
+        "E2E-01": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-02": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-03": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-04": {
+          "evidence_bundle_digest": null,
+          "reason": "Task execution is UNAVAILABLE on Windows until the B-35 provider qualifies (B-17)",
+          "state": "UNAVAILABLE"
+        },
+        "E2E-05": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-06": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-07": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-08": {
+          "evidence_bundle_digest": null,
+          "reason": "The daemon terminal half of this journey is UNAVAILABLE on Windows until the B-35 provider qualifies (B-17); the browser half is not qualified here",
+          "state": "UNAVAILABLE"
+        },
+        "E2E-09": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-10": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-11": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-12": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "backup_restore": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "browser_takeover": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "coworker_private_learner": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "effect_reconciliation": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "independent_verification": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "native_conversation_send": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "packaging": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "producer_scoped_planner_isolation": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "secret_scan": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "terminal_pty": {
+          "evidence_bundle_digest": null,
+          "reason": "The daemon terminal is UNAVAILABLE on Windows until the B-35 provider qualifies (B-17)",
+          "state": "UNAVAILABLE"
+        },
+        "workspace_root_revalidation": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        }
+      },
+      "counted": false,
+      "desktop_runtime": "WebView2",
+      "not_counted_reason": "CONTAINER",
+      "os": "windows",
+      "os_min_build": "10.0.19045",
+      "priority": 1,
+      "protocol": "acp",
+      "row_id": "windows-x64-opencode-v2.0.32",
+      "target_triple": "x86_64-pc-windows-msvc"
+    },
+    {
+      "agent": "opencode",
+      "agent_version": "2.0.32",
+      "arch": "x86_64",
+      "auth_mode": "user-configured",
+      "cells": {
+        "E2E-01": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-02": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-03": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-04": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-05": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-06": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-07": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-08": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-09": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-10": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-11": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "E2E-12": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "backup_restore": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "browser_takeover": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "coworker_private_learner": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "effect_reconciliation": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "independent_verification": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "native_conversation_send": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "packaging": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "producer_scoped_planner_isolation": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "secret_scan": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "terminal_pty": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        },
+        "workspace_root_revalidation": {
+          "evidence_bundle_digest": null,
+          "reason": "run under CONTAINER: container marker (/.dockerenv, /run/.containerenv or cgroup)",
+          "state": "NOT_COUNTED"
+        }
+      },
+      "counted": false,
+      "desktop_runtime": "WebKitGTK",
+      "not_counted_reason": "CONTAINER",
+      "os": "linux",
+      "os_min_build": "Ubuntu 24.04",
+      "priority": 2,
+      "protocol": "acp",
+      "row_id": "linux-x64-opencode-v2.0.32",
+      "target_triple": "x86_64-unknown-linux-gnu"
+    }
+  ],
+  "unsupported": [
+    {
+      "arch": "aarch64",
+      "os": "macos",
+      "reason": "No macOS row in V1"
+    }
+  ]
+}

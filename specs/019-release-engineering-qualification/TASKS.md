@@ -246,7 +246,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T14 - Row-aware release qualification matrix
 
-- **Status:** PARTIAL - `scripts/v1_platform_matrix.py` probes the host truthfully but writes to the retired `implementation/` path, has OS-only rows, lists macOS aarch64 and has no WSL2 detection or E2E cells.
+- **Status:** DONE (CODE): `scripts/v1_release_matrix_rows.json` (two declared rows, macOS UNSUPPORTED, Claude Code rows NOT_RUN, Windows E2E-04, E2E-08 and terminal_pty UNAVAILABLE per B-17/B-35), `v1_platform_matrix.py` (WSL2, container and CI_IMAGE detection, NOT_COUNTED rule, schema-validated bundles, PASSED only with a linked bundle on a native host of the row OS, QUALIFIED only with ACCEPT USER sign-off, refusal to write an unlinked PASSED cell, deterministic output, default output moved to `docs/release/`), `tests/test_platform_matrix.py` (17 tests), generated `docs/release/QUALIFICATION-MATRIX.md` and `.json`. The committed matrix was generated in a container, so every non-UNAVAILABLE cell is NOT_COUNTED; no row is PASSED. Real-host runs on native Windows and Ubuntu remain USER/owner steps. Depends on T01 and T04 only for scope, not for this code.
 - **Depends on:** T01, T02, T04
 - **Cross-package prerequisites:** NONE (each package supplies its E2E evidence through its own qualification task).
 - **Owner:** QA, Release Engineering.
@@ -254,10 +254,10 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 - **Contract:** SPEC sections 7.2, 8; ACCEPTANCE sections 3, 7; AC-002, AC-012.
 - **Change intent:** read declared rows (`windows-x64-opencode-v2.0.32`, `linux-x64-opencode-v2.0.32`, later `*-claude-code-*` rows marked NOT_RUN); detect WSL2 (`WSL_DISTRO_NAME`, `/proc/sys/kernel/osrelease` containing `microsoft`), containers (`/.dockerenv`, cgroup markers) and CI images (`CI=true` without the release-host label) and mark the run NOT_COUNTED; emit a cell per E2E-01..E2E-12 and per capability that links to an evidence bundle digest or carries NOT_RUN/BLOCKED/UNAVAILABLE with a reason (for example Task execution and terminal UNAVAILABLE on the Windows row until B-35 qualifies); keep macOS as UNSUPPORTED; move default output to `docs/release/`; update the stale roster comment.
 - **Acceptance:**
-  - [ ] Simulated WSL2, container and CI markers produce NOT_COUNTED with no PASSED cell (AC-002).
-  - [ ] A cell is PASSED only with a linked, schema-valid bundle observed on that host (AC-012).
-  - [ ] Windows row shows Task execution (E2E-04) and terminal (E2E-08 terminal half) UNAVAILABLE until the B-35 provider qualifies.
-  - [ ] Generated Markdown and JSON are deterministic for the same inputs.
+  - [x] Simulated WSL2, container and CI markers produce NOT_COUNTED with no PASSED cell (AC-002).
+  - [x] A cell is PASSED only with a linked, schema-valid bundle observed on that host (AC-012).
+  - [x] Windows row shows Task execution (E2E-04) and terminal (E2E-08 terminal half) UNAVAILABLE until the B-35 provider qualifies.
+  - [x] Generated Markdown and JSON are deterministic for the same inputs.
 - **Command:** `uv run --locked python -m unittest tests.test_platform_matrix -v` (test to be added by this task) and `uv run --locked python scripts/v1_platform_matrix.py --rows scripts/v1_release_matrix_rows.json --skip-slow-probes`
 - **Evidence:** generated matrix committed per release candidate.
 - **Stop:** a PASSED cell lacks a bundle; the generator must refuse to write it.

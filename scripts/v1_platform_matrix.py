@@ -9,9 +9,16 @@ command a qualified operator has to run.
 The script never invents a PASSED cell, never claims an operating system it did
 not run on, and never claims an agent version it did not observe.
 
+Release rows (019-T14): the declared rows in `scripts/v1_release_matrix_rows.json` each get a
+cell per E2E-01..E2E-12 and per capability. A run under WSL2, a container or a CI image is
+NOT_COUNTED and can never produce a PASSED cell (AC-002). A cell is PASSED only when a
+schema-valid evidence bundle for that exact row is linked and the run was observed on a native
+host of that row's operating system (AC-012); it is QUALIFIED only with an ACCEPT USER sign-off.
+
 Usage:
-    .venv/bin/python scripts/v1_platform_matrix.py \
-        --out implementation/QUALIFICATION-MATRIX.md \
+    python3 scripts/v1_platform_matrix.py \
+        --rows scripts/v1_release_matrix_rows.json \
+        --out docs/release/QUALIFICATION-MATRIX.md \
         --evidence-out /tmp/litecowork-release-evidence
 
 Exit code is 0 when the probes that ran all passed. A blocked probe is a
@@ -21,6 +28,7 @@ truthful outcome, not a script failure.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -37,8 +45,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 # The agent roster the repository knows about. Each entry is the executable the
 # harness is expected to provide; the script records the version it observes.
 #
-# The roster is the owner-directed list in
-# `implementation/AGENT-PORTFOLIO-2026-10-21.md`. Every roster entry gets a row here,
+# The roster is the owner-directed list in docs/AGENT-CONTROL.md and the archived
+# portfolio (docs/archive/legacy-implementation-c7e9c05/AGENT-PORTFOLIO-2026-10-16.md). Every roster entry gets a row here,
 # so a missing harness is reported as a host observation instead of disappearing
 # from the matrix. Gemini CLI is intentionally absent: the owner replaced it with
 # Antigravity CLI, and OpenCode is tracked on its v2 line.
@@ -115,7 +123,7 @@ CAPABILITIES: tuple[str, ...] = (
 SUPPORTED_PLATFORMS: tuple[tuple[str, str], ...] = (
     ("linux", "x86_64"),
     ("windows", "x86_64"),
-    ("macos", "aarch64"),
+    ("macos", "aarch64"),  # always UNSUPPORTED: no macOS row in V1
 )
 
 
@@ -393,7 +401,7 @@ def platform_cell(evidence: Evidence, capability: str) -> Cell:
     if credential.state != "PASSED":
         return Cell(
             state="BLOCKED",
-            command="see implementation/reviews/E13-S03.md",
+            command="see docs/ACCEPTANCE-AND-E2E-PLAN.md",
             observation=credential.observation,
             reason=(
                 "the OS credential store is unavailable on this host, so the daemon cannot "
@@ -402,7 +410,7 @@ def platform_cell(evidence: Evidence, capability: str) -> Cell:
         )
     return Cell(
         state="NOT RUN",
-        command=f"see implementation/reviews/E13-S03.md for the exact {capability} command",
+        command=f"see docs/ACCEPTANCE-AND-E2E-PLAN.md for the exact {capability} command",
         observation="not exercised by this generator",
         reason=(
             "this capability needs a qualified operator with the real provider and a real "
@@ -422,8 +430,8 @@ def render(evidence: Evidence) -> str:
     lines.append("")
     lines.append("```")
     lines.append(
-        ".venv/bin/python scripts/v1_platform_matrix.py "
-        "--out implementation/QUALIFICATION-MATRIX.md "
+        "python3 scripts/v1_platform_matrix.py "
+        "--out docs/release/QUALIFICATION-MATRIX.md "
         "--evidence-out /tmp/litecowork-release-evidence"
     )
     lines.append("```")
@@ -467,7 +475,9 @@ def render(evidence: Evidence) -> str:
     for capability in CAPABILITIES:
         cells: list[str] = []
         for system, arch in SUPPORTED_PLATFORMS:
-            if system == host_system:
+            if system == "macos":
+                cells.append("UNSUPPORTED")
+            elif system == host_system:
                 cells.append(platform_cell(evidence, capability).state)
             else:
                 cells.append("BLOCKED")
@@ -557,12 +567,268 @@ def render(evidence: Evidence) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Row-aware release matrix (019-T14)
+# ---------------------------------------------------------------------------
+
+E2E_IDS: tuple[str, ...] = tuple(f"E2E-{number:02d}" for number in range(1, 13))
+DEFAULT_ROWS = "scripts/v1_release_matrix_rows.json"
+DEFAULT_OUT = "docs/release/QUALIFICATION-MATRIX.md"
+SCHEMA_DIR = REPOSITORY_ROOT / "docs" / "schemas"
+STATES = (
+    "QUALIFIED", "PASSED", "FAILED", "BLOCKED", "UNAVAILABLE", "NOT_RUN", "NOT_COUNTED", "STALE",
+)
+
+
+def detect_host_class(
+    env: dict[str, str] | None = None,
+    osrelease: str | None = None,
+    exists: Any = None,
+    cgroup: str | None = None,
+) -> tuple[str, str]:
+    """Returns (class, detail). class is NATIVE, WSL2, CONTAINER or CI_IMAGE.
+
+    CI_IMAGE means CI=true without the explicit release-host label
+    LITECOWORK_RELEASE_HOST=1. Inputs are injectable so tests can simulate each marker.
+    """
+    environment = os.environ if env is None else env
+    exists = exists if exists is not None else os.path.exists
+    if osrelease is None:
+        try:
+            osrelease = Path("/proc/sys/kernel/osrelease").read_text(encoding="utf-8")
+        except OSError:
+            osrelease = ""
+    if environment.get("WSL_DISTRO_NAME") or "microsoft" in osrelease.lower():
+        return "WSL2", "WSL_DISTRO_NAME or a microsoft kernel release marker"
+    if cgroup is None:
+        try:
+            cgroup = Path("/proc/1/cgroup").read_text(encoding="utf-8")
+        except OSError:
+            cgroup = ""
+    if (
+        exists("/.dockerenv")
+        or exists("/run/.containerenv")
+        or any(marker in cgroup for marker in ("docker", "kubepods", "containerd", "lxc"))
+    ):
+        return "CONTAINER", "container marker (/.dockerenv, /run/.containerenv or cgroup)"
+    if environment.get("CI", "").lower() == "true" and environment.get("LITECOWORK_RELEASE_HOST") != "1":
+        return "CI_IMAGE", "CI=true without LITECOWORK_RELEASE_HOST=1"
+    return "NATIVE", "no WSL2, container or CI image marker"
+
+
+def canonical_digest(document: Any) -> str:
+    """SHA-256 of the canonical JSON form (sorted keys, no whitespace)."""
+    encoded = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _validator(schema_name: str) -> Any:
+    from jsonschema import Draft202012Validator  # local import: the legacy probe path needs only stdlib
+
+    schema = json.loads((SCHEMA_DIR / schema_name).read_text(encoding="utf-8"))
+    return Draft202012Validator(schema)
+
+
+def load_rows(path: Path) -> dict[str, Any]:
+    """Loads the declared rows and validates every row against the row schema."""
+    document = json.loads(path.read_text(encoding="utf-8"))
+    validator = _validator("release-matrix-row.schema.json")
+    rows = document.get("rows", [])
+    if len(rows) != 2:
+        raise ValueError("exactly two V1 rows must be declared")
+    for row in rows:
+        problems = sorted(error.message for error in validator.iter_errors(row))
+        if problems:
+            raise ValueError(f"row {row.get('row_id', '?')} is invalid: {problems[0]}")
+    return document
+
+
+def load_bundles(directory: Path | None) -> dict[tuple[str, str], dict[str, Any]]:
+    """Loads schema-valid evidence bundles keyed by (row_id, journey_id).
+
+    A bundle that fails the schema is ignored, never counted. Returns digest-annotated dicts.
+    """
+    bundles: dict[tuple[str, str], dict[str, Any]] = {}
+    if directory is None or not directory.is_dir():
+        return bundles
+    validator = _validator("release-evidence-bundle.schema.json")
+    for path in sorted(directory.glob("*.json")):
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(document, dict) or any(True for _ in validator.iter_errors(document)):
+            continue
+        bundles[(document["row_id"], document["journey_id"])] = {
+            "digest": canonical_digest(document),
+            "document": document,
+        }
+    return bundles
+
+
+def row_cells(
+    row: dict[str, Any],
+    unavailable: dict[str, str],
+    host_system: str,
+    host_class: str,
+    host_detail: str,
+    bundles: dict[tuple[str, str], dict[str, Any]],
+    probes: dict[str, Cell] | None,
+    current_sha: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Computes one cell per E2E id and capability for one declared row."""
+    cells: dict[str, dict[str, Any]] = {}
+    native_for_row = host_class == "NATIVE" and host_system == row["os"]
+    for cell_id in (*E2E_IDS, *CAPABILITIES):
+        cell: dict[str, Any] = {"state": "NOT_RUN", "reason": "", "evidence_bundle_digest": None}
+        if cell_id in unavailable:
+            cell["state"] = "UNAVAILABLE"
+            cell["reason"] = unavailable[cell_id]
+        elif host_class != "NATIVE":
+            cell["state"] = "NOT_COUNTED"
+            cell["reason"] = f"run under {host_class}: {host_detail}"
+        elif not native_for_row:
+            cell["state"] = "NOT_RUN"
+            cell["reason"] = f"this host is {host_system}; the row needs a native {row['os']} host"
+        elif cell_id in E2E_IDS:
+            bundle = bundles.get((row["row_id"], cell_id))
+            if bundle is None:
+                cell["reason"] = "no schema-valid evidence bundle is linked"
+            else:
+                document = bundle["document"]
+                cell["evidence_bundle_digest"] = bundle["digest"]
+                if current_sha and document["repo_sha"] != current_sha:
+                    cell["state"] = "STALE"
+                    cell["reason"] = "the bundle was recorded at a different repository SHA"
+                else:
+                    signoff = document.get("user_signoff")
+                    if signoff and signoff["decision"] == "ACCEPT":
+                        cell["state"] = "QUALIFIED"
+                    else:
+                        cell["state"] = "PASSED"
+                        cell["reason"] = "no ACCEPT owner USER sign-off, so the journey stays below QUALIFIED"
+        else:
+            probe = probes.get(cell_id) if probes else None
+            if probe is not None and probe.state == "FAILED":
+                cell["state"] = "FAILED"
+                cell["reason"] = probe.reason
+            else:
+                # A host probe is CODE evidence only. It never marks a row cell PASSED.
+                cell["reason"] = "capability evidence needs a linked bundle from the qualified operator"
+        cells[cell_id] = cell
+    return cells
+
+
+def build_release_matrix(
+    rows_document: dict[str, Any],
+    host_system: str,
+    host_class: str,
+    host_detail: str,
+    bundles: dict[tuple[str, str], dict[str, Any]],
+    probes: dict[str, Cell] | None = None,
+    current_sha: str | None = None,
+) -> dict[str, Any]:
+    """Pure function of its inputs; contains no timestamp, so equal inputs give equal output."""
+    unavailable_by_row = rows_document.get("unavailable_cells", {})
+    rows: list[dict[str, Any]] = []
+    for row in sorted(rows_document["rows"], key=lambda item: item["priority"]):
+        counted = host_class == "NATIVE" and host_system == row["os"]
+        entry = dict(row)
+        entry["counted"] = counted
+        if not counted:
+            entry.pop("not_counted_reason", None)
+            if host_class != "NATIVE":
+                entry["not_counted_reason"] = {
+                    "WSL2": "WSL2", "CONTAINER": "CONTAINER", "CI_IMAGE": "CI_IMAGE",
+                }[host_class]
+            else:
+                entry["not_counted_reason"] = "UNSUPPORTED_HOST"
+        entry["cells"] = row_cells(
+            row, unavailable_by_row.get(row["row_id"], {}), host_system, host_class,
+            host_detail, bundles, probes, current_sha,
+        )
+        rows.append(entry)
+    matrix = {
+        "host_class": host_class,
+        "host_system": host_system,
+        "rows": rows,
+        "unsupported": rows_document.get("unsupported", []),
+        "later_rows": rows_document.get("later_rows", []),
+    }
+    assert_no_unlinked_pass(matrix)
+    return matrix
+
+
+def assert_no_unlinked_pass(matrix: dict[str, Any]) -> None:
+    """Stop rule (T14): the generator refuses to write a PASSED cell without a bundle."""
+    for row in matrix["rows"]:
+        for cell_id, cell in row["cells"].items():
+            if cell["state"] in ("PASSED", "QUALIFIED") and not cell["evidence_bundle_digest"]:
+                raise ValueError(f"{row['row_id']} {cell_id}: {cell['state']} without a linked bundle")
+            if matrix["host_class"] != "NATIVE" and cell["state"] in ("PASSED", "QUALIFIED"):
+                raise ValueError(f"{row['row_id']} {cell_id}: {cell['state']} on a non-native host")
+
+
+def render_release_markdown(matrix: dict[str, Any]) -> str:
+    lines = [
+        "# LiteCowork V1 release qualification matrix",
+        "",
+        "This file is generated by `scripts/v1_platform_matrix.py`. Do not edit it by hand.",
+        "",
+        "```",
+        "python3 scripts/v1_platform_matrix.py --rows scripts/v1_release_matrix_rows.json "
+        "--out docs/release/QUALIFICATION-MATRIX.md --skip-slow-probes",
+        "```",
+        "",
+        f"- Probing host class: **{matrix['host_class']}** (`{matrix['host_system']}`)",
+        "- A cell is PASSED only with a linked, schema-valid evidence bundle observed on a native "
+        "host of the row's operating system; QUALIFIED additionally needs an ACCEPT owner USER sign-off.",
+        "- A run under WSL2, a container or a CI image is NOT_COUNTED and marks no cell PASSED.",
+        "- macOS is UNSUPPORTED in V1.",
+        "",
+    ]
+    for row in matrix["rows"]:
+        counted = "counted" if row["counted"] else f"NOT COUNTED ({row.get('not_counted_reason', '-')})"
+        lines += [
+            f"## {row['row_id']} (priority {row['priority']}, {counted})",
+            "",
+            f"{row['os']} {row['os_min_build']} {row['arch']}, {row['desktop_runtime']}, "
+            f"{row['agent']} {row['agent_version']}, auth {row['auth_mode']}, protocol {row['protocol']}.",
+            "",
+            "| Cell | State | Bundle digest | Reason |",
+            "|---|---|---|---|",
+        ]
+        for cell_id, cell in row["cells"].items():
+            digest = cell["evidence_bundle_digest"]
+            lines.append(
+                f"| {cell_id} | {cell['state']} | {digest[:12] if digest else '-'} | {cell['reason'] or '-'} |"
+            )
+        lines.append("")
+    lines += ["## Not part of V1", ""]
+    for item in matrix["unsupported"]:
+        lines.append(f"- {item['os']}/{item['arch']}: UNSUPPORTED. {item['reason']}.")
+    for item in matrix["later_rows"]:
+        lines.append(f"- {item['row_id']}: {item['state']}. {item['reason']}.")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--out",
-        default="implementation/QUALIFICATION-MATRIX.md",
-        help="the markdown matrix the generator writes",
+        default=DEFAULT_OUT,
+        help="the release matrix markdown the generator writes (JSON is written beside it)",
+    )
+    parser.add_argument(
+        "--rows",
+        default=DEFAULT_ROWS,
+        help="declared release rows JSON",
+    )
+    parser.add_argument(
+        "--bundles-dir",
+        default=None,
+        help="directory of evidence bundle JSON files (schema-validated; invalid ones are ignored)",
     )
     parser.add_argument(
         "--evidence-out",
@@ -590,10 +856,28 @@ def main() -> int:
     if not output_path.is_absolute():
         output_path = REPOSITORY_ROOT / output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render(evidence), encoding="utf-8")
+
+    rows_path = Path(arguments.rows)
+    if not rows_path.is_absolute():
+        rows_path = REPOSITORY_ROOT / rows_path
+    host_class, host_detail = detect_host_class()
+    bundles_dir = Path(arguments.bundles_dir) if arguments.bundles_dir else None
+    matrix = build_release_matrix(
+        load_rows(rows_path),
+        evidence.host["system"].lower(),
+        host_class,
+        host_detail,
+        load_bundles(bundles_dir),
+        evidence.probes,
+    )
+    output_path.write_text(render_release_markdown(matrix), encoding="utf-8", newline="\r\n")
+    output_path.with_suffix(".json").write_text(
+        json.dumps(matrix, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\r\n"
+    )
 
     evidence_directory = Path(arguments.evidence_out)
     evidence_directory.mkdir(parents=True, exist_ok=True)
+    (evidence_directory / "platform-host-observations.md").write_text(render(evidence), encoding="utf-8")
     evidence_path = evidence_directory / "platform-matrix-evidence.json"
     evidence_path.write_text(
         json.dumps(
@@ -611,6 +895,7 @@ def main() -> int:
         encoding="utf-8",
     )
     print(f"matrix: {output_path}")
+    print(f"host class: {host_class} ({host_detail})")
     print(f"evidence: {evidence_path}")
     failures = [
         name for name, cell in evidence.probes.items() if cell.state == "FAILED"
