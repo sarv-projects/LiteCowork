@@ -159,17 +159,18 @@ use storage_core::{
     ResourceUploadStore, RootObservationScanStatus, RuntimeCapabilityHostPageRequest,
     RuntimeCapabilityHostRecord, RuntimeCapabilityRef, RuntimeIncarnationLocalObservationRecord,
     RuntimeIncarnationRecord, RuntimeIncarnationStateUpdate, RuntimeLifecycleStore,
-    RuntimeOfferPageRequest, RuntimeOfferRecord, RuntimeRecord, RuntimeWorkspaceBindingRecord,
-    RuntimeWorkspaceBindingStore, StateStore, StepRecord, StoreError, StoredResourceContent,
-    TaskAggregateSnapshot, TaskCreateCommit, TaskLeadHandoffCommit, TaskPlanningSessionStart,
-    TaskRecord, TaskSpecRevisionCommit, TaskSpecRevisionRecord, TaskStore, TaskSummaryRecord,
-    TaskView, Workspace, WorkspaceCreateRequest, WorkspaceEventReplayEntry,
-    WorkspaceEventReplayPage, WorkspaceInstructionRevisionRecord, WorkspaceRootCreateCommit,
-    WorkspaceRootObservationBatch, WorkspaceRootRecord, WorkspaceRootResumeCommit,
-    WorkspaceRootRevalidationBindings, WorkspaceRootRevalidationCandidate,
-    WorkspaceRootRevalidationCommit, WorkspaceRootRevalidationFailure, WorkspaceRootScanCandidate,
-    WorkspaceRootScanCommit, WorkspaceRootScanResult, WorkspaceRootScanStatus,
-    WorkspaceRootStatusAction, WorkspaceRootStatusCommit, WorkspaceRootStore,
+    RuntimeOfferPageRequest, RuntimeOfferRecord, RuntimeRecord, RuntimeStopObservation,
+    RuntimeWorkspaceBindingRecord, RuntimeWorkspaceBindingStore, StateStore, StepRecord,
+    StoreError, StoredResourceContent, TaskAggregateSnapshot, TaskCreateCommit,
+    TaskLeadHandoffCommit, TaskPlanningSessionStart, TaskRecord, TaskSpecRevisionCommit,
+    TaskSpecRevisionRecord, TaskStore, TaskSummaryRecord, TaskView, Workspace,
+    WorkspaceCreateRequest, WorkspaceEventReplayEntry, WorkspaceEventReplayPage,
+    WorkspaceInstructionRevisionRecord, WorkspaceRootCreateCommit, WorkspaceRootObservationBatch,
+    WorkspaceRootRecord, WorkspaceRootResumeCommit, WorkspaceRootRevalidationBindings,
+    WorkspaceRootRevalidationCandidate, WorkspaceRootRevalidationCommit,
+    WorkspaceRootRevalidationFailure, WorkspaceRootScanCandidate, WorkspaceRootScanCommit,
+    WorkspaceRootScanResult, WorkspaceRootScanStatus, WorkspaceRootStatusAction,
+    WorkspaceRootStatusCommit, WorkspaceRootStore,
 };
 
 #[cfg(unix)]
@@ -750,6 +751,11 @@ enum Command {
         runtime_id: String,
         expected_incarnation_id: String,
         reply: mpsc::Sender<Result<Option<LocalRuntimeLifecycleSnapshot>, StoreError>>,
+    },
+    ReadRuntimeStopObservation {
+        runtime_id: String,
+        expected_incarnation_id: String,
+        reply: mpsc::Sender<Result<Option<RuntimeStopObservation>, StoreError>>,
     },
     ListWorkspaces {
         reply: mpsc::Sender<Result<Vec<Workspace>, StoreError>>,
@@ -2077,6 +2083,28 @@ impl RuntimeLifecycleStore for SqliteWorkspaceStore {
         let (reply_sender, reply_receiver) = mpsc::channel();
         self.execute_command(
             Command::ReadLocalRuntimeLifecycleSnapshot {
+                runtime_id: runtime_id.to_owned(),
+                expected_incarnation_id: expected_incarnation_id.to_owned(),
+                reply: reply_sender,
+            },
+            reply_receiver,
+        )
+    }
+
+    fn read_runtime_stop_observation(
+        &self,
+        runtime_id: &str,
+        expected_incarnation_id: &str,
+    ) -> Result<Option<RuntimeStopObservation>, StoreError> {
+        validate_nonempty(&[runtime_id, expected_incarnation_id])?;
+        if runtime_id.len() > 256 || expected_incarnation_id.len() > 256 {
+            return Err(StoreError::Invalid(
+                "Runtime stop observation identifier is too long".to_owned(),
+            ));
+        }
+        let (reply_sender, reply_receiver) = mpsc::channel();
+        self.execute_command(
+            Command::ReadRuntimeStopObservation {
                 runtime_id: runtime_id.to_owned(),
                 expected_incarnation_id: expected_incarnation_id.to_owned(),
                 reply: reply_sender,
@@ -19471,6 +19499,91 @@ fn transition_local_runtime_incarnation_transaction(
     })
 }
 
+/// Maximum identifiers a caller should keep per category. One extra row is fetched so the
+/// caller can tell that the list was truncated; the verdict is BLOCKED either way.
+const STOP_OBSERVATION_LIMIT: i64 = 200;
+
+fn stop_observation_ids(
+    connection: &Connection,
+    sql: &str,
+    runtime_id: &str,
+) -> Result<Vec<String>, StoreError> {
+    let mut statement = connection.prepare(sql).map_err(map_database_error)?;
+    let rows = statement
+        .query_map(params![runtime_id, STOP_OBSERVATION_LIMIT + 1], |row| {
+            row.get::<_, String>(0)
+        })
+        .map_err(map_database_error)?;
+    let mut ids = Vec::new();
+    for row in rows {
+        ids.push(row.map_err(map_database_error)?);
+    }
+    Ok(ids)
+}
+
+fn read_runtime_stop_observation(
+    connection: &Connection,
+    runtime_id: &str,
+    expected_incarnation_id: &str,
+) -> Result<Option<RuntimeStopObservation>, StoreError> {
+    let current: Option<String> = connection
+        .query_row(
+            "SELECT current_incarnation_id FROM runtimes WHERE runtime_id = ?1 AND current_incarnation_id = ?2",
+            params![runtime_id, expected_incarnation_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(map_database_error)?;
+    if current.is_none() {
+        return Ok(None);
+    }
+    // Conversation turns are not Runtime-scoped rows; one local Runtime owns the database.
+    let admitted_turn_ids = stop_observation_ids(
+        connection,
+        "SELECT turn_id FROM conversation_turns WHERE ?1 IS NOT NULL AND status IN ('OPEN', 'RUNNING', 'WAITING_USER', 'WAITING_DEPENDENCY', 'CANCEL_REQUESTED') ORDER BY turn_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let admitted_attempt_ids = stop_observation_ids(
+        connection,
+        "SELECT attempt_id FROM attempts WHERE runtime_id = ?1 AND status IN ('CREATED', 'PREPARING', 'RUNNING', 'WAITING_APPROVAL', 'WAITING_RESOURCE', 'CHECKPOINTING', 'CANCEL_REQUESTED') ORDER BY attempt_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let dependent_task_ids = stop_observation_ids(
+        connection,
+        "SELECT DISTINCT task_id FROM attempts WHERE runtime_id = ?1 AND status IN ('CREATED', 'PREPARING', 'RUNNING', 'WAITING_APPROVAL', 'WAITING_RESOURCE', 'CHECKPOINTING', 'CANCEL_REQUESTED') ORDER BY task_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let unresolved_effect_ids = stop_observation_ids(
+        connection,
+        "SELECT e.effect_id FROM effects e JOIN attempts a ON a.attempt_id = e.attempt_id WHERE a.runtime_id = ?1 AND e.state IN ('STARTED', 'ACKNOWLEDGED', 'RECONCILING', 'AMBIGUOUS') ORDER BY e.effect_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let execution_lease_ids = stop_observation_ids(
+        connection,
+        "SELECT lease_id FROM execution_leases WHERE runtime_id = ?1 AND state IN ('ACTIVE', 'RELEASING') ORDER BY lease_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let environment_control_lease_ids = stop_observation_ids(
+        connection,
+        "SELECT control_lease_id FROM environment_control_leases WHERE runtime_id = ?1 AND state IN ('ACTIVE', 'RELEASING') ORDER BY control_lease_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let pending_cleanup_ids = stop_observation_ids(
+        connection,
+        "SELECT workspace_root_id FROM workspace_root_cleanup_outbox WHERE ?1 IS NOT NULL AND status = 'PENDING' ORDER BY workspace_root_id LIMIT ?2",
+        runtime_id,
+    )?;
+    Ok(Some(RuntimeStopObservation {
+        admitted_turn_ids,
+        admitted_attempt_ids,
+        dependent_task_ids,
+        unresolved_effect_ids,
+        execution_lease_ids,
+        environment_control_lease_ids,
+        pending_cleanup_ids,
+    }))
+}
+
 fn read_local_runtime_lifecycle_snapshot(
     connection: &Connection,
     runtime_id: &str,
@@ -19894,6 +20007,17 @@ fn writer_loop(
                         reply,
                     } => {
                         let _ = reply.send(read_local_runtime_lifecycle_snapshot(
+                            &connection,
+                            &runtime_id,
+                            &expected_incarnation_id,
+                        ));
+                    }
+                    Command::ReadRuntimeStopObservation {
+                        runtime_id,
+                        expected_incarnation_id,
+                        reply,
+                    } => {
+                        let _ = reply.send(read_runtime_stop_observation(
                             &connection,
                             &runtime_id,
                             &expected_incarnation_id,

@@ -1797,6 +1797,14 @@ mod tests {
             ))
         }
 
+        fn read_runtime_stop_observation(
+            &self,
+            _runtime_id: &str,
+            _expected_incarnation_id: &str,
+        ) -> Result<Option<storage_core::RuntimeStopObservation>, StoreError> {
+            Ok(None)
+        }
+
         fn transition_local_incarnation(
             &self,
             update: RuntimeIncarnationStateUpdate,

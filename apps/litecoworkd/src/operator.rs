@@ -30,8 +30,9 @@ use domain_workspace::{
     ArchiveWorkspace, BeginContextDocumentPurge, ChangeReplicationPolicy,
     ChangeWorkspaceRootStatus, CreateResourceRevisionUploadSession, CreateResourceUploadSession,
     CreateWorkspace, CreateWorkspaceInstructionRevision, EventContext, RenameWorkspace,
-    ResourceService, ResourceUploadService, SetContextDocumentStatus as SetContextDocumentStatusCommand,
-    SetWorkspaceDefaultAgentBinding, WorkspaceRootService, WorkspaceService,
+    ResourceService, ResourceUploadService,
+    SetContextDocumentStatus as SetContextDocumentStatusCommand, SetWorkspaceDefaultAgentBinding,
+    WorkspaceRootService, WorkspaceService,
 };
 use http_body::Body as HttpBody;
 #[cfg(unix)]
@@ -1466,7 +1467,12 @@ async fn wait_for_test_operator_failure(marker: Option<&FsPath>) {
 }
 
 fn runtime_lifecycle_routes() -> Router<RuntimeLifecycleApiState> {
-    Router::new().route("/v1/runtime-lifecycle", get(get_runtime_lifecycle))
+    Router::new()
+        .route("/v1/runtime-lifecycle", get(get_runtime_lifecycle))
+        .route(
+            "/v1/runtime-lifecycle/stop-preview",
+            get(preview_local_runtime_stop),
+        )
 }
 
 fn runtime_workspace_bindings_routes() -> Router<RuntimeWorkspaceBindingsApiState> {
@@ -1972,6 +1978,51 @@ async fn get_runtime_lifecycle(
         &state.local_incarnation_id,
         state.lifecycle_blockers,
     )
+}
+
+/// Read-only stop preview. It never begins a drain and never reports QUIESCENT while the
+/// live-work observer is absent (see `runtime_stop_operator`).
+async fn preview_local_runtime_stop(
+    State(state): State<RuntimeLifecycleApiState>,
+) -> Result<Response, Response> {
+    let observation = state
+        .store
+        .read_runtime_stop_observation(&state.runtime_id, &state.local_incarnation_id)
+        .map_err(|_| {
+            operator_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL",
+                "Runtime stop preview is unavailable",
+            )
+        })?
+        .ok_or_else(|| {
+            operator_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "RUNTIME_UNAVAILABLE",
+                "Current Runtime incarnation could not be verified",
+            )
+        })?;
+    let observed_at = time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .map_err(|_| {
+            operator_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL",
+                "Runtime stop preview is unavailable",
+            )
+        })?;
+    let view = crate::runtime_stop_operator::build_stop_preview(
+        &state.runtime_id,
+        &state.local_incarnation_id,
+        &observed_at,
+        observation,
+        crate::runtime_stop_operator::LiveWorkObservation::Unobserved,
+    );
+    let mut response = Json(view).into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
 }
 
 fn runtime_lifecycle_response(

@@ -218,7 +218,7 @@ Only the rows below may be interactive in V1 (AC-020). A control not listed here
 | Runtime | View Runtime lifecycle and Operator readiness | SCOPED_READ/OBSERVATION | getLocalOperatorReadiness, getLocalRuntimeLifecycle (served) | interactive |
 | Runtime | Start Runtime | NATIVE_MUTATION | desktop bridge start_local_runtime | interactive; readiness derives from the authenticated observation |
 | Runtime | Startup policy | NATIVE_MUTATION | setLocalRuntimeStartupPolicy (target-only) | read-only text |
-| Runtime | Preview stop, Stop safely | NATIVE_MUTATION | previewLocalRuntimeStop, requestLocalRuntimeStop (target-only) | not interactive until 011-T13 proves settlement; verdict UNKNOWN never enables stop |
+| Runtime | Preview stop, Stop safely | NATIVE_MUTATION | previewLocalRuntimeStop (served, read-only), requestLocalRuntimeStop (target-only) | not interactive until 011-T13 proves settlement; verdict UNKNOWN never enables stop |
 | Notifications | Link to quiet hours | OPERATOR_CAS | Feature 010 owner operations | link only (011-T10) |
 | Usage & Monitoring, Storage & Backup, About & Diagnostics | Unavailable entries | none | Features 018 and 017 | rendered as unavailable text with prerequisite, no controls |
 

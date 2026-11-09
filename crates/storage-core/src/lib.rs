@@ -591,6 +591,22 @@ pub struct LocalRuntimeLifecycleSnapshot {
     pub incarnation: RuntimeIncarnationRecord,
 }
 
+/// Durable owner records that block a safe Runtime stop, read for one exact current
+/// incarnation. This is only what SQLite records show: live processes, provider
+/// sessions and terminal or browser sessions are NOT in this observation, so an empty
+/// observation never proves quiescence by itself.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeStopObservation {
+    pub admitted_turn_ids: Vec<String>,
+    pub admitted_attempt_ids: Vec<String>,
+    pub dependent_task_ids: Vec<String>,
+    pub unresolved_effect_ids: Vec<String>,
+    pub execution_lease_ids: Vec<String>,
+    pub environment_control_lease_ids: Vec<String>,
+    pub pending_cleanup_ids: Vec<String>,
+}
+
 /// Local Runtime lifecycle persistence. Registration commits the Runtime descriptor,
 /// one fresh incarnation, and its local observation atomically. It does not enroll a
 /// Workspace or publish Mesh presence.
@@ -614,6 +630,13 @@ pub trait RuntimeLifecycleStore: Send + Sync {
         runtime_id: &str,
         expected_incarnation_id: &str,
     ) -> Result<Option<LocalRuntimeLifecycleSnapshot>, StoreError>;
+
+    /// Reads the durable stop blockers only when `expected_incarnation_id` is current.
+    fn read_runtime_stop_observation(
+        &self,
+        runtime_id: &str,
+        expected_incarnation_id: &str,
+    ) -> Result<Option<RuntimeStopObservation>, StoreError>;
 }
 
 /// Explicit authorization for one Runtime installation to act within one Workspace.

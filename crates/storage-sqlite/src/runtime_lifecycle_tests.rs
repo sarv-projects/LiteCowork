@@ -280,3 +280,57 @@ fn superseded_runtime_incarnation_cannot_activate_an_execution_lease() {
         "expected the renewal fence to reject the stale incarnation: {error}"
     );
 }
+
+#[test]
+fn runtime_stop_observation_lists_durable_blockers_for_the_exact_incarnation_only() {
+    let directory = tempfile::tempdir().expect("temporary store directory");
+    let store = test_store(&directory, Duration::from_secs(1));
+    let (runtime, incarnation, observation) = registration("incarnation-stop");
+    store
+        .register_local_incarnation(runtime, incarnation, observation)
+        .expect("Runtime incarnation registers");
+
+    let idle = store
+        .read_runtime_stop_observation("runtime-lifecycle-test", "incarnation-stop")
+        .expect("idle observation reads")
+        .expect("current incarnation is observable");
+    assert_eq!(idle, storage_core::RuntimeStopObservation::default());
+
+    // A superseded or unknown incarnation is indistinguishable from a missing one.
+    assert!(
+        store
+            .read_runtime_stop_observation("runtime-lifecycle-test", "incarnation-old")
+            .expect("stale observation reads")
+            .is_none()
+    );
+    assert!(
+        store
+            .read_runtime_stop_observation("other-runtime", "incarnation-stop")
+            .expect("foreign observation reads")
+            .is_none()
+    );
+
+    let database = state_database(&directory);
+    let connection = Connection::open(&database).expect("open lifecycle projection");
+    connection
+        .execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             INSERT INTO conversation_turns (turn_id, conversation_id, user_message_id, status, created_at)
+               VALUES ('turn-running', 'c', 'm', 'RUNNING', '2026-10-10T10:00:00Z'),
+                      ('turn-done', 'c', 'm2', 'COMPLETED', '2026-10-10T10:00:00Z');
+             INSERT INTO workspace_root_cleanup_outbox (workspace_id, workspace_root_id, status, created_at, updated_at, version)
+               VALUES ('w', 'root-pending', 'PENDING', '2026-10-10T10:00:00Z', '2026-10-10T10:00:00Z', 1),
+                      ('w', 'root-done', 'COMPLETE', '2026-10-10T10:00:00Z', '2026-10-10T10:00:00Z', 1);",
+        )
+        .expect("seed durable blockers");
+    drop(connection);
+
+    let busy = store
+        .read_runtime_stop_observation("runtime-lifecycle-test", "incarnation-stop")
+        .expect("busy observation reads")
+        .expect("current incarnation is observable");
+    assert_eq!(busy.admitted_turn_ids, vec!["turn-running".to_owned()]);
+    assert_eq!(busy.pending_cleanup_ids, vec!["root-pending".to_owned()]);
+    assert!(busy.admitted_attempt_ids.is_empty());
+    assert!(busy.unresolved_effect_ids.is_empty());
+}

@@ -908,14 +908,22 @@ providers, mutate lifecycle state, or imply that execution is ready. Dependent T
 Automation arrays are omitted until their inventories can be reported truthfully.
 `GET /v1/operator/readiness` remains a separate proof that the Operator API is serving.
 
-`PATCH /v1/runtime-lifecycle/startup-policy`,
-`GET /v1/runtime-lifecycle/stop-preview`, and `POST /v1/runtime-lifecycle/stop` remain
+`GET /v1/runtime-lifecycle/stop-preview` is served (011-T13 prerequisite, read-only). It lists the
+durable records that block a safe stop for the exact current incarnation: admitted Conversation
+turns, non-terminal Attempts, dispatched unresolved Effects, held execution and environment
+control leases and pending cleanup. Its `verdict` is `BLOCKED` when any is present and `UNKNOWN`
+otherwise, because no live-work observer exists yet for agent sessions, child processes and
+terminal or browser sessions; `QUIESCENT` is unreachable in this build, `provider_reference_ids`
+stays empty and the dependent Automation, WorkspaceRoot, service-reference and handoff lists
+stay empty until their inventories exist.
+
+`PATCH /v1/runtime-lifecycle/startup-policy` and `POST /v1/runtime-lifecycle/stop` remain
 unimplemented. No authenticated Operator stop command is exposed. Do not emulate one
 with a signal, process kill, or direct socket shortcut. Implementing these operations
 requires a RuntimeLifecycleService that inventories and drains admitted Attempts,
 reconciles Effects, fences/releases leases, and settles local trigger/provider references
 before process exit. Those owners are not integrated, so the current Runtime must fail
-closed rather than claim a safe stop preview or accepted drain.
+closed rather than accept a drain or claim a safe stop.
 
 When implemented, these are local-Operator operations. Desktop Tauri calls use the OS-authenticated local
 IPC contract in [`LOCAL-OPERATOR-IPC.md`](LOCAL-OPERATOR-IPC.md); Windows transport source

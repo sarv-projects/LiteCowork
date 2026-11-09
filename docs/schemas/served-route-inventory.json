@@ -424,6 +424,13 @@
     },
     {
       "method": "GET",
+      "path": "/v1/runtime-lifecycle/stop-preview",
+      "openapi_path": "/runtime-lifecycle/stop-preview",
+      "operation_id": "previewLocalRuntimeStop",
+      "source": "apps/litecoworkd/src/operator.rs"
+    },
+    {
+      "method": "GET",
       "path": "/v1/runtimes/{runtime_id}/capability-hosts",
       "openapi_path": "/runtimes/{runtimeId}/capability-hosts",
       "operation_id": "listRuntimeCapabilityHosts",
@@ -1268,11 +1275,6 @@
       "method": "GET",
       "path": "/conversations/{conversationId}/usage",
       "operation_id": "getConversationUsage"
-    },
-    {
-      "method": "GET",
-      "path": "/runtime-lifecycle/stop-preview",
-      "operation_id": "previewLocalRuntimeStop"
     },
     {
       "method": "GET",

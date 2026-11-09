@@ -4559,8 +4559,14 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
         "incarnation-ipc-stale".to_owned(),
         blockers,
     ));
+    let preview_router = runtime_lifecycle_router(RuntimeLifecycleApiState::new(
+        store.clone(),
+        runtime_id.to_owned(),
+        incarnation_id.to_owned(),
+        Vec::new(),
+    ));
     let server = tokio::spawn(async move {
-        for router in [current_router, stale_router] {
+        for router in [current_router, stale_router, preview_router] {
             let connection = listener
                 .accept(|peer| peer.uid == expected_uid)
                 .await
@@ -4580,6 +4586,7 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
         endpoint: &UnixEndpoint,
         expected_uid: u32,
         request_id: &str,
+        path: &str,
     ) -> operator_ipc::ResponseFrame {
         let mut client = endpoint
             .connect(|peer| peer.uid == expected_uid)
@@ -4592,7 +4599,7 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
                 protocol_version: PROTOCOL_VERSION,
                 request_id: request_id.to_owned(),
                 method: "GET".to_owned(),
-                path_and_query: "/v1/runtime-lifecycle".to_owned(),
+                path_and_query: path.to_owned(),
                 headers: Vec::<LogicalHeader>::new(),
                 body_length: 0,
             },
@@ -4610,7 +4617,7 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
             .expect("response frame is correlated")
     }
 
-    let current = send_lifecycle_request(&endpoint, expected_uid, "lifecycle-current").await;
+    let current = send_lifecycle_request(&endpoint, expected_uid, "lifecycle-current", "/v1/runtime-lifecycle").await;
     assert_eq!(current.header.request_id, "lifecycle-current");
     assert_eq!(current.header.status, StatusCode::OK.as_u16());
     assert!(
@@ -4643,7 +4650,7 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
     assert!(body.get("dependent_tasks").is_none());
     assert!(body.to_string().find("test-boot-id").is_none());
 
-    let stale = send_lifecycle_request(&endpoint, expected_uid, "lifecycle-stale").await;
+    let stale = send_lifecycle_request(&endpoint, expected_uid, "lifecycle-stale", "/v1/runtime-lifecycle").await;
     assert_eq!(stale.header.request_id, "lifecycle-stale");
     assert_eq!(
         stale.header.status,
@@ -4655,9 +4662,31 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
         body["message"],
         "Current Runtime incarnation could not be verified"
     );
+    let preview = send_lifecycle_request(
+        &endpoint,
+        expected_uid,
+        "stop-preview",
+        "/v1/runtime-lifecycle/stop-preview",
+    )
+    .await;
+    assert_eq!(preview.header.status, StatusCode::OK.as_u16());
+    assert!(
+        preview
+            .header
+            .headers
+            .iter()
+            .any(|header| header.name == "cache-control" && header.value == "no-store")
+    );
+    let body: Value = serde_json::from_slice(preview.body()).expect("stop preview JSON");
+    assert_eq!(body["runtime_id"], runtime_id);
+    assert_eq!(body["runtime_incarnation_id"], incarnation_id);
+    // An idle Runtime is still UNKNOWN: no live-work observer exists, so QUIESCENT is unreachable.
+    assert_eq!(body["verdict"], "UNKNOWN");
+    assert_eq!(body["blockers"][0]["code"], "RUNTIME_QUIESCENCE_UNKNOWN");
+    assert_eq!(body["admitted_turn_ids"], serde_json::json!([]));
     server
         .await
-        .expect("server handles both lifecycle requests");
+        .expect("server handles all lifecycle requests");
     let persisted = store
         .read_local_lifecycle_snapshot(runtime_id, incarnation_id)
         .expect("post-request lifecycle read succeeds")
