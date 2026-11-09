@@ -45,7 +45,7 @@ React controls do not own durable truth. The Tauri bridge calls the local Operat
 
 ## 5. SDD lifecycle
 
-Feature 001 is IN_REVIEW: core decisions B-01–B-10 are locked but dependent API/UI/error/recovery subcontracts remain draft. Features 002–011 are DRAFT. Structural validation is not owner acceptance or implementation authorization. See V1-FEATURE-SDD-REGISTER.md and ../specs/README.md.
+Features 001-012 are ACCEPTED/LOCKED (owner sarv-projects, 2026-11-09): their accepted decisions authorize per-package implementation. Features 013-020 are IN_REVIEW. Structural validation is not owner acceptance or implementation authorization. See V1-FEATURE-SDD-REGISTER.md and ../specs/README.md.
 
 ## 6. Current release blockers
 
@@ -70,7 +70,7 @@ See IMPLEMENTATION-STATUS.md for evidence and ACCEPTANCE-AND-E2E-PLAN.md for rel
 | Events, projections and integration | EVENTS.md, `schemas/domain-event.schema.json`, SERVICES.md, PRESENTATION-RUNTIME.md, FAILURE-RECOVERY.md | 148 versioned event types are schema-aligned. Domain events, Operator stream frames and UI reducer actions are distinct. Each event needs a real producer/consumer and recovery path before its UI is treated as live. |
 | Flows, races and failure recovery | FLOWS.md, V1-END-TO-END-FLOW-AND-RACE-CONTRACTS.md, FAILURE-RECOVERY.md and domain owners | FL01–FL25 and race classes define acceptance targets. Only the exact tests listed in IMPLEMENTATION-STATUS.md are evidence; structural or unit passes do not qualify full journeys. |
 | HLD, ownership and rationale | ../ARCHITECTURE.md, COVERAGE-MATRIX.md, `adr/`, domain owner contracts | Architecture defines boundaries and ownership; ADRs explain accepted rationale. An implementation or product proposal cannot silently create a second authority. |
-| Requirements and feature acceptance | SPECIFICATION-STANDARD.md, `specs/001-*` through `specs/011-*`, V1-PRODUCT-RELEASE-CONTRACT.md | All 11 feature packages exist; Feature 001 is IN_REVIEW and Features 002–011 are DRAFT. Package structure is not owner acceptance. |
+| Requirements and feature acceptance | SPECIFICATION-STANDARD.md, `specs/001-*` through `specs/020-*`, V1-PRODUCT-RELEASE-CONTRACT.md | All 20 feature packages exist; Features 001-012 are ACCEPTED/LOCKED (owner 2026-11-09) and 013-020 are IN_REVIEW. Package structure is not owner acceptance; acceptance authorizes implementation per package. |
 | UI behavior and typed actions | V1-UI-SCREEN-CONTRACT.md, V1-UI-ACTION-STATE-LEDGER.md, DESKTOP-SHELL-LLD.md, EXPERIENCE.md, NATIVE-COMPOSER-LLD.md, each feature `contracts/ui-behavior.md` | Screen and action targets are mapped to actual mounted components in SEMANTIC-SERVED-UI-MAP.md. Every visible control must be checked against its actual typed command and owner route; target-only controls stay visibly unavailable. |
 | Tests and release evidence | TESTING.md, ACCEPTANCE-AND-E2E-PLAN.md, BENCHMARKS.md, feature TASKS.md and EARS | Rust workspace, focused frontend and structural checks have recorded results. Full serial frontend, packaged Tauri, cross-OS, provider and owner USER journeys remain explicit qualification gates. |
 | Market and reference research | COMPETITIVE-RESEARCH.md, REFERENCE-IMPLEMENTATIONS.md, pinned study docs | Research is evidence for design choices, not product requirements or implementation authority. Verify current vendor versions and licenses before adopting a pattern. |

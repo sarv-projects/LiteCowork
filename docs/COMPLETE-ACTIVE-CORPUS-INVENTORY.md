@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 359
-- Included lines: 72258
-- Included bytes: 6326915
+- Included lines: 72272
+- Included bytes: 6330467
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -26,7 +26,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
 | docs/ | 139 | 48108 |
-| repository root | 6 | 1587 |
+| repository root | 6 | 1601 |
 | scripts/ | 1 | 14 |
 | specs/ | 201 | 21769 |
 
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 81 | 6032 | 2fc07511243a861e |
-| CURRENT-RUN.md | 201 | 26387 | 10c74114d504bd28 |
+| CURRENT-RUN.md | 215 | 29855 | 903adbec52eadb14 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 92 | 7389 | 5a5a73e85c542f17 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -80,16 +80,16 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 8a2f18ec3e381484 |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 2697aa7c41e087bc |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 927 | 69198 | f6753a21cfcfe5eb |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
 | docs/FAILURE-RECOVERY.md | 213 | 17867 | 71418bc2b863c859 |
-| docs/FEATURE-AND-UI-CONTRACT-COVERAGE.md | 137 | 21002 | 16294042e9895d9c |
+| docs/FEATURE-AND-UI-CONTRACT-COVERAGE.md | 137 | 21086 | c847185083ce9674 |
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 299 | 59390 | 17212fb555edc72d |
+| docs/IMPLEMENTATION-STATUS.md | 299 | 59390 | 499fd18fa0af66c2 |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |

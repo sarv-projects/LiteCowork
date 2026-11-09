@@ -1,16 +1,16 @@
 # Current engineering handoff
 
 - **Repository:** LiteCowork
-- **Branch:** main
-- **Inspected revision:** 52269e4af6038ccc849e5c2fbef5376f3cdd2d8e
-- **Working-tree state at this handoff:** clean. The 197-entry pre-existing worktree recorded on 2026-11-06 has been committed in full across the audit-repair campaign; see the 2026-11-07 handoff below.
-- **Release posture:** pre-release; V1 is not release-qualified
+- **Branch:** docs/audit-competitor-superset (open PR #1)
+- **Inspected revision:** ef2bed7 (V1 implementation began this session; see "V1 implementation progress" below)
+- **Working-tree state at this handoff:** clean. The 197-entry pre-existing worktree recorded on 2026-11-06 has been committed in full across the audit-repair campaign; see the 2026-11-07 handoff below. One labelled stash holds two deferred delegation-snapshot fixture fixes to apply with the migration-wiring task.
+- **Release posture:** pre-release; V1 is not release-qualified. V1 implementation has started: the Feature 001/002 ACP native-agent core is implemented and tested; the remaining packages are not yet implemented.
 
 This file is the current engineering handoff. It records the active repository state and the checks performed against it. It is not a chronological diary and must not preserve stale "previous/latest" status paragraphs. Update the current facts and validation results in place whenever the repository changes.
 
 ## Repository state
 
-The active checkout contains the Tauri/React desktop application, the Rust daemon and workspace crates, first-party docs and JSON contracts, 11 feature SDD packages, scripts and pinned reference repositories. The repository is not documentation-only.
+The active checkout contains the Tauri/React desktop application, the Rust daemon and workspace crates, first-party docs and JSON contracts, 20 feature SDD packages (001-012 ACCEPTED/LOCKED, 013-020 IN_REVIEW), scripts and pinned reference repositories. The repository is not documentation-only.
 
 Primary application paths:
 
@@ -83,10 +83,10 @@ Current validation on the working tree:
 - Architecture/schema validator: passed active checks; one warning because the optional `openapi-spec-validator` package is not installed. JSON Schema, 148 event schemas, errors, OpenAPI structure, SQL, Gateway naming, concept and active Markdown checks passed.
 - Cross-owner consistency guard: **36 assertions passed, 0 issues**.
 - V1 contract/route/UI audit: **0 errors** (229 OpenAPI operations; 173 served, 1 outside OpenAPI, 56 target-only).
-- Design-depth audit: **0 findings**; 359 files, 72,258 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 20 packages.
+- Design-depth audit: **0 findings**; 359 files, 72,272 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 20 packages.
 - Feature SDD validator: **20/20 packages passed** (001-012 ACCEPTED/LOCKED 2026-11-09; 013-020 IN_REVIEW).
-- Markdown audit: **0 broken relative links** across 356 files / 72,271 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 359 files / 72,258 lines.
-- Sandbox note: on this Linux sandbox, cargo and Python `uv` commands require the prefix `TMPDIR=/tmp PKG_CONFIG_SYSROOT_DIR=/tmp/sysroot PKG_CONFIG_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig LIBRARY_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu`.
+- Markdown audit: **0 broken relative links** across 356 files / 72,285 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 359 files / 72,272 lines.
+- Sandbox note: the pinned Rust 1.98.1 toolchain is not installed and rustup/CARGO_HOME are read-only; the workspace builds clean on the newest installed toolchain (1.92.0) through a writable CARGO_HOME seeded from the read-only cache, plus a hand-built dbus pkg-config sysroot and link dir (keyring -> dbus-secret-service -> libdbus-sys needs `dbus-1.pc` and an unversioned `libdbus-1.so`, neither in the base image). The reproducible prefix is sourced from `/projects/sandbox/.work/env.sh` (sets CARGO_HOME, CARGO_TARGET_DIR, TMPDIR, RUSTUP_TOOLCHAIN=1.92.0, PKG_CONFIG_PATH, LIBRARY_PATH, RUSTFLAGS and PYTHONPATH). This does not change the pinned 1.98.1 release target.
 - Frontend production build: passed API type check, TypeScript and Vite. Main JS bundle is 1.05 MB minified (287 KB gzip), above Vite's 500 KB advisory.
 - Focused Conversation + responsive tests: **24/24 passed**, including journal retry, cursor pagination, drawer semantics and mobile canvas sizing.
 - The full serial frontend test command was attempted but did not emit a final TAP summary. It reached test 393 and stalled in the Settings Chrome DevTools check; observed failures included two production-App bootstrap timeouts and, before fixes, the Conversation pagination and responsive assertions. The latter three are now fixed and pass in isolation. Do not report an aggregate full-suite result.
@@ -94,6 +94,20 @@ Current validation on the working tree:
 - Rendered UI, packaged Tauri smoke and real-provider desktop E2E remain unqualified.
 
 The full Windows Rust workspace test suite is green, but that is not a LiteCowork V1 release pass. Do not describe frontend coverage as complete or imply packaged desktop/provider USER qualification.
+
+## V1 implementation progress (2026-11-09)
+
+V1 implementation started this session on the Feature 001/002 critical path. Status is honest and partial: one package core is implemented and tested; the other 19 packages and the rest of 001 are not yet implemented.
+
+Done and verified (committed on `docs/audit-competitor-superset`):
+
+- **ACP native-agent core (Feature 001/002, register A-52/A-54, tasks 001-T01/T04, P-11).** The broken top-level-SSE parsing (the A-52 defect where agent output never rendered) is replaced with a real Agent Client Protocol boundary: `apps/litecoworkd/src/agents/adapter.rs` (ACP client: initialize/session.new/session.prompt/session.update/session.cancel behind a per-provider launch catalog), `agents/normalizer.rs` (typed event normalizer mapping ACP update kinds to internal turn events), `agents/native_provider.rs` plus `agents/fixtures/opencode_v2_0_32_turn.jsonl` (a captured real v2.0.32 turn). The supervisor consumes the normalizer under a line-resetting inactivity watchdog that replaces the hard 60 s cap. OpenCode v2 HTTP is kept as one non-ACP adapter until its ACP route qualifies. Commits e10d496, ef2bed7.
+- **Verification:** 27 agent/adapter/normalizer/native-provider tests pass; `cargo check -p litecoworkd` clean; the storage-sqlite task/delegation/routine family that was briefly broken is back to green; UI `tsc --noEmit` and `api:check` clean.
+
+Deferred with a recorded reason (not done, not faked):
+
+- **Migration wiring.** An interim commit (78fba68) wired `SCHEMA_VERSION` 27 -> 29, which activated migration v28's delegation-policy triggers. v28 (`workspace_delegation_settings_revisions_v28`) is defined but its production `task_spec_revisions` delegation-snapshot writer is not implemented (that is Feature 005/015 work), so wiring it aborted every task-spec insert and broke 58 storage-sqlite tests plus the production task-spec path. Commit ef2bed7 reverted only the migration wiring to the baseline (`SCHEMA_VERSION` 27; both v28-delegation and the new conversation-durable-turn migration stay defined-but-unwired, consistent with register A-40) and kept all ACP code, which does not depend on the new tables. The migration is redone correctly in the Feature 001 turn-durability task, taking the real next free slot alongside its writer. Two correct delegation-snapshot fixture fixes (lead_failover, environment) are held in a labelled git stash to apply with that task.
+- **Remaining packages.** 003-020 and the rest of 001 (turn durability/outbox, streaming frames, Stop/Retry, UI rendering fixes P-01..P-04) are not yet implemented. Delivery follows the waves in docs/LITECOWORK-BUILD-TASKS.md.
 
 ## Release-critical work
 
@@ -154,9 +168,9 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 - Feature package validator: **12/12 passed**; structural checks only, not owner approval or runtime qualification.
 - Cross-owner consistency: **36 assertions passed, 0 issues**.
 - V1 contract audit: **0 errors**; 229 OpenAPI operations, 173 served, 1 authenticated local-only route and 56 target-only.
-- Design-depth audit: **0 findings**; 359 files, 72,258 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 20 packages.
-- Markdown audit: **0 broken relative links** across 356 files and 72,271 lines.
-- Active-corpus manifest: **359 files and 72,258 lines** (manifest excludes itself).
+- Design-depth audit: **0 findings**; 359 files, 72,272 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 20 packages.
+- Markdown audit: **0 broken relative links** across 356 files and 72,285 lines.
+- Active-corpus manifest: **359 files and 72,272 lines** (manifest excludes itself).
 - Architecture/schema validator: passed with one warning because optional openapi-spec-validator is not installed; JSON Schema, 148 typed events, errors, OpenAPI structure, SQLite, Gateway naming, canonical concepts and active Markdown checks passed.
 - Rust workspace: lint gate (`clippy --all-targets -- -D warnings`) **0 diagnostics**; `check --all-targets` **0 errors**; `fmt --all --check` clean; test counts as listed under "Current validation on the working tree".
 - Whitespace check: **passed** (`check.sh` whitespace stage, exit 0).
