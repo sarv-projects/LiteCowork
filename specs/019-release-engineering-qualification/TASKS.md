@@ -264,7 +264,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T15 - Evidence bundle process and owner USER sign-off record
 
-- **Status:** NOT STARTED (ACCEPTANCE section 6 lists fields; no schema or tool).
+- **Status:** DONE (CODE): `scripts/v1_evidence_bundle.py` (`assemble` and `validate`; schema validation, secret scan of the bundle and every attachment with redacted findings, attachment digests re-checked so editing one invalidates the bundle, path traversal refused, redacted index line only), `tests/test_evidence_bundle.py` (9 tests), `docs/release/evidence/INDEX.md` (empty, no bundle recorded), `docs/release/USER-SIGNOFF-TEMPLATE.md`. The dry-run example bundle exists only inside the tests (temporary directory); no real journey bundle exists, so no journey is QUALIFIED.
 - **Depends on:** T01, T02, T14
 - **Cross-package prerequisites:** NONE
 - **Owner:** QA, Product (USER sign-off), Security (redaction).
@@ -272,10 +272,10 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 - **Contract:** SPEC sections 8, 10; ACCEPTANCE sections 2, 6; AC-013, AC-014.
 - **Change intent:** `v1_evidence_bundle.py assemble --journey E2E-01 --row windows-x64-opencode-v2.0.32` collects SHA and dirty status, OS build, agent version (`opencode --version`), protocol, CODE command outputs, SYSTEM trace (request ids, event sequences, receipt refs), USER artifact digests and negative cases; validates against `release-evidence-bundle.schema.json`; runs the secret scan on the bundle; writes only a redacted index entry to the repository while screenshots/video stay in owner storage referenced by SHA-256. The USER sign-off template captures reviewer, date, what remained blocked or unknown, and an explicit "not a green row" note for partial journeys.
 - **Acceptance:**
-  - [ ] Missing SHA, OS, agent version, negative cases or reviewer rejects the bundle (AC-013).
-  - [ ] A seeded token in a log attachment rejects the bundle (AC-013).
-  - [ ] A journey without USER sign-off stays below QUALIFIED in the matrix (AC-014).
-  - [ ] Bundle references are content digests; changing an attachment invalidates the bundle.
+  - [x] Missing SHA, OS, agent version, negative cases or reviewer rejects the bundle (AC-013).
+  - [x] A seeded token in a log attachment rejects the bundle (AC-013).
+  - [x] A journey without USER sign-off stays below QUALIFIED in the matrix (AC-014).
+  - [x] Bundle references are content digests; changing an attachment invalidates the bundle.
 - **Command:** `uv run --locked python -m unittest tests.test_evidence_bundle -v` (test to be added by this task) and `uv run --locked python scripts/v1_evidence_bundle.py validate docs/release/evidence/INDEX.md`
 - **Evidence:** example bundle for a dry-run journey.
 - **Stop:** a bundle would require committing user content; keep it out of the repository.
