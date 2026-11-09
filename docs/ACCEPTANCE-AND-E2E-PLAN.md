@@ -129,6 +129,19 @@ A release row moves to QUALIFIED only when the full chain is linked and reproduc
 
 The historical c7e9c05 acceptance matrix in docs/archive/legacy-implementation-c7e9c05 records all ten core product journeys as BLOCKED. Re-run the inventories from the new live implementation before updating any release status.
 
+### Declared V1 release rows and the NOT_COUNTED rule
+
+*Accepted target interface (not yet in source) until Feature 019 tasks T14 and T15 land; the owner is Feature 019 (see `docs/release/README.md`).*
+
+V1 declares exactly two release rows. Nothing else is a V1 row.
+
+| Row id | Priority | Target |
+|---|---|---|
+| `windows-x64-opencode-v2.0.32` | 1 | Windows 10 22H2 and Windows 11 x64, native, WebView2, OpenCode v2.0.32 |
+| `linux-x64-opencode-v2.0.32` | 2 | Ubuntu 24.04 x64 native desktop, WebKitGTK 4.1, OpenCode v2.0.32 |
+
+A run under WSL2, inside a container, or on a CI image is NOT_COUNTED for every row: it can supply CODE evidence only and never marks a cell PASSED or a journey QUALIFIED. Hosted CI runners are CODE/SYSTEM evidence, never USER. macOS is UNSUPPORTED. Evidence bundles and rows validate against `docs/schemas/release-evidence-bundle.schema.json` and `docs/schemas/release-matrix-row.schema.json`.
+
 
 ## Desktop stop/update qualification gate - future and currently blocked
 

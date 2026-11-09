@@ -35,7 +35,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T02 - Promote release contracts into owner docs and schemas
 
-- **Status:** NOT STARTED.
+- **Status:** DONE (CODE/DOCS) pending T01 owner acceptance: `docs/schemas/release-evidence-bundle.schema.json`, `docs/schemas/release-matrix-row.schema.json`, `tests/test_release_schemas.py` (9 tests), `docs/release/README.md`, ADR 0026 skeleton (PROPOSED, not accepted), ACCEPTANCE section 7 declared rows and NOT_COUNTED rule, TESTING "Release gates", SECURITY signing and updater trust, BUILD-TASKS BT-00.7 and BT-10.5 mapping. The B-44 text in the ADR is proposed text, not owner-accepted.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE (Feature 011 must review the updater call contract against its update quiescence gate).
 - **Owner:** Release Engineering, QA, Security; Documentation owners.
@@ -43,9 +43,9 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 - **Contract:** SPEC sections 5, 7.2, 8; ACCEPTANCE sections 6, 7; AC-012, AC-013, AC-017.
 - **Change intent:** in one reviewed change: add the JSON Schemas for EvidenceBundle and ReleaseRow (fields from ACCEPTANCE section 6 plus row tuple id, `counted` flag and `not_counted_reason`); add the licensing/packaging ADR skeleton with the accepted B-44 text; add to ACCEPTANCE section 7 the declared V1 rows and the NOT_COUNTED rule; add to TESTING a "Release gates" section naming the CI jobs; add to SECURITY the signing-key custody and updater trust rules from B-43; map BT-00 and BT-10.5 rows to this package's tasks. No SQLite migration: this package owns no daemon table. Each new name is labelled "accepted target interface (not yet in source)" until its task lands.
 - **Acceptance:**
-  - [ ] Each schema validates a positive fixture and rejects fixtures missing SHA, OS/build, agent version, negative cases or reviewer (AC-013).
-  - [ ] ACCEPTANCE names exactly two V1 rows and states WSL2/container/CI image runs are NOT_COUNTED (AC-002, AC-012).
-  - [ ] No definition is duplicated between the owner docs and this package.
+  - [x] Each schema validates a positive fixture and rejects fixtures missing SHA, OS/build, agent version, negative cases or reviewer (AC-013).
+  - [x] ACCEPTANCE names exactly two V1 rows and states WSL2/container/CI image runs are NOT_COUNTED (AC-002, AC-012).
+  - [x] No definition is duplicated between the owner docs and this package.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py` and `uv run --locked python scripts/audit_v1_contracts.py --strict` and `uv run --locked python -m unittest discover -s tests -v` (schema fixture test to be added by this task)
 - **Evidence:** PR link; validator output.
 - **Stop:** a field conflicts with an owner definition elsewhere; resolve at that owner.

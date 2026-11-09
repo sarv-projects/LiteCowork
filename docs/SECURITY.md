@@ -130,6 +130,15 @@ and Trust policy.
 LiteSPM package verification metadata should include source, publisher, digest/signature, permissions, compatibility and last verification. LiteCowork consumes normalized lock metadata and independently applies task policy.
 
 
+## Release signing and updater trust (proposed, B-43)
+
+*Accepted target interface (not yet in source); B-43 is PROPOSED until the owner accepts it.*
+
+- The signing key lives only in a protected release environment; a pull request, fork run or `pull_request_target` workflow cannot reach it, and it never appears in logs or evidence bundles (the secret scan covers job logs).
+- Every shipped Windows PE and installer carries a timestamped Authenticode signature; Linux publishes `SHA256SUMS` signed with the release key. An unsigned or tampered artifact fails the release job; the release is blocked rather than shipped unsigned.
+- The updater accepts only a signed manifest from a pinned HTTPS origin and refuses downgrades, channel mismatch and tampered artifacts. It installs only after the Feature 011 authenticated stop and update quiescence gate returns Quiescent; an unavailable or UNKNOWN gate means no install. The Linux row has no updater in V1.
+- Licensing: no licence-check network call exists (B-44); no native agent harness binary is bundled.
+
 ## Agent lifecycle, registry, and native configuration security
 
 ACP/distribution registry metadata is untrusted supply-chain input. It may describe a

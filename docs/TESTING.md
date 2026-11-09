@@ -130,6 +130,10 @@ schema-only pass does not satisfy SYSTEM or OWNER acceptance.
 ### Performance/soak
 Long Tasks, many events, large artifacts, large file/data corpora, repeated reconnects, hours-long automation/channel operation.
 
+### Release gates
+
+*Accepted target interface (not yet in source) except where marked present.* The release gate set is owned by Feature 019 and runs as named CI jobs in `.github/workflows/architecture-docs.yml` (present: `check`, `ui`, `tauri`). Jobs to be added by Feature 019 tasks: a native Windows x64 job (T04, never WSL2), secret scan plus dependency audit (T05), packaging check (T08, T10), and release qualification (T14 to T19). A result from WSL2, a container or a CI image is NOT_COUNTED for release rows (see ACCEPTANCE-AND-E2E-PLAN section 7). Release-evidence schema fixture tests: `python3 -m unittest tests.test_release_schemas`.
+
 ## Mandatory vertical slice gates
 
 ### Gate 1 — durable local Task

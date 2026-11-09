@@ -12,6 +12,7 @@ This is the working delivery checklist for the active source tree. It is not a G
 | BT-00.4 | **Validated** — Windows WorkspaceRoot private-locator route regressions | Six route tests pass on the declared Windows target; production locator validation remains fail-closed |
 | BT-00.5 | Run documentation link and owner-contract guards | Markdown audit and cross-contract validator pass with reviewed exceptions only |
 | BT-00.6 | Run frontend type/build/unit checks and packaged desktop smoke | Exact commands and results recorded |
+| BT-00.7 | Release evidence and release-row schemas, release docs index | docs/schemas/release-evidence-bundle.schema.json, docs/schemas/release-matrix-row.schema.json, docs/release/README.md; 019-T02 |
 
 ## BT-01 — Conversation dispatch durability (Feature 001)
 
@@ -117,7 +118,7 @@ BT-06.1 and BT-06.2 are owned by Feature 007; BT-06.3..BT-06.5 are owned by Feat
 | BT-10.2 | Map every visible Settings control to exact owner and receipt | Control-level semantic map |
 | BT-10.3 | Verify Runtime vs Operator vs Task readiness copy | No false “execution ready” indication |
 | BT-10.4 | Complete shell keyboard/focus/reduced-motion tests | Packaged desktop acceptance |
-| BT-10.5 | Run full declared OS/provider release matrix | CODE/SYSTEM/USER and owner sign-off |
+| BT-10.5 | Run full declared OS/provider release matrix | CODE/SYSTEM/USER and owner sign-off; owned by 019-T14, 019-T15 and 019-T22 |
 
 ## BT-11: Conversation history management (Feature 014)
 

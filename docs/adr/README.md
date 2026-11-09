@@ -37,3 +37,4 @@ Superseded decisions remain available with an explicit successor reference.
 | [0023](0023-host-guidance-is-not-capability-authority.md) | Built-in Host guidance is zero-authority context, not a capability |
 | [0024](0024-optional-chat-first-coworkers.md) | Coworkers are optional chat-first identities; standing work and automatic memory remain scoped and bounded |
 | [0025](0025-agent-module-registry-and-native-configuration.md) | Agent-specific lifecycle/configuration is modular; native auth/options/surface stay agent-owned and LiteSPM bridges cross-agent packages |
+| [0026](0026-licensing-and-packaging-decision.md) | PROPOSED (skeleton, pending B-44): licensing and packaging decision |
