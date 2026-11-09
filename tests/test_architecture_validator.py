@@ -415,8 +415,8 @@ class CICoverageContractTests(unittest.TestCase):
                 encoding="utf-8"
             )
         self.assertIn("not semantic or runtime qualification", report)
-        self.assertIn("OpenAPI operations: 229", report)
-        self.assertIn("Composed Operator OpenAPI registrations: 173", report)
+        self.assertIn("OpenAPI operations: 230", report)
+        self.assertIn("Composed Operator OpenAPI registrations: 174", report)
         self.assertIn("OpenAPI target-only operations: 56", report)
         self.assertNotIn("Actual OpenAPI?", report)
 

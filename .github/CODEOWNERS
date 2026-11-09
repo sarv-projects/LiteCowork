@@ -1,0 +1,5 @@
+# 019-T03: Release Engineering reviews CI; Security reviews the Tauri configuration and capabilities.
+# Owners below are the repository owner until named teams exist.
+/.github/ @sarv-projects
+/apps/litecowork-ui/src-tauri/tauri.conf.json @sarv-projects
+/apps/litecowork-ui/src-tauri/capabilities/ @sarv-projects

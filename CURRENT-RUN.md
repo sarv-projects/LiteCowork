@@ -249,6 +249,13 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 - Added src/shell/shortcut-registry.ts, tests/keyboard-focus-baseline.test.mjs (3), tests/shell-reachability.test.mjs (3); removed Back/Forward buttons that called window.history without any pushState.
 - Not done: focus-return/skip-link/browser keyboard path (T11); Recent Chats states and Needs You count (T19).
 
+### Wave 0 slice 8: 019-T03 CI skeleton and 019-T05 secret scan hardening (2026-11, CODE, not run on GitHub)
+
+- Added .github/workflows/architecture-docs.yml, .github/CODEOWNERS, tests/test_ci_workflow_policy.py, tests/test_secret_scan.py, scripts/secret-scan-exceptions.json, .gitattributes. Fixed v1_secret_scan.py to mask the matched secret in report previews. Updated tests/test_architecture_validator.py expected counts (230 operations, 174 served).
+- Found and fixed: scripts/check.sh, the other shell scripts, .uv-version, .python-version and rust-toolchain.toml were committed with CRLF, which breaks `$(<.uv-version)` comparisons and the shebang on Linux runners. They are now LF with .gitattributes rules.
+- Commands: `python3 -m unittest discover -s tests` (with PyYAML on the path): 50 tests, 3 failures, all caused by the host rustc 1.92.0 differing from the pinned 1.98.1 (the stubbed-tool tests call the real rustc); the same file shows these only because the host is not on the pin. Source scan on a `git archive` copy of HEAD: 0 findings with the exceptions table.
+- Not verified: actionlint, a real GitHub Actions run, cargo deny, pnpm audit.
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.

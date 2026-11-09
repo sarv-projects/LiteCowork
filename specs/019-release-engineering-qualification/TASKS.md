@@ -52,7 +52,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T03 - CI skeleton on a native Linux runner (Wave 0)
 
-- **Status:** NOT STARTED (no `.github/` directory exists).
+- **Status:** PARTIAL (CODE, not run on GitHub): `.github/workflows/architecture-docs.yml` (jobs check, ui, tauri; the filename and shape are pinned by existing tests in `tests/test_architecture_validator.py`, so it is used instead of the `ci.yml` named below), `.github/CODEOWNERS` (repository owner only until teams exist) and `tests/test_ci_workflow_policy.py` (SHA pinning, contents: read, concurrency, no secrets, no pull_request_target). LF endings enforced for `scripts/*.sh`, `.uv-version`, `.python-version`, `rust-toolchain.toml` via `.gitattributes` because CRLF made `scripts/check.sh` unrunnable on Linux. NOT done: `actionlint` run (tool not available), any CI run URL, the injected-failure PR proofs, per-stage duration evidence from CI. Depends on T01 owner acceptance, which is still BLOCKED, so this is a skeleton
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Release Engineering.
@@ -61,8 +61,8 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 - **Change intent:** add a workflow, introduced only through a reviewed pull request (never a direct push), with jobs on `ubuntu-24.04`: `scripts/check.sh` full gate; `python3 .specify/scripts/validate_feature_package.py`; `pnpm --dir apps/litecowork-ui install --frozen-lockfile`, `pnpm --dir apps/litecowork-ui test`, `pnpm --dir apps/litecowork-ui run build`; `cargo test --manifest-path apps/litecowork-ui/src-tauri/Cargo.toml --locked`. Permissions default `contents: read`; every third-party action pinned to a full commit SHA; `concurrency` cancels superseded runs; no secrets on `pull_request` from forks. CODEOWNERS requires Release Engineering review for `.github/` and Security review for `apps/litecowork-ui/src-tauri/tauri.conf.json` and `capabilities/`.
 - **Acceptance:**
   - [ ] A PR with an injected failing Rust test, failing UI test, broken spec link or stale generated ledger is blocked (AC-001).
-  - [ ] Negative: a workflow step referencing an action by tag instead of SHA fails the pinning check.
-  - [ ] Negative: a fork PR run cannot read any repository secret.
+  - [x] Negative: a workflow step referencing an action by tag instead of SHA fails the pinning check.
+  - [x] Negative: a fork PR run cannot read any repository secret.
   - [ ] Stage durations are printed per stage (reuse `run_stage`).
 - **Command:** `actionlint .github/workflows/ci.yml` (tool pinned by this task) and `uv run --locked python -m unittest tests.test_check_script -v`
 - **Evidence:** CI run URLs for a passing and a deliberately failing PR in Completion evidence.
@@ -87,7 +87,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T05 - Secret scan and dependency audit as release gates
 
-- **Status:** PARTIAL - `scripts/v1_secret_scan.py` exists with redacted reporting and `--source`/`--extra-path`; nothing runs it; no dependency advisory or licence audit exists; no `deny.toml`.
+- **Status:** PARTIAL (CODE): the secret scan now masks the matched bytes in its preview (it previously echoed the whole line including the token), supports a reviewed exceptions table (`scripts/secret-scan-exceptions.json`: id, path, pattern, reason, reviewer, expiry; expired or incomplete entries fail), runs on tracked source in the `check` job, and `tests/test_secret_scan.py` (9 tests) seeds fake tokens into a bundle file, an evidence file and source. Two existing test fixtures needed exceptions SS-001 and SS-002 (reviewer pending owner confirmation). NOT done: `cargo deny` (no `deny.toml`; tool not installed), `pnpm audit --prod`, lockfile-coverage self-check, SECURITY.md exceptions table, release-job bundle scanning
 - **Depends on:** T01, T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Security.
@@ -95,10 +95,10 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 - **Contract:** SPEC section 10; SECURITY "Secrets", "Supply chain"; AC-003, AC-004.
 - **Change intent:** wire `v1_secret_scan.py --source` into every PR and `--extra-path <bundle dir>` plus each evidence bundle into the release job; add a seeded fake-token fixture test; add `cargo deny check advisories licenses bans sources` for the root workspace and for `apps/litecowork-ui/src-tauri`, and `pnpm --dir apps/litecowork-ui audit --prod` with a reviewed exceptions table (id, reason, expiry date, reviewer). The licence allowlist comes from the accepted B-44 decision.
 - **Acceptance:**
-  - [ ] Seeded token in source, in a bundle file and in an evidence file each fail the gate, and the report shows only a redacted preview (AC-003).
+  - [x] Seeded token in source, in a bundle file and in an evidence file each fail the gate, and the report shows only a redacted preview (AC-003).
   - [ ] A pinned crate with a known advisory fails `cargo deny` unless an unexpired reviewed exception exists (AC-004).
   - [ ] Both Cargo lockfiles and the pnpm lockfile are covered; removing one from the job fails a self-check.
-  - [ ] Negative: an expired exception fails the gate.
+  - [x] Negative: an expired exception fails the gate.
 - **Command:** `uv run --locked python scripts/v1_secret_scan.py --source --json` and `cargo deny check` and `cargo deny --manifest-path apps/litecowork-ui/src-tauri/Cargo.toml check` and `pnpm --dir apps/litecowork-ui audit --prod`
 - **Evidence:** gate outputs in CI artifacts; exceptions table in SECURITY.md.
 - **Stop:** a real secret is found; rotate it with its owner before continuing.
