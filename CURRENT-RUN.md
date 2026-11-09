@@ -256,6 +256,34 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 - Commands: `python3 -m unittest discover -s tests` (with PyYAML on the path): 50 tests, 3 failures, all caused by the host rustc 1.92.0 differing from the pinned 1.98.1 (the stubbed-tool tests call the real rustc); the same file shows these only because the host is not on the pin. Source scan on a `git archive` copy of HEAD: 0 findings with the exceptions table.
 - Not verified: actionlint, a real GitHub Actions run, cargo deny, pnpm audit.
 
+### Wave 0 slices 9-14: 019 release machinery and 011 shell/Settings leftovers (2026-11-10, CODE)
+
+Done (all CODE; nothing here is QUALIFIED, and nothing was run on Windows, in a packaged app or in a browser):
+
+- 019-T02: `docs/schemas/release-evidence-bundle.schema.json` and `release-matrix-row.schema.json`, `tests/test_release_schemas.py` (9), `docs/release/README.md`, ADR 0026 skeleton (PROPOSED, B-44 not owner-accepted), ACCEPTANCE section 7 declared rows and NOT_COUNTED rule, TESTING "Release gates", SECURITY signing/updater trust (PROPOSED B-43).
+- 019-T10 PARTIAL: `bundle.linux.deb` (WebKitGTK 4.1 dependency, systemd unit shipped disabled), `scripts/linux-release-checksums.sh`, `scripts/qualify-linux-package.sh`, `tests/test_linux_package_scripts.py`. The five GPG signing tests are skipped here (no gpg-agent) and `dpkg-deb` is absent, so no deb was built or inspected.
+- 019-T12 PARTIAL: `src/updates/` reducer, controller, typed command parsing and `UpdatePanel` (16 tests). Not mounted; `check_for_update` and `install_update` do not exist.
+- 019-T14 DONE: row-aware matrix in `scripts/v1_platform_matrix.py` (WSL2/container/CI detection, NOT_COUNTED, bundle-linked PASSED only, deterministic), `scripts/v1_release_matrix_rows.json`, `tests/test_platform_matrix.py` (17), generated `docs/release/QUALIFICATION-MATRIX.{md,json}` (generated in a container, so every cell is NOT_COUNTED or UNAVAILABLE).
+- 019-T15 DONE: `scripts/v1_evidence_bundle.py`, `tests/test_evidence_bundle.py` (9), empty `docs/release/evidence/INDEX.md`, `USER-SIGNOFF-TEMPLATE.md`.
+- 019-T18 PARTIAL: `crates/storage-sqlite/tests/resilience.rs` (3 native tests) and a portable resilience runner (`tests/test_resilience_matrix.py`, 3).
+- 011-T13 prerequisite: read-only `GET /v1/runtime-lifecycle/stop-preview` is now SERVED (`runtime_stop_operator.rs`, `RuntimeLifecycleStore::read_runtime_stop_observation`). Its verdict is BLOCKED when durable work exists and UNKNOWN otherwise; it is never QUIESCENT because no live-session observer exists. `requestLocalRuntimeStop` stays unmounted. Route inventory is now 175 served / 1 local-only / 55 target-only (three audit scripts, five docs and `tests/test_architecture_validator.py` updated).
+- 011-T14 PARTIAL: stop preview panel and update gate in Settings > Runtime; Rust bridge `get_runtime_stop_preview` and `check_update_quiescence`.
+- 011-T09 DONE, 011-T11 PARTIAL (skip link, universal focus-visible, registry shortcut list), 011-T12 PARTIAL (`power_assertion.rs` state machine, not wired), 011-T16 PARTIAL (trace table), 011-T19 PARTIAL and 011-T21 DONE (SettingsPage deleted and merged), 011-T20 PARTIAL (shared Operator-unavailable panel, LibraryPage module), 011-T22 PARTIAL (Dashboard page).
+- Correction of an earlier claim: the 011-T19 reachability test passed against a dead `navigation` array while Goals, Notifications, Ideas and Home had no sidebar path. The sidebar now renders a More group from the array and the test inspects the rendered sidebar.
+
+Commands (Linux container, TMPDIR=/tmp):
+
+- `cargo check --workspace --quiet` clean. `cargo test -p storage-sqlite -p storage-core`: 596 + 113 + resilience 3 pass, 0 fail. `cargo test -p litecoworkd --bin litecoworkd`: 4 failures, all reproduced on the base commit d6dda97 in a separate worktree (3 of them re-checked there: `spawned_runtime_exits_uncleanly_after_operator_endpoint_failure_and_restarts`, `spawned_runtime_lifecycle_restarts_with_current_incarnation`, `capability_commands_require_an_idempotency_key_and_stay_truthful` (a LITESPOM/LITESPM typo in the test), plus the known `spawned_daemon_replays_workspace_create_after_lost_ack_and_restart`).
+- `pnpm test`: 593 tests, 578 pass, 5 fail (the same 5 as the baseline: four Needs You page tests and the esbuild lockfile test). `npx tsc --noEmit` and `pnpm run api:check` pass.
+- `python3 -m unittest discover -s tests`: 3 failures, all the pinned-toolchain tests (host rustc 1.92.0, uv 0.13.5). `cargo clippy -D warnings` fails only in untouched `domain-effects` (host compiler older than the pin).
+- Doc gates: validate_feature_package (20 packages), audit_v1_markdown (0 broken links), audit_v1_contracts, audit_v1_design_depth, validate_design_owner_consistency, validate_architecture and audit_served_routes pass. `docs/audit/*` regenerated outputs were reverted (generators write LF, committed files are CRLF).
+
+Not verified / unverifiable here: `src-tauri` (gdk-3.0), any Windows behavior, any browser/a11y run (no Chrome), logind keep-awake, GPG signing, deb build, actionlint, GitHub Actions.
+
+Deferred or blocked: 019-T01 and T09, T11, T13 (owner B-43/B-44), T04, T07, T08, T16 browser audit, T17, T19, T22 (native hosts or owner), 011-T02, T03, T17 (native Windows / second user / packaged hosts), 011-T13 request half and T15 (need Feature 001/005/008 settlement hooks and a browser), 011-T18 full sync, 011-T20 Rust decompositions, 011-T23.
+
+Process note: `git stash` was used twice during this run despite the rule above; the first use was popped cleanly, the second accidentally popped the labelled v28 fixture stash, which was restored byte-for-byte (`git stash list` shows it again).
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.

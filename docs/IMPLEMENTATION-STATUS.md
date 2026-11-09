@@ -241,6 +241,16 @@ Manual graph authoring remains in the external provider's own editor. A future p
 
 Needs You reads persisted user-request, approval and attention projections and exposes only the actions backed by their current owner operations. Notification, Goal, Suggestion and other Workspace read routes do not establish a complete delivery, scheduling or action lifecycle; each must be qualified against its own producer, persistence, UI and recovery path.
 
+## Desktop shell, release machinery and stop contract (Wave 0 progress, 2026-11-10)
+
+Evidence class is CODE unless stated. None of this is QUALIFIED on any release row.
+
+- **Stop preview (SERVED, read-only):** `GET /v1/runtime-lifecycle/stop-preview` reports admitted Conversation turns, non-terminal Attempts, dispatched unresolved Effects, held execution and environment control leases and pending cleanup for the exact current incarnation. The verdict is BLOCKED when any is present and UNKNOWN otherwise; it is never QUIESCENT because nothing observes live agent sessions, child processes or terminal and browser sessions. `requestLocalRuntimeStop` is not mounted, so Stop safely and any automatic update stay disabled. The desktop panel and the `check_update_quiescence` bridge treat anything but a clean QUIESCENT preview as a refusal; the Tauri wrappers are uncompiled here (no gdk-3.0), only their decoder was compiled in a scratch crate.
+- **Keep-awake:** a state machine and Linux `systemd-inhibit` backend exist (`power_assertion.rs`, unit tests only). It is not wired into the daemon, `RuntimeLifecycleView.power_assertion` is not published, and HELD was never observed on a real OS.
+- **Release machinery:** release evidence and row schemas, a row-aware qualification matrix (generated in a container, so no cell is PASSED), an evidence-bundle tool, a Linux deb configuration with signed-checksum and qualify scripts (no deb was built; GPG tests skipped), a CSP audit and a CI workflow skeleton that has never run on GitHub. B-43 (signing and update channel) and B-44 (licensing ADR, proposed text only) are not owner-accepted, so there is no signing, updater or installer qualification.
+- **Update panel:** reducer, controller and component exist but are not mounted and their Tauri commands do not exist.
+- **Shell:** SettingsPage is deleted (one Settings surface), the sidebar now reaches Goals, Notifications, Ideas, Home and a new Dashboard page, a skip link and global focus-visible style exist, LibraryPage and a shared Operator-unavailable panel are extracted from App.tsx. The Dashboard shows Task counts, Automation counts and a Coworker roster count from served reads; Recent artifacts is UNAVAILABLE (no Workspace-wide artifact projection). No browser, keyboard-only or screen-reader run has happened.
+
 ## Test and validation evidence
 
 Validation evidence from the connected Windows development machine:
@@ -275,7 +285,7 @@ The structural validators and focused frontend coverage are useful evidence, not
 4. Connect Task planning, accepted PlanRevision, Attempt admission, Environment, Trust, Effects, worker execution, reconciliation and verification as one recoverable vertical slice.
 5. Remove the simulated Terminal and generated sample Diffs; implement real process-backed terminal sessions and actual diffs.
 6. Replace the iframe preview label/behavior with an honest preview surface until a real browser Environment/controller exists; design Computer use separately.
-7. Disable or implement the inert Settings controls and cache-clearing notices. (Partly done in Feature 011 Wave 0: the General appearance controls are applied and persisted locally, the shortcut labels are removed, every SettingsView control is mapped and audited, and Workspace rename is served. The `AgentCatalogSettings` controls are not yet in the control map.)
+7. Disable or implement the inert Settings controls and cache-clearing notices. (Mostly done in Feature 011 Wave 0: the General appearance controls are applied and persisted locally, the shortcut list is generated from the registry, every SettingsView and AgentCatalogSettings control is mapped and audited, Workspace rename is served, and SettingsPage is merged into the one SettingsView. Stop safely, the update check and install, and keep-awake are still not interactive.)
 8. Qualify LiteSPM's versioned service integration; preserve one package manager and separate installation, connection, assignment and invocation authority.
 9. Complete one professional Artifact format and one declarative Intelligent UI path with schema validation, fallback semantics and evidence.
 10. Align every screen with the release contract: no visual state may imply a Task, approval, Effect, process, browser, progress or completion that the owner service has not established.

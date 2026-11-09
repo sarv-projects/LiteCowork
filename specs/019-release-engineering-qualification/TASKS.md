@@ -367,7 +367,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T21 - Documentation and ledger sync
 
-- **Status:** NOT STARTED.
+- **Status:** PARTIAL (docs): `CURRENT-RUN.md` and `docs/IMPLEMENTATION-STATUS.md` now record the Wave 0 release-machinery and shell progress honestly, `docs/LITECOWORK-BUILD-TASKS.md` maps BT-00.7 and BT-10.5, the served-route inventory was regenerated (175/1/55) and `audit_served_routes.py` matches it. NOT done: Area 10 row-by-row evidence classes in the V1 UI ledgers, and the SPEC section 4 refresh; no row claims QUALIFIED
 - **Depends on:** T01, T14, T15, T20
 - **Cross-package prerequisites:** NONE (orchestrator owns shared ledgers; this task supplies edits for review).
 - **Owner:** Documentation owners, Release Engineering.

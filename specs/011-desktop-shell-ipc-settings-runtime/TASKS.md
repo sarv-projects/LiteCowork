@@ -311,7 +311,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T18 - Documentation sync
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL: API.md, RUNTIME-LIFECYCLE.md, V1-SETTINGS-CONTRACT-LEDGER (generated), SEMANTIC-SERVED-UI-MAP, FEATURE-AND-UI-CONTRACT-COVERAGE, the contradiction register A-03 and IMPLEMENTATION-STATUS were updated for the served stop preview and 175/1/55; the ui-behavior trace table was added. NOT done: the V1 UI action-state ledger rows for Dashboard, More navigation and the update gate, and the full status-document sweep for the control counts
 - **Depends on:** T17
 - **Cross-package prerequisites:** NONE
 - **Owner:** Documentation owner (orchestrator)
