@@ -5,6 +5,7 @@
 //! fields only after a scoped, side-effect-bounded handshake.
 
 pub(crate) mod acp_registry;
+pub(crate) mod adapter;
 mod cline;
 mod codex;
 mod codex_app_server;
@@ -13,6 +14,8 @@ pub(crate) mod control_descriptor;
 mod conversation_prompt;
 pub(crate) mod module_registry;
 mod native_cli;
+pub(crate) mod native_provider;
+pub(crate) mod normalizer;
 mod opencode;
 mod opencode_profile_probe;
 mod opencode_server;
@@ -28,9 +31,10 @@ pub(crate) use codex_app_server::NativeEnvironment;
 pub(crate) use codex_profile_probe::{
     RuntimeOfferAssessment, codex_runtime_offer_assessment, probe_codex_profile,
 };
-pub(crate) use opencode_profile_probe::{
-    OpenCodeProbeReadiness, opencode_native_environment, probe_opencode_profile,
+pub(crate) use native_provider::{
+    OfferAdmission, opencode_offer_admission, resolve_opencode_executable,
 };
+pub(crate) use opencode_profile_probe::{opencode_native_environment, probe_opencode_profile};
 pub(crate) use opencode_server::{
     OpenCodeEnvironment, OpenCodeError, OpenCodeProcessState, OpenCodeServer, OpenCodeServerConfig,
     OpenCodeServerProtocol,

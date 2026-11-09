@@ -7279,7 +7279,9 @@ async fn probe_local_opencode_profile(
 ) -> Result<Json<AgentProfileResponse>, Response> {
     // This explicit owner action is the only code path that resolves and records
     // the private OpenCode executable locator. Inventory alone never probes it.
-    let executable = resolve_local_executable("opencode").ok_or_else(|| {
+    // The shared resolver applies the Windows `.exe`/`.cmd`/npm/bun rules and
+    // canonicalizes, so the probe and the supervisor bind the same executable.
+    let executable = crate::agents::resolve_opencode_executable().ok_or_else(|| {
         operator_error(
             StatusCode::NOT_FOUND,
             "AGENT_UNAVAILABLE",
@@ -7308,31 +7310,9 @@ async fn probe_local_opencode_profile(
             display_name: "OpenCode".to_owned(),
             discovered_at: observed_at.clone(),
         };
-        let endpoint = AgentEndpointRecord {
-            endpoint_id: endpoint_id.clone(),
-            agent_profile_id: profile_id.clone(),
-            protocol: "API".to_owned(),
-            topology: "PROCESS_ADAPTER".to_owned(),
-            protocol_version: None,
-            capabilities: opencode_endpoint_capabilities(),
-        };
-        let existing = state_for_probe
-            .store
-            .list_agent_profiles(
-                &state_for_probe.principal_id,
-                &scoped_workspace,
-                &observed_at,
-            )
-            .map_err(|error| map_agent_store_error(error, "Agent profile could not be read"))?
-            .into_iter()
-            .find(|entry| entry.profile.agent_profile_id == profile_id);
-        let stable_profile = existing.map_or(profile, |entry| entry.profile);
-        state_for_probe
-            .store
-            .put_agent_profile(stable_profile, vec![endpoint])
-            .map_err(|error| {
-                map_agent_store_error(error, "OpenCode profile identity could not be recorded")
-            })?;
+        // Register the Runtime-local endpoint locator the supervisor will
+        // dispatch before the probe. It is re-validated as the same canonical
+        // path at dispatch time, so probe/dispatch executable drift fails closed.
         let locator = executable.to_string_lossy().into_owned();
         state_for_probe
             .store
@@ -7359,16 +7339,44 @@ async fn probe_local_opencode_profile(
                 "Probe time could not be recorded",
             )
         })?;
-        let readiness = if probe.host_process_stopped
-            && probe.probe_readiness == crate::agents::OpenCodeProbeReadiness::Complete
-        {
-            // Catalog observation is useful for display, but no compatible
-            // session/model-selection semantics have been qualified. This
-            // deliberately cannot admit or enable an AgentBinding.
-            "DEGRADED"
-        } else {
-            "UNAVAILABLE"
+
+        // Write the endpoint after the probe so its declared capabilities and
+        // protocol version reflect the exact observed CLI version.
+        let endpoint = AgentEndpointRecord {
+            endpoint_id: endpoint_id.clone(),
+            agent_profile_id: profile_id.clone(),
+            protocol: "API".to_owned(),
+            topology: "PROCESS_ADAPTER".to_owned(),
+            protocol_version: probe.protocol_version.clone(),
+            capabilities: opencode_endpoint_capabilities(probe.protocol_version.as_deref()),
         };
+        let existing = state_for_probe
+            .store
+            .list_agent_profiles(
+                &state_for_probe.principal_id,
+                &scoped_workspace,
+                &observed_at,
+            )
+            .map_err(|error| map_agent_store_error(error, "Agent profile could not be read"))?
+            .into_iter()
+            .find(|entry| entry.profile.agent_profile_id == profile_id);
+        let stable_profile = existing.map_or(profile, |entry| entry.profile);
+        state_for_probe
+            .store
+            .put_agent_profile(stable_profile, vec![endpoint])
+            .map_err(|error| {
+                map_agent_store_error(error, "OpenCode profile identity could not be recorded")
+            })?;
+
+        // Offer compatibility is computed, never hard-coded. Only the exact
+        // accepted route (2.0.32, a complete probe and an observed host stop)
+        // publishes a compatible STARTABLE offer; every negative keeps
+        // compatible=false, so the unchanged storage gate rejects the binding.
+        let crate::agents::OfferAdmission {
+            compatible,
+            readiness,
+            reason: _,
+        } = crate::agents::opencode_offer_admission(&probe);
         let constraints = serde_json::to_value(&probe).map_err(|_| {
             operator_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -7384,7 +7392,7 @@ async fn probe_local_opencode_profile(
                 runtime_incarnation_id: incarnation_id.clone(),
                 offer_kind: "AGENT_ENDPOINT".to_owned(),
                 offer_ref: endpoint_id,
-                compatible: false,
+                compatible,
                 readiness: readiness.to_owned(),
                 constraints,
                 observed_at: observed_at.clone(),
@@ -7426,12 +7434,15 @@ async fn probe_local_opencode_profile(
     Ok(result)
 }
 
-fn opencode_endpoint_capabilities() -> serde_json::Value {
+fn opencode_endpoint_capabilities(protocol_version: Option<&str>) -> serde_json::Value {
+    // Record the observed protocol version and declare only `input.text`, the
+    // single input the Conversation supervisor path sends. Every other capability
+    // stays false until it is implemented and qualified.
     json!({
         "protocol": "OPENCODE_SERVER",
-        "protocol_version": null,
+        "protocol_version": protocol_version,
         "session": {"resume":false,"steer":false,"interrupt":false,"cancel":false,"fork":false},
-        "input": {"text":false,"image":false,"file":false,"resources":false},
+        "input": {"text":true,"image":false,"file":false,"resources":false},
         "extension": {"mcp_stdio":false,"mcp_http":false,"skills":false,"plugins":false,"dynamic_attach":false},
         "reporting": {"tool_calls":false,"plan":false,"usage":false,"native_subagents":false,"approvals":false},
         "environment": {"cwd":false,"extra_directories":false},

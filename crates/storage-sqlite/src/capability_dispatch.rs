@@ -1451,6 +1451,9 @@ mod tests {
             .execute_batch("DROP TRIGGER environment_requires_issued_preview;")
             .expect("relax the unrelated Environment preview guard for the fixture");
         connection
+            .execute_batch("DROP TRIGGER task_spec_delegation_policy_snapshot_guard;")
+            .expect("relax the unrelated v28 delegation-policy snapshot guard for the fixture");
+        connection
             .execute_batch(&format!(
                 "INSERT INTO workspaces(workspace_id,name,owner_principal_id,replication_policy,status,created_at,updated_at,version)
                  VALUES('ws','Workspace','owner','LOCAL_ONLY','ACTIVE','{AT}','{AT}',1);

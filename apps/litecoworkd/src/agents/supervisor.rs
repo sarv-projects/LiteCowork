@@ -11,9 +11,8 @@
 //!    via `commit_conversation_agent_response`.
 
 use std::path::PathBuf;
-use std::time::Duration;
 
-use serde_json::{Value, json};
+use serde_json::json;
 use storage_core::conversation::{
     CommitConversationAgentResponse, ConversationMessageRecord, ConversationTurn,
     ConversationTurnStatus, ConversationTurnStore, TurnCommand,
@@ -25,9 +24,10 @@ use storage_core::{
 };
 use storage_sqlite::{SqliteConversationStore, SqliteWorkspaceStore};
 
+use super::adapter::{AgentAdapter, OpenCodeAdapter, StreamBudget, TurnObservation};
+use super::native_provider::NativeProviderKey;
 use super::opencode_server::{
-    OpenCodeEnvironment, OpenCodeError, OpenCodeServer, OpenCodeServerConfig,
-    OpenCodeServerProtocol,
+    OpenCodeEnvironment, OpenCodeServer, OpenCodeServerConfig, OpenCodeServerProtocol,
 };
 
 fn now_utc_rfc3339() -> String {
@@ -300,6 +300,9 @@ impl AgentSessionSupervisor {
                 &host_instance_id,
                 &host.agent_binding_id,
                 &provider_key,
+                &host.endpoint_id,
+                &host.runtime_id,
+                &host.runtime_incarnation_id,
                 &correlation,
             );
 
@@ -410,16 +413,52 @@ fn execute_agent_turn(
     host_instance_id: &str,
     agent_binding_id: &str,
     provider_key: &str,
+    endpoint_id: &str,
+    host_runtime_id: &str,
+    host_runtime_incarnation_id: &str,
     correlation_id: &str,
 ) -> Result<(), String> {
     let conv_store = SqliteConversationStore::new(store.clone());
 
+    // Parse the stored provider key once at the boundary. The canonical stored
+    // form is upper case (`OPENCODE`); an unknown key fails closed below.
+    let provider = NativeProviderKey::from_profile_key(provider_key);
+
     // Native session establishment
-    match provider_key {
-        "opencode" => {
-            // Real OpenCode integration
-            let exe = find_opencode_executable()
+    match provider {
+        Some(NativeProviderKey::OpenCode) => {
+            // Dispatch exactly the executable the probe registered for this
+            // endpoint and re-validate it is the same canonical path. Probe or
+            // dispatch executable drift fails the turn closed with no native spawn.
+            let now = now_utc_rfc3339();
+            let binding = store
+                .get_local_endpoint_binding(
+                    host_runtime_id,
+                    host_runtime_incarnation_id,
+                    endpoint_id,
+                    &now,
+                )
+                .map_err(|e| format!("Query endpoint binding error: {e:?}"))?
+                .ok_or_else(|| {
+                    "no fresh Runtime-local endpoint binding for the OpenCode endpoint".to_owned()
+                })?;
+            let registered = PathBuf::from(&binding.endpoint_ref);
+            let canonical_registered = std::fs::canonicalize(&registered).map_err(|_| {
+                "registered OpenCode endpoint executable no longer resolves".to_owned()
+            })?;
+            if !canonical_registered.is_file() {
+                return Err("registered OpenCode endpoint executable is not a file".to_owned());
+            }
+            // Re-resolve through the shared resolver and require the same canonical
+            // path, so a changed PATH or a replaced executable fails closed.
+            let resolved = crate::agents::resolve_opencode_executable()
                 .ok_or_else(|| "opencode executable not found".to_owned())?;
+            if resolved != canonical_registered {
+                return Err(
+                    "OpenCode executable drifted from the registered endpoint reference".to_owned(),
+                );
+            }
+            let exe = canonical_registered;
             let working_dir =
                 resolve_workspace_working_dir(store, principal_id, workspace_id, runtime_id)
                     .ok_or_else(|| {
@@ -432,14 +471,24 @@ fn execute_agent_turn(
                 .with_protocol(OpenCodeServerProtocol::V2_0_32)
                 .with_environment(OpenCodeEnvironment::from_current_process());
 
-            let mut server = OpenCodeServer::spawn(config)
+            let server = OpenCodeServer::spawn(config)
                 .map_err(|e| format!("OpenCodeServer spawn failed: {e:?}"))?;
 
-            // The V2 session API has no title field and the adapter refuses a title
-            // rather than silently dropping the caller's label, so none is supplied.
-            let native_session = server
-                .create_session(None)
-                .map_err(|e| format!("OpenCode create_session failed: {e:?}"))?;
+            // Drive the native boundary through the provider-neutral AgentAdapter
+            // (001-T04) rather than hand-parsing SSE. The OpenCode v2 HTTP path is
+            // the one non-ACP adapter; it owns the server for the life of the turn.
+            let mut adapter = OpenCodeAdapter::new(server);
+
+            // Phase 1: version/capability probe (B-03). A failed probe is a typed
+            // FAILED turn with the USER message kept and no fallback (AC-015).
+            adapter.probe_version().map_err(|f| {
+                format!("OpenCode adapter version probe failed: {}", f.reason_code())
+            })?;
+
+            // Phase 2: create the native session; the handle binds to SQLite only.
+            let native_session = adapter
+                .create_session()
+                .map_err(|f| format!("OpenCode create_session failed: {}", f.reason_code()))?;
 
             // Activate session in SQLite
             let now = now_utc_rfc3339();
@@ -516,63 +565,38 @@ fn execute_agent_turn(
                 )
                 .map_err(|e| format!("Load context error: {e:?}"))?;
 
-            let mut event_stream = server
-                .subscribe_events()
-                .map_err(|e| format!("Subscribe events error: {e:?}"))?;
-
+            // Phase 3: dispatch the bounded committed context only after the
+            // activation commit above. The native message id correlates native
+            // events; it is not treated as an idempotency guarantee.
             let native_msg_id = format!("msg_{}", generate_id("m"));
-            server
-                .send_conversation_context_async(&native_session, &native_msg_id, &context)
-                .map_err(|e| format!("Send context error: {e:?}"))?;
+            adapter
+                .send_context(&native_session, &native_msg_id, &context)
+                .map_err(|f| format!("Send context error: {}", f.reason_code()))?;
 
-            // Read events until completion or timeout
-            let mut accumulated_text = String::new();
-            let mut completed = false;
-            let read_deadline = std::time::Instant::now() + Duration::from_secs(60);
-            while std::time::Instant::now() < read_deadline {
-                match event_stream.next_event(Duration::from_millis(500)) {
-                    Ok(Some(ev)) => {
-                        // Correlate session ID if present in untrusted payload
-                        if let Some(event_session) = ev
-                            .data
-                            .get("session_id")
-                            .or_else(|| ev.data.get("sessionId"))
-                            .or_else(|| ev.data.get("session"))
-                            .and_then(Value::as_str)
-                            && event_session != native_session
-                        {
-                            continue;
-                        }
+            // Phase 4: consume the correlated, bounded event stream through the
+            // normalizer under a line-resetting idle/heartbeat watchdog (replaces
+            // the old hard 60 s cap). Every event is correlated to the native
+            // session; uncorrelated, foreign-session, oversized and unknown frames
+            // are dropped and counted, never projected (AC-008).
+            let observation = adapter.drive_turn(&native_session, StreamBudget::default());
 
-                        if let Some(delta) = ev.data.get("delta").and_then(Value::as_str) {
-                            accumulated_text.push_str(delta);
-                        } else if let Some(content) = ev.data.get("content").and_then(Value::as_str)
-                        {
-                            accumulated_text = content.to_owned();
-                        }
-                        if ev.event_type.as_deref() == Some("message_completed")
-                            || ev.data.get("done").and_then(Value::as_bool) == Some(true)
-                        {
-                            completed = true;
-                            break;
-                        }
-                    }
-                    Ok(None) => {}
-                    Err(OpenCodeError::StreamClosed) => break,
-                    Err(e) => {
-                        let _ = server.stop();
-                        return Err(format!("OpenCode SSE event error: {e:?}"));
-                    }
+            // The server is reaped regardless of outcome.
+            adapter.shutdown();
+
+            let accumulated_text = match observation {
+                Ok(TurnObservation::Completed { answer_text }) => answer_text,
+                Ok(TurnObservation::Stopped) => {
+                    // A stop observation is not a settlement; the caller's error
+                    // path reconciles it through session state, never a resend.
+                    return Err("OpenCode turn stopped before completion".to_owned());
                 }
-            }
-
-            let _ = server.stop();
-            if !completed || accumulated_text.trim().is_empty() {
-                return Err(format!(
-                    "OpenCode turn failed closed: stream completed={completed}, response length={}",
-                    accumulated_text.trim().len()
-                ));
-            }
+                Ok(TurnObservation::Failed { reason_code }) | Err(reason_code) => {
+                    return Err(format!(
+                        "OpenCode turn failed closed: {}",
+                        reason_code.reason_code()
+                    ));
+                }
+            };
 
             let final_message_id = format!("msg-agent-{}", generate_id("m"));
             let now = now_utc_rfc3339();
@@ -670,75 +694,8 @@ fn execute_agent_turn(
 
             Ok(())
         }
-        other => Err(format!(
-            "Agent provider '{other}' is not supported or not configured for execution in this runtime"
+        _ => Err(format!(
+            "Agent provider '{provider_key}' is not supported or not configured for execution in this runtime"
         )),
     }
-}
-
-fn find_opencode_executable() -> Option<PathBuf> {
-    let mut candidates = Vec::new();
-
-    if let Ok(user_profile) = std::env::var("USERPROFILE") {
-        candidates.push(
-            PathBuf::from(&user_profile)
-                .join(".bun")
-                .join("bin")
-                .join("opencode.exe"),
-        );
-        candidates.push(
-            PathBuf::from(&user_profile)
-                .join(".bun")
-                .join("bin")
-                .join("opencode.cmd"),
-        );
-    }
-    if let Ok(app_data) = std::env::var("APPDATA") {
-        candidates.push(PathBuf::from(&app_data).join("npm").join("opencode.cmd"));
-        candidates.push(PathBuf::from(&app_data).join("npm").join("opencode.exe"));
-    }
-    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-        candidates.push(
-            PathBuf::from(&local_app_data)
-                .join("pi-node")
-                .join("current")
-                .join("opencode.cmd"),
-        );
-        candidates.push(
-            PathBuf::from(&local_app_data)
-                .join("pi-node")
-                .join("current")
-                .join("opencode.exe"),
-        );
-        candidates.push(
-            PathBuf::from(&local_app_data)
-                .join("Programs")
-                .join("opencode")
-                .join("opencode.exe"),
-        );
-    }
-
-    for p in candidates {
-        if p.is_file() {
-            return Some(p);
-        }
-    }
-
-    if let Ok(paths) = std::env::var("PATH") {
-        for dir in std::env::split_paths(&paths) {
-            let exe = dir.join("opencode.exe");
-            if exe.is_file() {
-                return Some(exe);
-            }
-            let cmd = dir.join("opencode.cmd");
-            if cmd.is_file() {
-                return Some(cmd);
-            }
-            let bare = dir.join("opencode");
-            if bare.is_file() {
-                return Some(bare);
-            }
-        }
-    }
-    None
 }

@@ -4155,8 +4155,8 @@ export type components = {
             host_process_stopped: boolean;
             /** @constant */
             writer_quiescence_proven: false;
-            /** @constant */
-            profile_admission_supported: false;
+            /** @description Computed Conversation admission. True only for the exact accepted route (CLI 2.0.32 */
+            profile_admission_supported: boolean;
         };
         OpenCodeProviderOption: {
             id: string;
@@ -6066,10 +6066,10 @@ export type components = {
             purge_manifest_digest?: string;
             purge_target_count?: number;
         } & (unknown & unknown);
-        /** @description Current domain-workspace create validation accepts only PERSONAL_PROFILE with a USER owner_ref matching the authenticated principal, and WORKSPACE_NOTES with a WORKSPACE owner_ref matching the selected Workspace. COWORKER_NOTES and GOAL_NOTES remain target enum values and are rejected by the current create validator until their authoritative owner aggregates and resource authorization are implemented. */
+        /** @description PROPOSED owner resolution (register A-18, pending acceptance): the create-metadata kind enum is narrowed to the two kinds the domain-workspace create validator actually accepts, PERSONAL_PROFILE with a USER owner_ref matching the authenticated principal and WORKSPACE_NOTES with a WORKSPACE owner_ref matching the selected Workspace, so the machine create contract no longer overstates it. COWORKER_NOTES and GOAL_NOTES remain valid ContextDocumentKind values for the record/read type and policy allowlists but are TARGET-pending-aggregate-services for creation: they cannot be created until their authoritative Coworker/Goal owner aggregates and resource authorization exist, so they are not offered here. See DATA-MODEL.md ContextDocument create ownership. */
         ContextDocumentCreateMetadata: {
             /** @enum {string} */
-            kind: "PERSONAL_PROFILE" | "COWORKER_NOTES" | "WORKSPACE_NOTES" | "GOAL_NOTES";
+            kind: "PERSONAL_PROFILE" | "WORKSPACE_NOTES";
             owner_ref: components["schemas"]["ContextOwnerRef"];
         };
         CoworkerRevisionRef: {
@@ -10318,7 +10318,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Explicit owner-triggered, bounded local adapter observation. Each request performs a new probe and records a refreshed expiring Runtime offer; it is not an idempotent domain mutation. Requires the selected Workspace owner and an active local RuntimeWorkspaceBinding. Codex and OpenCode are accepted. OpenCode accepts only the exactly qualified CLI versions 2.0.26 and 2.0.28 and reads /api/provider plus /api/model. Version 2.0.26 readiness uses /api/health with healthy=true and username litecowork; version 2.0.28 uses /api/info with exact version and owned child PID matching, and username opencode. It returns bounded sanitized catalog IDs and display names, never native provider/model objects, options, headers, keys, URLs, raw responses, or location paths. Catalog provider IDs are not connected-provider or authentication evidence. Unsupported versions fail closed without route fallback. OpenCode session-model selection is NOT_QUALIFIED and its offer is always incompatible, so the profile cannot be bound or enabled. Raw native messages, endpoint locators, account identifiers, and private configuration are omitted. */
+            /** @description Explicit owner-triggered, bounded local adapter observation. Each request performs a new probe and records a refreshed expiring Runtime offer; it is not an idempotent domain mutation. Requires the selected Workspace owner and an active local RuntimeWorkspaceBinding. Codex and OpenCode are accepted. OpenCode accepts only the exactly qualified CLI versions 2.0.26 and 2.0.28 and reads /api/provider plus /api/model. Version 2.0.26 readiness uses /api/health with healthy=true and username litecowork; version 2.0.28 uses /api/info with exact version and owned child PID matching, and username opencode. It returns bounded sanitized catalog IDs and display names, never native provider/model objects, options, headers, keys, URLs, raw responses, or location paths. Catalog provider IDs are not connected-provider or authentication evidence. Unsupported versions fail closed without route fallback. OpenCode publishes a compatible STARTABLE offer only for the exact accepted route (CLI 2.0.32 with a complete probe and an observed host stop); 2.0.26 and 2.0.28 stay observation-only and incompatible. OpenCode session-model selection is NOT_QUALIFIED. Raw native messages, endpoint locators, account identifiers, and private configuration are omitted. */
             200: {
                 headers: {
                     [name: string]: unknown;

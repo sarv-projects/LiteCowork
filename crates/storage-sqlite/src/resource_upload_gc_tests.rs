@@ -1454,6 +1454,42 @@ fn downgrade_resource_content_schema_to_v16(connection: &Connection) {
 }
 
 fn downgrade_resource_index_schema_to_v18(connection: &Connection) {
+    // Version 29 wires the Conversation durable turn (dispatch outbox, single-flight
+    // index, commit identity column, usage records); version 28 adds Workspace delegation
+    // settings. The fixture base is migrated to the current tip, so a downgrade must strip
+    // these objects first before any earlier-version fingerprint can match on re-migration.
+    connection
+        .execute_batch(
+            "DROP INDEX IF EXISTS idx_conversation_usage_records_workspace;
+             DROP TABLE IF EXISTS conversation_usage_records;
+             DROP INDEX IF EXISTS uq_conversation_single_flight_turn;
+             DROP INDEX IF EXISTS idx_conversation_dispatch_intents_unclaimed;
+             DROP TABLE IF EXISTS conversation_dispatch_intents;
+             ALTER TABLE conversation_messages DROP COLUMN provider_response_id;
+             DELETE FROM schema_migrations WHERE version = 29;
+             PRAGMA user_version = 28;",
+        )
+        .expect("restore the v28 migration boundary without Conversation durable-turn objects");
+    connection
+        .execute_batch(
+            "DROP TRIGGER IF EXISTS coworker_revision_delegation_source_guard;
+             DROP TRIGGER IF EXISTS task_spec_delegation_policy_snapshot_guard;
+             DROP TRIGGER IF EXISTS workspace_delegation_settings_head_guard;
+             DROP TRIGGER IF EXISTS workspace_delegation_settings_default_on_insert;
+             DROP TRIGGER IF EXISTS workspace_delegation_settings_head_insert_guard;
+             DROP TRIGGER IF EXISTS workspace_delegation_settings_revision_immutable_delete;
+             DROP TRIGGER IF EXISTS workspace_delegation_settings_revision_immutable_update;
+             DROP TRIGGER IF EXISTS workspace_delegation_settings_revision_insert_guard;
+             DROP INDEX IF EXISTS idx_workspace_delegation_settings_revision;
+             DROP TABLE IF EXISTS workspace_delegation_settings_revisions;
+             ALTER TABLE delegation_profile_revisions DROP COLUMN worker_model_selection_policy;
+             ALTER TABLE task_spec_revisions DROP COLUMN delegation_policy_snapshot_json;
+             ALTER TABLE coworker_revisions DROP COLUMN delegation_policy_source;
+             ALTER TABLE workspaces DROP COLUMN current_delegation_settings_revision;
+             DELETE FROM schema_migrations WHERE version = 28;
+             PRAGMA user_version = 27;",
+        )
+        .expect("restore the v27 migration boundary without delegation-settings objects");
     // Version 27 adds Task test-run provenance; remove it before the v26 boundary.
     connection
         .execute_batch(

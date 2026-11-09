@@ -621,6 +621,10 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
   const openCodeInstallation = installations.find((installation) => `${installation.agentId} ${installation.displayName} ${installation.protocolCandidate}`.toLowerCase().includes("opencode"));
   const codexProbeAvailable = codexInstallation?.installation === "INSTALLED";
   const openCodeProbeAvailable = openCodeInstallation?.installation === "INSTALLED";
+  const openCodeProfile = profiles.find((profile) => profile.providerKey === "OPENCODE");
+  const openCodeObservation = openCodeProfile ? latestObservation(openCodeProfile) : undefined;
+  const openCodeOfferFresh = openCodeObservation ? observationIsFresh(openCodeObservation, offerClock) : false;
+  const openCodeLeadEligible = openCodeProfile ? freshCompatibleOffer(openCodeProfile, offerClock) : false;
   const hasWorkspace = workspaceId !== null;
   const canProbe = hasWorkspace && workspaceActive && runtimeReady && runtimeEnrolled && busyAction == null;
   const canProbeCodex = canProbe && codexProbeAvailable;
@@ -782,7 +786,16 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
           </button>
         </div>
         {!openCodeProbeAvailable && <p className="agent-catalog__footnote">Probe is unavailable because the local inventory has not confirmed an installed OpenCode executable.</p>}
-        <p className="agent-catalog__footnote">OpenCode profile probing is owner-triggered. Probe details show only sanitized provider/model catalog IDs and display names. Provider connection and authentication are not reported. Inference access and session model selection are unqualified. This probe starts no Task or work session; OpenCode remains incompatible for Task execution and cannot be bound for use.</p>
+        <p className="agent-catalog__footnote">OpenCode profile probing is owner-triggered. Probe details show only sanitized provider/model catalog IDs and display names. Provider connection and authentication are not reported. This probe starts no Task or work session; OpenCode remains incompatible for Task execution.</p>
+        <p className="agent-catalog__footnote" role="status" aria-live="polite">
+          {openCodeLeadEligible
+            ? "The latest OpenCode observation is a fresh compatible offer, so a disabled Workspace binding can be created below. Session admission still checks readiness and authorization."
+            : openCodeOfferFresh
+              ? "The latest OpenCode observation is fresh but not compatible for Workspace binding, so it cannot be bound for use yet. Probe again once OpenCode 2.0.32 is installed and the host stop is observed."
+              : openCodeObservation
+                ? "The last OpenCode observation has expired. Probe again to request a current offer before creating a binding."
+                : "No OpenCode offer has been observed yet. Probe to request one; it is not by itself a binding."}
+        </p>
       </section>
 
       <section className="agent-catalog__section" aria-labelledby="agent-profiles-title">
