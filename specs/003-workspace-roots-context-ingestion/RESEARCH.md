@@ -1,6 +1,7 @@
 # Research - Workspace Roots and Context Ingestion
 
-**Feature:** 003 | **Checked:** 2026-11-06 (source, route and UI audit; no native root scan/provider Conversation executed)
+**Feature:** 003 | **Checked:** 2026-11-06 (source, route and UI audit; no native root scan/provider Conversation executed); grounding re-checked 2026-11-09 for the V1 task plan
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Sources
 
@@ -11,6 +12,15 @@ Authorities: docs/WORLD-RESOURCES.md, docs/CONTEXT.md, docs/STORAGE.md, docs/API
 - The owner documents already decide the trust boundaries this slice must keep.
 - Hosted competitors often collapse connection, permission and execution into one toggle. LiteCowork forbids that collapse.
 - Reference desktop repositories are architecture comparisons, not code to vendor. Pins and paths: [REFERENCE-IMPLEMENTATIONS.md](../../docs/REFERENCE-IMPLEMENTATIONS.md), [REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](../../docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md).
+
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs ingestion | Verdict |
+|---|---|---|---|---|
+| ZCode `packages/desktop` thin-shell / Host / CLI split | https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9 | Apache-2.0 + NOTICE | The Host/shell ownership split informs keeping the folder-selection picker (shell) separate from the daemon root/location commit and the metadata scanner (Host), so OS handles and canonical paths stay Runtime-local. | Port the ownership-split pattern only; do not drop in React or the ZCode Host runtime. |
+| DeepSeek Harness `apps/desktop` typed IPC with sender assert | https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159 | MIT | Typed IPC with sender assertion and contextBridge preloads informs the authenticated local-only `workspace-root-selection` route boundary: the untrusted WebView never passes a raw path that bypasses validation. | Prototype the typed-IPC/sender-assert pattern against LOCAL-OPERATOR-IPC; port the pattern, not the code. |
+
+No ZCode or DeepSeek Harness code is imported; both are prototype/reference inputs that reinforce the shell/Host trust boundary this slice already requires.
 
 ## Source and UI audit (2026-11-06)
 
@@ -27,6 +37,14 @@ Inspected `apps/litecoworkd/src/operator.rs`, `workspace_root_scan_operator.rs`,
 - This means the intended Windows local folder journey is not implemented on the current checkout: root add returns 503, scan returns 501, and no content is ingested from roots. The separate Resource upload/index route does not satisfy automatic root ingestion or Context Used.
 
 These are source/route/UI findings. No native root selection, live scan, content extraction from a root, or provider-backed Conversation was executed during this audit.
+## Grounding re-check (2026-11-09)
+
+- Windows add: `create_workspace_root_from_native_selection` has a `#[cfg(any(target_os = "linux", target_os = "macos"))]` implementation and a `#[cfg(not(any(target_os = "linux", target_os = "macos")))]` fallback in `apps/litecoworkd/src/operator.rs` that returns 503 `UNAVAILABLE`; the route is mounted at the local-only `/__litecowork_local/workspace-root-selection` path.
+- Windows primitives that exist and are reusable: `windows_local_security::open_directory_path_without_reparse`, `VerifiedDirectory::{identity, revalidate_path}`, `DirectoryIdentity::{volume_serial_number, file_id}` and `windows_absolute_paths_overlap` (ordinal case-insensitive, fails closed on UNC, drive-relative and noncanonical paths) in `crates/windows-local-security/src/lib.rs`. `apps/litecoworkd/src/local_filesystem.rs` already has `target_os = "windows"` branches for identity binding and projection.
+- Windows scan: `scan_workspace_root` returns 501 under `#[cfg(not(target_os = "linux"))]`; the census helpers (`scan_linux_root`, `revalidate_scan_root_before_commit`, `finalize_scan_result`, `ensure_before_scan_deadline`) are all `#[cfg(target_os = "linux")]`.
+- Send path: `ConversationTurnResourceRef { workspace_id, resource_id, revision_id }` is accepted and validated by `conversation_operator.rs` (at most 256 refs, same Workspace) and stored in `resource_refs` on the message; the OpenCode prompt encoder (`apps/litecoworkd/src/agents/conversation_prompt.rs`) refuses non-empty refs with `ResourceMaterializationRequired`. The composer in `apps/litecowork-ui/src/conversations/ConversationsPage.tsx` sends `resourceRefs: []`, shows placeholder copy "@ to mention" and an "Add context or file" button with no handler.
+- Retrieval: `rag_retrieval_operator.rs` serves `POST /v1/resources/retrieval` over `crates/domain-rag/src/local_lexical.rs` and `crates/storage-sqlite/src/rag_retrieval.rs`; no caller in the conversation path.
+
 ## Alternatives
 
 - Wait for full multi-provider parity before any slice. Rejected: the release contract asks for one qualified flow per area.

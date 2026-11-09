@@ -1,5 +1,5 @@
 feature_id: "002"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
 nodes:
   - id: "catalog-ui"
     owner: Settings Agent Catalog and profile UI
@@ -116,3 +116,7 @@ recovery:
   owner: Agent Runtime and Workspace binding owners
   source_of_truth: last-committed-runtime-observation-and-workspace-binding-receipt
   restart_action: re-probe-runtime-incarnation-and-install-auth-descriptor-independently; preserve-binding; reconcile-in-flight-lifecycle-before-new-side-effect
+
+# Status note (2026-11-09): ACCEPTED/LOCKED records owner acceptance of this target graph. Edges are target
+# wiring, not a claim that they are served. The probe -> offer -> binding -> conversation path is broken today
+# (SPEC section 4a) until 002-T01 lands; descriptor and auth edges stay target-only until 002-T05 and 002-T07.

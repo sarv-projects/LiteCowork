@@ -1,7 +1,7 @@
 # Competitor-Promoted Use Cases — USER Test Catalog
 
 **Status:** research-backed test intentions; not proof rivals reliably deliver them  
-**Updated:** 2026-11-01  
+**Updated:** 2026-11-08 (Phase 2: added Claude Code Desktop, Claude Duet, Rowboat, OpenLoomi journeys)  
 **Purpose:** collect **exact promoted journeys** from rivals for parity USER testing on LiteCowork. Map each to a stable ID; execution evidence is [ACCEPTANCE-AND-E2E-PLAN.md](ACCEPTANCE-AND-E2E-PLAN.md) and [LITECOWORK-BUILD-TASKS.md](LITECOWORK-BUILD-TASKS.md).
 
 Sources: [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), vendor pages cited there, pinned repos in [REFERENCE-IMPLEMENTATIONS.md](REFERENCE-IMPLEMENTATIONS.md) and [DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md](DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md). Re-verify promotions before locking release tests.
@@ -24,10 +24,14 @@ Sources: [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), vendor pages cited 
 | UC-CHAT-02 | Claude chat/Cowork, ChatGPT | Same composer for quick Q&A and larger work | P1 | No forced Task wrapper |
 | UC-CHAT-03 | OpenWork | Chat home; tool activity compact; no auto side-panel on background result | P7 Workbench | UX policy |
 | UC-CHAT-04 | Grok, Dots, Muse | Named persistent assistant optional; ordinary chat without persona | P8 Coworkers | Coworker optional |
-| UC-CHAT-05 | ZCode/DSH (ref) | Switch agent/model mid-draft; draft preserved; invalid options cleared | P1 | UIV1-023–036 |
+| UC-CHAT-05 | ZCode/DSH (ref) | Switch agent/model mid-draft; draft preserved; invalid options cleared | P1 | UIV1-023–036 (provenance pointer only — see note) |
 | UC-CHAT-06 | Open Cowork | Rich attachments (files/images) in chat | P2 context | Agent-dependent |
 | UC-CHAT-07 | Claude Cowork | Native slash/commands where harness supports | P1 BYO agent | Descriptor-driven |
 | UC-CHAT-08 | OpenHands (ref) | A conversation whose execution runtime is gone still shows its full history, read-only, with the reason visible | P1/P7 | **PROPOSAL:** runtime-availability projection; see index §OpenHands |
+| UC-CHAT-09 | Claude Code Desktop | Ask a side question that uses the session's context without derailing the main session | P1/P7 | **Research:** scoped side-conversation; not locked |
+| UC-CHAT-10 | Claude Duet | Synchronous human+Claude co-edit / take-control on an ordinary conversation | **Research gate RV-14** | Co-edit UX, not a durable Task type; source URL unresolved 2026-11-08 |
+
+> The `UIV1-023–036` citation in UC-CHAT-05 is a provenance pointer to the archived legacy catalog only; the legacy `UIV1-xxx` namespace is retired as an active acceptance authority (register [A-39](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)). The live acceptance obligation is the referenced flow/AC IDs, per [V1-UI-ACTION-STATE-LEDGER.md](V1-UI-ACTION-STATE-LEDGER.md).
 
 ## Long-running and delegated work
 
@@ -41,7 +45,9 @@ Sources: [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), vendor pages cited 
 | UC-WORK-06 | Eigent | Visual multi-agent activity timeline | P4 delegation | Timeline ≠ Core truth |
 | UC-WORK-07 | Open Cowork | Trace/tool visibility for debugging | P7 Inspector | Optional technical detail |
 | UC-WORK-08 | OpenHands (ref) | Launch a child conversation that runs in parallel and reports its id, status and URL; worktree isolation by default, shared on request | P4 delegation | **PROPOSAL:** observed launch result, never an acknowledgment |
-| UC-WORK-09 | OpenHands (ref) | Work that stops making progress stops with a visible reason instead of looping | P4 | **PROPOSAL:** threshold-based non-progress guard; no owner contract yet |
+| UC-WORK-09 | OpenHands (ref) | Work that stops making progress stops with a visible reason instead of looping | P4 | **PROPOSAL:** threshold-based non-progress guard; no owner contract yet (Open Cowork `agent-runner-loop-guard.ts` is a second reference) |
+| UC-WORK-10 | Rowboat | Meeting note-taker turns captured notes into action items / recap deck | P6/P9 | Magnetic use case; format-qualified Artifact + consent to capture |
+| UC-WORK-11 | OpenLoomi | "Attention Agent": surface only what needs the user's decision/action from connected tools | P8/P9 | Parallel to Needs You projection; projection ≠ action authority |
 
 ## Files, workspace, library
 
@@ -53,6 +59,7 @@ Sources: [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), vendor pages cited 
 | UC-FILE-04 | Grok Library | Shared pages/files/links per Bot | P6/P8 | Scoped Coworker library |
 | UC-FILE-05 | DSH (ref) | Drag file into session; digest-verified transfer | P2/P6 | ResourceRef pattern |
 | UC-FILE-06 | ZCode (ref) | Workspace identity ≠ path; remote attachment stale offline | P2/P3 | Concurrency tests |
+| UC-FILE-07 | Claude Code Desktop | Each session (or scheduled run) gets its own isolated Git worktree so runs do not collide | P2/P4 Environment | ENVIRONMENTS §GitWorktree; per-run isolation option (RV-13) |
 
 ## Browser, terminal, computer
 
@@ -90,7 +97,8 @@ Sources: [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), vendor pages cited 
 | UC-AUTO-05 | Claude Cowork | Scheduled / on-demand Cowork runs | P9 | |
 | UC-AUTO-06 | OpenDot | Watchers + schedules + webhooks wake Dots | P9 | Sleep/wake catch-up |
 | UC-AUTO-07 | composio open-dot | Cron routine posts to chat + notification | P9 | |
-| UC-AUTO-08 | OpenWork | Scheduled automations in desktop | P9 | |
+| UC-AUTO-08 | OpenWork | Scheduled automations in desktop; receipts/events readable after the admitting process exits | P9 | Durable receipt survives worker exit (OpenWork automations engine) |
+| UC-AUTO-09 | Claude Code Desktop | Choose Local vs Cloud vs `/loop` schedule; UI states machine-awake / open-session / local-file access honestly per option | P9 | **RV-13 truth table;** local V1 = no laptop-off continuation | |
 
 ## Memory, knowledge, proactivity
 
@@ -101,6 +109,7 @@ Sources: [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), vendor pages cited 
 | UC-MEM-03 | Muse | Goals + Ideas + proactive suggestions (non-authoritative) | P8 | ADR-0024 area |
 | UC-MEM-04 | OpenDot | ~/.opendot plain files; PII masking before cloud | P8 SECURITY | Masking ≠ LiteCowork default yet |
 | UC-MEM-05 | Grok | Primary Bot proactivity offers work | P8 | Suggestion ≠ grant |
+| UC-MEM-06 | Rowboat | Index your work into a living knowledge graph and use it as context | P8 Knowledge | **Research:** source-eligible Knowledge, not an auto-indexing background crawler |
 
 ## Skills, teach, organisation
 
@@ -137,4 +146,4 @@ Translate upstream E2E themes from pinned **ZCode** and **DeepSeek Harness** ([D
 
 ---
 
-**Total catalog:** 50+ UC-IDs. Extend this file when a rival promotion is verified; link new IDs in SDD acceptance and [LITECOWORK-BUILD-TASKS.md](LITECOWORK-BUILD-TASKS.md).
+**Total catalog:** 60+ UC-IDs (2026-11-08 Phase 2 added UC-CHAT-09/10, UC-WORK-10/11, UC-FILE-07, UC-AUTO-09, UC-MEM-06). Extend this file when a rival promotion is verified; link new IDs in SDD acceptance and [LITECOWORK-BUILD-TASKS.md](LITECOWORK-BUILD-TASKS.md).

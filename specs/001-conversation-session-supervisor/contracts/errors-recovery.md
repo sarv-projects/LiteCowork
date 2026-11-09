@@ -1,6 +1,6 @@
 # Error and Recovery Contract - Feature 001
 
-**Status:** DRAFT  
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.  
 **Owners:** Conversation, Agent Runtime, Storage, Security/Trust, UI.  
 **Canonical owner:** [Failure Recovery](../../../docs/FAILURE-RECOVERY.md), [State Machines](../../../docs/STATE-MACHINES.md), [API](../../../docs/API.md), [Storage](../../../docs/STORAGE.md).
 

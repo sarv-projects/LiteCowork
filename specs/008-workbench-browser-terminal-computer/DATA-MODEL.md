@@ -1,6 +1,6 @@
 # Data model - Workbench Browser Terminal and Computer
 
-**Feature:** 008 | **Status:** DRAFT
+**Feature:** 008 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 Identities and lifecycles stay in the canonical owner documents. This file lists the records this slice reads or commits. It does not authorize new tables by itself.
 
@@ -10,6 +10,9 @@ Identities and lifecycles stay in the canonical owner documents. This file lists
 - Terminal session bound to Environment id.
 - Redacted handle refs.
 - AvailabilityStatus.
+- Ordered terminal CommandReceipt and QuiescenceReceipt (B-23).
+- WorkbenchActivityItem read projection over committed events and receipts (no new table).
+- RevisionDiff result computed on demand from exact ResourceRevision or VCS identities (no new table; not cached as evidence).
 
 ## Relations
 
@@ -29,7 +32,7 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-None in this revision. Blockers in SPEC section 5 must be closed before a migration is designed.
+The blockers are ACCEPTED (2026-11-09). One new immutable SQLite migration is authorized for BrowserSession, BrowserControlLease, ChromeAttachConsent/epoch, BrowserActionReceipt, TerminalSession, CommandReceipt and QuiescenceReceipt. It is designed and promoted by 008-T01 (next `sqlite-vNN.sql`) and implemented by T03 and T08. No migration exists yet.
 
 ## Current implementation boundary (2026-11-06)
 
@@ -39,7 +42,7 @@ None in this revision. Blockers in SPEC section 5 must be closed before a migrat
 - Runtime-local browser CDP handles, Chrome profile paths, PTY handles, OS process handles, shell environment values and raw terminal bytes must never enter replicated domain events or public projections. User-facing projections expose opaque session/process references and redacted health only.
 - Current UI-local terminal scrollback and browser URL do not have durable owner identity or replay semantics; they must not be treated as session records or Task Evidence.
 - Job Object process containment records from `windows-local-security` are separate OS primitives. They become TerminalSession evidence only when the actual spawned shell process is attached and measured under the admitted Environment.
-- No database migration is authorized in this DRAFT. A future persistent session/lease schema requires owner decision, event/schema promotion and explicit migration/recovery design.
+- No database migration exists yet. The accepted persistent session/lease schema still requires event/schema promotion and explicit migration/recovery design in the T01 change.
 ## Current implementation boundary checked 2026-11-06
 
 - Workspace Resources and ResourceRevisions remain owned by Feature 003/ResourceStore. The Workbench Files pane consumes a Workspace-scoped Resource catalog projection and fetches exact ResourceRevision content for preview; it is not a native filesystem tree, Environment mount or shell working directory.

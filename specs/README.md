@@ -7,19 +7,30 @@ This directory contains the feature-level Software Design Document packages for 
 
 DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package validator checks required files and structure; it does not accept design or establish implementation/qualification.
 
+Owner acceptance was recorded on 2026-11-09 in [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Packages 001-012 are ACCEPTED/LOCKED; 013-020 were added from the V1 gap analysis and are IN_REVIEW until their own blockers are accepted. Every package carries a V1 TASKS.md that ends in a "Package VERIFIED for V1" task; the release go/no-go is 019-T23. Delivery waves are in [LITECOWORK-BUILD-TASKS.md](../docs/LITECOWORK-BUILD-TASKS.md).
+
 | ID | Feature | Status | Package |
 |---|---|---|---|
-| 001 | Conversation Session Supervisor and Native Turn Execution | IN_REVIEW — decisions B-01–B-10 declared, owner acceptance not yet evidenced; API/UI/error subcontracts remain DRAFT | [001-conversation-session-supervisor](001-conversation-session-supervisor/README.md) |
-| 002 | Native agent installation, authentication and binding | DRAFT | [002-native-agent-install-auth-binding](002-native-agent-install-auth-binding/README.md) |
-| 003 | Workspace roots and context ingestion | DRAFT | [003-workspace-roots-context-ingestion](003-workspace-roots-context-ingestion/README.md) |
-| 004 | Agent relay | DRAFT | [004-agent-relay](004-agent-relay/README.md) |
-| 005 | Safe Task path | DRAFT | [005-safe-task-path](005-safe-task-path/README.md) |
-| 006 | Golden Connection and one capability write | DRAFT | [006-golden-connection-capability-write](006-golden-connection-capability-write/README.md) |
-| 007 | Professional Artifacts, one format | DRAFT | [007-professional-artifacts](007-professional-artifacts/README.md) |
-| 008 | Workbench browser, terminal and computer | DRAFT | [008-workbench-browser-terminal-computer](008-workbench-browser-terminal-computer/README.md) |
-| 009 | Coworkers and scoped memory | DRAFT | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |
-| 010 | Automations and recurring host | DRAFT | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
-| 011 | Desktop shell, IPC, settings and Runtime | DRAFT | [011-desktop-shell-ipc-settings-runtime](011-desktop-shell-ipc-settings-runtime/README.md) |
+| 001 | Conversation Session Supervisor and Native Turn Execution | ACCEPTED/LOCKED 2026-11-09 (B-01..B-10; B-02 rider: OpenCode v2.0.32 first, Windows x64 first row) | [001-conversation-session-supervisor](001-conversation-session-supervisor/README.md) |
+| 002 | Native agent installation, authentication and binding | ACCEPTED/LOCKED 2026-11-09 (B-11, B-12) | [002-native-agent-install-auth-binding](002-native-agent-install-auth-binding/README.md) |
+| 003 | Workspace roots and context ingestion | ACCEPTED/LOCKED 2026-11-09 (B-13, B-14 with Windows scanner rider) | [003-workspace-roots-context-ingestion](003-workspace-roots-context-ingestion/README.md) |
+| 004 | Agent relay | ACCEPTED/LOCKED 2026-11-09 (B-15, B-16) | [004-agent-relay](004-agent-relay/README.md) |
+| 005 | Safe Task path | ACCEPTED/LOCKED 2026-11-09 (B-17 Linux-first rider, B-18); B-35 Windows provider PROPOSED | [005-safe-task-path](005-safe-task-path/README.md) |
+| 006 | Golden Connection and one capability write | ACCEPTED/LOCKED 2026-11-09 (B-19, B-20); 006-T02 BLOCKED on the client_secret finding | [006-golden-connection-capability-write](006-golden-connection-capability-write/README.md) |
+| 007 | Professional Artifacts, one format | ACCEPTED/LOCKED 2026-11-09 (B-21, B-30, B-31); 007-T06 BLOCKED on the export receipt class | [007-professional-artifacts](007-professional-artifacts/README.md) |
+| 008 | Workbench browser, terminal and computer | ACCEPTED/LOCKED 2026-11-09 (B-22, B-23, B-32 deferred) | [008-workbench-browser-terminal-computer](008-workbench-browser-terminal-computer/README.md) |
+| 009 | Coworkers and scoped memory | ACCEPTED/LOCKED 2026-11-09 (B-24, B-25) | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |
+| 010 | Automations and recurring host | ACCEPTED/LOCKED 2026-11-09 (B-26, B-27); CONNECTOR_EVENT trigger kind pending owner confirmation | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
+| 011 | Desktop shell, IPC, settings and Runtime | ACCEPTED/LOCKED 2026-11-09 (B-28 Windows-first rider, B-29, B-33) | [011-desktop-shell-ipc-settings-runtime](011-desktop-shell-ipc-settings-runtime/README.md) |
+| 012 | Conversation co-edit and take-control | ACCEPTED/LOCKED 2026-11-09 (B-34 model; implementation waits on the 001 Stop fix) | [012-conversation-coedit-take-control](012-conversation-coedit-take-control/README.md) |
+| 013 | LiteSPM package lifecycle bridge | IN_REVIEW (new 2026-11-09); B-36, B-37 PROPOSED | [013-litespm-package-lifecycle-bridge](013-litespm-package-lifecycle-bridge/README.md) |
+| 014 | Conversation history management | IN_REVIEW (new); B-38 PROPOSED | [014-conversation-history-management](014-conversation-history-management/README.md) |
+| 015 | Task control and heterogeneous delegation | IN_REVIEW (new); B-39 PROPOSED | [015-task-control-delegation](015-task-control-delegation/README.md) |
+| 016 | Rich presentation, Intelligent UI and generated media | IN_REVIEW (new); B-40 PROPOSED | [016-rich-presentation-intelligent-ui](016-rich-presentation-intelligent-ui/README.md) |
+| 017 | Data portability, backup and restore | IN_REVIEW (new); B-41 PROPOSED | [017-data-portability-backup-restore](017-data-portability-backup-restore/README.md) |
+| 018 | Usage, diagnostics and observability | IN_REVIEW (new); B-42 PROPOSED | [018-usage-diagnostics-observability](018-usage-diagnostics-observability/README.md) |
+| 019 | Release engineering and V1 qualification | IN_REVIEW (new); B-43, B-44 PROPOSED | [019-release-engineering-qualification](019-release-engineering-qualification/README.md) |
+| 020 | Proactivity and quiet learning | IN_REVIEW (new); D-01, B-45 PROPOSED | [020-proactivity-quiet-learning](020-proactivity-quiet-learning/README.md) |
 
 ## Package 001 manifest
 
@@ -48,4 +59,4 @@ DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package
 - [Implementation status](../docs/IMPLEMENTATION-STATUS.md)
 - [Acceptance and E2E plan](../docs/ACCEPTANCE-AND-E2E-PLAN.md)
 
-Every new package's RESEARCH.md must record pinned repository SHAs, current vendor documentation links, a copy/prototype/reject decision against LiteCowork invariants and unresolved questions with accountable owners. Tests must name executable commands and evidence outputs. UI contracts must cite the relevant UIV1 IDs and feature acceptance IDs.
+Every new package's RESEARCH.md must record pinned repository SHAs, current vendor documentation links, a copy/prototype/reject decision against LiteCowork invariants and unresolved questions with accountable owners. Tests must name executable commands and evidence outputs. UI contracts must cite the live flow IDs in [FLOWS.md](../docs/FLOWS.md) (F00–F143) and the feature EARS acceptance IDs. The legacy `UIV1-xxx` namespace is retired as an active acceptance authority (register [A-39](../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md)); treat any UIV1 citation as a provenance pointer to the archived catalog only.

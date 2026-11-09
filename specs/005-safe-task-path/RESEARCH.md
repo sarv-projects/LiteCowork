@@ -1,6 +1,8 @@
 # Research - Safe Task Path
 
-**Feature:** 005 | **Checked:** 2026-11-06
+**Feature:** 005 | **Checked:** 2026-11-06, grounding refreshed 2026-11-09
+
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Sources
 
@@ -11,6 +13,16 @@ Authorities: docs/TASK-RUNTIME.md, docs/ENVIRONMENTS.md, docs/TRUST.md, docs/DEL
 - The owner documents already decide the trust boundaries this slice must keep.
 - Hosted competitors often collapse connection, permission and execution into one toggle. LiteCowork forbids that collapse.
 - Reference desktop repositories are architecture comparisons, not code to vendor. Pins and paths: [REFERENCE-IMPLEMENTATIONS.md](../../docs/REFERENCE-IMPLEMENTATIONS.md), [REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](../../docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md).
+
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs the safe task path | Verdict |
+|---|---|---|---|---|
+| OpenWork `packages/automations` engine/ports doctrine (`engine.ts`, `ports.ts`, `contracts.ts`) | https://github.com/different-ai/openwork/blob/5493b18a6af64d56454658a53da00eabbc6e033d/packages/automations/src/engine.ts | MIT except `/ee` (Enterprise Edition License) | Receipts/events/results stay readable after the admitting process stops. This supports the restart-reload-receipt and independent-verification requirement (AC-007) and the reconcile-before-retry doctrine (AC-006). | Prototype the durable-readable engine/ports pattern against TASK-RUNTIME/FAILURE-RECOVERY; do not vendor the runtime or import `/ee` paths. |
+| OpenCowork agent-runner loop guard (`src/main/agent/agent-runner-loop-guard.ts`) | https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/agent/agent-runner-loop-guard.ts | MIT at checked root LICENSE | Non-progress/loop guarding informs bounded Attempt admission and the refusal to retry blindly on an ambiguous result. | Prototype the guard logic; LiteCowork keeps TRUST/TASK-RUNTIME as the admission authority, not the loop guard. |
+| OpenCowork path guard + VM bridges (`src/main/sandbox/path-guard.ts`, `lima-bridge.ts`, `wsl-bridge.ts`) | https://github.com/opencoworkai/open-cowork/blob/e94ee2c50239e64ba0e18921e339d49b93dae31f/src/main/sandbox/path-guard.ts | MIT at checked root LICENSE | Path-traversal/zip-slip guarding and VM isolation map directly to the ENFORCED filesystem-root dimension of `IsolationAttestation` and the confined-path write (AC-008/AC-009). | Prototype the path-guard checks against ENVIRONMENTS attestation; do not adopt the Electron sandbox as a second authority. |
+
+No OpenWork or OpenCowork code is imported; all three are prototype/reference inputs that reinforce the isolation-attestation and reconcile-before-retry contracts this slice already requires.
 
 ## Source, route and UI audit (2026-11-06)
 
@@ -60,6 +72,16 @@ These findings are source/route/UI inspection, not an end-to-end Task USER test.
 - Rival web pages were not re-fetched on 2026-11-06 for this package; use [COMPETITIVE-RESEARCH.md](../../docs/COMPETITIVE-RESEARCH.md) only for a future market-positioning decision.
 - No end-to-end Task execution was run: no plan acceptance, Attempt admission, Environment provisioning, Task-provider file modification or independent Effect verification occurred.
 
+## Windows provider research input (B-35, PROPOSED)
+
+- AppContainer gives per-profile filesystem and object-namespace confinement keyed by a package SID; resources must be explicitly ACL-granted to that SID.
+- A restricted token removes privileges and sets user and administrator groups deny-only.
+- A Job Object gives process-tree lifetime (KILL_ON_JOB_CLOSE), active-process, memory and CPU limits. It confines nothing on the filesystem or network by itself (B-09 caveat).
+- Windows Filtering Platform filters can block outbound traffic for an AppContainer package SID.
+- Only the combination, with each dimension observed after launch, can satisfy the four-dimension attestation. Exact Windows builds, required privileges for WFP filter install and cleanup after crash are open items for the owner decision task.
+
 ## Unresolved questions
 
-See SPEC section 5 blockers. Owners are named on the package README.
+- B-35 (Windows Environment provider) is PROPOSED and needs the owner.
+- The Linux-row planning harness and version (SPEC §18).
+- Whether a broker-only connector Step needs an admitted Environment (SPEC §18, shared with 006).

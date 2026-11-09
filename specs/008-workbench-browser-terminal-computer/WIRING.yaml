@@ -1,5 +1,5 @@
 feature_id: "008"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
 nodes:
   - id: "ui"
     owner: Desktop UI
@@ -19,6 +19,12 @@ nodes:
   - id: "pty"
     owner: PTY host
     kind: external
+  - id: "activity"
+    owner: Workbench Activity read projection over committed events (target)
+    kind: service
+  - id: "diff"
+    owner: exact-revision and VCS diff service in litecoworkd (target)
+    kind: service
 edges:
   - id: "e-ui-op"
     from: "ui"
@@ -44,6 +50,22 @@ edges:
     from: "owner"
     to: "pty"
     kind: session
+  - id: "e-op-activity"
+    from: "operator"
+    to: "activity"
+    kind: read-target-only
+  - id: "e-activity-storage"
+    from: "activity"
+    to: "storage"
+    kind: committed-event-read
+  - id: "e-op-diff"
+    from: "operator"
+    to: "diff"
+    kind: read-target-only
+  - id: "e-diff-storage"
+    from: "diff"
+    to: "storage"
+    kind: exact-revision-read
 transactions:
   - id: "tx-epoch"
     owner: Trust and browser owner
@@ -51,7 +73,7 @@ transactions:
     external_calls_inside: false
   - id: "tx-term"
     owner: Environment owner
-    atomic_records: ["terminal_session"]
+    atomic_records: ["terminal_session", "command_receipt", "quiescence_receipt"]
     external_calls_inside: false
 external_boundaries:
   - id: "outside-sqlite"
@@ -64,6 +86,11 @@ recovery:
   source_of_truth: durable-owner-records
   restart_action: reload-last-commit-and-reconcile
 
+# Owner-accepted 2026-11-09: status ACCEPTED/LOCKED authorizes implementation only.
+# Every edge above is TARGET; none is served. Activity and diff nodes are revision 1.0
+# gap coverage. Terminal edges qualify on the Linux x64 row first; on Windows they stay
+# unavailable until Feature 005 B-35. Since register A-51 the UI terminal and diff panes
+# render unavailable notices; the notes below that describe fabricated output predate A-51.
 # Current implementation boundary checked 2026-11-06
 # The target graph above is not connected in the active checkout.
 # WorkbenchPanel is mounted as a right-pane React component and calls App resource

@@ -1,5 +1,9 @@
 # UI behavior - Native Agent Install, Auth and Binding
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
+Screen ownership (A-35, accepted): the Settings -> Agents screen, its layout and its normative control table belong to [Feature 011](../../011-desktop-shell-ipc-settings-runtime/SPEC.md). This file specifies only the behavior of the 002 operations that screen and the composer invoke.
+
 Behavior, not pixels. The Settings shell, global control authority and per-control mutation/failure classes are owned by [V1-UI-SCREEN-CONTRACT.md](../../../docs/V1-UI-SCREEN-CONTRACT.md), [V1-SETTINGS-CONTRACT-LEDGER.md](../../../docs/V1-SETTINGS-CONTRACT-LEDGER.md), [DESKTOP-SHELL-LLD.md](../../../docs/DESKTOP-SHELL-LLD.md), and the [V1 Agent Discovery LLD](../../../docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md). This package owns agent-specific lifecycle and profile details.
 
 ## Settings > Agents screens

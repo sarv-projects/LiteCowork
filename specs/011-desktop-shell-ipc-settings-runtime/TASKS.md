@@ -1,75 +1,373 @@
-
-
 # Tasks - Desktop Shell IPC Settings and Runtime Health
 
-**Feature:** 011 | **Status:** DRAFT - do not execute before SPEC is ACCEPTED/LOCKED.
-**Spec revision:** 0.2
+**Feature:** 011 | **Status:** ACCEPTED/LOCKED - implementation authorized; tasks not started unless marked.
+**Spec revision:** 1.0 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
 
-## 011-T01 - Resolve GA OS/IPC and enabled first-slice groups
-- **Status:** BLOCKED
-- **Depends on:** NONE
-- **Owner:** Product, Runtime, Operator IPC
-- **Allowed paths:** this package and owner docs with approval
-- **Contract:** SPEC §5; LOCAL-OPERATOR-IPC; RUNTIME-LIFECYCLE
-- **Change intent:** Resolve B-28/B-29: declared GA desktop OS/versions and first served Settings category subset.
-- **Acceptance:** OS/Runtime qualification matrix, authenticated peer tests and explicit list of interactive Settings controls whose owner route is served. All other target operations remain unavailable or omitted.
-- **Stop:** no native OS action is marked GA from WSL-only tests.
-**Command:** `python3 .specify/scripts/validate_feature_package.py`
+## Current baseline
 
-## 011-T02 - Authenticated IPC gate
-- **Status:** SOURCE IMPLEMENTED / PLATFORM AND PACKAGED-PEER QUALIFICATION OPEN
-- **Depends on:** T01
-- **Owner:** Operator IPC
-- **Allowed paths:** IPC adapters and tests
-- **Contract:** LOCAL-OPERATOR-IPC
-- **Change intent:** Reject unauthenticated peers on each qualified OS.
-- **Acceptance:** AC-001/002, no bearer fallback, redacted frames, OS security tests.
-- **Command:** `cargo test -p operator-ipc --locked ipc_peer_auth`
+Verified in source on 2026-11-09 (branch `docs/audit-competitor-superset`):
 
-## 011-T03 - Runtime health and power/recovery observation
-- **Status:** PARTIAL SOURCE / OS PROVIDER NOT QUALIFIED
-- **Depends on:** T01
-- **Owner:** Runtime / native desktop bridge
-- **Allowed paths:** runtime lifecycle, Tauri OS adapters, tests
-- **Contract:** RUNTIME-LIFECYCLE and SPEC Notifications/Advanced sections
-- **Change intent:** Expose separate process incarnation/readiness/drain and qualified keep-awake assertion state; keep startup policy independent from resume policy.
-- **Acceptance:** AC-005/006 plus native power assertion tests on declared OS; unsupported battery/power modes are unavailable; resume only for durable LiteCowork-owned work and never all CLI process state.
-- **Current gap:** Lifecycle reads/start/refresh exist; no evidenced keep-awake power provider or generic native-agent resume implementation.
-- **Stop:** never report an OS assertion or resumed child process from UI-only state.
-**Command:** `python3 .specify/scripts/validate_feature_package.py`
+- IPC: `crates/operator-ipc/src/windows.rs` (`WindowsEndpoint::derive`, `WindowsEndpoint::bind`, `WindowsIpcListener`, `AuthenticatedWindowsConnection`, eight pending pipe instances) uses `crates/windows-local-security/src/lib.rs` `create_operator_pipe` and `current_logon_sid`. `crates/operator-ipc/src/unix.rs` (`UnixEndpoint`, `UnixIpcListener` with an `authorize_peer` callback over `PeerCredentials`) enforces a 0700 directory and 0600 socket. Limits are constants in `crates/operator-ipc/src/lib.rs` (`MAX_HEADER_BYTES`, `MAX_BODY_BYTES`, `DEFAULT_MAX_IN_FLIGHT_BODY_BYTES`). Tests: unit tests in both transport files, `crates/operator-ipc/tests/unix_endpoint_lifecycle.rs`, `apps/litecoworkd/src/operator_ipc_tests.rs`, `apps/litecoworkd/src/runtime_windows_security_tests.rs` (state-directory DACL, junction and symlink rejection). Not found: a DACL-creation-failure no-fallback test, a remote pipe client rejection test on native Windows, a packaged-peer test.
+- Runtime: `apps/litecoworkd/src/runtime.rs` drains only from the process-supervisor signal (`wait_for_shutdown_signal_or_endpoint_failure`, `stop_admission`, `advance_to_stopping_after_operator_drain`) and its comment forbids an Operator stop route until Task/Attempt, Effect, lease and local service-reference settlement is proven. `previewLocalRuntimeStop` and `requestLocalRuntimeStop` exist only as OpenAPI target operations. `apps/litecoworkd/src/main.rs` HELP says there is no authenticated Operator stop command.
+- Desktop bridge: `apps/litecowork-ui/src-tauri/src/runtime_lifecycle_bridge.rs` (`get_runtime_lifecycle`, `decode_runtime_lifecycle`) and `apps/litecowork-ui/src-tauri/src/lib.rs` `start_local_runtime`, which uses `systemd_user_service::start`/`verify_active` (`apps/litecowork-ui/src-tauri/src/systemd_user_service.rs`) on Linux and spawns the daemon directly elsewhere.
+- Settings: `apps/litecowork-ui/src/settings/SettingsView.tsx` mounts General, Workspaces, Agents (via `AgentCatalogSettings`) and Runtime. Theme, density, text scale and reduced motion are `useState` only. Ctrl + N, Ctrl + W and Ctrl + K are `<kbd>` labels; `App.tsx` keydown handlers cover Escape and Tab focus trapping for the navigation drawer and narrow Workbench only. Runtime shows "Connected (Localhost)". `runtimeLifecycleLoading`, `runtimeLifecycleError` and `runtimeError` props are declared but not rendered. Archive Workspace exists with a two-step confirm (`onArchiveWorkspace`, Operator `archive_workspace`); there is no rename (`updateWorkspacePolicy` accepts only replication fields). `apps/litecowork-ui/tests/settings-accessibility.test.mjs` covers contrast and keyboard access to technical details only.
+- Keep-awake: no power-assertion code exists in `apps/` or `crates/`.
 
-## 011-T04 - Settings semantic gate and common UI
-- **Status:** PARTIAL SOURCE / NOT RELEASE QUALIFIED
-- **Depends on:** T01–T03
-- **Owner:** Desktop UI
-- **Allowed paths:** Settings shell and panel components
-- **Contract:** V1-UI-SCREEN-CONTRACT.md, V1-SETTINGS-CONTRACT-LEDGER.md, SEMANTIC-SERVED-UI-MAP
-- **Change intent:** Align actual SettingsView with the chosen IA and render each control according to its owner class.
-- **Acceptance:** AC-003/004/007/008; the mounted four-category SettingsView is mapped control-by-control; local preferences actually apply and persist or remain unavailable; shortcut labels match registered handlers; no target-only category/control is presented as active; Runtime transport/readiness copy is accurate; all visible panels have empty/stale/offline/denied/error states. Do not count the unmounted SettingsPage or passed-but-unused props as controls.
-- **Command:** `python3 .specify/scripts/validate_feature_package.py specs/011-desktop-shell-ipc-settings-runtime`
-- **Stop:** no target-only button is rendered active.
+Gaps: B-28 native-row qualification, inert-control removal, applied local preferences, Workspace rename, Settings -> Agents served-operation map, keep-awake, stop/update quiescence gate, app-wide keyboard baseline, packaged qualification. The former Usage telemetry task moves to Feature 018 (usage dashboard owner); this package only renders the Usage category unavailable and links there.
 
-## 011-T05 - Usage telemetry owner chain
-- **Status:** NOT STARTED / TARGET ONLY
-- **Depends on:** T01, T04
-- **Owner:** Observability, Storage, Agent Runtime, Desktop UI
-- **Allowed paths:** telemetry domain/schema/storage/OpenAPI/Operator/Tauri/UI/tests
-- **Contract:** V1-TELEMETRY-USAGE-RESILIENCE-LLD.md
-- **Change intent:** Implement per-inference leaf accounting and separate quota snapshot ledger, then expose scoped dashboard projections.
-- **Acceptance:** source-only readers; immutable price snapshots; provider/native/gateway/estimate/unknown confidence; verified dedupe; exact Workspace/agent/model filters; DST-safe quick ranges and All; no double-count; no prompts/transcripts; redacted export. Full TLM adversarial test suite.
-- **Stop:** no totals UI until both accounting stores + projections + route/command + generated types + tests are present.
-**Command:** `python3 .specify/scripts/validate_feature_package.py`
+## 011-T01 - Promote accepted 011 interfaces into owner docs and schemas
 
-## 011-T06 - Settings per-tab E2E and accessibility acceptance
 - **Status:** NOT STARTED
-- **Depends on:** T01–T05 and each domain owner feature accepted
-- **Owner:** Desktop UI / QA / Product
-- **Allowed paths:** settings UI and test harness
-- **Contract:** SPEC, V1-UI-SCREEN-CONTRACT, Settings control ledger
-- **Change intent:** Execute every shipped interactive control against real owner behavior on exact packaged desktop build/OS.
-- **Acceptance:** every action has a working owner receipt/observation, all keyboard/focus/zoom/contrast/reduced-motion states; no dead button; screenshot snapshots and real OS tests.
-- **Stop:** target features without owners remain hidden or disabled with reason.
+- **Depends on:** NONE
+- **Cross-package prerequisites:** NONE
+- **Owner:** Runtime, Operator IPC, Workspace owner, Desktop UI (contract owners)
+- **Allowed paths:** `docs/RUNTIME-LIFECYCLE.md`, `docs/LOCAL-OPERATOR-IPC.md`, `docs/V1-SETTINGS-CONTRACT-LEDGER.md`, `docs/SEMANTIC-SERVED-UI-MAP.md`, `docs/EVENTS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/domain-event.schema.json`, `docs/schemas/error-codes.schema.json`, `apps/litecowork-ui/src/generated/` (regenerated types), this package
+- **Contract:** SPEC §5, §7.2; AC-014, AC-015, AC-016, AC-017, AC-019, AC-020
+- **Change intent:** In one change: define the `previewLocalRuntimeStop` response (`StopPreview` item lists and verdict) and the `requestLocalRuntimeStop` idempotency/If-Match semantics; add `renameWorkspace` over the existing `workspaces.name` and `Workspace.version`; define the update quiescence gate contract that Feature 019 calls; define the `PowerAssertion` observation and keep-awake modes; pin the exact V1 Settings control set (B-33) in the ledger with each control's owner operation or LOCAL_PREF class; add a Workspace renamed event and the stop/rename/keep-awake error codes. All new operations stay target-only in the route inventory until handlers land.
+- **Acceptance:**
+  - [ ] OpenAPI, event and error-code schemas validate and match owner prose.
+  - [ ] Ledger lists every control that will be interactive in V1 and nothing else (AC-020).
+  - [ ] `api:check` passes after regeneration.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` and `pnpm --dir apps/litecowork-ui run api:check` and `python3 scripts/audit_served_routes.py`
+- **Evidence:** schema validation output in CURRENT-RUN.md.
+- **Stop:** stop if a promoted field duplicates another owner's schema.
 
+## 011-T02 - Qualify the Windows named-pipe DACL profile (B-28 first row)
 
-**Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Status:** PARTIAL (`crates/operator-ipc/src/windows.rs` endpoint/listener and `crates/windows-local-security/src/lib.rs` `create_operator_pipe`, `current_logon_sid` exist with unit tests; missing: DACL-failure no-fallback, remote-client rejection and packaged-peer tests on native Windows)
+- **Depends on:** NONE
+- **Cross-package prerequisites:** Feature 019 Windows CI runner (native, not WSL2).
+- **Owner:** Operator IPC, Security
+- **Allowed paths:** `crates/operator-ipc/src/windows.rs`, `crates/operator-ipc/tests/windows_endpoint_lifecycle.rs` (new), `crates/windows-local-security/src/lib.rs`, `apps/litecoworkd/src/runtime_windows_security_tests.rs`, `apps/litecoworkd/src/operator_ipc_tests.rs`
+- **Contract:** SPEC §5 B-28, §10; LOCAL-OPERATOR-IPC; AC-001, AC-002, AC-009, AC-010
+- **Change intent:** Add a fault-injection seam in `create_operator_pipe` so a DACL failure is testable; assert startup returns a typed error and opens no pipe and no loopback listener. Add tests that a client opening the pipe through remote `\\host\pipe\...` syntax and a client under a different logon SID are rejected, and that the packaged `litecowork-ui` binary connects as the authenticated peer.
+- **Acceptance:**
+  - [ ] DACL failure: no pipe instance exists afterwards and no TCP listener is bound (AC-009).
+  - [ ] Remote and foreign-SID clients are rejected before any frame read (AC-010).
+  - [ ] Same-user packaged client is accepted; principal derives from the pipe, never from a header (AC-001).
+  - [ ] Frame without the authenticated connection marker is rejected (AC-002).
+- **Command:** `cargo test -p operator-ipc --locked windows_endpoint` (filter to be added by this task) and `cargo test -p windows-local-security --locked` and `cargo test -p litecoworkd --locked runtime_windows_security` on native Windows x64
+- **Evidence:** native Windows 11 and Windows 10 x64 output in CURRENT-RUN.md (exact build numbers).
+- **Stop:** stop if any test ran under WSL2.
 
+## 011-T03 - Qualify the Linux 0600/0700 socket profile (second row)
+
+- **Status:** PARTIAL (`crates/operator-ipc/src/unix.rs` enforces directory/socket modes and peer credentials; `crates/operator-ipc/tests/unix_endpoint_lifecycle.rs` exists; missing: native Linux desktop packaged-peer and foreign-UID evidence)
+- **Depends on:** NONE
+- **Cross-package prerequisites:** Feature 019 Linux CI runner.
+- **Owner:** Operator IPC, Security
+- **Allowed paths:** `crates/operator-ipc/src/unix.rs`, `crates/operator-ipc/tests/unix_endpoint_lifecycle.rs`, `apps/litecoworkd/src/operator_ipc_tests.rs`
+- **Contract:** SPEC §5 B-28; LOCAL-OPERATOR-IPC; AC-001, AC-002, AC-010
+- **Change intent:** Add tests for a foreign-UID peer (run as a second user in CI), a symlinked socket path, a 0755 directory, and the packaged client connecting as the same UID.
+- **Acceptance:**
+  - [ ] Foreign UID rejected before frame read (AC-010).
+  - [ ] Symlink and wrong-mode directory refuse to bind.
+  - [ ] Packaged client accepted (AC-001); missing marker rejected (AC-002).
+- **Command:** `cargo test -p operator-ipc --locked unix_endpoint` on native Linux x64
+- **Evidence:** native Linux x64 output in CURRENT-RUN.md.
+- **Stop:** stop if run inside WSL2 or a container without a real second user.
+
+## 011-T04 - IPC admission bounds and frame isolation
+
+- **Status:** PARTIAL (limit constants in `crates/operator-ipc/src/lib.rs`; eight-slot limit in both transports; missing: combined in-flight body bound and interleaving tests under concurrency)
+- **Depends on:** NONE
+- **Cross-package prerequisites:** NONE
+- **Owner:** Operator IPC
+- **Allowed paths:** `crates/operator-ipc/src/lib.rs`, `crates/operator-ipc/src/async_io.rs`, `crates/operator-ipc/src/unix.rs`, `crates/operator-ipc/src/windows.rs`, `crates/operator-ipc/tests/`
+- **Contract:** SPEC §7a IPC limits; AC-013
+- **Change intent:** Enforce `DEFAULT_MAX_IN_FLIGHT_BODY_BYTES` across connections with a typed backpressure error; test nine concurrent peers and bodies summing past 128 MiB; assert response frames never interleave.
+- **Acceptance:**
+  - [ ] Ninth concurrent request is held or rejected with the typed error, never accepted (AC-013).
+  - [ ] Combined bodies over 128 MiB are refused; memory stays bounded (AC-013).
+  - [ ] Each response correlates to its request_id with no interleaved bytes under 8 concurrent peers.
+- **Command:** `cargo test -p operator-ipc --locked ipc_admission_bounds` (filter to be added by this task)
+- **Evidence:** test output in CURRENT-RUN.md.
+- **Stop:** stop if a bound can be exceeded under any interleaving.
+
+## 011-T05 - Runtime health honesty in the shell
+
+- **Status:** PARTIAL (`runtime_lifecycle_bridge.rs` decodes lifecycle; `SettingsView.tsx` shows start/refresh; missing: loading/error props unrendered, "Connected (Localhost)" copy, incarnation matrix test)
+- **Depends on:** NONE
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop UI, Runtime
+- **Allowed paths:** `apps/litecowork-ui/src/settings/SettingsView.tsx`, `apps/litecowork-ui/src/App.tsx` (runtime status props only), `apps/litecowork-ui/src-tauri/src/runtime_lifecycle_bridge.rs`, `apps/litecowork-ui/tests/runtime-start-readiness.test.ts`, `apps/litecowork-ui/tests/settings-runtime-health.test.mjs` (new)
+- **Contract:** SPEC §7a recovery states; RUNTIME-LIFECYCLE; AC-005
+- **Change intent:** Render `runtimeLifecycleLoading`, `runtimeLifecycleError` and `runtimeError`; replace "Connected (Localhost)" with the actual transport ("Local IPC (named pipe)" / "Local IPC (socket)"); show recovery_state, Operator readiness and execution readiness as separate rows; DEGRADED keeps Operator commands but shows execution closed.
+- **Acceptance:**
+  - [ ] STOPPED, STARTING and RECOVERING never show execution ready (AC-005).
+  - [ ] DEGRADED with readiness SERVING shows commands available and execution closed (AC-005).
+  - [ ] No string "Localhost" remains in Settings.
+  - [ ] Error and loading states render with accessible live-region announcements.
+- **Command:** `pnpm --dir apps/litecowork-ui test` and `cargo test -p litecowork-ui --locked runtime_lifecycle` 
+- **Evidence:** test names; IMPLEMENTATION-STATUS Settings row.
+- **Stop:** stop if any readiness value is derived from a click rather than an observation.
+
+## 011-T06 - Remove inert Settings controls and gate by owner class (B-29/B-33)
+
+- **Status:** PARTIAL (four categories mounted in `SettingsView.tsx`; inert General controls and display-only shortcut labels remain; the 16-category target is not rendered)
+- **Depends on:** T01
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop UI, Product
+- **Allowed paths:** `apps/litecowork-ui/src/settings/SettingsView.tsx`, `apps/litecowork-ui/src/settings/settings-view.css`, `apps/litecowork-ui/src/settings/categories/` (new per-category modules), `apps/litecowork-ui/src/settings/settings-control-map.ts` (new), `apps/litecowork-ui/tests/settings-inert-control-audit.test.mjs` (new)
+- **Contract:** SPEC §5 B-29, B-33; V1-SETTINGS-CONTRACT-LEDGER; AC-003, AC-007, AC-011, AC-020
+- **Change intent:** Add a typed `settings-control-map.ts` with one entry per rendered control (`SettingsControlClass`: LocalOnly, Native, Target, OperatorServed) generated from the T01 ledger. Remove the General appearance controls until T07 wires them, and the shortcut card until T11's registry exists. Render Usage & Monitoring (Feature 018), Storage & Backup (Feature 017) and About & Diagnostics (Feature 018) as unavailable entries with their prerequisite, not as controls. Split categories into modules under `settings/categories/` with a typed context instead of 60 props.
+- **Acceptance:**
+  - [ ] Audit test fails if any rendered input/button lacks a control-map entry with a served operation or applied local effect (AC-020).
+  - [ ] Target-only entries render as text with a reason and send no mutation (AC-003).
+  - [ ] Category navigation and unavailable reasons are keyboard and screen-reader accessible (AC-011).
+  - [ ] Rich presentation disabled still shows semantic Conversation text (AC-007).
+- **Command:** `pnpm --dir apps/litecowork-ui test` and `pnpm --dir apps/litecowork-ui run build`
+- **Evidence:** audit test output; UI ledger diff.
+- **Stop:** stop if a control would be enabled without a ledger entry.
+
+## 011-T07 - Applied and persisted local display preferences
+
+- **Status:** NOT STARTED (values exist only as `useState` in `SettingsView.tsx`)
+- **Depends on:** T06
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop UI
+- **Allowed paths:** `apps/litecowork-ui/src/settings/local-preferences.ts` (new), `apps/litecowork-ui/src/settings/categories/` , `apps/litecowork-ui/src/App.tsx` (apply at root only), `apps/litecowork-ui/tests/local-preferences.test.ts` (new)
+- **Contract:** SPEC §7.2 `LocalPreferenceStore`; DATA-MODEL; AC-004
+- **Change intent:** Persist theme, density, text scale and reduced motion in a desktop-local store and apply them at the document root (CSS variables and `prefers-reduced-motion` override). Corrupt or unknown stored values fall back to defaults. No preference touches grants, bindings or Operator state.
+- **Acceptance:**
+  - [ ] Changing a value applies immediately and survives app restart (AC-004).
+  - [ ] Corrupt stored JSON resets to defaults without crashing.
+  - [ ] Test proves no Operator call is made by a preference change (AC-004).
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test names; ledger rows switch to LOCAL_PREF served.
+- **Stop:** stop if a preference would be synced or replicated.
+
+## 011-T08 - Workspace rename and archive in Settings
+
+- **Status:** PARTIAL (archive: `SettingsView.tsx` confirm flow, Tauri `archive_workspace` in `apps/litecowork-ui/src-tauri/src/lib.rs`, Operator `archive_workspace` in `apps/litecoworkd/src/operator.rs`, storage `crates/storage-sqlite/src/workspace_archive.rs`; rename: absent)
+- **Depends on:** T01, T06
+- **Cross-package prerequisites:** NONE
+- **Owner:** Workspace owner, Desktop UI
+- **Allowed paths:** `crates/storage-sqlite/src/lib.rs` (Workspace mutation next to the existing policy update), `crates/storage-core/src/lib.rs`, `apps/litecoworkd/src/operator.rs` (rename handler and route), `apps/litecowork-ui/src-tauri/src/lib.rs` (rename command), `apps/litecowork-ui/src/settings/categories/`, `apps/litecowork-ui/tests/workspace-rename.test.ts` (new), `crates/storage-sqlite/tests/`
+- **Contract:** SPEC §7.2 `renameWorkspace`; AC-017
+- **Change intent:** Storage: CAS on `workspaces.version`, trim and bound the name, emit the promoted renamed event and idempotency receipt in one transaction. Operator: authenticated, Workspace-scoped, If-Match and Idempotency-Key required. UI: inline rename with pending, conflict (shows latest name, keeps draft) and archived read-only states; archive keeps its confirm.
+- **Acceptance:**
+  - [ ] Stale If-Match returns conflict with the current name; no write (AC-017).
+  - [ ] Same key and name returns the original receipt; same key, different name fails.
+  - [ ] Archived Workspace rejects rename and the UI shows read-only (AC-017).
+  - [ ] Two concurrent renames: exactly one commits.
+- **Command:** `cargo test -p storage-sqlite --locked workspace_rename` (filter to be added by this task) and `cargo test -p litecoworkd --locked workspace_rename` (filter to be added by this task) and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output; served-route inventory diff.
+- **Stop:** stop if rename would bypass the Workspace version.
+
+## 011-T09 - Settings -> Agents screen over served Feature 002 operations (A-35)
+
+- **Status:** PARTIAL (`SettingsView.tsx` renders `AgentCatalogSettings` with probe, binding create/enable/disable and default-lead actions; descriptor and credential routes in `apps/litecoworkd/src/agent_control_operator.rs` and `agent_credentials_operator.rs` return 503)
+- **Depends on:** T06
+- **Cross-package prerequisites:** Feature 002 OpenCode binding probe fix and AgentControlDescriptor producer tasks.
+- **Owner:** Desktop UI (screen), Feature 002 owners (operations)
+- **Allowed paths:** `apps/litecowork-ui/src/settings/categories/`, `apps/litecowork-ui/src/agents/AgentCatalogSettings.tsx`, `apps/litecowork-ui/src/settings/settings-control-map.ts`, `apps/litecowork-ui/tests/agent-catalog-settings.test.mjs`
+- **Contract:** SPEC §5 A-35, Agents tab; Feature 002 SPEC (operations); AC-019
+- **Change intent:** Map every Agents control to its Feature 002 operation and served state. Unserved operations (descriptor, sign-in, install/update) render unavailable with the reason; the screen layout and categories stay owned here and Feature 002 links to it. Remove the heading text that lists agents with no probe.
+- **Acceptance:**
+  - [ ] With descriptor routes returning 503, model/effort controls are shown unavailable, not hidden as ready (AC-019).
+  - [ ] Probe and binding actions show pending, receipt and error states.
+  - [ ] Heading names only harnesses with active probes.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test names; ledger rows.
+- **Stop:** stop if this screen would restate Feature 002 operation semantics instead of linking.
+
+## 011-T10 - Notifications entry linking Feature 010 quiet hours
+
+- **Status:** NOT STARTED
+- **Depends on:** T06
+- **Cross-package prerequisites:** Feature 010 quiet-hours control surface task (A-35).
+- **Owner:** Desktop UI
+- **Allowed paths:** `apps/litecowork-ui/src/settings/categories/`, `apps/litecowork-ui/src/settings/settings-control-map.ts`, `apps/litecowork-ui/tests/settings-inert-control-audit.test.mjs`
+- **Contract:** SPEC Notifications tab; A-35; AC-020
+- **Change intent:** Add a Notifications category entry that hosts Feature 010's quiet-hours component when Feature 010 serves it, and otherwise shows an unavailable reason. Shell-local sound/notification choices appear only when the OS notification provider exists.
+- **Acceptance:**
+  - [ ] No quiet-hours control is defined in this package's code (AC-020).
+  - [ ] Unavailable state names Feature 010 as the prerequisite.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** audit test output.
+- **Stop:** stop if quiet-hours semantics would be duplicated here.
+
+## 011-T11 - App-wide keyboard and focus baseline
+
+- **Status:** PARTIAL (`App.tsx` traps focus and handles Escape for the narrow navigation drawer and narrow Workbench; `tests/settings-accessibility.test.mjs` covers Settings details; shortcut labels Ctrl + N / W / K have no handlers)
+- **Depends on:** T06
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop UI
+- **Allowed paths:** `apps/litecowork-ui/src/App.tsx` (keyboard wiring only), `apps/litecowork-ui/src/shell/shortcut-registry.ts` (new), `apps/litecowork-ui/src/settings/categories/`, `apps/litecowork-ui/tests/keyboard-focus-baseline.test.mjs` (new), `apps/litecowork-ui/tests/browser/`
+- **Contract:** SPEC §13 accessibility; V1-UI-SCREEN-CONTRACT; AC-011, AC-018
+- **Change intent:** One shortcut registry that registers handlers and generates the Settings shortcut list and the sidebar label ("Ctrl N" in `App.tsx`). Visible focus style on all interactive elements; focus return after dialogs/drawers; skip link to main content; Tab order through navigation, composer, Workbench and Settings.
+- **Acceptance:**
+  - [ ] Every listed shortcut has a registered handler; test fails on a label without a handler (AC-018).
+  - [ ] Keyboard-only path: open New Chat, send focus to composer, open Workbench, open Settings, change category, close drawer, focus returns (AC-018).
+  - [ ] Settings categories reachable and announced (AC-011).
+- **Command:** `pnpm --dir apps/litecowork-ui test` and `pnpm --dir apps/litecowork-ui run test:browser`
+- **Evidence:** test output; a11y section of IMPLEMENTATION-STATUS.
+- **Stop:** stop if a shortcut conflicts with an OS or WebView reserved key without a documented alternative.
+
+## 011-T12 - Keep-awake power assertion
+
+- **Status:** NOT STARTED (no power-assertion code in `apps/` or `crates/`)
+- **Depends on:** T01
+- **Cross-package prerequisites:** Feature 001 admitted-turn state and Feature 005 admitted-Attempt state (definition of "work runs").
+- **Owner:** Runtime, native desktop bridge
+- **Allowed paths:** `apps/litecoworkd/src/power_assertion.rs` (new), `apps/litecoworkd/src/runtime.rs` (hold/release hooks), `crates/windows-local-security/src/lib.rs` (Power request wrappers), `crates/windows-local-security/Cargo.toml`, `apps/litecowork-ui/src/settings/categories/`, `apps/litecowork-ui/tests/keep-awake.test.mjs` (new)
+- **Contract:** SPEC Advanced tab, §7.2 `PowerAssertion`; AC-016
+- **Change intent:** Daemon holds the assertion while admitted work runs: Windows `PowerCreateRequest`/`PowerSetRequest` via `windows-sys`; Linux logind `Inhibit` (or `systemd-inhibit`). Battery-only mode is UNSUPPORTED where the OS cannot report power source. Release on drain, stop and when work ends; clear at restart. UI shows the observed state only.
+- **Acceptance:**
+  - [ ] HELD appears only after the OS call succeeds; OS refusal shows UNKNOWN (AC-016).
+  - [ ] Drain releases the assertion before STOPPING (AC-016).
+  - [ ] Unsupported mode renders UNSUPPORTED and cannot be selected (AC-016).
+- **Command:** `cargo test -p litecoworkd --locked power_assertion` (filter to be added by this task) on each native row and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** per-row output with `powercfg /requests` (Windows) or `systemd-inhibit --list` (Linux) capture in CURRENT-RUN.md.
+- **Stop:** stop if the UI could show HELD from the radio selection alone.
+
+## 011-T13 - Authenticated Operator stop with settlement proof
+
+- **Status:** BLOCKED (needs Feature 001 effective Stop with observed quiescence, owner Conversation/Agent Runtime, and Feature 005 Attempt/Effect/lease settlement, owner Task Runtime; `apps/litecoworkd/src/runtime.rs` forbids the route until then)
+- **Depends on:** T01, T04
+- **Cross-package prerequisites:** Feature 001 Stop/quiescence task (A-25); Feature 005 Effect reconciliation and lease release tasks; Feature 008 terminal and browser session settlement (when those exist).
+- **Owner:** Runtime
+- **Allowed paths:** `apps/litecoworkd/src/runtime.rs`, `apps/litecoworkd/src/runtime_stop_operator.rs` (new), `apps/litecoworkd/src/operator.rs` (route mount only), `apps/litecoworkd/src/runtime_shutdown_tests.rs`, `apps/litecoworkd/src/main.rs` (HELP text)
+- **Contract:** SPEC §7.2 stop preview; RUNTIME-LIFECYCLE drain; ACCEPTANCE-AND-E2E-PLAN "Desktop stop/update qualification gate"; AC-012, AC-014
+- **Change intent:** Implement `previewLocalRuntimeStop` as a read over owner records and `requestLocalRuntimeStop` that fences admission (`stop_admission`), persists DRAINING, waits for each owner's settlement, and reaches STOPPED only with positive quiescence; otherwise stays DRAINING with UNKNOWN items. Route mounts only when every owner settlement hook exists. Update HELP to describe the route.
+- **Acceptance:**
+  - [ ] Idle stop reaches STOPPED with a QUIESCENT verdict (AC-014).
+  - [ ] Active turn, dispatched unresolved Effect, outstanding ExecutionLease/EnvironmentControlLease, child process that outlives its parent and pending cleanup each block STOPPED and are listed (AC-014).
+  - [ ] Admission racing drain: new requests after the fence are rejected (AC-012).
+  - [ ] Duplicate stop request returns the same receipt; stale If-Match fails.
+  - [ ] Unauthenticated stop is rejected.
+- **Command:** `cargo test -p litecoworkd --locked runtime_shutdown` and `cargo test -p litecoworkd --locked runtime_stop_gate` (filter to be added by this task)
+- **Evidence:** gate journey matrix in CURRENT-RUN.md.
+- **Stop:** stop if any owner lacks a settlement hook; keep the route unmounted.
+
+## 011-T14 - Desktop stop and update UI with quiescence gate
+
+- **Status:** NOT STARTED
+- **Depends on:** T13
+- **Cross-package prerequisites:** Feature 019 updater (calls the gate).
+- **Owner:** Desktop UI, Runtime
+- **Allowed paths:** `apps/litecowork-ui/src-tauri/src/runtime_lifecycle_bridge.rs`, `apps/litecowork-ui/src-tauri/src/lib.rs` (commands), `apps/litecowork-ui/src/settings/categories/`, `apps/litecowork-ui/tests/runtime-stop-update.test.mjs` (new)
+- **Contract:** SPEC Advanced tab, §7.2 `UpdateQuiescenceGate`; AC-014, AC-015
+- **Change intent:** Tauri commands for preview and request stop and for `check_update_quiescence`. UI: Preview stop lists running and unknown items; Stop safely enabled only on QUIESCENT; update/install flow refuses without positive quiescence and offers Retry.
+- **Acceptance:**
+  - [ ] Stop button disabled with reasons while preview is BLOCKED or UNKNOWN (AC-014).
+  - [ ] Update refused without positive quiescence; message lists what is running (AC-015).
+  - [ ] Window close never shows "Runtime stopped".
+- **Command:** `cargo test -p litecowork-ui --locked runtime_stop` (filter to be added by this task) and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output; ledger rows.
+- **Stop:** stop if any path installs an update without the gate.
+
+## 011-T15 - Shell failure and recovery
+
+- **Status:** PARTIAL (`apps/litecoworkd/src/runtime_recovery_tests.rs`, `runtime_shutdown_tests.rs`, `runtime_process_tests.rs` cover daemon-side recovery and drain; missing: desktop-side disconnected state, window-close vs Runtime state, simultaneous stop/update)
+- **Depends on:** T05, T14
+- **Cross-package prerequisites:** NONE
+- **Owner:** Runtime, Desktop UI
+- **Allowed paths:** `apps/litecoworkd/src/runtime_recovery_tests.rs`, `apps/litecoworkd/src/runtime_shutdown_tests.rs`, `apps/litecowork-ui/src-tauri/src/lib.rs`, `apps/litecowork-ui/tests/browser/`
+- **Contract:** SPEC §11, §12; AC-005, AC-006, AC-012, AC-015
+- **Change intent:** Tests and fixes for: daemon kill while UI open shows disconnected (not an empty Workspace); restart produces a new incarnation and the UI drops stale identity; window close with the Runtime running keeps it running and reports it; drain deadline handling; simultaneous stop and update; handler deadline (504) treated as unsettled.
+- **Acceptance:**
+  - [ ] Daemon crash: UI shows disconnected within the readiness poll interval (AC-005).
+  - [ ] Window close: Runtime stays running and is reported running on reopen (AC-006).
+  - [ ] Drain never claims STOPPED before admitted handlers finish or time out unsettled (AC-012).
+  - [ ] Concurrent stop and update produce one drain and a refused update (AC-015).
+- **Command:** `cargo test -p litecoworkd --locked runtime_recovery` and `cargo test -p litecoworkd --locked runtime_shutdown` and `pnpm --dir apps/litecowork-ui run test:browser`
+- **Evidence:** test output in CURRENT-RUN.md.
+- **Stop:** stop if any recovery path infers success from intent.
+
+## 011-T16 - Cross-layer traces for shell and Settings operations
+
+- **Status:** NOT STARTED
+- **Depends on:** T07-T12, T14
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop UI, Runtime, Operator IPC
+- **Allowed paths:** this package (`contracts/ui-behavior.md`, `WIRING.yaml`), `docs/SEMANTIC-SERVED-UI-MAP.md`
+- **Contract:** AGENTS.md §4
+- **Change intent:** Record the full trace for: start Runtime, refresh health, rename Workspace, archive Workspace, change a local preference, keep-awake, preview stop, stop safely, update check, each Agents action, and the Notifications link.
+- **Acceptance:**
+  - [ ] Every interactive Settings control has a complete trace with real symbol names.
+  - [ ] No trace has a control without a route or a route without a control.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** trace table in contracts/ui-behavior.md.
+- **Stop:** stop if a trace names a missing symbol.
+
+## 011-T17 - Packaged qualification on Windows x64 then Linux x64
+
+- **Status:** NOT STARTED
+- **Depends on:** T02, T03, T15, T16
+- **Cross-package prerequisites:** Feature 019 release matrix, installer and signing; Feature 001 qualified OpenCode v2.0.32 route (E2E-01 shell portion).
+- **Owner:** QA, Product (owner USER evidence)
+- **Allowed paths:** `apps/litecowork-ui/tests/browser/`, `scripts/v1_platform_matrix.py` (row entries only)
+- **Contract:** docs/ACCEPTANCE-AND-E2E-PLAN.md E2E-01 (shell and IPC parts), E2E-11 (fallback, AC-007), "Desktop stop/update qualification gate"; AC-001 through AC-020
+- **Change intent:** On the packaged desktop: fresh install, authenticated IPC, Settings per-category journeys, keyboard-only pass, keep-awake, rename/archive, stop/update gate journey (idle, active turn, unresolved Effect, leases, outliving child, pending cleanup, simultaneous stop/update, admission racing drain, crash/timeout, restart). Windows row first, Linux second.
+- **Acceptance:**
+  - [ ] CODE, SYSTEM and owner USER evidence per row with exact OS build and app build (AC-008: no WSL2).
+  - [ ] Every denial and recovery case in the gate journey passes (AC-014, AC-015).
+  - [ ] Keyboard-only and screen-reader passes recorded (AC-011, AC-018).
+- **Command:** `pnpm --dir apps/litecowork-ui run test:browser` and `python3 scripts/v1_platform_matrix.py`
+- **Evidence:** evidence bundle per row in CURRENT-RUN.md and docs/IMPLEMENTATION-STATUS.md.
+- **Stop:** stop if any row lacks owner USER evidence.
+
+## 011-T18 - Documentation sync
+
+- **Status:** NOT STARTED
+- **Depends on:** T17
+- **Cross-package prerequisites:** NONE
+- **Owner:** Documentation owner (orchestrator)
+- **Allowed paths:** `docs/IMPLEMENTATION-STATUS.md`, `docs/schemas/served-route-inventory.json`, `docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md`, `docs/V1-SETTINGS-CONTRACT-LEDGER.md`, `docs/SEMANTIC-SERVED-UI-MAP.md`, `docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md`, this package
+- **Contract:** AGENTS.md §1, §4
+- **Change intent:** Regenerate the route inventory; update the Settings audit, ledger served flags and IMPLEMENTATION-STATUS rows; close register rows for B-28, B-29, B-33 and A-35 obligations that are met; refresh SPEC §4 crosswalk.
+- **Acceptance:**
+  - [ ] Inventory matches mounted routes, including the stop route only if mounted.
+  - [ ] No document still claims "Connected (Localhost)" or inert controls as current.
+- **Command:** `python3 scripts/audit_served_routes.py` and `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** documentation diff.
+- **Stop:** stop if a status claim exceeds recorded evidence.
+
+## 011-T19 - Package VERIFIED for V1
+
+- **Status:** NOT STARTED
+- **Depends on:** T01-T18
+- **Cross-package prerequisites:** NONE beyond those of T13 and T17.
+- **Owner:** Product (repository owner), Runtime, Desktop UI
+- **Allowed paths:** this package
+- **Contract:** docs/SPECIFICATION-STANDARD.md lifecycle; SPEC §15 all AC IDs
+- **Change intent:** Assemble the evidence bundle, move SPEC and WIRING status ACCEPTED/LOCKED -> IMPLEMENTING (when T02 resumes code work) -> VERIFIED, and obtain owner sign-off.
+- **Acceptance:**
+  - [ ] Every AC from AC-001 to AC-020 has recorded CODE/SYSTEM/USER evidence on both rows.
+  - [ ] Owner sign-off recorded with date and revision.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** evidence bundle index in CURRENT-RUN.md; IMPLEMENTATION-STATUS.md row.
+- **Stop:** stop if T13 remains BLOCKED; the package cannot be VERIFIED without the stop/update gate.
+
+## Implementation language and optimization notes
+
+- Keep IPC, stop gate, settlement and keep-awake in Rust (`operator-ipc`, `windows-local-security`, `litecoworkd`). The UI renders observations only.
+- Keep-awake belongs in the daemon process, not the Tauri shell, because the daemon knows when admitted work runs and survives window close.
+- `SettingsView.tsx` receives about 60 props from `App.tsx` (4523 lines). Splitting categories into modules with a typed context (T06) stops every category re-rendering on unrelated App state changes and makes the inert-control audit per-category.
+- A single TypeScript shortcut registry (T11) makes "label only when a handler exists" structural.
+- `apps/litecowork-ui/src-tauri/src/lib.rs` (6132 lines) registers every command; new stop/update and rename commands go in their own bridge modules, as `runtime_lifecycle_bridge.rs` already does, rather than growing `lib.rs`.
+
+## Dependency order
+
+T02, T03, T04, T05 start immediately (hardening existing code). T01 -> T06 -> T07, T09, T10, T11; T01, T06 -> T08; T01 -> T12; T01, T04 -> T13 (blocked on Features 001 and 005) -> T14; T05, T14 -> T15; T07-T12, T14 -> T16; T02, T03, T15, T16 -> T17 -> T18 -> T19 (T19 depends on all).
+
+## Cross-package dependencies
+
+| This task | Other package task | Reason |
+|---|---|---|
+| T02, T03 | Feature 019 native Windows and Linux CI runners | Native-row evidence, never WSL2 |
+| T09 | Feature 002 OpenCode binding probe fix and AgentControlDescriptor producer | Agents screen consumes 002 operations (A-35) |
+| T10 | Feature 010 quiet-hours control surface | Quiet hours owned by 010 (A-35) |
+| T12 | Feature 001 admitted-turn state; Feature 005 admitted-Attempt state | Defines "work runs" for keep-awake |
+| T13 | Feature 001 Stop/quiescence (A-25); Feature 005 Effect/lease settlement; Feature 008 session settlement | Stop route requires settlement proof |
+| T14 | Feature 019 updater | Update must call the quiescence gate |
+| T17 | Feature 019 release matrix and installer; Feature 001 qualified route | Packaged E2E per row |
+| (dashboard) | Feature 018 usage and diagnostics; Feature 017 backup | Former Usage task moved; categories render unavailable here |
+
+Cross-package task numbers are named by package and outcome because those packages' TASKS.md are being renumbered in the same release-planning change. Feature 012 sequences after Feature 001 Stop, not after this package.
+
+## Completion evidence
+
+For each task record in CURRENT-RUN.md and the matching docs/IMPLEMENTATION-STATUS.md row: task ID, git revision, exact command, pass/fail with test names, OS and build (Windows 11 or 10 x64 build number, or Linux x64 distribution and kernel; never WSL2), app build, harness and version where relevant (OpenCode v2.0.32), evidence level reached (CODE, SYSTEM or USER), and reviewer. A task is DONE only when its acceptance boxes are checked against that record.

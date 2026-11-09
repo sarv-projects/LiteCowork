@@ -2176,6 +2176,23 @@ the `DELETING` fence for retry. Empty plans are valid only after the local inven
 verified empty. This Resource deletion state does not assert that an already-fed native
 AgentSession is invalidated or that its history can be recalled.
 
+**ContextDocument create ownership (PROPOSED, owner acceptance required, register A-18).**
+`ContextDocumentKind` has four values (`PERSONAL_PROFILE | COWORKER_NOTES | WORKSPACE_NOTES
+| GOAL_NOTES`, owned by [SCHEMAS.md](SCHEMAS.md)) and the record/read `ContextDocumentMetadata`
+and `CoworkerContextPolicy.allowed_context_kinds` retain all four as target values. The
+*create* path is narrower and the machine contract is reconciled to match it: the
+`ContextDocumentCreateMetadata` enum in
+[operator-api.openapi.yaml](schemas/operator-api.openapi.yaml) is narrowed to the two kinds
+the domain-workspace create validator accepts, `PERSONAL_PROFILE` with a USER owner_ref
+matching the authenticated principal, and `WORKSPACE_NOTES` with a WORKSPACE owner_ref
+matching the selected Workspace. `COWORKER_NOTES` and `GOAL_NOTES` are TARGET-pending their
+authoritative Coworker/Goal aggregate create/read/revoke/retrieval services and resource
+authorization; until those exist they cannot be created, so Coworker Settings must hide or
+disable those create options rather than offer an Add that cannot persist that scope. This
+is a PROPOSED resolution pending the named owner
+([SPECIFICATION-STANDARD.md](SPECIFICATION-STANDARD.md) §7); it narrows only the create
+contract and does not remove the two kinds from the type, events or policy allowlists.
+
 ProviderIdentity {
   provider_instance_id: string
   stable_object_id: string # stable opaque pseudonym, never a raw path or credential
@@ -2307,7 +2324,7 @@ ResourceUploadSession {
   expected_size_bytes: u64 # initial desktop Resource uploads are capped at 100 MiB
   expected_digest: Sha256Digest?
   chunk_size_bytes: u64 # local desktop currently negotiates fixed 4 MiB chunks
-  context_document?: ContextDocumentCreateMetadata # pinned only for initial Resource uploads
+  context_document?: ContextDocumentCreateMetadata # pinned only for initial Resource uploads; see ContextDocument create ownership below
   folder_import?: FolderImportMetadata # pinned only for initial one-time folder attachments
   state: ResourceUploadState
   received_ranges: UploadRange[]  # derived from immutable ResourceUploadChunk rows
@@ -2562,7 +2579,7 @@ and case-folded by the owning service using `NFC(NFC(trim(name)).casefold())`; t
 
 ## Accepted Coworker target additions (draft, not current SQLite)
 
-See [Coworker target](COWORKERS-TARGET.md), sections 8-9. An ordinary Conversation has NULL owner_coworker_id; a Coworker-owned Conversation pins one same-Workspace Coworker and cannot silently change owner. Last activity is an authoritative server-derived cursor/order projection. StandingResponsibility / Revision link existing Goal, Routine and Automation revisions to a Coworker, with immutable title/purpose/stop criteria, budgets, notification and approval policy. CoworkerCapabilityAssignment references a shared installed/connected capability with an independently revocable access ceiling. CoworkerMemoryPolicy defines eligible sources and quiet automatic-learning mode, while MemoryCandidate records source digest/receipt/reconciliation state and MemoryRecordMetadata extends Resource-backed ContextDocuments. Handoff between Coworkers creates a separate recipient Task/association, never inherited private context. These models are NOT yet in the canonical SQLite schema, and no live API or status claims may assume they exist until migrated and verified.
+See [Coworker target](COWORKERS-TARGET.md), sections 8-9. An ordinary Conversation has NULL owner_coworker_id; a Coworker-owned Conversation pins one same-Workspace Coworker and cannot silently change owner. Last activity is an authoritative server-derived cursor/order projection. StandingResponsibility / Revision link existing Goal, Routine and Automation revisions to a Coworker, with immutable title/purpose/stop criteria, budgets, notification and approval policy. CoworkerCapabilityAssignment references a shared installed/connected capability with an independently revocable access ceiling. CoworkerMemoryPolicy defines eligible sources and quiet automatic-learning mode, while the `LearningCandidate` record (the single candidate-lifecycle vocabulary selected by the PROPOSED owner resolution in [LEARNING.md](LEARNING.md), register A-34/A-20, superseding the earlier `MemoryCandidate` state set) records source digest/receipt/reconciliation state and MemoryRecordMetadata extends Resource-backed ContextDocuments with its own committed-record lifecycle. Handoff between Coworkers creates a separate recipient Task/association, never inherited private context. These models are NOT yet in the canonical SQLite schema, and no live API or status claims may assume they exist until migrated and verified.
 
 
 ## Accepted connector, workflow, learning, and follow-up target records

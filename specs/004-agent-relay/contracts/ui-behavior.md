@@ -1,5 +1,7 @@
 # UI behavior - Agent Relay on One Conversation
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs/V1-UI-SCREEN-CONTRACT.md). Control classes: [V1-SETTINGS-CONTRACT-LEDGER.md](../../../docs/V1-SETTINGS-CONTRACT-LEDGER.md) and [SEMANTIC-SERVED-UI-MAP.md](../../../docs/SEMANTIC-SERVED-UI-MAP.md). Action states: [V1-UI-ACTION-STATE-LEDGER.md](../../../docs/V1-UI-ACTION-STATE-LEDGER.md).
 
 ## Target flows and states
@@ -16,7 +18,7 @@ Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs
 
 - `ConversationsPage` displays the selected Conversation/Workspace binding picker and persists changes through the Tauri `set_conversation_agent_binding` command. The UI notice explicitly states that the change is for future turns and an already-running session keeps its current agent.
 - The current choice builder filters by same Workspace, enabled and lead-eligible. It does not filter by actual supervisor adapter support or descriptor/auth freshness. `conversation-agent-surface.ts` contains descriptor/auth logic with unit tests, but no production component imports or invokes it.
-- The backend message projection carries `agent_binding_id` and `agent_session_id`, but the desktop `ConversationMessageView` type omits both and `parseConversationSnapshot` reconstructs messages without them. The transcript cannot resolve or render a producer label; AC-005 is not implemented in the visible UI.
+- The backend message projection carries `agent_binding_id` and `agent_session_id`, and the Tauri bridge forwards them unchanged as JSON, but the desktop `ConversationMessageView` type (`apps/litecowork-ui/src/conversations/conversation-view.ts`) omits both and `parseConversationSnapshot` reconstructs messages without them (fixed by 004-T02). The transcript cannot resolve or render a producer label; AC-005 is not implemented in the visible UI.
 - The current composer `Add context or file` button has no click handler. There is no Resource attachment chooser or Context Used presentation in this flow.
 - The supervisor dispatches OpenCode only. The OpenCode profile probe marks its offer incompatible, preventing new binding creation from the current Agent Catalog UI. Codex profile probing exists but Codex has no Conversation supervisor branch. Thus there is no current selectable A→B→A flow.
 

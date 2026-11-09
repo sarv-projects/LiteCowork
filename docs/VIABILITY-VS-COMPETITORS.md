@@ -1,10 +1,12 @@
 # LiteCowork Viability vs Competitors (Local Desktop V1)
 
 **Status:** product viability assessment from **design authority** and **dated research** — not implementation proof  
-**Updated:** 2026-11-06
+**Updated:** 2026-11-08 (Phase 2 rival re-verification: Claude Code Desktop reconciled, Claude Duet + Rowboat + OpenLoomi added, RV-13/RV-14 allocated, stale pins corrected)
 **Scope:** compare **local desktop** capability intent to named rivals. **Cloud execution** (laptop-off continuation, hosted agent computers, multi-device sync) is **explicitly out of scope** for this parity table unless noted as V2.
 
 **Related:** [V1-PRODUCT-RELEASE-CONTRACT.md](V1-PRODUCT-RELEASE-CONTRACT.md), [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md), [COMPETITOR-PROMOTED-USE-CASES.md](COMPETITOR-PROMOTED-USE-CASES.md), [IMPLEMENTATION-MASTER-PLAN.md](IMPLEMENTATION-MASTER-PLAN.md).
+
+**Cross-cutting gap view:** for a single feature × {LiteCowork done? / doc-accuracy / each resolved rival has it?} matrix and the derived three-way gap lists, see the [superset gap matrix](SUPERSET-GAP-MATRIX.md). That view **reads** the verdicts and RV gates owned here; parity authority stays in this document and is not duplicated there.
 
 Legend:
 
@@ -23,7 +25,7 @@ Legend:
 | TARGET | Ordinary chat, BYO native agents, optional Coworkers, Tasks, Workbench, LiteSPM packages, Connections, automations, memory policy, library artifacts, settings/daemon |
 | PARTIAL | Organisation-style multi-agent projects, teach-to-skill, some doc formats, channel ingress |
 | DEFER-V2 | Cloud computer while asleep, cross-device chat sync, mobile/WhatsApp agents |
-| RESEARCH | LiteSPM wire, first harness tuple, browser/computer OS matrix, voice, OpenDot-style Dot Links |
+| RESEARCH | LiteSPM wire, first harness tuple, browser/computer OS matrix, voice, OpenDot-style Dot Links, local-vs-cloud schedule truth table (RV-13), Claude Duet co-edit (RV-14), Rowboat knowledge-graph, OpenLoomi screen-understanding |
 | NO | Universal model router, hidden second planner, duplicate package manager, fake served UI |
 
 ---
@@ -31,6 +33,8 @@ Legend:
 ## By competitor theme
 
 ### Grok Bot
+
+2026-11-08 note: xAI's Grok Bot app/marketplace layer now routes through `cursor.com/marketplace` (SpaceXSI/Cursor bundling). The external marketplace is evidence, not a LiteCowork capability.
 
 | Promoted capability | LiteCowork verdict | Authority / gap |
 |---|---|---|
@@ -44,6 +48,8 @@ Legend:
 | Connect-in-chat resume | **TARGET** | P5 + FLOWS |
 
 ### OpenAI dots / ChatGPT Plus / Work
+
+2026-11-08 note: the dots model family now includes **GPT-6.1 Terra** (a dot can draw on different models per subtask); primary evidence moved to [learn.chatgpt.com/docs/dots](https://learn.chatgpt.com/docs/dots). ChatGPT Work evidence likewise moved to learn.chatgpt.com (the old help.openai.com Work/Codex article 403s). Neither changes a LiteCowork verdict below; cloud continuation stays DEFER-V2.
 
 | Promoted capability | Verdict | Notes |
 |---|---|---|
@@ -64,6 +70,26 @@ Legend:
 | Long-running delegated projects | **TARGET** | Task runtime |
 | Scheduled Cowork | **TARGET** | P9 |
 | Cloud continue away from machine | **DEFER-V2** | Local-first V1 |
+
+### Claude Code Desktop (Code tab — distinct from Cowork)
+
+Reconciled 2026-11-08: the Code tab is a distinct desktop surface alongside chat and Cowork in one app ([COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md) §2026-11-08 Claude Code Desktop vs Cowork).
+
+| Promoted capability | Verdict | Notes |
+|---|---|---|
+| Session = own chat history + project folder; parallel sessions | **TARGET** | Conversation + Workspace scoping |
+| Per-session Git-worktree isolation | **TARGET** | ENVIRONMENTS §GitWorktree; per-run isolation is a desirable option (RV-13) |
+| Pane layout: chat/diff/browser/terminal/editor one shell, distinct authority | **TARGET** | Workbench three-pane; authority per pane |
+| Side chat reusing session context without derailing | **PARTIAL** | Maps to a scoped side-conversation; not locked |
+| Local vs cloud vs `/loop` scheduled tasks with honest machine/session columns | **TARGET (local)** / **DEFER-V2 (cloud)** | RV-13 truth table; local-first honesty |
+| Dispatch sessions from phone | **DEFER-V2** | Mobile ingress not first-class V1 |
+| SSH / cloud environment per session | **DEFER-V2** | RUNTIME-MESH V2 |
+
+### Claude Duet (tracked; source URL unresolved)
+
+| Promoted capability | Verdict | Notes |
+|---|---|---|
+| Synchronous human+Claude pair/duet co-edit | **RESEARCH** | RV-14; co-edit UX on a Conversation, not a new Task type; first-party URL unresolved 2026-11-08 |
 
 ### Kimi Work
 
@@ -110,6 +136,18 @@ Legend:
 | Typed Electron bridge | **TARGET** (pattern) | Tauri + Operator IPC |
 | CAMEL workforce orchestration | **NO** as authority | DELEGATION native lead |
 | OpenDots Slack/voice template | **RESEARCH** | CHANNELS post-V1 |
+
+### Rowboat / OpenLoomi (new local-first desktop coworkers, 2026-11-08)
+
+Both Apache-2.0, actively maintained; see [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md) §Rowboat / §OpenLoomi.
+
+| Promoted capability | Verdict | Notes |
+|---|---|---|
+| Rowboat: living knowledge-graph of your work as context | **RESEARCH** | Map to quiet scoped Memory + source-backed Knowledge; not an auto-indexing background crawler (RV-06/RV-12 area) |
+| Rowboat: email/notes/browser/code-mode/meeting-note surfaces in one app | **PARTIAL** | Workbench + Artifacts per-format; meeting-note taker is a magnetic use case, not V1-locked |
+| OpenLoomi: "surface only what needs your decision/action" attention/triage | **TARGET (UX)** | Direct parallel to Needs You projection; projection, not action authority |
+| OpenLoomi: screen-understanding + audio capture | **RESEARCH / NO as default** | Consent-gated only; never a default capability; privacy/permission owner required |
+| Both: Tauri+Rust (OpenLoomi) / on-machine desktop (Rowboat) local-first | **TARGET (pattern)** | Validates LiteCowork's local-first Tauri + daemon stack |
 
 ### ZCode / DeepSeek Harness (reference desktops)
 
@@ -186,6 +224,8 @@ This table is a research/design register. **LOCKED DESIGN** means an owner has c
 | RV-10 | Stop/update drain with Effect reconciliation | Target: bounded shutdown drain, admission stop, effect reconciliation and explicit UNKNOWN outcomes. Confirm the exact handler/process behavior for each daemon shutdown path before claiming a 60-second guarantee. | **TARGET; not fully qualified** — [RUNTIME-LIFECYCLE.md](RUNTIME-LIFECYCLE.md), [FAILURE-RECOVERY.md](FAILURE-RECOVERY.md) |
 | RV-11 | Interactive Artifact OS isolation profile | Target: dedicated isolated execution context with bounded IPC and no host filesystem/network authority. CSP alone is not an isolation boundary; current full interactive Artifact runtime is not release-qualified. | **TARGET; not qualified** — [INTERACTIVE-ARTIFACT-RUNTIME.md](INTERACTIVE-ARTIFACT-RUNTIME.md), [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) |
 | RV-12 | Coworker ADR-0024 schema/API | Optional Coworker aggregate with scoped instructions, pinned default AgentBinding, dedicated ContextAttachments, and per-Coworker audit ledger. Current Coworker CRUD/revision/primary records exist, but scoped learning, Coworker-owned Conversation and responsibility execution are not fully integrated. | **TARGET / PARTIAL CODE; NOT QUALIFIED** — [COWORKERS-TARGET.md](COWORKERS-TARGET.md), ADR-0024, [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) |
+| RV-13 | Local-vs-cloud scheduled-task truth table (Claude Code Desktop benchmark) | Target: the TriggerHost/Occurrence surface must expose, per scheduled task, whether it needs the machine awake, needs an open session, and has local-file access — exactly the honest columns Claude Code Desktop shows for Local vs Cloud vs `/loop`. A local V1 task never claims laptop-off continuation; per-run Git-worktree isolation is a desirable Environment option. | **TARGET; not qualified** — [AUTOMATION.md](AUTOMATION.md), [ENVIRONMENTS.md](ENVIRONMENTS.md), [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md) §2026-11-08 Claude Code Desktop |
+| RV-14 | Claude Duet synchronous co-edit surface | Research: Claude Duet is tracked as a distinct Anthropic human+Claude pair/duet surface, but no stable first-party product URL resolved on 2026-11-08 (claude.com/product/duet and anthropic.com/news/claude-duet 404). Map a synchronous co-edit / take-control UX onto an ordinary Conversation; do not create a new durable-Task type or cite a Duet capability as fact until a dated first-party page is pinned. The co-edit / take-control UX is now authored as the DRAFT feature package [specs/012-conversation-coedit-take-control](../specs/012-conversation-coedit-take-control/SPEC.md) (owner decision B-34, PROPOSED). | **RESEARCH; source URL unresolved** — [COMPETITIVE-RESEARCH.md](COMPETITIVE-RESEARCH.md) §Claude Duet (2026-11-08), [specs/012](../specs/012-conversation-coedit-take-control/README.md) |
 
 ---
 

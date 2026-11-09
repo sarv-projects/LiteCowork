@@ -1088,7 +1088,13 @@ Artifact reference becomes visible. Expired temporary chunks are garbage-collect
   Task once and then becomes immutable. No AutomationOccurrence or AutomationCursor is
   written, and the database triggers refuse a test Task that also carries occurrence
   provenance or points at an unlinked reservation with different Workspace/Routine pins.
-- migration 28 adds immutable `workspace_delegation_settings_revisions`, the Workspace
+- migration 28 is **defined but not yet wired** (register A-40): `schemas/sqlite-v28.sql`
+  exists, but `crates/storage-sqlite/src/lib.rs` keeps `SCHEMA_VERSION = 27` and includes
+  migrations only through `sqlite-v27.sql`, so v28 never applies and a database already at
+  `user_version` 28 is rejected as unsupported. Until v28 is wired (`include_str!` plus
+  `SCHEMA_VERSION = 28`), the delegation-settings persistence it describes does not exist
+  and the delegation-settings route family remains target-only. The target shape, when
+  wired, adds immutable `workspace_delegation_settings_revisions`, the Workspace
   settings head, Coworker `delegation_policy_source`, exact per-profile
   `worker_model_selection_policy`, and nullable `task_spec_revisions.delegation_policy_snapshot_json`.
   Existing Workspaces receive deterministic revision 1 with `NATIVE_DEFAULT` and
@@ -1098,16 +1104,16 @@ Artifact reference becomes visible. Expired temporary chunks are garbage-collect
   and profile IDs. Legacy TaskSpec rows stay NULL; no past policy is invented. New Task
   admissions and new TaskSpec revisions must write a server-resolved immutable snapshot
   and a matching `task.delegation.policy.pinned.v1` event. The migration does not append
-  fabricated user-authored setting events or change active Attempts. Its source is
-  `schemas/sqlite-v28.sql`.
+  fabricated user-authored setting events or change active Attempts. Its source file is
+  `schemas/sqlite-v28.sql`, which remains unwired per the note above.
 - each applied migration records a SHA-256 checksum of its exact embedded SQL bytes and
   the schema-object fingerprint at that migration boundary. Reopening verifies every
   recorded migration name/source checksum and compares the active schema version's
   fingerprint with the current non-internal `sqlite_master` objects; historical
   fingerprints are retained because later migrations intentionally add schema objects.
-  The current schema version is 28, so the v28 fingerprint is checked against the full
-  current schema. Missing migration records, changed source checksums, or changed current
-  schema fail closed.
+  The current wired schema version is 27, so the v27 fingerprint is checked against the full
+  current schema; v28 is not yet applied (register A-40). Missing migration records, changed
+  source checksums, or changed current schema fail closed.
 - a clean install applies migration 1, writes its migration row, and advances
   `PRAGMA user_version` in one transaction. A crash leaves either the old schema/version
   or the complete new schema/version.

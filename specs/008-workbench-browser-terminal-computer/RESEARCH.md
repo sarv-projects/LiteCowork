@@ -1,6 +1,7 @@
 # Research - Workbench Browser Terminal and Computer
 
-**Feature:** 008 | **Checked:** 2026-11-06 (active source, route composition, Tauri bridge and visible Workbench UI)
+**Feature:** 008 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Checked:** 2026-11-06 (active source, route composition, Tauri bridge and visible Workbench UI); re-checked 2026-11-09 for register A-51 (see SPEC §4).
 
 ## Sources inspected
 
@@ -8,6 +9,17 @@
 - Daemon: `apps/litecoworkd/src/main.rs`, `browser_consent.rs`, `browser_control_service.rs`, `environment_computer_use.rs`, `environment_action_batch.rs`, `environment_provider.rs`, `environment_isolation.rs`, `operator.rs` and the composed `docs/schemas/served-route-inventory.json`.
 - Desktop UI/native bridge: `apps/litecowork-ui/src/workbench/WorkbenchPanel.tsx`, `workbench-panel.css`, `apps/litecowork-ui/src/App.tsx`, `apps/litecowork-ui/src-tauri/src/lib.rs`, Tauri source modules and generated `operator-api.ts`.
 - Containment primitives: `crates/windows-local-security`, process-scope and environment crates. Search for ConPTY/PTY providers, terminal spawn/session routes and provider consumers was run across `apps/` and `crates/`.
+
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs this feature | Verdict |
+|---|---|---|---|---|
+| OpenHands shell + engine command receipts (`OpenHands/OpenHands` + `OpenHands/software-agent-sdk`) | https://github.com/OpenHands/OpenHands/tree/22e3057c89b2e5245a5a36fd9c48e52c8a984ba4 and https://github.com/OpenHands/software-agent-sdk/tree/f19fb2cf6a7f38266c6be954e91a9ef2a360bf9f | MIT at checked root LICENSE in both | B-23 terminal command-receipt doctrine: ordered `BashOutput{command_id, order, exit_code}` persisted before publication; timeout as a terminal receipt (`exit_code=-1`) rather than a silent kill; model-visible `[Command finished with exit code N]`; duplicate/unknown receipt never reported as success. Directly replaces the fabricated "exit code 0" defect. | PROTOTYPE the receipt shape and timeout-as-receipt doctrine against V1-INTEGRATED-TERMINAL-LLD; LiteCowork keeps daemon-owned PTY/ConPTY authority. No code copied; the existing PROPOSAL section below carries file:line citations. |
+| DeepSeek Harness quit-drain + typed IPC (`deepseek-ai/deepseek-harness`) | https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159 | MIT at checked root | Typed IPC with sender assertion and the quit-with-active-work UNKNOWN UX inform the honest close/stop/crash evidence (AC-010) for a terminal process and the operator boundary for browser/terminal commands. | PROTOTYPE the quit-drain and typed-IPC/sender-assert pattern against RUNTIME-LIFECYCLE; do not vendor the Electron host. |
+| browser-use browser-harness daemon/helpers/_ipc/admin (`browser-use/browser-harness`) | https://github.com/browser-use/browser-harness/tree/a6426f846fc59d16f38cf66f79176bc7793c16b6 | MIT at checked root | The `{daemon, helpers, _ipc, admin}` structure is a reference for a managed browser gateway boundary (B-22): a separate provider process behind a typed IPC with an admin surface, distinct from the visible-surface adapter. | PROTOTYPE the gateway/daemon boundary only. ADAPTER RULE: ambient-CDP discovery and default-profile copy are DISABLED in LiteCowork; raw attached-Chrome access is not a qualified capability. |
+| browser-use dom/serializer + recording watchdog (`browser-use/browser-use`) | https://github.com/browser-use/browser-use/tree/ccd22fef47a1a36e0c4596fef5db73a5117b9d06 (`dom/serializer`, `watchdogs/recording_watchdog.py`) | MIT at checked root | Bounded DOM/accessibility serialization and a screencast/recording lifecycle inform how `OBSERVATION_FRAMES` and DOM observations should be bounded and treated as untrusted input (AC-008/AC-012). | PROTOTYPE bounded serialization and the recording lifecycle. ADAPTER RULE: do not adopt default-profile copying, storage-state cookie handling, ambient CDP attachment, the model loop, or unfiltered logging. |
+
+No OpenHands, DeepSeek Harness or browser-use code is imported; all are read at the pinned SHAs. The managed browser provider uses an isolated LiteCowork profile; ambient-CDP discovery and profile-copy stay DISABLED. OpenBot (PolyForm Noncommercial) is not cited here and would be reference/UX only with no code reuse if it were.
 
 ## Composed route and provider findings
 
@@ -44,9 +56,17 @@
 - Preserve fake terminal success for design polish: rejected. Unsupported or unavailable must be visible, and arbitrary commands must never return fabricated exit code 0.
 - Build a separate browser/terminal security engine in the UI: rejected. Provider processes and actions belong behind daemon/Environment/Trust owners.
 
-## Unresolved decisions
+## Decisions (accepted 2026-11-09)
 
-See SPEC §5 blockers B-22 (exact browser provider/mode and real session surface), B-23 (exact PTY/ConPTY provider, shell profile and Environment/process lifecycle), and B-32 (include or defer Computer use and exact OS provider/permission contract).
+SPEC §5 blockers B-22 (`MANAGED_CHROMIUM`, isolated profile), B-23 (daemon-owned PTY/ConPTY under an admitted Environment; Linux row first, Windows UNAVAILABLE until Feature 005 B-35) and B-32 (Computer deferred, UNAVAILABLE) are owner-accepted. The Workbench React findings above predate A-51 for the Terminal, Diffs and Browser default; SPEC §4 records the 2026-11-09 source state.
+
+## Implementation language and reuse notes (2026-11-09)
+
+- Diffs: `apps/litecowork-ui/src/artifacts/text-version-diff-model.ts` `lineDiff` is a bounded O(n x m) LCS table (`Uint16Array` rows) run on the UI thread. It is adequate for small Artifact previews. For Workbench exact-revision and VCS diffs, compute in the Rust daemon with a Myers/histogram algorithm (for example the `similar` crate, license to be checked at T15) under the same line/byte bounds, and send rows to the UI. This keeps untrusted revision bytes off the WebView thread and makes counts authoritative.
+- PTY: Linux `openpty` is available through `rustix` (already a `litecoworkd` dependency with `fs`/`process` features; the `pty` feature must be added). Windows ConPTY uses `windows-sys` `CreatePseudoConsole` in `crates/windows-local-security`, which already has `spawn_kill_on_drop_job`, `kill_tree` and `wait_for_job_quiescence`. Prefer these over adding `portable-pty`, so containment receipts stay in one crate.
+- Browser: REF-BROWSER-HARNESS is Python with pinned CDP dependencies. Do not ship a Python runtime inside the daemon for V1; implement the allowlisted CDP session in Rust (`tokio` WebSocket client) and reuse only the harness mechanics as reference. The existing Rust policy modules `browser_consent.rs` and `browser_control_service.rs` become the admission layer.
+- Terminal rendering stays in TypeScript (a terminal emulator component in the WebView); scrollback ring buffer, backpressure and receipts live in Rust.
+- `WorkbenchPanel.tsx` (608 lines) mixes five views; split per view and lazy-load Browser and Terminal panes so the unavailable path costs no bundle weight.
 
 ## Upstream reference: OpenHands command receipts and terminal observations — PROPOSAL (2026-11-06)
 

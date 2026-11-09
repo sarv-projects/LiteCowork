@@ -1,0 +1,149 @@
+feature_id: "016"
+name: "Rich Presentation, Intelligent UI and Generated Media"
+status: "IN_REVIEW"
+spec_revision: "0.1"
+notes: "Edges are TARGET unless marked existing. Served today: rich presentation and Conversation presentation reads, stream. No production publisher, no media ingestion, no Interactive Artifact Runtime."
+nodes:
+  - id: "session-supervisor"
+    owner: "AgentSessionSupervisor (Feature 001)"
+    kind: "runtime supervisor"
+    responsibility: "Final semantic text commit; hands harness file outputs to media ingestion"
+    inputs: ["native observations"]
+    outputs: ["committed AGENT message", "harness file paths"]
+  - id: "presentation-binder"
+    owner: "PresentationBinder"
+    kind: "daemon service"
+    responsibility: "Derive a RichPresentation from committed semantic text and validated PresentationIntent after commit"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["committed AGENT message"]
+    outputs: ["candidate document"]
+  - id: "presentation-validator"
+    owner: "domain-presentation crate"
+    kind: "pure library"
+    responsibility: "Bounds, V1 allowlist, canonical bytes, digests, slice bindings, chart bindings, CalcAst"
+    implementation_status: "PARTIAL: checks exist inside storage-sqlite rich_presentations.rs for two kinds"
+    inputs: ["document bytes", "semantic context"]
+    outputs: ["validated document or typed rejection"]
+  - id: "presentation-store"
+    owner: "RichPresentationStore (Storage)"
+    kind: "transaction boundary"
+    responsibility: "Publish, idempotent replay, reads"
+    inputs: ["validated document"]
+    outputs: ["committed presentation"]
+  - id: "media-ingestion"
+    owner: "MediaIngestionService"
+    kind: "daemon service"
+    responsibility: "Sniff, bound and hash harness image files; request Artifact create"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["admitted Workspace file path"]
+    outputs: ["blob", "Artifact create request"]
+  - id: "artifact-service"
+    owner: "Feature 007 Artifact create"
+    kind: "external feature service"
+    responsibility: "Atomic Artifact and ArtifactVersion create with provenance and Conversation association"
+    inputs: ["create request"]
+    outputs: ["Artifact version"]
+  - id: "presentation-operator"
+    owner: "Presentation Operator"
+    kind: "authenticated boundary"
+    responsibility: "GET /v1/rich-presentations/{presentation_id}, GET /v1/conversations/{conversation_id}/presentation, POST /v1/stream (existing)"
+    inputs: ["IPC request"]
+    outputs: ["authorized projection"]
+  - id: "conversation-bridge"
+    owner: "Tauri conversation_bridge"
+    kind: "IPC client"
+    responsibility: "get_rich_presentation with valid_rich_presentation_response (existing)"
+    inputs: ["UI request"]
+    outputs: ["envelope"]
+  - id: "desktop-validator"
+    owner: "rich-presentation.ts"
+    kind: "component"
+    responsibility: "Defensive re-validation mirroring the Rust validator; fallback decision"
+    inputs: ["envelope", "semantic text", "preference"]
+    outputs: ["validated presentation or null"]
+  - id: "rich-view"
+    owner: "Desktop UI"
+    kind: "component"
+    responsibility: "RichResponseView, ChartBlock, SafeCalculatorBlock, semantic fallback, accessibility"
+    inputs: ["validated presentation", "semantic text"]
+    outputs: ["rendered view (no host commands)"]
+  - id: "artifact-workbench"
+    owner: "Desktop UI (Artifacts)"
+    kind: "component"
+    responsibility: "Image Artifact view; interactive Artifact inert PREVIEW_ONLY"
+    inputs: ["Artifact projection"]
+    outputs: ["rendered view"]
+edges:
+  - id: "e-supervisor-binder"
+    from: "session-supervisor"
+    to: "presentation-binder"
+    kind: "after-commit call"
+  - id: "e-binder-validator"
+    from: "presentation-binder"
+    to: "presentation-validator"
+    kind: "validate"
+  - id: "e-binder-store"
+    from: "presentation-binder"
+    to: "presentation-store"
+    kind: "publish"
+  - id: "e-store-validator"
+    from: "presentation-store"
+    to: "presentation-validator"
+    kind: "validate inside publish before insert (pure, no I/O)"
+  - id: "e-supervisor-media"
+    from: "session-supervisor"
+    to: "media-ingestion"
+    kind: "harness file output"
+  - id: "e-media-artifact"
+    from: "media-ingestion"
+    to: "artifact-service"
+    kind: "create Artifact version"
+  - id: "e-store-operator"
+    from: "presentation-store"
+    to: "presentation-operator"
+    kind: "read"
+  - id: "e-operator-bridge"
+    from: "presentation-operator"
+    to: "conversation-bridge"
+    kind: "authenticated IPC response"
+  - id: "e-bridge-desktop-validator"
+    from: "conversation-bridge"
+    to: "desktop-validator"
+    kind: "envelope"
+  - id: "e-desktop-validator-view"
+    from: "desktop-validator"
+    to: "rich-view"
+    kind: "validated presentation or fallback"
+  - id: "e-artifact-workbench"
+    from: "artifact-service"
+    to: "artifact-workbench"
+    kind: "Artifact projection (via Feature 007 routes)"
+transactions:
+  - id: "tx-publish-presentation"
+    owner: "RichPresentationStore"
+    atomic_records: ["rich_presentations row", "blob reference", "rich.presentation.published.v1", "idempotency receipt"]
+    external_calls_inside: false
+  - id: "tx-record-rejection"
+    owner: "PresentationBinder via Storage"
+    atomic_records: ["rich.presentation.rejected.v1"]
+    external_calls_inside: false
+  - id: "tx-media-artifact-create"
+    owner: "Feature 007 Artifact create"
+    atomic_records: ["Artifact", "ArtifactVersion with provenance", "Conversation association", "artifact created event", "idempotency receipt"]
+    external_calls_inside: false
+external_boundaries:
+  - id: "harness-semantic-output"
+    owner: "AgentSessionSupervisor"
+    input_trust: "untrusted"
+    timeout: "turn-bounded (Feature 001)"
+    retry: "binder failure never retries the turn"
+  - id: "harness-file-output"
+    owner: "MediaIngestionService"
+    input_trust: "untrusted"
+    timeout: "bounded read of at most 20 MiB"
+    retry: "none; a rejected file stays a rejection"
+  - id: "webview-render"
+    owner: "Desktop UI"
+    input_trust: "validated data only"
+    timeout: "render budget 100 ms per main-thread task"
+    retry: "fallback to semantic text"

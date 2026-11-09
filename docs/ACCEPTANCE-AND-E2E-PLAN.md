@@ -53,10 +53,16 @@ Never translate a unit pass, mocked UI, schema, catalog row, successful process 
 | E2E-10 | Scheduled and event Automation → occurrence → Task → notification | Exactly-once occurrence identity, timezone/misfire handling, recovery and truthful delivery |
 | E2E-11 | Rich UI response with presentation disabled | Semantic message remains complete; rendered controls cannot forge or settle host state |
 | E2E-12 | Backup/export → restore/import → inspect provenance | Data integrity, secret exclusion, tombstone and evidence preservation |
+| E2E-14 (proposed, Feature 014) | Search Conversations → rename → archive → unarchive → delete one Conversation → restart | Search hits only ACTIVE/ARCHIVED rows; delete tombstones then purges under a fence; retrieval, context and memory fences exclude the deleted Conversation after restart |
+| E2E-15 (proposed, Feature 015) | Running Task → steer → pause → resume → OpenCode lead delegates one Step to Claude Code → independent verification → cancel fan-out | Typed control requests and receipts; child Attempt admitted under allowlist and budget; late results fenced; Linux row first, Windows after B-35 |
+| E2E-16 (proposed, Feature 018) | Turn settles → Usage shows provider-reported or ESTIMATED_LOCAL counts → crash daemon → write support bundle from preview | No fabricated zero usage; crash record present after restart; bundle contains only allowlisted, redacted categories |
+| E2E-17 (proposed, Feature 020) | Coworker chat → "Remember this" → Remembered notice → correct → revoke → restart | Candidate lifecycle follows LearningCandidate; only eligible CONFIRMED private memories auto-commit; revoked memory excluded from retrieval after restart |
+
+E2E-14..E2E-17 were proposed on 2026-11-09 with packages 014, 015, 018 and 020. They stay proposed until those packages are accepted.
 
 ### Optional future extension — external WorkflowBackend adapter (not a current V1 release gate)
 
-Do not run or report this journey as available until an owner has promoted Feature 010 T05,
+Do not run or report this journey as available until an owner has promoted Feature 010 T18,
 Feature 005 Task/Attempt admission, Feature 006 CapabilityInvocation/Connection integration,
 and a provider-specific adapter. Provider-native AI builders used directly in n8n/Activepieces
 are external-provider functionality and do not constitute this LiteCowork E2E.
@@ -65,7 +71,7 @@ are external-provider functionality and do not constitute this LiteCowork E2E.
 |---|---|---|
 | E2E-13 (conditional) | Connect a user-owned workflow provider → choose one explicitly MCP-exposed workflow → inspect provider/version/scopes → validate pinned Routine inputs → run one bounded provider workflow inside a LiteCowork Task → inspect/reconcile result → revoke Connection | Exact provider/instance/version and exposed workflow set; least-privilege read/build/run scope; Task/CapabilityInvocation/Effect receipt; timeout-after-dispatch and duplicate replay reconcile the same provider run; provider node states remain external observations; revoked scope blocks later calls; independent Task acceptance is not inferred from provider test/success status |
 
-For a later direct LiteCowork-agent authoring extension (010-T06, deferred and not authorized),
+For a later direct LiteCowork-agent authoring extension (010-T19, deferred and not authorized),
 add a separate journey proving read/list versus draft/mutate versus validate/test versus
 publish/activate versus production-run versus delete permissions. Bind the owner approval to
 the exact provider graph digest/revision, scope/effect summary and operation. Test stale

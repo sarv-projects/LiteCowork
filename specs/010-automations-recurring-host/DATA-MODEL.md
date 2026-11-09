@@ -1,6 +1,6 @@
 # Data model - Automations and Recurring Host
 
-**Feature:** 010 | **Status:** DRAFT
+**Feature:** 010 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 Identities and lifecycles stay in the canonical owner documents. This file lists the records this slice reads or commits. It does not authorize new tables by itself.
 
@@ -29,7 +29,7 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-None in this revision. Blockers in SPEC section 5 must be closed before a migration is designed.
+No migration has shipped for this package yet. B-26 and B-27 are accepted (2026-11-09); the delivery lease/status transition columns, SUPPRESSED delivery rows and the event-trigger cursor land as the next immutable `docs/schemas/sqlite-vNN.sql` through TASKS.md T01, T06, T07 and T09.
 
 
 ## External workflow references (provider-owned)

@@ -1,6 +1,6 @@
 # Data model - Safe Task Path
 
-**Feature:** 005 | **Status:** DRAFT
+**Feature:** 005 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 Identities and lifecycles stay in the canonical owner documents. This file lists the records this slice reads or commits. It does not authorize new tables by itself.
 
@@ -29,7 +29,7 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-None in this revision. Blockers in SPEC section 5 must be closed before a migration is designed.
+None shipped yet. B-17 and B-18 are accepted, so task T01 designs one forward-only migration for the file-write grant, the Attempt-to-Environment link and the attestation digest reference (no host paths, no native handles). Conversation-origin Tasks reuse the existing `task_spec_revisions.source_message_refs_json` column and the Task `conversation_id`; storage currently refuses them in `validate_task_create_commit`.
 
 ## Current implementation boundary (2026-11-06)
 

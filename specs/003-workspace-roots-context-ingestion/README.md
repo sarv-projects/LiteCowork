@@ -1,8 +1,10 @@
 # 003 - Workspace Roots and Context Ingestion
 
-**Status:** DRAFT - review required; does not authorize implementation.
-**Revision:** 0.2 | **Updated:** 2026-11-06
-**Owners to approve:** Resource, Conversation, Storage, Security/Trust, Desktop UI.
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Revision:** 1.0 | **Updated:** 2026-11-09
+**Owners:** Resource, Conversation, Storage, Security/Trust, Desktop UI.
+**Owner acceptance:** repository owner (sarv-projects), 2026-11-09, via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). B-13 (UTF-8 lexical text set first) and B-14 (manual rescan, no V1 watcher) are accepted.
+**Release target:** V1 release matrix rows Windows 11/10 `x86_64-pc-windows-msvc` with OpenCode v2.0.32 first; Linux x86_64 desktop second.
 
 ## User outcome
 
@@ -10,7 +12,7 @@ The owner attaches a folder as a persistent WorkspaceRoot, asks a grounded quest
 
 ## Current truth
 
-The active checkout contains the Rust daemon, Tauri desktop application and shared crates. This package remains DRAFT and does not authorize implementation until owner decisions and supporting contracts are accepted. Its current implementation boundary is mapped in docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
+The active checkout contains the Rust daemon, Tauri desktop application and shared crates. Owner acceptance authorizes implementation of this package; it does not change what the code does. Today Windows root add returns 503 (`create_workspace_root_from_native_selection` fallback in `apps/litecoworkd/src/operator.rs`), scan returns 501 `SCAN_UNSUPPORTED_PLATFORM` on every non-Linux target (`apps/litecoworkd/src/workspace_root_scan_operator.rs`), grounded retrieval (`apps/litecoworkd/src/rag_retrieval_operator.rs`) is not called by Send and writes no receipt, there is no persisted ContextAttachment, and the composer sends `resourceRefs: []`. The implementation boundary is mapped in SPEC.md §4 and docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
 
 ## Package
 
@@ -21,6 +23,10 @@ The active checkout contains the Rust daemon, Tauri desktop application and shar
 - [RESEARCH.md](RESEARCH.md)
 - [WIRING.yaml](WIRING.yaml)
 - [contracts/](contracts/README.md)
+
+## Dependencies
+
+Feature 001 owns Send, the composer and ResourceRef materialization (B-08); this package owns WorkspaceRoots, ContextAttachments, retrieval receipts, Context Used and the ResourceRef picker it surfaces in the 001 composer. Feature 011 owns the Tauri shell and the Windows named-pipe Operator IPC. Feature 014 consumes the retrieval fences on Conversation delete.
 
 ## Canonical owners
 

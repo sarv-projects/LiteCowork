@@ -1,0 +1,260 @@
+feature_id: "020"
+name: "Proactivity and Quiet Learning"
+status: "IN_REVIEW"
+spec_revision: "0.1"
+notes: "Suggestion routes, Goals and Needs You are SERVED today; producers, propose, learning storage/service/routes/UI are TARGET. No edge marked here is qualified."
+nodes:
+  - id: "ideas-ui"
+    owner: "Desktop UI"
+    kind: "component"
+    responsibility: "SuggestionsPage (Ideas), Home prominent idea slot, preference mute"
+    implementation_status: "CODE for Ideas page; Home limit and quiet-hours behavior TARGET"
+    inputs: ["Suggestion projection", "owner action"]
+    outputs: ["typed Tauri commands"]
+  - id: "learning-ui"
+    owner: "Desktop UI"
+    kind: "component"
+    responsibility: "Learning review list, Remembered notice with View/Undo/Correct, Remember this action, policy control, memory list"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["candidate and memory projections"]
+    outputs: ["typed Tauri commands"]
+  - id: "goals-needs-you-ui"
+    owner: "Desktop UI"
+    kind: "component"
+    responsibility: "GoalsPage and TaskAttentionPage"
+    implementation_status: "CODE"
+    inputs: ["Goal and Needs You projections"]
+    outputs: ["goal_request", "list_needs_you"]
+  - id: "suggestions-bridge"
+    owner: "Desktop Shell"
+    kind: "Tauri commands"
+    responsibility: "list_suggestions, suggestion_owner_action, accept_suggestion_task, list/set preferences"
+    implementation_status: "CODE"
+    inputs: ["ideas-ui"]
+    outputs: ["authenticated Operator requests"]
+  - id: "learning-bridge"
+    owner: "Desktop Shell"
+    kind: "Tauri commands"
+    responsibility: "Candidate list/approve/dismiss, policy read/revise, memory list/revoke, message feedback"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["learning-ui"]
+    outputs: ["authenticated Operator requests"]
+  - id: "operator"
+    owner: "litecoworkd Operator"
+    kind: "authenticated boundary"
+    responsibility: "Auth, Workspace and Coworker scope, Idempotency-Key, If-Match, no-store"
+    inputs: ["bridge requests"]
+    outputs: ["service commands", "projections"]
+  - id: "suggestion-service"
+    owner: "SuggestionService (domain-responsibility)"
+    kind: "domain service"
+    responsibility: "propose (TARGET), settle_expired, owner_action, preferences (CODE)"
+    inputs: ["owner commands", "producer candidates"]
+    outputs: ["storage commands"]
+  - id: "producer-worker"
+    owner: "litecoworkd"
+    kind: "bounded worker"
+    responsibility: "Reads event journal after cursor; runs registered producers; calls propose; advances cursor"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["committed events"]
+    outputs: ["SuggestionCandidate"]
+  - id: "producers"
+    owner: "Responsibility"
+    kind: "deterministic rules"
+    responsibility: "GOAL_NEXT_STEP, REPEATED_TASK (D-01)"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["committed Goal and Task state"]
+    outputs: ["candidates, never rows"]
+  - id: "quiet-hours"
+    owner: "Feature 010"
+    kind: "domain contract"
+    responsibility: "QuietHours::contains over notification_preferences.quiet_hours_json; notification delivery"
+    implementation_status: "CODE for parse/contains; new event classes TARGET"
+    inputs: ["Workspace", "clock"]
+    outputs: ["in-window verdict"]
+  - id: "learning-worker"
+    owner: "litecoworkd"
+    kind: "bounded worker"
+    responsibility: "Claims learning work items after turn settlement; calls classifier and LearningService"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["settled turn", "owner feedback"]
+    outputs: ["service calls"]
+  - id: "learning-classifier"
+    owner: "Agent Runtime adapter"
+    kind: "port"
+    responsibility: "Optional extractor; output is MODEL_OUTPUT"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["owner message view"]
+    outputs: ["ProposedMemory list"]
+  - id: "learning-service"
+    owner: "LearningService (domain-responsibility)"
+    kind: "domain service"
+    responsibility: "Candidate lifecycle, gate evaluation, in-transaction recheck, commit, review, revoke, policy"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["owner commands", "worker items"]
+    outputs: ["storage commands", "Resource writes"]
+  - id: "learning-gates"
+    owner: "Responsibility"
+    kind: "pure functions"
+    responsibility: "evaluate_learning_candidate, classify_learning_conflict, redact_sensitive_content, learning_candidate_event_payload"
+    implementation_status: "CODE, no caller; defects fixed by T03"
+    inputs: ["candidate", "context"]
+    outputs: ["LearningEvaluation"]
+  - id: "resource-service"
+    owner: "Feature 003 / Feature 009"
+    kind: "domain service"
+    responsibility: "Payload, redaction report and Coworker-scoped memory ContextDocument revisions; purge"
+    inputs: ["bounded bodies"]
+    outputs: ["ResourceRef"]
+  - id: "sqlite-store"
+    owner: "Storage"
+    kind: "transaction boundary"
+    responsibility: "suggestions, preferences, learning tables, cursors, events, receipts"
+    inputs: ["typed storage commands"]
+    outputs: ["committed results"]
+  - id: "goal-needs-you-operator"
+    owner: "litecoworkd Operator"
+    kind: "served routes"
+    responsibility: "goal_operator.rs and needs_you_operator.rs"
+    implementation_status: "SERVED"
+    inputs: ["bridge requests"]
+    outputs: ["Goal projections", "Needs You page"]
+edges:
+  - id: "e01"
+    from: "ideas-ui"
+    to: "suggestions-bridge"
+    kind: "Tauri command"
+    contract: "suggestions_bridge.rs commands"
+  - id: "e02"
+    from: "suggestions-bridge"
+    to: "operator"
+    kind: "authenticated-request"
+    contract: "GET /v1/suggestions; POST .../resolve, /accept-task, /snooze; preferences"
+  - id: "e03"
+    from: "operator"
+    to: "suggestion-service"
+    kind: "command"
+    contract: "owner actions and listing"
+  - id: "e04"
+    from: "suggestion-service"
+    to: "sqlite-store"
+    kind: "transaction"
+    contract: "expiry, owner action, preference, acceptance, propose (TARGET)"
+  - id: "e05"
+    from: "producer-worker"
+    to: "producers"
+    kind: "call"
+    contract: "SuggestionProducer::on_event"
+  - id: "e06"
+    from: "producer-worker"
+    to: "suggestion-service"
+    kind: "command"
+    contract: "SuggestionService::propose"
+  - id: "e07"
+    from: "suggestion-service"
+    to: "quiet-hours"
+    kind: "read"
+    contract: "push_eligible projection flag"
+  - id: "e08"
+    from: "learning-ui"
+    to: "learning-bridge"
+    kind: "Tauri command"
+    contract: "learning_bridge.rs commands (TARGET)"
+  - id: "e09"
+    from: "learning-bridge"
+    to: "operator"
+    kind: "authenticated-request"
+    contract: "LEARNING section 18 routes (TARGET)"
+  - id: "e10"
+    from: "operator"
+    to: "learning-service"
+    kind: "command"
+    contract: "approve, dismiss, revoke, revise policy, record owner action"
+  - id: "e11"
+    from: "learning-worker"
+    to: "learning-classifier"
+    kind: "external call"
+    contract: "bounded, rate-limited, outside any transaction"
+  - id: "e12"
+    from: "learning-worker"
+    to: "learning-service"
+    kind: "command"
+    contract: "observe_settled_turn, evaluate_and_settle"
+  - id: "e13"
+    from: "learning-service"
+    to: "learning-gates"
+    kind: "call"
+    contract: "evaluate_learning_candidate"
+  - id: "e14"
+    from: "learning-service"
+    to: "resource-service"
+    kind: "command"
+    contract: "payload and redaction report revisions before candidate insert"
+  - id: "e15"
+    from: "learning-service"
+    to: "sqlite-store"
+    kind: "transaction"
+    contract: "candidate insert; commit with recheck; revoke; policy revision"
+  - id: "e16"
+    from: "learning-service"
+    to: "quiet-hours"
+    kind: "read"
+    contract: "notice eligibility"
+  - id: "e17"
+    from: "goals-needs-you-ui"
+    to: "goal-needs-you-operator"
+    kind: "authenticated-request"
+    contract: "goal_bridge::goal_request, needs_you_bridge::list_needs_you"
+  - id: "e18"
+    from: "goal-needs-you-operator"
+    to: "sqlite-store"
+    kind: "transaction"
+    contract: "Goal revisions; Needs You read"
+transactions:
+  - id: "tx-suggestion-propose"
+    owner: "SqliteSuggestionStore"
+    atomic_records: ["PROPOSED Suggestion", "suggestion.proposed.v1", "producer receipt", "snapshot"]
+    external_calls_inside: false
+    note: "Mute, cooldown, dedupe, budget, scope and source checks inside; suppression writes nothing"
+  - id: "tx-suggestion-task-acceptance"
+    owner: "SqliteWorkspaceStore (existing)"
+    atomic_records: ["READY Task", "ACCEPTED Suggestion", "suggestion.resolved.v1", "acceptance receipt"]
+    external_calls_inside: false
+  - id: "tx-preference-mute"
+    owner: "SqliteSuggestionStore (existing)"
+    atomic_records: ["SuggestionPreference", "suggestion.preference.changed.v1", "MUTED_KIND resolutions", "receipt"]
+    external_calls_inside: false
+  - id: "tx-producer-cursor"
+    owner: "producer-worker"
+    atomic_records: ["SuggestionProducerCursor"]
+    external_calls_inside: false
+  - id: "tx-learning-candidate-insert"
+    owner: "LearningStore"
+    atomic_records: ["NEW LearningCandidate", "learning.candidate.created.v1", "receipt"]
+    external_calls_inside: false
+    note: "Resource revisions are committed before this transaction"
+  - id: "tx-learning-commit"
+    owner: "LearningStore"
+    atomic_records: ["ACTIVE MemoryRecordMetadata", "COMMITTED LearningCandidate", "learning.memory.committed.v1", "receipt"]
+    external_calls_inside: false
+    note: "Re-reads candidate version, policy revision, source, Coworker status and current memory"
+  - id: "tx-memory-revoke"
+    owner: "LearningStore"
+    atomic_records: ["REVOKED MemoryRecordMetadata", "learning.memory.revoked.v1", "receipt"]
+    external_calls_inside: false
+external_boundaries:
+  - id: "classifier"
+    owner: "learning-classifier"
+    input_trust: "untrusted MODEL_OUTPUT"
+    timeout: "bounded per call; per-Coworker rate limit"
+    retry: "skip on failure; no retry storm"
+  - id: "source-content"
+    owner: "producers and learning-worker"
+    input_trust: "untrusted user and provider content"
+    timeout: "n/a"
+    retry: "n/a"
+recovery:
+  owner: "producer-worker and learning-worker with their stores"
+  source_of_truth: ["event journal cursor", "LearningWorkItem", "LearningCandidate", "MemoryRecordMetadata", "Suggestion"]
+  restart_action: "resume from cursor; return stale CLAIMED items to QUEUED; re-evaluate non-terminal candidates idempotently; sweep orphan payload Resources"
+  ui_action: "reload projections; show skipped-learning count; never replay a notice already acknowledged"

@@ -1,5 +1,7 @@
 # API and events - Agent Relay on One Conversation
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Existing served operations reused
 
 - `PATCH /v1/conversations/{conversation_id}/agent-binding` (`setConversationAgentBinding`) is served by `apps/litecoworkd/src/conversation_operator.rs`. It requires the selected Workspace, `If-Match` with the current Conversation aggregate version, and `Idempotency-Key`; it commits `conversation.agent_binding.changed.v1` and returns the updated Conversation. The binding change applies to future turns; it does not migrate or interrupt an already admitted native session.
@@ -8,11 +10,11 @@
 
 ## Events
 
-Reuse the canonical event contracts only: `conversation.agent_binding.changed.v1`, `conversation.turn.created.v2`, `agent.session.starting.v1`, and `agent.session.started.v1`, together with the Feature 001 settlement events. This feature does not declare a new event type or schema in DRAFT.
+Reuse the canonical event contracts only: `conversation.agent_binding.changed.v1`, `conversation.turn.created.v2`, `agent.session.starting.v1`, and `agent.session.started.v1`, together with the Feature 001 settlement events. Revision 1.0 declares no new event type. The truncation receipt and relay error codes are accepted target interfaces (not yet in source) promoted by 004-T01.
 
 ## Runtime boundary
 
-The current `AgentSessionSupervisor` dispatches only `provider_key=opencode`. `CodexAppServer` profile/protocol code is not a Conversation dispatch route. Do not represent the Codex provider as relay-capable until a supervisor adapter is wired and qualified. Feature 002's current OpenCode profile offer is incompatible for new binding creation, so the current UI has no supported second binding to select.
+The current `AgentSessionSupervisor` dispatches only `provider_key=opencode` (and stored profiles use `OPENCODE`, see Feature 002 SPEC §4a). The accepted target adds a Claude Code arm (004-T05). `CodexAppServer` profile/protocol code is not a Conversation dispatch route. Do not represent the Codex provider as relay-capable until a supervisor adapter is wired and qualified. Feature 002's current OpenCode profile offer is incompatible for new binding creation, so the current UI has no supported second binding to select.
 
 ## Target-only work
 

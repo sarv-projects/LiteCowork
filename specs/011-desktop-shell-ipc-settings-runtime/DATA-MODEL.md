@@ -1,6 +1,6 @@
 # Data model - Desktop Shell IPC Settings and Runtime Health
 
-**Feature:** 011 | **Status:** DRAFT | **Updated:** 2026-11-06
+**Feature:** 011 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification. | **Updated:** 2026-11-09
 
 Identity and durable state remain in the canonical domain owners. This package coordinates the shell and does not create a shadow settings database for domain policy.
 
@@ -27,6 +27,14 @@ Target local display preference changes may commit to a desktop preference store
 
 Use existing event names in docs/EVENTS.md. New durable domain events require same-change EVENTS.md, JSON Schema, OpenAPI/Operator and migration. Never emit events for hover, filter changes or local preview. Do not log notification payloads, secret bytes, prompts, native transcripts, raw CLI arguments or private paths. OS assertion observations contain only the minimum process/mode/status metadata. Usage local readers extract counters/model/response IDs/timestamps only and never ingest prompt/completion/reasoning content.
 
+## Revision 1.0 gap records
+
+- StopPreview: a computed read over owner records (turns, Attempts, Effects, leases, provider references, cleanup); not persisted.
+- Runtime stop request: idempotency receipt and incarnation transition rows already used by `persist_incarnation_transition` in `apps/litecoworkd/src/runtime.rs`.
+- PowerAssertion observation: process-scoped, not replicated, cleared at restart.
+- Workspace name (existing `workspaces.name`): owned by the Workspace aggregate; rename is a versioned mutation with event and receipt.
+- Local preferences: desktop-local file, never synced, never a grant.
+
 ## Migration
 
-No migration is authorized in this revision. Feature 011 must not create shadow copies of Workspace, AgentBinding, Coworker, Trust, Runtime or Usage owner records.
+No migration is needed for revision 1.0: rename reuses `workspaces.name` and `version`; stop, keep-awake and preferences add no SQLite table. Feature 011 must not create shadow copies of Workspace, AgentBinding, Coworker, Trust, Runtime or Usage owner records.

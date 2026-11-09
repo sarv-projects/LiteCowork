@@ -1,7 +1,7 @@
 # Reference Repositories — Core Architecture Reading Index
 
 **Status:** research procedure + pinned paths (not normative product)  
-**Updated:** 2026-11-01  
+**Updated:** 2026-11-08 (Phase 2 rival re-verification: ZCode→3.17.2, DeepSeek Harness desktop→0.2.2-rc.1; added OpenWork, Open Cowork, Rowboat, OpenLoomi read-first indexes)  
 **Companion:** [DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md](DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md) (ZCode + DeepSeek Harness desktop deep dive)
 
 Reading **every line** of large repos is not required. Before borrowing behavior or tests, read the **core architecture, IPC, persistence, agent loop, and lifecycle** paths below at the pinned revision.
@@ -12,7 +12,7 @@ Local clones (gitignored, absent from a fresh checkout): `repo_take/` per `repo_
 
 ## ZCode — `zai-org/ZCode`
 
-| Pin | `a60ba6a7e5a06742270ca605f5d2cc2766afa7e1` (2026-10-30) |
+| Pin | `a9fe401eede6e6e5e01be9048679c206fe6f02d9` (v3.17.2, 2026-11-08; prior pin `a60ba6a7…` was v3.17.1/2026-10-30) |
 | App path | `packages/desktop` (not `apps/zcode-cli`) |
 | License | Apache-2.0 + NOTICE |
 
@@ -36,7 +36,7 @@ Local clones (gitignored, absent from a fresh checkout): `repo_take/` per `repo_
 
 ## DeepSeek Harness — `deepseek-ai/deepseek-harness`
 
-| Pin | `ce7073d51254c26cd63b22a60835b8f948deb447` (2026-10-30) |
+| Pin | `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` (desktop v0.2.2-rc.1, 2026-11-08; prior pin `ce7073d5…` was v0.2.2-alpha.2/2026-10-30) |
 | App path | `apps/desktop` |
 | License | MIT |
 
@@ -103,7 +103,77 @@ Task/Effect drain on quit **not integrated** in LiteCowork owners — see audit 
 
 ## OpenWork — `different-ai/openwork`
 
-Read `DESIGN.md` + session/desktop layout; compare lazy capability gateway to CAPABILITY-FABRIC.
+| Pin | `5493b18a6af64d56454658a53da00eabbc6e033d` (2026-11-08) |
+| App path | `apps/desktop` client + optional `apps/server` control plane; capabilities under `packages/*` |
+| License | MIT except `/ee` (Enterprise Edition); pre-EE content FSL-1.1 / MIT-Future |
+
+### Read first
+
+| Path (under pin) | Why |
+|---|---|
+| `DESIGN.md` | Chat-first doctrine; compact tool activity; no auto side-panel on background result |
+| `packages/automations/src/engine.ts`, `ports.ts`, `contracts.ts` | Durable automation receipts/events survive the admitting process exit — compare to AUTOMATION/TASK-RUNTIME |
+| `packages/automations/src/calendar-trigger.ts` | Event/calendar trigger shape |
+| `packages/codemode/` | Code-step package (study only; runs under provider host rules) |
+
+Compare the lazy capability gateway (`search_capabilities`/`execute_capability`) to CAPABILITY-FABRIC. `/ee` is Enterprise-licensed — no reuse.
+
+---
+
+## Open Cowork — `opencoworkai/open-cowork`
+
+| Pin | `e94ee2c50239e64ba0e18921e339d49b93dae31f` (v3.3.1, 2026-11-08) |
+| App path | `src/main` (Electron main) + `src/renderer` |
+| License | MIT |
+
+### Read first
+
+| Path (under pin) | Why |
+|---|---|
+| `src/main/agent/agent-runner-loop-guard.ts` | Non-progress / loop guard (maps to OpenHands non-progress proposal) |
+| `src/main/schedule/scheduled-task-manager.ts`, `local-condition-checker.ts` | Scheduler + condition polling (TriggerHost / ON_CONDITION) — **roadmap: cron not yet shipped** |
+| `src/main/sandbox/path-guard.ts`, `lima-bridge.ts`, `wsl-bridge.ts` | WSL2/Lima VM isolation + path-traversal/zip-slip guard (ENVIRONMENTS attestation) |
+| `src/main/mcp/mcp-manager.ts`, `mcp-oauth.ts` | MCP transports + OAuth credential indirection |
+| `src/renderer/components/` | ChatView / Sidebar / ContextPanel / TracePanel (TracePanel → Inspector only) |
+
+ROADMAP Completed vs Planned: treat VM sandbox, PPTX/DOCX/PDF/XLSX skills, MCP connectors and GUI computer-use as shipped; scheduled tasks, first-class Linux builds and native tool schemas are Planned, not shipped.
+
+---
+
+## Rowboat — `rowboatlabs/rowboat` (NEW)
+
+| Pin | `9052e28b9ede46478e04f9cf600c7ebaf5895dc7` (2026-11-08) |
+| App path | `apps/x` (desktop), `apps/harbor` (agent runtime, spec-driven) |
+| License | Apache-2.0 |
+
+### Read first
+
+| Path (under pin) | Why |
+|---|---|
+| `apps/harbor/SPEC.md`, `apps/harbor/CONTRACT.md` | Spec-driven agent-runtime contract (like LiteCowork SDD) |
+| `apps/x/CODE_MODE_ENGINES_PLAN.md` | Code-mode engine plan |
+| `apps/x/GRANOLA_PARITY.md`, `apps/x/MINI_APPS_PLAN.md` | Meeting-note parity + mini-apps surfaces |
+
+Living knowledge-graph-of-your-work → Memory/Knowledge reference. Do not adopt harbor as Task authority.
+
+---
+
+## OpenLoomi — `melandlabs/openloomi` (NEW, same Tauri+Rust stack as LiteCowork)
+
+| Pin | `2aca1016fa3065e2fee912afd0e94576d0483c66` (2026-11-08) |
+| App path | `apps/web` (React) packaged as Tauri; `apps/web/src-tauri` (Rust) |
+| License | Apache-2.0 |
+
+### Read first
+
+| Path (under pin) | Why |
+|---|---|
+| `apps/web/src-tauri/src/lifecycle.rs`, `close_behavior.rs`, `launch_mode.rs` | Tauri app lifecycle / quit-close / launch mode — direct Operator-vs-daemon reference |
+| `apps/web/src-tauri/src/js_scheduler.rs` | In-process scheduler |
+| `apps/web/src-tauri/capabilities/`, `permissions/` | Tauri capability/permission manifest discipline |
+| `apps/web/src-tauri/src/audio_capture.rs` | Screen/audio understanding — **consent-gated RESEARCH only, never default** |
+
+Attention/triage "surface only what needs you" parallels LiteCowork **Needs You**.
 
 ---
 
@@ -187,6 +257,8 @@ Evidence column = upstream `file:line` at the pins above. LiteCowork column name
 
 ## LiteCowork reference desktop audit status
 
-ZCode + DSH: **targeted component audit complete** in DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT (2026-10-31). Re-read Host/IPC if pins change.
+ZCode + DSH: **targeted component audit complete** in DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT (2026-10-31); pins refreshed 2026-11-08 (ZCode 3.17.2, DSH 0.2.2-rc.1). Re-read Host/IPC when deepening against the new pins.
 
 AionUi + OpenDot: **2026-11-01** shallow architecture pass; deepen when SDD 008/009/011 enters IN_REVIEW.
+
+OpenWork + Open Cowork + Rowboat + OpenLoomi: **2026-11-08** shallow architecture pass (read-first indexes above). OpenLoomi is the closest same-stack (Tauri+Rust) reference; deepen its lifecycle/scheduler modules when SDD 010/011 enters IN_REVIEW.

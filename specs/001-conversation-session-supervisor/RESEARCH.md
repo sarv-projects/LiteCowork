@@ -1,6 +1,7 @@
 # Research and Decision Log - Conversation Session Supervisor
 
-**Feature:** 001 | **Status:** IN_REVIEW | **Checked:** 2026-11-06 — active-source audit; upstream protocol claims are not web-verified.
+**Feature:** 001 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Checked:** 2026-11-06 — active-source audit; upstream protocol claims are not web-verified.
 
 ## 1. Repository sources inspected
 

@@ -1,14 +1,31 @@
 feature_id: "003"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
+# ACCEPTED/LOCKED (owner-accepted 2026-11-09) authorizes implementation of this graph.
+# Edges are the accepted target wiring, not a claim that they are served. Current source:
+# root add is served on Linux/macOS only (Windows 503), scan is Linux-only (non-Linux 501),
+# retrieval is served but not called by Send, and no ContextAttachment or retrieval receipt
+# store exists. See SPEC.md section 4 and TASKS.md.
 nodes:
   - id: "ui"
     owner: Desktop UI
+    kind: component
+  - id: "composer"
+    owner: Feature 001 composer (ResourceRef picker surfaced by 003)
     kind: component
   - id: "operator"
     owner: authenticated Operator
     kind: service
   - id: "owner"
     owner: domain owner service
+    kind: service
+  - id: "scanner"
+    owner: Metadata Scanner (Linux today, Windows target)
+    kind: worker
+  - id: "retrieval"
+    owner: Grounded Retrieval (local lexical)
+    kind: service
+  - id: "send"
+    owner: Feature 001 turn admission
     kind: service
   - id: "storage"
     owner: Storage
@@ -21,6 +38,10 @@ edges:
     from: "ui"
     to: "operator"
     kind: command
+  - id: "e-composer-op"
+    from: "composer"
+    to: "operator"
+    kind: query
   - id: "e-op-owner"
     from: "operator"
     to: "owner"
@@ -41,14 +62,50 @@ edges:
     from: "fs"
     to: "owner"
     kind: identity
+  - id: "e-owner-scanner"
+    from: "owner"
+    to: "scanner"
+    kind: request
+  - id: "e-scanner-fs"
+    from: "scanner"
+    to: "fs"
+    kind: traverse
+  - id: "e-scanner-storage"
+    from: "scanner"
+    to: "storage"
+    kind: transaction
+  - id: "e-send-retrieval"
+    from: "send"
+    to: "retrieval"
+    kind: request
+  - id: "e-retrieval-storage"
+    from: "retrieval"
+    to: "storage"
+    kind: read
+  - id: "e-send-storage"
+    from: "send"
+    to: "storage"
+    kind: transaction
+  - id: "e-storage-composer"
+    from: "storage"
+    to: "composer"
+    kind: projection
 transactions:
   - id: "tx-root"
     owner: ResourceService
-    atomic_records: ["workspace_root","private_binding"]
+    atomic_records: ["resource","workspace_root","resource_location","private_binding","idempotency_receipt"]
+    external_calls_inside: false
+  - id: "tx-scan"
+    owner: Metadata Scanner
+    atomic_records: ["root_file_membership","root_observation","scan_receipt"]
     external_calls_inside: false
   - id: "tx-attach"
     owner: Conversation context owner
-    atomic_records: ["context_attachment"]
+    atomic_records: ["context_attachment","retrieval_receipt","idempotency_receipt"]
+    external_calls_inside: false
+  - id: "tx-revoke"
+    owner: ResourceService
+    atomic_records: ["workspace_root","private_binding","replication_membership"]
     external_calls_inside: false
 external_boundaries:
   - id: "outside-sqlite"
@@ -56,6 +113,11 @@ external_boundaries:
     input_trust: untrusted
     timeout: bounded
     retry: reconcile-before-retry
+  - id: "native-picker"
+    owner: Desktop UI (Tauri)
+    input_trust: untrusted
+    timeout: user-bounded
+    retry: owner-initiated
 recovery:
   owner: domain owner
   source_of_truth: durable-owner-records

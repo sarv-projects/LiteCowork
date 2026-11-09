@@ -279,8 +279,11 @@ revision. Settings edits affect future Task admissions only. An existing Task re
 pinned policy; applying new settings requires an explicit TaskSpec revision action that
 re-resolves policy server-side. The caller never submits a per-Task route override.
 
-A pre-v28 TaskSpecRevision may have a null policy snapshot because the earlier schema did
-not preserve this contract. Do not interpret null as native-only or reconstruct a policy
+This delegation-settings persistence is the migration v28 target, which is defined but not
+yet wired (`SCHEMA_VERSION` is 27; register A-40 and [STORAGE.md](STORAGE.md)); treat the
+snapshot behavior below as the contract that applies once v28 is wired. A pre-v28
+TaskSpecRevision may have a null policy snapshot because the earlier schema did not preserve
+this contract. Do not interpret null as native-only or reconstruct a policy
 from current mutable settings. Existing Attempts remain under their recorded provenance;
 new child admission for a legacy Task is blocked until an explicit TaskSpec revision
 resolves and pins policy under the current contract.
@@ -671,6 +674,18 @@ ambiguous, or budget-exhausted result blocks automatic escalation and returns a 
 blocker to the lead or Needs You. The scheduler never mutates an Attempt's binding or
 model in place, loops indefinitely, or escalates around Trust policy.
 
+`EscalationPolicy.on_exhaustion` (`RETURN_TO_LEAD | NEEDS_YOU` in
+[delegation.schema.json](schemas/delegation.schema.json)) is the typed selector for which
+of those two destinations the exhausted result takes. It is **TARGET, not yet wired**
+(register A-37): the Rust `EscalationPolicy` struct currently carries only
+`max_worker_attempts` and `fallback_profile_ids`, and no non-test code produces the field.
+Until a delegation dispatcher is implemented, the exhaustion destination follows the prose
+above (lead or Needs You) and no `DelegateRequest` may be rejected as malformed solely for
+omitting `on_exhaustion`. The schema is kept as the authoritative target shape because it
+matches this accepted design; wiring the field is a Feature 004/005 implementation step,
+not a schema correction. This is a PROPOSED owner resolution pending acceptance
+([SPECIFICATION-STANDARD.md](SPECIFICATION-STANDARD.md) §7).
+
 Only the lead or TaskService may accept the worker output into Task completion. A passing
 child verifier is evidence for its criteria; it does not itself complete the Task.
 
@@ -885,3 +900,4 @@ Workspace DelegationProfile CRUD/revision/duplicate/disable/archive, immutable r
 ## V1 detailed design integration — 2026-10-12
 
 V1-WORKFLOW-EVENT-LLD.md defines cross-agent bounded portable Task envelope, versioned worker choice, explicit handoff and stop criteria. Native subagent/@ semantics remain owned by the harness and are not automatically LiteCowork host child Tasks. The end-user selected AgentBinding is not permission to migrate another provider's private session state. Verify result against acceptance independent of worker claim.
+

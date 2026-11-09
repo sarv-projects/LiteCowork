@@ -1,10 +1,12 @@
 # Plan - Automations and Recurring Host
 
-**Feature:** 010 | **Status:** DRAFT
+**Feature:** 010 | **Spec:** SPEC.md revision 1.0
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Updated:** 2026-11-09. The authoritative ordered work list is [TASKS.md](TASKS.md) (T01 to T17 for V1; T18 and T19 are outside the V1 gate).
 
 ## Phases
 
-1. Resolve SPEC section 5 blockers with the named owners. No code.
+1. B-26 (cron in a named timezone first, RUN_ONCE_WHEN_AVAILABLE default), B-27 (LOCAL_POLL channel, delivery status separate from Task outcome) and A-35 (quiet-hours control surface owned here) were accepted by the repository owner on 2026-11-09. The event-trigger kind required by E2E-10 is added after cron (TASKS.md T09).
 2. Promote any missing machine-schema field in the canonical owner and `docs/schemas/` together if the locked design needs it.
 3. Implement tasks in dependency order on a recovered source tree after ACCEPTED/LOCKED.
 4. Run the cargo filters in TASKS.md and the desktop USER path in [ACCEPTANCE-AND-E2E-PLAN.md](../../docs/ACCEPTANCE-AND-E2E-PLAN.md).
@@ -22,11 +24,11 @@ Allowed implementation paths are listed per task. The active source tree is in a
 
 ## Migration, rollout, rollback
 
-No migration ships in DRAFT. A later schema change uses the next immutable SQLite migration. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
+No migration has shipped for this package yet; the chain ends at `docs/schemas/sqlite-v28.sql`. Accepted changes (delivery lease and status transitions, SUPPRESSED rows, event-trigger cursor) land as the next immutable `sqlite-vNN.sql` in the task that needs them. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
 
 ## Risks
 
-- Implementing from this DRAFT before blockers close.
+- Implementing ahead of the TASKS.md dependency order or before the T01 contract promotion lands.
 - Treating archive CODE as current qualification.
 - Collapsing distinct states into one UI boolean.
 

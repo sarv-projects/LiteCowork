@@ -1,5 +1,7 @@
 # Errors and recovery - Agent Relay on One Conversation
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Target behavior
 
 If B is unavailable, turn admission fails, the user's draft remains available, and the system does not fall back to A or the Workspace default. A partially dispatched B turn settles or fails through Feature 001's turn/session rules before another relay is admitted. Restart reloads committed Conversation turns and per-message producer identity; it never infers a missing response from a native process that may have disappeared.

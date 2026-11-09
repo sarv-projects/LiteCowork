@@ -83,9 +83,9 @@ Current validation on the working tree:
 - Architecture/schema validator: passed active checks; one warning because the optional `openapi-spec-validator` package is not installed. JSON Schema, 148 event schemas, errors, OpenAPI structure, SQL, Gateway naming, concept and active Markdown checks passed.
 - Cross-owner consistency guard: **36 assertions passed, 0 issues**.
 - V1 contract/route/UI audit: **0 errors** (229 OpenAPI operations; 173 served, 1 outside OpenAPI, 56 target-only).
-- Design-depth audit: **0 findings**; 258 files, 54,687 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 11 packages.
-- Feature SDD validator: **11/11 packages passed**.
-- Markdown audit: **0 broken relative links** across 255 files / 54,599 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 258 files / 54,687 lines.
+- Design-depth audit: **0 findings**; 352 files, 71,172 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 20 packages.
+- Feature SDD validator: **20/20 packages passed** (001-012 ACCEPTED/LOCKED 2026-11-09; 013-020 IN_REVIEW).
+- Markdown audit: **0 broken relative links** across 349 files / 71,178 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 352 files / 71,172 lines.
 - Sandbox note: on this Linux sandbox, cargo and Python `uv` commands require the prefix `TMPDIR=/tmp PKG_CONFIG_SYSROOT_DIR=/tmp/sysroot PKG_CONFIG_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig LIBRARY_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu`.
 - Frontend production build: passed API type check, TypeScript and Vite. Main JS bundle is 1.05 MB minified (287 KB gzip), above Vite's 500 KB advisory.
 - Focused Conversation + responsive tests: **24/24 passed**, including journal retry, cursor pagination, drawer semantics and mobile canvas sizing.
@@ -151,12 +151,12 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 
 ### Current validation
 
-- Feature package validator: **11/11 passed**; structural checks only, not owner approval or runtime qualification.
+- Feature package validator: **12/12 passed**; structural checks only, not owner approval or runtime qualification.
 - Cross-owner consistency: **36 assertions passed, 0 issues**.
 - V1 contract audit: **0 errors**; 229 OpenAPI operations, 173 served, 1 authenticated local-only route and 56 target-only.
-- Design-depth audit: **0 findings**; 258 files, 54,687 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 11 packages.
-- Markdown audit: **0 broken relative links** across 255 files and 54,599 lines.
-- Active-corpus manifest: **258 files and 54,687 lines** (manifest excludes itself).
+- Design-depth audit: **0 findings**; 352 files, 71,172 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 20 packages.
+- Markdown audit: **0 broken relative links** across 349 files and 71,178 lines.
+- Active-corpus manifest: **352 files and 71,172 lines** (manifest excludes itself).
 - Architecture/schema validator: passed with one warning because optional openapi-spec-validator is not installed; JSON Schema, 148 typed events, errors, OpenAPI structure, SQLite, Gateway naming, canonical concepts and active Markdown checks passed.
 - Rust workspace: lint gate (`clippy --all-targets -- -D warnings`) **0 diagnostics**; `check --all-targets` **0 errors**; `fmt --all --check` clean; test counts as listed under "Current validation on the working tree".
 - Whitespace check: **passed** (`check.sh` whitespace stage, exit 0).
@@ -166,17 +166,34 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 
 1. Keep Send disabled until the exact native OS/provider/auth USER path and durable dispatch/single-flight/stop/retry recovery are qualified.
 2. Implement one safe Task vertical slice with accepted plan, Attempt, Environment, Trust, mediated Effect, reconciliation and independent verification.
-3. Replace simulated Terminal/Browser/Diffs claims with real provider-backed sessions and evidence; defer unsupported Computer use.
+3. The Workbench Terminal/Diffs/Browser simulation is already removed from the UI (register A-51): Terminal shows "unavailable", Diffs/Review shows "nothing to review", the browser iframe starts empty with no containment claim. The remaining obligation is to implement real provider-backed sessions and evidence (PTY/ConPTY B-23, browser B-22) and defer unsupported Computer use (B-32).
 4. Complete one Artifact create/format/export/reopen path with a durable receipt.
 5. Complete one account Connection and provider read/write/revoke journey; Approval alone is not execution.
 6. Close Coworker-owned Conversation, scoped Memory and proactive PAUSED-admission gaps before enabling those claims.
 7. Keep local automation, notification delivery and Settings controls honest until their actual consumers/handlers exist.
 
+### Phase 1 assumption-free doc re-audit resolved (FEAT-002)
+
+The full-corpus re-audit verdict table is [docs/DOCS-REAUDIT-2026.md](docs/DOCS-REAUDIT-2026.md) (five clusters, plus an SDD-completeness-gap list for specs/001-011). It reconciled the known danglers at their owners and recorded the decisions in the register:
+
+- **A-38** (FLOWS.md flow index): the "Flow outputs and UI projection" index now covers F00-F143 (added F115-F124 and F136-F143), and the F119/F128 duplicate is resolved by distinguishing the save flow (F119) from its navigation-recovery sibling (F128).
+- **A-39** (UIV1 namespace): retired as an active acceptance authority; acceptance resolves on live flow IDs and feature AC IDs, with resolution notes at V1-UI-ACTION-STATE-LEDGER.md and V1-END-TO-END-FLOW-AND-RACE-CONTRACTS.md. The archived catalog stays provenance-only; specs/README.md's UIV1 instruction is updated.
+- **A-40** (sqlite-v28 unreachable): v28 is recorded as defined-but-not-yet-wired (`SCHEMA_VERSION` is 27); STORAGE.md ("current schema version is 28" corrected to 27), EVENTS.md, DELEGATION.md and COVERAGE-MATRIX.md are corrected to stop presenting v28 as active.
+- **Line-count drift**: CURRENT-RUN.md and IMPLEMENTATION-STATUS.md now cite the live generator output; the corpus audits/generators exclude `.agents/` plan files so plan-file churn no longer inflates corpus counts.
+- **A-51 (new)**: the Workbench Terminal/Diff/Browser status docs were stale after the UI was remediated; IMPLEMENTATION-STATUS.md and rows A-08/A-09/A-10/A-30 are corrected to the current source.
+
+### Phase 3 superset matrix + three-way gap analysis resolved (FEAT-004)
+
+The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUPERSET-GAP-MATRIX.md): one feature × {LiteCowork done? (TARGET/CODE/SERVED/INTEGRATED/QUALIFIED) / doc-claims? / doc-accuracy (linked to DOCS-REAUDIT-2026 + A-xx) / each resolved rival has it?} matrix whose feature axis is the union of LiteCowork's capability set and every Phase 2 resolved rival's first-release surface (max superset). It derives the three lists the audit asked for — ✓ Done / ✗ Not-done (real state), 📝 doc errors, 🎯 missing-to-be-a-superset. It **reads** the owners and holds no authority: parity verdicts stay in docs/VIABILITY-VS-COMPETITORS.md, concern→owner in docs/COVERAGE-MATRIX.md, verdicts in docs/DOCS-REAUDIT-2026.md, real state in docs/IMPLEMENTATION-STATUS.md. Cross-linked from VIABILITY-VS-COMPETITORS.md, COMPETITIVE-RESEARCH.md and the docs/README.md index.
+
+- **Headline gap count:** **14** capability gaps to reach a max superset (8 already TARGET-owned via allocated B-xx/RV-xx; 6 RESEARCH/owner-decision gates — RV-06, RV-07, RV-08, RV-13, RV-14, plus the consent-gated screen/audio decision); **~18** doc-accuracy findings (2 still-open code defects: A-24 Send gate, A-26 empty-canvas branding); **0** LiteCowork rows reach Done as a qualified product journey (the lone "Done (pattern)" is the runtime-split invariant), consistent with the pre-release posture.
+- No new tracker ids were invented: every missing/owner-decision item reuses an allocated B-xx / RV-xx.
+
 ### Pending research (recorded 2026-11-07)
 
 - **Dify workflow-sufficiency verdict — failed on infrastructure mid-run** (session `conversation://394419fe-285e-483c-8478-75f478adb2f9`). Objective unchanged: an evidence-based verdict, grounded in a Dify read, on whether the Trigger-to-Occurrence-to-Task-to-CapabilityInvocation model is sufficient for the V1 promise or a graph engine is warranted — plus a lightweight visible-execution-path sketch that fits the existing authorities. Relaunch; do not re-scope.
 - **Agenta visible-execution-path design — failed on infrastructure mid-run** (session `conversation://b4977637-41e5-4e84-b74d-82df1cdf217f`). Objective unchanged: a design (no vendor dependency) derived from Agenta's source for a truthful Task/Attempt and Automation-occurrence execution projection owned by existing LiteCowork authorities. Relaunch; do not re-scope.
-- **Competitive-landscape corrections — verified 2026-11-06 but not yet applied to owner docs:** Claude Duet exists as a distinct rival and appears nowhere under docs/ or specs/; "OpenBot" names two different products (nightly-labs/openbot vs CopilotKit/openbot) and the docs pin only one without qualification; Grok's vendor rebrands as SpaceXSI and bundles Cursor; ChatGPT Work evidence has moved to learn.chatgpt.com (the cited help.openai.com URL returns 403 to curl); the DeepSeek desktop pin is stale (0.2.2-alpha.2 to 0.2.2-rc.1); ZCode 3.17.1 to 3.17.2; OpenAI Dots' model is now GPT-6.1 Terra. Apply each into its owning document (docs/COMPETITIVE-RESEARCH.md, docs/VIABILITY-VS-COMPETITORS.md, docs/COMPETITOR-PROMOTED-USE-CASES.md) under those files' own evidence rules.
+- **Competitive-landscape corrections — APPLIED 2026-11-08 (Phase 2 fresh rival re-verification).** Resolved into the owning competitor docs under their own evidence rules: Claude Duet added as a tracked rival (RV-14; first-party URL unresolved on re-check, gap recorded); the OpenBot nightly-labs/openbot vs CopilotKit/openbot naming collision preserved and OpenBot repinned 0.62.0→0.65.0 (PolyForm Noncommercial, reference-only); Grok's app/marketplace layer confirmed routing through cursor.com/marketplace (SpaceXSI/Cursor bundling); ChatGPT Work and dots evidence moved to learn.chatgpt.com (help.openai.com 403s); DeepSeek desktop pin corrected 0.2.2-alpha.2→0.2.2-rc.1; ZCode 3.17.1→3.17.2; OpenAI dots model now GPT-6.1 Terra. Claude Code Desktop reconciled as a distinct Code-tab surface vs Cowork; Open Cowork corrected off the stale "single-turn wrapper" framing; two new local-first desktop coworkers added (Rowboat, OpenLoomi) with pinned clones. Shallow clones for every GitHub-backed rival live in repo_take/ (gitignored, never staged) at recorded HEAD SHAs; RV-13 allocated for the local-vs-cloud scheduled-task truth table. Owning docs: docs/COMPETITIVE-RESEARCH.md (§2026-11-08 Phase 2), docs/VIABILITY-VS-COMPETITORS.md (RV-13/RV-14 + new theme tables), docs/COMPETITOR-PROMOTED-USE-CASES.md (UC-CHAT-09/10, UC-WORK-10/11, UC-FILE-07, UC-AUTO-09, UC-MEM-06), docs/REFERENCE-IMPLEMENTATIONS.md (REF-OPENWORK/OPENCOWORK/ZCODE/DEEPSEEK-HARNESS/ROWBOAT/OPENLOOMI), docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md (refreshed pins + read-first indexes).
 - **Reference studies landed:** the OpenHands study is committed (`0fdbfe8`, with the index wave in `f5896b8`); the LiteSPM parity/reconciliation appendices (A: upstream parity requests; B: reconciliation against the pinned revision) are committed on docs/LITESPM-LITECOWORK-INTEROP-LLD.md.
 
 ### Preservation and delivery rules

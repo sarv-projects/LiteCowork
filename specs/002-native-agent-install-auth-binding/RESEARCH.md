@@ -1,9 +1,20 @@
 # Research - Native Agent Install, Auth, Binding and Agent Profile UX
 
-**Feature:** 002 | **Checked:** 2026-11-06 (active source/UI audit and screenshot/competitor comparison; no native install or provider session executed).
+**Feature:** 002 | **Checked:** 2026-11-06 (active source/UI audit and screenshot/competitor comparison; no native install or provider session executed). Re-traced 2026-11-09 for the OpenCode binding break (SPEC §4a).
+
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Primary authority
 Canonical design and state ownership: docs/AGENT-CONTROL.md, docs/AGENT-FABRIC.md, docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md, docs/V1-SETTINGS-CONTRACT-LEDGER.md, docs/V1-UI-SCREEN-CONTRACT.md and root ARCHITECTURE.md. Feature 002 owns native AgentModule/profile/install/auth/binding boundaries. LiteSPM owns MCP/skill/plugin/capability-package lifecycle. Feature 001 owns Conversation admission/session execution. Feature 011 owns Settings shell/control authority. The agent catalogue LLD is normative target, not current implementation proof.
+
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs install/probe/auth | Verdict |
+|---|---|---|---|---|
+| DeepSeek Harness `apps/desktop` typed IPC with sender assert | https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159 | MIT | Typed IPC with sender assertion, contextBridge preloads and host lifecycle/deadlines inform the authenticated Operator boundary for install/probe/auth commands and the quit-with-active-work UNKNOWN UX for an in-flight probe. | Prototype the quit-drain against RUNTIME-LIFECYCLE and port the typed-IPC/sender-assert pattern; do not vendor the Electron host. |
+| ZCode `packages/desktop` thin-shell / Host / CLI split | https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9 | Apache-2.0 + NOTICE | The Host/shell ownership split informs keeping the Settings catalogue UI (shell) separate from the Runtime-local lifecycle/probe Host, so native handles and credentials never cross into the WebView. | Port the ownership-split pattern only; do not drop in React or the ZCode Host runtime. |
+
+No DeepSeek Harness or ZCode code is imported; both are prototype/reference inputs. OpenBot (PolyForm Noncommercial) is cited below for model/effort-picker UX only and is explicitly reference/UX with no code reuse.
 
 ## External comparison and adoption
 NeuralAgent public material describes a desktop workflow around discovering/using agents, configured/installed state, persistent agent work views, model routing, local voice, scheduling and computer-use. Its historic public repository describes a different Electron/React + Python/FastAPI architecture and plugin-like agent roles; current public product pages now describe a later computer-use product. Do not treat those web pages and the old code repository as one versioned implementation or copy either architecture wholesale. NeuralAgent's Settings screenshots are useful information-hierarchy references: persistent category navigation, installed vs available agents, notification preference, advanced runtime behavior and a separate cost/usage surface. Its Agents overview uses three summary filters (Needs You, Working, Done) and a grouped work list rather than separate permanent sidebar pages. Those counts/statuses must be real owner projections in LiteCowork.
@@ -55,3 +66,20 @@ Adopt the compact interaction hierarchy only: agent/profile identity, searchable
 The OpenBot package declares PolyForm Noncommercial 1.0.0 and its README describes a development preview with danger-full-access / approvalPolicy never. No code or permission model is reused. Full source pin and limitations: [OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md](../../docs/OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md).
 
 LiteCowork's model/effort picker remains target-only until fresh AgentControlDescriptor read/refresh, adapter compatibility, account scope, and an exact native Conversation/Task send path are all qualified. Existing discovery/profile/binding evidence does not establish that a selected model is dispatchable.
+
+
+## Claude Code CLI as the second module (B-11, accepted 2026-11-09)
+
+The inventory already lists a `CLAUDE_CODE` candidate (`agent_id: "claude-code"`, executable `claude`) in `apps/litecoworkd/src/agents/native_cli.rs`. That is version/path detection only. There is no Claude Code profile probe, descriptor, auth observation or supervisor dispatch arm. 002-T12 pins the exact CLI version, the non-interactive streaming transport and the native auth method in a conformance fixture by running the installed CLI and reading its own help/version output on each release-matrix OS; it does not infer flags from third-party listings. The dispatch arm itself is Feature 004 (B-16).
+
+## Implementation efficiency and language-placement observations (2026-11-09)
+
+These are source-grounded observations recorded for the implementer. Each is folded into the task named; none changes a locked decision.
+
+- **Stringly-typed provider dispatch (Rust).** `execute_agent_turn` matches `provider_key` string literals, which is how the `OPENCODE`/`opencode` mismatch went unnoticed. A closed `NativeProviderKey` enum parsed once removes the class of bug (002-T01).
+- **Duplicate executable resolution (Rust).** `resolve_local_executable` in `operator.rs` and `find_opencode_executable` in `agents/supervisor.rs` implement different search rules for the same binary. One resolver in `apps/litecoworkd/src/agents/` plus dispatch from the probe-registered `endpoint_ref` gives one identity and avoids a second PATH walk per turn (002-T01).
+- **Profile lookup by full scan (Rust).** The supervisor calls `list_agent_profiles` and then searches linearly for one `agent_profile_id` on every turn. A keyed `get_agent_profile` read is cheaper and narrower (002-T01, shared file with Feature 004).
+- **Descriptor rules duplicated across Rust and TypeScript.** `apps/litecoworkd/src/agents/control_descriptor.rs` validates descriptors in Rust, while `apps/litecowork-ui/src/conversations/conversation-agent-surface.ts` re-derives readiness in TypeScript and has no production caller. The daemon should own the derivation and serve a projection; the TypeScript side should only parse and render, so freshness rules have one implementation (002-T05, 002-T09).
+- **Generated constant types.** `operator-api.ts` encodes `profile_admission_supported: false` as a literal type. After the OpenAPI change the file must be regenerated with `pnpm --dir apps/litecowork-ui run api:generate` and checked with `api:check`, not hand-edited (002-T01).
+- **Large single files.** `apps/litecowork-ui/src-tauri/src/lib.rs` (about 6,100 lines) holds the agent profile/binding Tauri commands inline (`probe_agent_profile`, `create_agent_binding`, `enable_agent_binding`), unlike the per-domain `*_bridge.rs` modules. `apps/litecoworkd/src/operator.rs` (about 9,500 lines) holds the agent probe handlers. New 002 commands go into `agent_control_bridge.rs` or a new `agent_binding_bridge.rs` rather than growing `lib.rs`; moving existing commands is optional and only with no behavior change (002-T05, 002-T10).
+- **Per-probe server spawn.** Each OpenCode probe spawns and stops a server (8 s startup budget). That is correct for a bounded read-only probe; the B-12 probe budget (3 per minute) bounds the cost. No change proposed.

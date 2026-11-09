@@ -1,6 +1,7 @@
 # Research - Professional Artifacts One Format
 
-**Feature:** 007 | **Checked:** 2026-11-06 (active source, composed routes, storage, Tauri bridge and UI)
+**Feature:** 007 | **Checked:** 2026-11-06 (active source, composed routes, storage, Tauri bridge and UI); grounding re-checked 2026-11-09 for the V1 task plan
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Sources inspected
 
@@ -8,6 +9,14 @@
 - Backend: `apps/litecoworkd/src/artifact_operator.rs`; `crates/storage-core/src/artifact.rs`; `crates/storage-sqlite/src/artifacts.rs`; `apps/litecoworkd/src/environment_office_qualification.rs`; `apps/litecoworkd/src/zip_intake_operator.rs`; `capabilities/zip_intake/README.md`.
 - Native bridge and UI: `apps/litecowork-ui/src-tauri/src/artifact_bridge.rs`; `apps/litecowork-ui/src/artifacts/ArtifactLibrary.tsx`, `ArtifactWorkbench.tsx`, `TaskArtifactOutputs.tsx`, `StructuredTextPreview.tsx`, `artifact-api.ts`, `desktop-artifact-api.ts`, `README.md`; `apps/litecowork-ui/src/App.tsx` Library/Work integration.
 - Machine route inventory: `docs/schemas/served-route-inventory.json` checked against `artifact_operator.rs` route composition.
+
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs this feature | Verdict |
+|---|---|---|---|---|
+| Open Cowork document-skills surface (`opencoworkai/open-cowork`) | https://github.com/opencoworkai/open-cowork/tree/e94ee2c50239e64ba0e18921e339d49b93dae31f | MIT at checked root LICENSE | Its document Skills UX (one-deliverable create/edit/export flow, per-format skill surface and inspect-then-publish habit) is a reference for how the B-21 one-format editor, B-30 create entry point and B-31 export surface should feel, including keeping an unsupported format visibly read-only rather than fake-editable. | Prototype the create/edit/export UX shape only; keep the LiteCowork Artifact/Evidence identity, immutable versions and ArtifactStore owner. Do not import Open Cowork code, its Electron host or its Claude Agent SDK runner. |
+
+No Open Cowork code is imported; it is a UX/skill reference read at the pinned SHA. LiteCowork retains its own Artifact/Resource/ExportReceipt model and does not adopt any competitor's document store or renderer.
 
 ## Source and route findings
 
@@ -40,7 +49,25 @@
 - The core immutable Artifact/Resource versioning and digest-bound local text append are technically coherent and useful. The native exact-version Save As path has strong identity/digest checks and does not leak bytes or filesystem destinations into WebView IPC.
 - The V1 outcome is still missing. A user cannot create the first Artifact through the production Artifact owner API, cannot invoke an accepted professional editor/round-trip engine, and cannot commit the specified export receipt. The current path can inspect and manage an Artifact that some other producer has already inserted.
 - Feature 005 is an upstream dependency for Task-generated output; Feature 003 is an upstream dependency for admitted Resource inputs. Do not claim a full deliverable workflow when those producer paths remain incomplete.
-- B-21, B-30 and B-31 must be separately resolved and promoted into the canonical owner contracts/schemas before implementation. Do not assume DOCX/XLSX support because file upload accepts their extensions or a host readiness probe recognizes their media types.
+- B-21, B-30 and B-31 were accepted by the owner on 2026-11-09 and are promoted into the canonical owner contracts/schemas by TASKS T01 before implementation. Do not assume DOCX/XLSX support because file upload accepts their extensions or a host readiness probe recognizes their media types.
+
+## Grounding re-check (2026-11-09)
+
+- `apps/litecoworkd/src/artifact_operator.rs` mounts `GET /v1/artifacts`, `GET /v1/library`, `GET /v1/artifacts/{artifact_id}`, version metadata/content, edit-head, `text-version`, promote, archive and `GET /v1/tasks/{task_id}/artifacts`; no POST on `/v1/artifacts`.
+- `crates/storage-core/src/artifact.rs` defines `ArtifactReadStore`, `ArtifactLibraryWriteStore` and `ArtifactVersionWriteStore` (`stage_text_content`, `append_artifact_version`, `resolve_artifact_version_append_replay`); no create trait. `ArtifactRecord` has `task_id: Option<String>` and no Conversation or message field.
+- `apps/litecowork-ui/src/artifacts/ArtifactWorkbench.tsx` hardcodes the edit gate to `media_type == "text/plain"`; capability is not declared by the daemon. `StructuredTextPreview.tsx` contains a hand-written restricted Markdown block renderer with a raw-text fallback. `text-version-diff-model.ts` is a bounded LCS diff (400 lines, 160,000 cells) that returns null above the bound.
+- `apps/litecowork-ui/src-tauri/src/resource_save_bridge.rs` (`resource_save_as`) and `artifact_bridge.rs` (`artifact_save_as`) are the two native Save As paths (10 MiB bound, SAVED/CANCELLED only).
+- `apps/litecoworkd/src/environment_office_qualification.rs` (`OfficeFormat`, `qualify_office_provider`, `probe_office_providers`) observes readiness only.
+
+## B-21 engine candidates (to be pinned in TASKS T01)
+
+The accepted B-21 decision requires a deterministic in-process serializer and validator. These Rust candidates are named for evaluation only; neither is a dependency today and the exact version, license file and SHA are pinned in T01 before use.
+
+| Candidate | License (to verify at pin) | Role | Verdict |
+|---|---|---|---|
+| `pulldown-cmark` | MIT | CommonMark + GFM tables pull parser for validation | Prototype as the validator; it does not serialize back to Markdown by itself |
+| `comrak` | BSD-2-Clause | CommonMark + GFM AST with a CommonMark formatter, usable for parse -> AST -> re-serialize canonical form | Prototype as the canonical round-trip engine |
+| `similar` | Apache-2.0 | Myers line diff for daemon-side version compare | Optional for T11 if compare moves server-side |
 
 ## Alternatives and decisions
 
@@ -57,4 +84,4 @@
 
 ## Unresolved questions
 
-See SPEC §5 blockers B-21 (format/engine), B-30 (initial Artifact creation path/atomic owner transaction), and B-31 (export receipt and distinction from native Save As).
+B-21, B-30 and B-31 are accepted. Remaining implementation questions: the exact Markdown engine pin (T01), the Product confirmation of the local-export receipt destination class under the B-31 caveat (T01), and whether a sandboxed read-only PDF view qualifies for V1 (T10).

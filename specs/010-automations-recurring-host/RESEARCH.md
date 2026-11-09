@@ -1,6 +1,7 @@
 # Research - Automations and Recurring Host
 
 **Feature:** 010 | **Checked:** 2026-11-06
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Canonical authorities
 
@@ -9,6 +10,16 @@
 - [CONNECTORS-WORKFLOWS.md](../../docs/CONNECTORS-WORKFLOWS.md) defines the target WorkflowBackendAdapter contract, provider connections, workflow references, external invocation and provider effect boundaries; no production adapter implementation is present in the active source tree.
 - [TASK-RUNTIME.md](../../docs/TASK-RUNTIME.md), [TRUST.md](../../docs/TRUST.md) and Feature 005 own Task/Attempt execution, grants, approvals, effects and verification.
 - Historical plans under docs/superpowers/plans/ are not authoritative.
+
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs this feature | Verdict |
+|---|---|---|---|---|
+| OpenLoomi attention/triage + lifecycle Rust modules (`melandlabs/openloomi`) | https://github.com/melandlabs/openloomi/tree/2aca1016fa3065e2fee912afd0e94576d0483c66 | Apache-2.0 at checked root LICENSE | Local-first Tauri + Rust "Attention Agent" on the SAME stack as LiteCowork; `apps/web/src-tauri` carries lifecycle/close-behavior/launch-mode/js-scheduler Rust modules and Tauri capability/permission manifests. Most directly liftable reference for the TriggerHost lifecycle, close-behavior (window close vs Runtime stop, AC-005) and a local JS scheduler shape for cron/misfire. | PROTOTYPE the lifecycle/close-behavior/launch-mode and scheduler patterns against RUNTIME-LIFECYCLE and AUTOMATION; it is same-stack so patterns port cleanly. Flag screen-understanding/audio capture as consent-gated RESEARCH, out of this feature's scope. No code copied wholesale. |
+| OpenCowork schedule / local-condition-checker (`opencoworkai/open-cowork`) | https://github.com/opencoworkai/open-cowork/tree/e94ee2c50239e64ba0e18921e339d49b93dae31f | MIT at checked root LICENSE | Its schedule and local-condition-checker inform the first trigger type (B-26) and misfire handling; note cron scheduling there is still roadmap (not shipped), reinforcing that LiteCowork's cron trigger is a qualification target, not a borrowed shipped feature. | PROTOTYPE the local-condition-check shape only; keep LiteCowork occurrence identity and Task materialization. No Electron host or Claude Agent SDK runner adopted. |
+| OpenDot notification levels (`athulsreekumar/opendot`) | https://github.com/athulsreekumar/opendot/tree/ec75891b819713acf29cb659bd9c72d1ed34f76a | MIT at checked root LICENSE | Its local Dot notification levels and `~/.opendot` audit/masking inform the local notification channel and status vocabulary (B-27) and the quiet-hours suppression semantics owned here. | PROTOTYPE the notification-level and masking UX only. Do not use Pi/Dot sessions as LiteCowork durable Task truth; a PENDING delivery row is not a delivered notification. |
+
+No OpenLoomi, OpenCowork or OpenDot code is imported; all are read at the pinned SHAs. OpenBot (PolyForm Noncommercial) is reference/UX only and carries no code-reuse permission; its in-Core graph runtime is not adopted (see the WorkflowBackend boundary section).
 
 ## OpenBot source comparison
 

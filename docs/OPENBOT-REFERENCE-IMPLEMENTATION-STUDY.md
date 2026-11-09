@@ -6,6 +6,19 @@
 **License:** PolyForm Noncommercial 1.0.0 (package.json)  
 **Status:** architecture and source comparison only; no code copied, no runtime build or security test performed.
 
+> **2026-11-08 Phase 2 re-verification note (does not alter the pinned study above):** a fresh
+> shallow clone of nightly-labs/openbot now resolves HEAD to
+> `3ec318ef791bf3259d84c3dc326d7c66545bc1ec`, **package version 0.65.0**, still
+> `PolyForm-Noncommercial-1.0.0`. The study below remains anchored to the 2026-11-06 pin
+> `6759fa3…` (v0.62.0) for reproducibility; the newer HEAD is recorded here for a future
+> re-pin, not substituted into the historical analysis. **License discipline unchanged:**
+> PolyForm Noncommercial = reference/UX study ONLY, no commercial code reuse — flag this on
+> every borrowable OpenBot item. **Naming-collision discipline preserved:** "OpenBot" names
+> two distinct products — **nightly-labs/openbot** (this study, PolyForm Noncommercial desktop
+> agent) and **CopilotKit/openbot** (a separate project under its own license). Always cite the
+> owner/repo; do not treat one as evidence for the other. The clone lives in
+> `repo_take/openbot` (gitignored, never staged).
+
 This study records what the inspected OpenBot source actually implements, what is merely documented, and which ideas fit LiteCowork's existing owner contracts. It does not promote a new LiteCowork runtime, workflow engine, API, or release commitment.
 
 ## 1. Executive decision

@@ -1,10 +1,21 @@
 # Research - Desktop Shell IPC Settings and Runtime Health
 
-**Feature:** 011 | **Checked:** 2026-11-06 (source crosswalk and NeuralAgent screenshot comparison).
+**Feature:** 011 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Checked:** 2026-11-06 (source crosswalk and NeuralAgent screenshot comparison); re-checked 2026-11-09 for the V1 task plan.
 
 ## Sources and authorities
 
 Authorities: docs/RUNTIME-LIFECYCLE.md, docs/LOCAL-OPERATOR-IPC.md, docs/DESKTOP-SHELL-LLD.md, docs/V1-SETTINGS-CONTRACT-LEDGER.md, docs/V1-UI-SCREEN-CONTRACT.md, docs/SEMANTIC-SERVED-UI-MAP.md, docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md, docs/V1-TELEMETRY-USAGE-RESILIENCE-LLD.md, docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md. The Settings control ledger is normative target, not evidence of all controls being served.
+
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs this feature | Verdict |
+|---|---|---|---|---|
+| ZCode thin-shell / Host / CLI ownership split (`zai-org/ZCode`) | https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9 | Apache-2.0 + NOTICE | `packages/desktop` Main/Renderer/Host/CLI ownership split and plugin guest sandbox inform keeping the Tauri shell (untrusted renderer) strictly separate from the Runtime-local Host, so the shell is never the security boundary and native handles/credentials never cross into the WebView. | PORT the ownership-split pattern only; do not drop in React or the ZCode Host runtime. Read-first paths in REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX §ZCode. |
+| DeepSeek Harness typed IPC with sender assert (`deepseek-ai/deepseek-harness`) | https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159 | MIT at checked root | `apps/desktop` typed IPC with sender assertion, contextBridge preloads and host lifecycle/deadlines inform the authenticated local IPC boundary (AC-001/AC-002), the no-bearer-fallback rule and the quit-with-active-work UNKNOWN UX for drain (AC-012). | PROTOTYPE the typed-IPC/sender-assert and quit-drain patterns against LOCAL-OPERATOR-IPC and RUNTIME-LIFECYCLE; do not vendor the Electron host. |
+| OpenLoomi Tauri capability/permission manifests (`melandlabs/openloomi`) | https://github.com/melandlabs/openloomi/tree/2aca1016fa3065e2fee912afd0e94576d0483c66 | Apache-2.0 at checked root | Same Tauri + Rust stack as LiteCowork; its `apps/web/src-tauri` Tauri capability/permission manifests and lifecycle/close-behavior/launch-mode modules are the closest same-stack reference for scoping shell-to-Host capabilities and honest Runtime close/drain behavior. | PROTOTYPE the Tauri capability/permission manifest scoping and close-behavior patterns; same-stack so they port cleanly. Flag screen-understanding/audio capture as out-of-scope consent-gated RESEARCH. |
+
+No ZCode, DeepSeek Harness or OpenLoomi code is imported; all are read at the pinned SHAs. OpenBot (PolyForm Noncommercial) is not cited here and would be reference/UX only with no code reuse if it were.
 
 ## External comparison
 
@@ -43,3 +54,18 @@ The current route/source search found no complete historical usage projection/da
 ## Validation limitation
 
 This is a source and document audit plus screenshot comparison. No Notification OS provider, keep-awake native integration, generic resume workflow, AgentModule install/auth route or Usage projection was executed as part of this documentation pass. Those remain implementation and OS qualification work.
+
+## Source re-check and implementation notes (2026-11-09)
+
+- IPC: `crates/operator-ipc/src/windows.rs` (`WindowsEndpoint::derive/bind`, eight pending pipe instances, per-connection admission) uses `windows_local_security::create_operator_pipe` and `current_logon_sid`. `crates/operator-ipc/src/unix.rs` enforces 0700 directory and 0600 socket and captures `PeerCredentials` before any frame read. Limits live in `crates/operator-ipc/src/lib.rs` (`MAX_HEADER_BYTES`, `MAX_BODY_BYTES`, `DEFAULT_MAX_IN_FLIGHT_BODY_BYTES`). `apps/litecoworkd/src/runtime_windows_security_tests.rs` covers state-directory DACL and reparse rejection; no DACL-failure no-fallback or remote-client test was found.
+- Stop: `apps/litecoworkd/src/runtime.rs` reaches drain only from the process-supervisor signal and says not to wire an Operator route until Task/Attempt, Effect, lease and local service-reference settlement is proven. `previewLocalRuntimeStop` and `requestLocalRuntimeStop` exist only as OpenAPI targets.
+- Runtime start: `apps/litecowork-ui/src-tauri/src/lib.rs` `start_local_runtime` uses `systemd_user_service::start` and `verify_active` on Linux and spawns the daemon directly elsewhere. `runtime_lifecycle_bridge::get_runtime_lifecycle` decodes the lifecycle view and rejects foreign identities.
+- Settings: `apps/litecowork-ui/src/settings/SettingsView.tsx` (611 lines) receives about 60 props from `App.tsx` (4523 lines). Theme/density/text-scale/reduced-motion are `useState` only; Ctrl + N, Ctrl + W and Ctrl + K are `<kbd>` labels with no matching handler in `App.tsx` (its keydown handlers cover Escape and Tab focus trapping only). Archive exists with confirmation (`archiveWorkspace`); rename does not. `updateWorkspacePolicy` accepts only replication fields.
+- Keep-awake: no power-assertion code exists in `apps/` or `crates/`.
+
+Implementation language and optimization notes:
+
+- Keep-awake belongs in the Rust daemon (it knows when admitted work runs): Windows `PowerCreateRequest`/`PowerSetRequest` through `windows-sys` in `crates/windows-local-security`, Linux logind `Inhibit` (D-Bus) or `systemd-inhibit`. The UI only renders the observed state.
+- The stop/update gate belongs in Rust (`runtime.rs` plus a new settlement module); the updater in Feature 019 calls it.
+- Settings UI: split `SettingsView.tsx` into one module per category and pass a typed context object instead of 60 props; that removes re-render of every category on each `App.tsx` state change and makes the inert-control audit testable per category.
+- Keyboard: one shortcut registry in TypeScript so labels are generated from registered handlers; this makes "label only when handler exists" structural rather than reviewed.

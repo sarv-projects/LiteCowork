@@ -1,0 +1,158 @@
+feature_id: "014"
+name: "Conversation History Management"
+status: "IN_REVIEW"
+spec_revision: "0.1"
+notes: "All new edges are proposed target wiring, not served. Only Conversation create, list, get, turn and agent-binding routes exist today."
+nodes:
+  - id: "sidebar-ui"
+    owner: "Desktop UI (sidebar)"
+    kind: "component"
+    responsibility: "Search field, Recent Chats list, Active/Archived filter, row menu, delete dialog, accessible states"
+    implementation_status: "PARTIAL: Recent Chats list exists in App.tsx without search or actions"
+    inputs: ["owner input", "Conversation pages", "search pages", "deletion status"]
+    outputs: ["typed history-management commands"]
+  - id: "header-ui"
+    owner: "Desktop UI (Conversation header)"
+    kind: "component"
+    responsibility: "Title display and More options (rename, archive, delete)"
+    implementation_status: "PARTIAL: More options button has no handler"
+    inputs: ["selected Conversation"]
+    outputs: ["typed history-management commands"]
+  - id: "tauri-bridge"
+    owner: "Desktop Tauri bridge"
+    kind: "desktop transport"
+    responsibility: "Bounded typed commands; If-Match from observed version; one idempotency key per intent"
+    inputs: ["UI command"]
+    outputs: ["authenticated Operator request"]
+  - id: "operator"
+    owner: "litecoworkd Operator"
+    kind: "authenticated boundary"
+    responsibility: "Owner and Workspace scope, If-Match, idempotency, typed errors"
+    inputs: ["desktop IPC request"]
+    outputs: ["validated command", "projection"]
+  - id: "history-service"
+    owner: "Conversation history service"
+    kind: "domain service"
+    responsibility: "Rename, archive, search, deletion impact and delete orchestration"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["validated command"]
+    outputs: ["storage commands"]
+  - id: "sqlite-store"
+    owner: "Storage"
+    kind: "transaction boundary"
+    responsibility: "Conversation status CAS, search index maintenance, tombstone, sealed manifest, read fences, receipts, events"
+    inputs: ["typed storage command"]
+    outputs: ["committed result"]
+  - id: "purge-reconciler"
+    owner: "Conversation purge reconciler (Runtime)"
+    kind: "background worker"
+    responsibility: "Remove manifest targets, acknowledge after physical removal, complete DELETED, resume at startup"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["pending purge targets"]
+    outputs: ["acknowledgements", "completion"]
+  - id: "blob-store"
+    owner: "Storage blob store"
+    kind: "local object store"
+    responsibility: "Snapshot and rich presentation document blobs"
+    inputs: ["remove request"]
+    outputs: ["removal result"]
+  - id: "turn-path"
+    owner: "Feature 001 Conversation turn path"
+    kind: "upstream writer and reader"
+    responsibility: "Message insert (index hook), context package loading (status fence), single-flight check"
+    inputs: ["status predicate"]
+    outputs: ["committed messages"]
+  - id: "consuming-readers"
+    owner: "Features 003, 007, 009, 018"
+    kind: "downstream readers"
+    responsibility: "Retrieval sources, Artifact association, Coworker memory sources, diagnostics honour the readable predicate"
+    inputs: ["conversation_is_readable predicate"]
+    outputs: ["fenced reads"]
+edges:
+  - id: "e01"
+    from: "sidebar-ui"
+    to: "tauri-bridge"
+    kind: "typed-command"
+    contract: "search_conversations, rename_conversation, archive_conversation, unarchive_conversation, get_conversation_deletion_impact, delete_conversation"
+  - id: "e02"
+    from: "header-ui"
+    to: "tauri-bridge"
+    kind: "typed-command"
+    contract: "rename_conversation, archive_conversation, delete_conversation"
+  - id: "e03"
+    from: "tauri-bridge"
+    to: "operator"
+    kind: "authenticated-request"
+    contract: "proposed Conversation history routes (SPEC 7.2)"
+  - id: "e04"
+    from: "operator"
+    to: "history-service"
+    kind: "command"
+    contract: "owner-scoped validated command"
+  - id: "e05"
+    from: "history-service"
+    to: "sqlite-store"
+    kind: "transaction"
+    contract: "rename, archive, unarchive, search read, deletion request"
+  - id: "e06"
+    from: "purge-reconciler"
+    to: "sqlite-store"
+    kind: "transaction"
+    contract: "list pending targets, acknowledge, complete"
+  - id: "e07"
+    from: "purge-reconciler"
+    to: "blob-store"
+    kind: "local-io"
+    contract: "outside any SQLite transaction; acknowledge only after removal"
+  - id: "e08"
+    from: "turn-path"
+    to: "sqlite-store"
+    kind: "transaction"
+    contract: "message insert writes index rows in the same transaction; context load checks status"
+  - id: "e09"
+    from: "consuming-readers"
+    to: "sqlite-store"
+    kind: "read"
+    contract: "conversation_is_readable inside each reader transaction"
+  - id: "e10"
+    from: "operator"
+    to: "sidebar-ui"
+    kind: "projection"
+    contract: "Conversation pages, search pages with index_state, deletion status"
+transactions:
+  - id: "tx-rename"
+    owner: "Storage via Conversation history service"
+    atomic_records: ["Conversation title and version", "conversation.renamed.v1", "snapshot", "request receipt"]
+    external_calls_inside: false
+  - id: "tx-archive"
+    owner: "Storage via Conversation history service"
+    atomic_records: ["Conversation status and version", "conversation.archived.v1 or conversation.unarchived.v1", "snapshot", "request receipt"]
+    external_calls_inside: false
+  - id: "tx-index-message"
+    owner: "Storage within the Feature 001 message transaction"
+    atomic_records: ["ConversationMessage", "ConversationSearchTerm rows"]
+    external_calls_inside: false
+  - id: "tx-request-deletion"
+    owner: "Storage via Conversation history service"
+    atomic_records: ["Conversation DELETION_PENDING tombstone", "ConversationPurgePlan", "ConversationPurgeReceipt PENDING rows", "conversation.deletion_requested.v1", "request receipt"]
+    external_calls_inside: false
+  - id: "tx-acknowledge-target"
+    owner: "Storage via purge reconciler"
+    atomic_records: ["ConversationPurgeReceipt ACKNOWLEDGED", "removed row or cleared field for row targets"]
+    external_calls_inside: false
+  - id: "tx-complete-deletion"
+    owner: "Storage via purge reconciler"
+    atomic_records: ["Conversation DELETED", "conversation.deleted.v1"]
+    external_calls_inside: false
+external_boundaries:
+  - id: "blob-removal"
+    owner: "Conversation purge reconciler"
+    input_trust: "local filesystem"
+    timeout: "finite per target"
+    retry: "retry pending target; acknowledge only after verified removal"
+recovery:
+  owner: "Conversation purge reconciler"
+  source_of_truth: ["Conversation status", "ConversationPurgePlan", "ConversationPurgeReceipt"]
+  implementation_status: "TARGET_ONLY"
+  restart_action: "resume pending receipts; complete DELETED when all acknowledged; fences hold throughout"
+  ui_action: "deleted Conversation shows deleted state; sidebar omits it; deletion status shows pending count"

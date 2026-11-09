@@ -1,6 +1,8 @@
 # Research - Golden Connection and One Capability Write
 
-**Feature:** 006 | **Checked:** 2026-11-06 (source, composed routes and desktop UI)
+**Feature:** 006 | **Checked:** 2026-11-06 (source, composed routes and desktop UI); provider docs re-checked 2026-11-09
+
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Sources
 
@@ -15,6 +17,16 @@ Authorities: docs/CONNECTORS-WORKFLOWS.md, docs/CAPABILITY-FABRIC.md, docs/NETWO
 - Windows peer identity is not independently verified by the current LiteSPM bridge (`peerAuth.verified=false`, owner-only Named Pipe DACL is the stated OS boundary). Do not label this application-level verified identity.
 - Hosted competitors often collapse connection, permission and execution into one toggle. LiteCowork forbids that collapse.
 - Reference desktop repositories are architecture comparisons, not code to vendor. Pins and paths: [REFERENCE-IMPLEMENTATIONS.md](../../docs/REFERENCE-IMPLEMENTATIONS.md), [REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md](../../docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md).
+
+## Borrowable-design sources (pinned)
+
+| Source | Exact pinned URL | License | What informs the golden connection/write | Verdict |
+|---|---|---|---|---|
+| OpenWork lazy capability gateway (`search_capabilities`/`execute_capability`) | https://github.com/different-ai/openwork/tree/5493b18a6af64d56454658a53da00eabbc6e033d | MIT except `/ee` (Enterprise Edition License) | The lazy gateway admits a named capability only on demand, which maps to the broker loading only a grant-scoped invocation rather than exposing a standing provider surface. | Prototype the lazy-admission shape against CAPABILITY-FABRIC; do not import `/ee` paths or adopt the OpenCode loop. |
+| LiteSPM published package/host contract | https://github.com/sarv-projects/LiteSPM/tree/9f42b25ddfb1acedce0f2dbf9964f4a7724d622e | Apache-2.0 at checked root LICENSE | LiteSPM is the selected package lifecycle authority; its published package/host contract is the boundary LiteCowork links to for install, not reimplements. The checked root does not yet settle the LiteCowork-facing wire contract, so no API is inferred. | Reference/boundary only; use the published contract when available, do not invent or duplicate its API. |
+| Arcade MCP authorized tool declarations | https://github.com/ArcadeAI/arcade-mcp/blob/79a2dc90d347e4cd1a96366a2d94c8ddc356f1c3/README.md | MIT | Study authorized MCP tool declarations and secret-injection boundaries: tokens are injected by the host, never exposed to the model, which matches the SecretStore custody and token-redaction requirement (AC-001). | Reference only; Arcade MCP is an optional provider, not a required dependency of this slice. |
+
+No OpenWork, LiteSPM or Arcade MCP code is imported; all three are prototype/reference/boundary inputs. OpenBot is not cited here; if it were, it would be reference/UX only with no code reuse under its PolyForm Noncommercial license.
 
 ## Source, composed-route and UI audit (2026-11-06)
 
@@ -51,6 +63,24 @@ These are source/route/UI findings. No LiteCowork account Connection was created
 - Rival web pages were not re-fetched on 2026-11-06 for this package; LiteSPM upstream bridge evidence remains pinned to commit `111fd9b8e84573f8fce76b6374b4ff9639502539` as checked on 2026-11-05, not as proof of LiteCowork integration.
 - No LiteCowork runtime or end-to-end bridge integration was executed. The upstream source review is static and commit-pinned; it does not qualify a local LiteCowork process launch, IPC identity, host mutation, or receipt/recovery path.
 
+## Provider documentation check (2026-11-09)
+
+| Source | Finding | Effect on this package |
+|---|---|---|
+| [GitHub: Authorizing OAuth apps](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps) | PKCE supported with `S256` only; loopback `redirect_uri` on any port at `127.0.0.1` is accepted; `client_secret` is listed as required for the web-flow code exchange and for refresh unless the token came from the device flow; the device flow needs no client secret; token exchange is at `github.com/login/oauth/access_token`. | B-19's loopback-PKCE recipe still needs a client secret, so B-19's stop clause applies until the owner decides (TASKS T02). The OAuth token endpoint must be a separate allowlisted auth host. |
+| [GitHub REST: OAuth authorizations](https://docs.github.com/en/rest/apps/oauth-applications) | `DELETE /applications/{client_id}/token` requires Basic auth with the client secret. | Remote revocation is not possible without a client secret; revoke is local first and remote revoke may be an owner action (AC-015). |
+
+Content was rephrased for compliance with licensing restrictions.
+
+## Implementation placement notes
+
+- Keep OAuth, token custody and brokered HTTP in the Rust daemon (`apps/litecoworkd`), not in TypeScript or the Tauri shell, so verifiers and tokens never reach the WebView process. The daemon already has `reqwest` with rustls.
+- Reuse `OsSecretStore` and its `keyring` backends; add a crate-private resolver and a delete rather than a second secret store.
+- Reuse `SqliteCapabilityDispatchStore::admit_capability_dispatch` rather than writing a second admission path.
+- Keep UI state logic in small TypeScript modules (`connections-state.ts`) so it is testable with the existing `node --test` runner.
+
 ## Unresolved questions
 
-See SPEC section 5 blockers. Owners are named on the package README.
+- OAuth recipe after the client-secret finding (TASKS T02, owner).
+- Whether the Task-scoped golden write needs an admitted Environment (SPEC §18; affects the Windows row through 005 B-35).
+- Confirmation of the golden read operation (proposed: list issue comments), recorded in T01.

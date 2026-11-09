@@ -1,5 +1,7 @@
 # UI behavior - Workspace Roots and Context Ingestion
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs/V1-UI-SCREEN-CONTRACT.md). Control classes: [V1-SETTINGS-CONTRACT-LEDGER.md](../../../docs/V1-SETTINGS-CONTRACT-LEDGER.md) and [SEMANTIC-SERVED-UI-MAP.md](../../../docs/SEMANTIC-SERVED-UI-MAP.md). Action states: [V1-UI-ACTION-STATE-LEDGER.md](../../../docs/V1-UI-ACTION-STATE-LEDGER.md).
 
 ## Flows and states
@@ -7,6 +9,8 @@ Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs
 - Add root uses the OS picker then an explicit confirm.
 - Paused, unavailable and revoked are different labels with different repairs.
 - Context Used lists citations; search hits require an explicit attach.
+- Add persistent folder and Scan folder are disabled before selection, with a stated reason, on a platform where they are not qualified (AC-015).
+- The Feature 001 composer @-reference picker lists only Resources of the current Workspace under ACTIVE roots or otherwise admitted, pins exact revisions, and is a labelled keyboard-operable listbox (AC-017). The "Add context or file" button opens the same picker.
 
 ## Commands
 

@@ -1,32 +1,34 @@
 # Data model - Workspace Roots and Context Ingestion
 
-**Feature:** 003 | **Status:** DRAFT
+**Feature:** 003 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
-Identities and lifecycles stay in the canonical owner documents. This file lists the records this slice reads or commits. It does not authorize new tables by itself.
+Identities and lifecycles stay in the canonical owner documents. This file lists the records this slice reads or commits. New tables are added only by the TASKS T01 migration promoted together with the owner documents.
 
 ## Records
 
-- WorkspaceRoot status ACTIVE | PAUSED | UNAVAILABLE | REVOKED.
-- Resource revision and digest.
-- ContextAttachment and retrieval receipt.
+- WorkspaceRoot status ACTIVE | PAUSED | UNAVAILABLE | REVOKED (CODE: `crates/storage-core/src/lib.rs` root store methods, `crates/storage-sqlite/src/workspace_root_membership.rs`, `workspace_root_observations.rs`).
+- Private local identity binding: Linux/macOS device + inode; Windows volume serial number + 128-bit file id (`windows_local_security::DirectoryIdentity`; the Windows branch in `apps/litecoworkd/src/local_filesystem.rs` is compiled but not reached by root add today).
+- Resource revision and content digest.
+- ContextAttachment (accepted target interface, not yet in source): `context_attachment_id`, `workspace_id`, `conversation_id`, `turn_id`, `resource_id`, `resource_revision_id`, `content_digest`, `root_id` (nullable for uploaded Resources), `retrieval_receipt_id` (nullable for explicit @-references), `created_at`, idempotency key.
+- Retrieval receipt (accepted target interface, not yet in source): `retrieval_receipt_id`, `workspace_id`, `conversation_id`, `turn_id`, `query_digest`, `provider_id`, cited revision list, outcome GROUNDED | INSUFFICIENT_EVIDENCE | PROVIDER_UNAVAILABLE, `created_at`, idempotency key.
 - Runtime-local private locator.
 
 ## Relations
 
-Workspace is the security boundary. Child records carry workspace id. Runtime-local secrets, handles and private locators are excluded from replicated events and ordinary backups.
+Workspace is the security boundary. Child records carry workspace id. A ContextAttachment references one exact revision and, when it came from retrieval, one retrieval receipt. Runtime-local secrets, handles and private locators are excluded from replicated events and ordinary backups.
 
 ## Lifecycle
 
-Create and settle through the transactions in WIRING.yaml. External effects happen after commit. Terminal states are explicit. Unknown is not success.
+Create and settle through the transactions in WIRING.yaml. ContextAttachments and retrieval receipts are immutable once committed. Root revoke fences future attachment and retrieval; it does not rewrite committed attachments or the transcript that already received bytes. External effects happen after commit. Unknown is not success.
 
 ## Persistence and events
 
-Use existing event names in [docs/EVENTS.md](../../docs/EVENTS.md). A new event type requires a same-change edit to EVENTS.md and `docs/schemas/domain-event.schema.json`.
+Use existing event names in [docs/EVENTS.md](../../docs/EVENTS.md) (`workspace.root.created.v1`, `workspace.root.status.changed.v1`). Any ContextAttachment or retrieval-receipt event is an accepted target interface (not yet in source) and requires a same-change edit to EVENTS.md and `docs/schemas/domain-event.schema.json`.
 
 ## Retention
 
-Follow the owner retention rules. Purge removes future visibility of payload bytes. Receipts of the deletion may remain.
+Follow the owner retention rules. Purge removes future visibility of payload bytes. Receipts of the deletion may remain. Conversation delete fences (Feature 014) remove attachments from future projections without deleting the receipt identity.
 
 ## Migration
 
-None in this revision. Blockers in SPEC section 5 must be closed before a migration is designed.
+One additive migration in the next free immutable `docs/schemas/sqlite-vNN.sql` (TASKS T01). No migration exists today.

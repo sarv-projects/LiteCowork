@@ -1,8 +1,8 @@
 # 002 - Native Agent Install, Auth and Binding
 
-**Status:** DRAFT - review required; does not authorize implementation.
-**Revision:** 0.3 | **Updated:** 2026-11-06
-**Owners to approve:** Agent Runtime, Security/Trust, Desktop UI, Product, Conversation Runtime.
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Revision:** 1.0 | **Updated:** 2026-11-09
+**Owners:** Agent Runtime, Security/Trust, Desktop UI, Product, Conversation Runtime. Accepted by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
 
 ## User outcome
 
@@ -10,11 +10,18 @@ The owner discovers and inspects a native agent, establishes a module-qualified 
 
 ## Current truth
 
-The active checkout has 15 curated candidates plus read-only ACP metadata and bounded version/path observations; auth remains UNKNOWN and readiness NOT_PROBED. Profile probes are limited to Codex and OpenCode: Codex observations do not imply Conversation dispatch, while OpenCode's current profile offer is incompatible. Install/update/repair and native sign-in are absent; descriptor/credential routes return 503; binding enable does not enforce the fresh AC-004 descriptor gate. Model/effort selection and Usage are not qualified. Feature 001 remains the authority for Conversation execution. Do not infer qualification from a catalogue row, model list, installed binary, profile probe or enabled binding.
+The active checkout has 15 curated candidates plus read-only ACP metadata and bounded version/path observations; auth remains UNKNOWN and readiness NOT_PROBED. Profile probes are limited to Codex and OpenCode: Codex observations do not imply Conversation dispatch, while OpenCode's current profile offer is incompatible. Install/update/repair and native sign-in are absent; descriptor/credential routes return 503; binding enable does not enforce the fresh AC-004 descriptor gate. Model/effort selection and Usage are not qualified. Feature 001 remains the authority for Conversation execution. The OpenCode binding break is traced to exact symbols in SPEC §4a and is fixed first by TASKS 002-T01. Do not infer qualification from a catalogue row, model list, installed binary, profile probe or enabled binding.
 
 ## V1 design
 
 The catalogue, Agent profile sections, action preconditions and status projections are defined in SPEC.md and contracts/ui-behavior.md. The screenshot hierarchy is adopted without treating the old NeuralAgent repository or public discovery metadata as trusted install authority.
+
+## Lifecycle, scope and dependencies
+
+- Lifecycle: ACCEPTED/LOCKED (2026-11-09). Next transitions: IMPLEMENTING when 002-T01 starts, VERIFIED only through the final TASKS.md task with owner sign-off.
+- Release target: V1 release matrix row 1 (Windows x64 + OpenCode v2.0.32), row 2 (Linux x64). Claude Code CLI is the second AgentModule (B-11).
+- Screen ownership (A-35): the Settings -> Agents screen is owned by [Feature 011](../011-desktop-shell-ipc-settings-runtime/SPEC.md). Feature 002 owns only the install/auth/descriptor/binding operations that screen invokes.
+- Consumers: [Feature 001](../001-conversation-session-supervisor/SPEC.md) needs a creatable OpenCode binding (P1 prerequisite); [Feature 004](../004-agent-relay/SPEC.md) needs the second module.
 
 ## Package
 

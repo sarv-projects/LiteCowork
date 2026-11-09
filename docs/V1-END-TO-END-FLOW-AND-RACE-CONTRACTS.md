@@ -1,6 +1,8 @@
 # V1 End-to-End Flow, Admission and Race-Condition Verification Contracts
 
-Status: normative TARGET cross-owner design crosswalk. Canonical states, machine enums, operation IDs, event names and SQLite transactions remain in STATE-MACHINES, API/OpenAPI, EVENTS, STORAGE and TASK-RUNTIME. This ledger defines handoffs and negative-condition acceptance; it does not pretend unserved candidate routes exist. Every chain must be demonstrated in source and UIV1 plus canonical UAT before release.
+Status: normative TARGET cross-owner design crosswalk. Canonical states, machine enums, operation IDs, event names and SQLite transactions remain in STATE-MACHINES, API/OpenAPI, EVENTS, STORAGE and TASK-RUNTIME. This ledger defines handoffs and negative-condition acceptance; it does not pretend unserved candidate routes exist. Every chain must be demonstrated in source plus canonical UAT before release.
+
+**UIV1 namespace resolution (register A-39).** The `UIV1-xxx` identifiers in the acceptance column are a traceability pointer to the archived catalog [`archive/legacy-implementation-c7e9c05/V1-DESIGN-COVERAGE.md`](archive/legacy-implementation-c7e9c05/V1-DESIGN-COVERAGE.md); that namespace is retired as an active acceptance authority (see [V1-UI-ACTION-STATE-LEDGER.md](V1-UI-ACTION-STATE-LEDGER.md)). Acceptance for each chain resolves on its live flow ID (FL-/F-number) and the owning feature's EARS AC IDs, not on the UIV1 number.
 
 ## General end-to-end proof obligation
 

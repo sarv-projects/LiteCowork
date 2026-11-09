@@ -1,5 +1,7 @@
 # UI behavior - Desktop Shell IPC Settings and Runtime Health
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 Behavior, not pixels. The screen inventory is [V1-UI-SCREEN-CONTRACT.md](../../../docs/V1-UI-SCREEN-CONTRACT.md). Per-control authority is [V1-SETTINGS-CONTRACT-LEDGER.md](../../../docs/V1-SETTINGS-CONTRACT-LEDGER.md); current evidence is [SETTINGS-AND-SHELL-SURFACE-AUDIT.md](../../../docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md) and [IMPLEMENTATION-STATUS.md](../../../docs/IMPLEMENTATION-STATUS.md). This contract defines the Settings host and common state behavior; domain tabs retain their canonical owner contracts.
 
 ## Common Settings shell
@@ -28,3 +30,19 @@ The active Settings route mounts `SettingsView` with four categories only (Gener
 ## Validation
 
 Cover empty, stale, offline, denied, stale version, unsupported OS, unqualified provider, ambiguous timeout, cancellation, restart and recovery. Keyboard navigation, focus restore, screen reader labels, high contrast and reduced motion are required. Semantic Conversation output remains available when a rich renderer fails.
+
+## Revision 1.0 accepted control states (2026-11-09)
+
+| Control | Location | Enabled when | Pending / success / failure / unavailable |
+|---|---|---|---|
+| Workspace rename | Settings > Workspaces | Workspace ACTIVE, Operator ready, rename operation served | Saving; committed name from receipt; conflict shows latest; archived shows read-only |
+| Archive Workspace | Settings > Workspaces (exists) | Workspace ACTIVE | Two-step confirm; "Archiving"; read-only after receipt |
+| Preview stop / Stop safely | Settings > Runtime and Advanced | Stop route served and preview verdict QUIESCENT | Preview lists running/unknown items; Stop disabled with reason otherwise; never "Stopped" before STOPPED |
+| Keep-awake | Settings > Advanced | OS provider present on this row | HELD only after OS confirms; UNSUPPORTED with reason; released on drain |
+| Theme, density, text scale, reduced motion | Settings > General | Local preference store wired and applied | Applied immediately and persisted; otherwise removed (not shown inert) |
+| Shortcut list | Settings > General | Generated from the registered shortcut registry | Only registered shortcuts are listed |
+| Agents screen | Settings > Agents | Per Feature 002 served operation | Descriptor/credential operations that return 503 render unavailable with reason |
+| Notifications | Settings > Notifications entry | Always (link) | Links to Feature 010 quiet-hours contract; no local quiet-hours control |
+| Transport status | Settings > Runtime | Always | "Local IPC (named pipe)" on Windows, "Local IPC (socket)" on Linux; never "Localhost" |
+
+Keyboard baseline (app-wide): primary navigation, New Chat, Conversation composer, Workbench and Settings are reachable with Tab/Shift+Tab; drawers and dialogs trap focus and return it on close; Escape closes the topmost drawer or dialog; focus is always visible.

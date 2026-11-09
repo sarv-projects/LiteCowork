@@ -1,5 +1,5 @@
 feature_id: "006"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
 nodes:
   - id: "ui"
     owner: Desktop UI
@@ -17,8 +17,11 @@ nodes:
     owner: external provider HTTP
     kind: external
   - id: "secrets"
-    owner: SecretStore
+    owner: SecretStore (OS keystore via OsSecretStore; broker-only resolver)
     kind: store
+  - id: "reconciler"
+    owner: Capability reconciler
+    kind: service
 edges:
   - id: "e-ui-op"
     from: "ui"
@@ -44,6 +47,18 @@ edges:
     from: "owner"
     to: "secrets"
     kind: custody
+  - id: "e-owner-reconciler"
+    from: "owner"
+    to: "reconciler"
+    kind: request
+  - id: "e-reconciler-provider"
+    from: "reconciler"
+    to: "provider"
+    kind: http
+  - id: "e-reconciler-storage"
+    from: "reconciler"
+    to: "storage"
+    kind: transaction
 transactions:
   - id: "tx-connection"
     owner: ConnectionService
@@ -52,6 +67,14 @@ transactions:
   - id: "tx-invoke"
     owner: CapabilityBroker
     atomic_records: ["invocation","approval","idempotency_receipt"]
+    external_calls_inside: false
+  - id: "tx-revoke"
+    owner: ConnectionService
+    atomic_records: ["connection","capability_grants","connection_state_event","idempotency_receipt"]
+    external_calls_inside: false
+  - id: "tx-reconcile"
+    owner: Capability reconciler
+    atomic_records: ["invocation","effect","evidence"]
     external_calls_inside: false
 external_boundaries:
   - id: "outside-sqlite"
@@ -73,3 +96,11 @@ recovery:
 # resolution does not dispatch an action. CapabilityInvocation APIs are GET-only; SQLite
 # refuses DISPATCHED admission. The provider/secret/invocation/effect edges must remain
 # TARGET until the golden OAuth/read/write flow and reconciliation are qualified.
+
+# Owner acceptance 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md): status ACCEPTED/LOCKED
+# authorizes implementation of this target wiring. It does not make any edge SERVED, INTEGRATED
+# or QUALIFIED. Keystore writes and removals happen outside tx-connection and tx-revoke (before
+# commit on connect, after commit on revoke). The provider edges allow only api.github.com for
+# Invocations and the GitHub OAuth token endpoint for ConnectionService. No edge reaches LiteSPM:
+# package lifecycle belongs to package 013. tx-revoke, tx-reconcile and the reconciler node are
+# accepted target wiring added in revision 1.0, not yet in source.

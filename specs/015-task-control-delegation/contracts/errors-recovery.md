@@ -1,0 +1,46 @@
+# Error and Recovery Contract - Feature 015
+
+**Status:** IN_REVIEW - authored for owner review; does not authorize implementation.
+Canonical codes: [docs/schemas/error-codes.schema.json](../../../docs/schemas/error-codes.schema.json). Recovery semantics: [docs/FAILURE-RECOVERY.md](../../../docs/FAILURE-RECOVERY.md).
+
+## 1. Error mapping
+
+| Condition | Code | HTTP | Exists today |
+|---|---|---|---|
+| Pause on PAUSED Task | `TASK_ALREADY_PAUSED` | 409 | yes |
+| Pause at unsafe boundary | `TASK_PAUSE_UNSAFE` | 409 | yes |
+| Control on terminal Task | `TASK_TERMINAL` | 409 | yes |
+| Resume when not PAUSED | `TASK_NOT_PAUSED` | 409 | accepted target |
+| Stale Task version | `STALE_TASK_VERSION` | 409 | yes |
+| Stale spec revision | `STALE_SPEC_REVISION` | 409 | yes |
+| Same idempotency key, different body | `CONFLICT` | 409 | yes |
+| Late result from superseded Attempt or epoch | `STALE_FENCE` | 409 (internal) | yes |
+| Handoff while prior lease is live | `HANDOFF_PRIOR_LEASE_ACTIVE` | 409 with retry-after | accepted target |
+| Profile not in Coworker allowlist | `DELEGATION_PROFILE_NOT_ENABLED_FOR_COWORKER` | 403 | accepted target |
+| Depth limit | `DELEGATION_DEPTH_EXCEEDED` | 409 | yes |
+| Concurrency limit | `DELEGATION_CONCURRENCY_EXCEEDED` | 409 | yes |
+| Profile disabled or archived | `DELEGATION_PROFILE_DISABLED`, `DELEGATION_PROFILE_ARCHIVED` | 409 | yes |
+| Budget STOP_NEW_DELEGATION | `DELEGATION_BUDGET_EXHAUSTED` | 409 | accepted target |
+| Shared writable Environment requested | `DELEGATION_ENVIRONMENT_SHARING_DENIED` | 403 | accepted target |
+| No qualified Environment (Windows row) | `ENVIRONMENT_UNAVAILABLE` | 503 | yes |
+| Foreign Workspace or Task | `NOT_FOUND` | 404 | yes |
+
+`ChildAdmissionDenial` variants map in one exhaustive function: `StaleTask` to `STALE_TASK_VERSION`, `StalePlanOrSpec` to `STALE_SPEC_REVISION`, `StepNotReady` to `STEP_NOT_READY`, `ParentAttemptNotCurrent`, `ParentSessionNotCurrent`, `ParentLeaseNotCurrent` and `InvalidLineage` to `STALE_FENCE`, `DepthLimitReached` to `DELEGATION_DEPTH_EXCEEDED`, `ConcurrencyLimitReached` to `DELEGATION_CONCURRENCY_EXCEEDED`, `ProfileNotEnabledForCoworker` to `DELEGATION_PROFILE_NOT_ENABLED_FOR_COWORKER`, `ProfileUnavailable` and `ProfileRevisionMismatch` to `DELEGATION_PROFILE_INCOMPATIBLE`, `AuthorityPrerequisitesUnproven` to `POLICY_DENIED`, `WorkspaceMismatch` to `NOT_FOUND`, `InvalidInput` to `INVALID_ARGUMENT`.
+
+## 2. Failure and crash matrix
+
+| Window | Required behaviour |
+|---|---|
+| Crash after PAUSE_REQUESTED commit, before quiescence | Startup sweep: prior leases cannot be renewed; Attempts ABANDONED; Effects reconciled; then PAUSED commits from the durable control request |
+| Crash after child admission commit, before worker start | Child Attempt CREATED with no session: sweep marks it ABANDONED and releases the reservation; escalation may admit a new Attempt |
+| Timeout after worker dispatch | Effect AMBIGUOUS; Feature 005 reconciler settles it before any replacement |
+| Late ResultEnvelope after handoff or replacement | Fenced observation; no state change |
+| Duplicate command replay | Stored receipt returned; no second effect |
+| Cancel racing child completion | Earlier committed outcome wins; cancel settles the rest |
+| Pause racing cancel | One CAS wins; cancel supersedes a pending pause |
+| Quiescence never observed | Bounded wait then forceful stop of LiteCowork-owned processes only; Task stays in the requested state with a typed blocker until settled |
+| Verifier timeout | VerificationRun INCONCLUSIVE |
+
+## 3. Mandatory behaviour
+
+UNKNOWN is never success. No retry resends a native prompt to repair a storage write. Recovery never replays recorded actions.

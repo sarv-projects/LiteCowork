@@ -1,6 +1,7 @@
 # Data Model - Conversation Session Supervisor
 
-**Feature:** 001 | **Status:** IN_REVIEW | **Authority:** DATA-MODEL.md, STATE-MACHINES.md, STORAGE.md, EVENTS.md, SCHEMAS.md, AGENT-CONTROL.md.
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Feature:** 001 | **Authority:** DATA-MODEL.md, STATE-MACHINES.md, STORAGE.md, EVENTS.md, SCHEMAS.md, AGENT-CONTROL.md.
 
 This feature reuses canonical records. It must not create a parallel Conversation transcript, provider-session aggregate or model-routing database.
 

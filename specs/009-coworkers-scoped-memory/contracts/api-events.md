@@ -1,6 +1,6 @@
 # API and events - Coworkers and Scoped Memory
 
-**Feature:** 009 | **Status:** DRAFT | **Source cross-check:** 2026-11-06
+**Feature:** 009 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification. | **Source cross-check:** 2026-11-06
 
 ## Currently served Coworker API
 
@@ -40,7 +40,7 @@ The target LearningService API in `docs/LEARNING.md` §11 and proposed routes el
 
 ## Events
 
-This DRAFT does not add event types. Coworker and Workspace lifecycle events remain owned by their current canonical domain/store schemas. No production learning-candidate or learning-memory event producer was found. Any future learning event must be added to `docs/EVENTS.md` and `docs/schemas/domain-event.schema.json` in the same owner-reviewed change; event payloads must not contain candidate body text, raw memory values, credentials or native handles.
+No new event type is served by this package yet. The accepted target events (`conversation.coworker.assigned.v1`, `coworker.capability_assignment.created.v1` / `revised.v1` / `revoked.v1`, `coworker.responsibility.created.v1` / `revised.v1` / `status_changed.v1`, from COWORKERS-TARGET.md) are accepted target interfaces (not yet in source) and are promoted by TASKS.md T01 into docs/EVENTS.md and the event schema before any producer exists. Coworker and Workspace lifecycle events remain owned by their current canonical domain/store schemas. No production learning-candidate or learning-memory event producer was found. Any future learning event must be added to `docs/EVENTS.md` and `docs/schemas/domain-event.schema.json` in the same owner-reviewed change; event payloads must not contain candidate body text, raw memory values, credentials or native handles.
 
 ## Versioning and replay
 
