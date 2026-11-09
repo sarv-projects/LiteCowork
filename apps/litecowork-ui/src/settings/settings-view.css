@@ -385,3 +385,4 @@
 
 .settings-unavailable-list { margin: 0; padding: 0 12px; list-style: none; display: grid; gap: 8px; color: var(--color-text-muted); font-size: 12px; }
 .settings-unavailable-list strong { display: block; color: var(--color-text); font-size: 12px; }
+.settings-error { margin: 0 0 12px; font-size: 12.5px; color: #b91c1c; }

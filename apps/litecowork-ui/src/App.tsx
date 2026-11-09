@@ -133,6 +133,13 @@ import {
   saveLocalPreferences,
   type LocalPreferences,
 } from "./settings/local-preferences.ts";
+import {
+  classifyRenameFailure,
+  nextRenameRequest,
+  renameFailureMessage,
+  validateWorkspaceName,
+  type PendingRename,
+} from "./settings/workspace-rename.ts";
 
 type Page = "Home" | "Conversations" | "Work" | "Library" | "Discover" | "Needs You" | "Ideas" | "Coworkers" | "Goals" | "Notifications" | "Routines" | "Automations" | "Settings";
 export type RuntimeStatus = {
@@ -800,6 +807,9 @@ function App() {
   const [workspacePolicyBusy, setWorkspacePolicyBusy] = useState(false);
   const workspacePolicyBusyRef = useRef(false);
   const [workspaceArchiveBusy, setWorkspaceArchiveBusy] = useState(false);
+  const [workspaceRenameBusy, setWorkspaceRenameBusy] = useState(false);
+  const [workspaceRenameError, setWorkspaceRenameError] = useState<string | null>(null);
+  const pendingWorkspaceRename = useRef<PendingRename | null>(null);
   const pendingWorkspaceArchive = useRef<{ workspaceId: string; version: number; requestId: string } | null>(null);
   const [workspaceDefaultAgentBusy, setWorkspaceDefaultAgentBusy] = useState(false);
   const [workspaceInstructions, setWorkspaceInstructions] = useState<WorkspaceInstructionView[]>([]);
@@ -1662,6 +1672,49 @@ function App() {
       setWorkspaceError(message);
     } finally {
       setWorkspaceArchiveBusy(false);
+    }
+  };
+
+  /** Resolves true when the rename committed; false keeps the caller's draft. */
+  const renameWorkspace = async (draftName: string): Promise<boolean> => {
+    const workspace = workspaces.find((item) => item.workspaceId === selectedWorkspaceId);
+    if (!workspace || workspaceRenameBusy) return false;
+    if (workspace.status !== "ACTIVE") {
+      setWorkspaceRenameError(renameFailureMessage("ARCHIVED", null));
+      return false;
+    }
+    const checked = validateWorkspaceName(draftName);
+    if (!checked.ok) {
+      setWorkspaceRenameError(checked.reason);
+      return false;
+    }
+    setWorkspaceRenameBusy(true);
+    setWorkspaceRenameError(null);
+    const pending = nextRenameRequest(pendingWorkspaceRename.current, workspace.workspaceId, workspace.version, checked.name, () => crypto.randomUUID());
+    pendingWorkspaceRename.current = pending;
+    try {
+      const updated = await invoke<WorkspaceView>("rename_workspace", {
+        workspaceId: workspace.workspaceId,
+        name: checked.name,
+        expectedVersion: workspace.version,
+        requestId: pending.requestId,
+      });
+      pendingWorkspaceRename.current = null;
+      updateWorkspaceProjection((items) => items.map((item) => item.workspaceId === updated.workspaceId ? updated : item));
+      return true;
+    } catch (error) {
+      const failure = classifyRenameFailure(typeof error === "string" ? error : "");
+      if (failure !== "OTHER") pendingWorkspaceRename.current = null;
+      let latestName: string | null = null;
+      if (failure === "STALE" || failure === "ARCHIVED") {
+        await refreshWorkspaces((items) => {
+          latestName = items.find((item) => item.workspaceId === workspace.workspaceId)?.name ?? null;
+        });
+      }
+      setWorkspaceRenameError(renameFailureMessage(failure, latestName));
+      return false;
+    } finally {
+      setWorkspaceRenameBusy(false);
     }
   };
 
@@ -2673,7 +2726,7 @@ function App() {
             requestPageNavigation("Work");
           }} />
         ) : page === "Settings" ? (
-          <SettingsView localPreferences={localPreferences} onChangeLocalPreferences={changeLocalPreferences} runtime={runtime} runtimeLifecycle={runtimeLifecycle?.identity === `${runtime?.runtimeId}:${runtime?.localIncarnationId}` ? runtimeLifecycle.view : null} runtimeLifecycleLoading={runtimeLifecycleLoading} runtimeLifecycleError={runtimeLifecycleError} runtimeError={runtimeError} runtimeBusy={runtimeBusy} startRuntime={startRuntime} refreshRuntime={refreshRuntime} agents={agentInstallations} agentError={agentInstallationError} refreshAgents={refreshAgentInstallations} agentProfiles={agentProfiles} agentProfileError={agentProfileError} runtimeInventoryStreamStatus={runtimeInventoryStreamStatus} agentBindings={agentBindings} agentBindingError={agentBindingError} agentActionMessage={agentActionFeedbackForWorkspace(agentActionFeedback, selectedWorkspaceId).message} agentActionError={agentActionFeedbackForWorkspace(agentActionFeedback, selectedWorkspaceId).error} agentActionBusy={agentActionFeedbackForWorkspace(agentActionFeedback, selectedWorkspaceId).busy} onProbeCodex={probeCodexProfile} onProbeOpenCode={probeOpenCodeProfile} onRefreshAgentProfiles={() => refreshAgentProfiles(selectedWorkspaceId)} onRefreshAgentBindings={async () => { await refreshAgentBindings(selectedWorkspaceId); }} onCreateAgentBinding={createAgentBinding} onEnableAgentBinding={enableAgentBinding} onDisableAgentBinding={disableAgentBinding} runtimeBindings={runtimeBindings} runtimeBindingError={runtimeBindingError} runtimeBindingsLoading={runtimeBindingsLoading} runtimeEnrollmentBusy={runtimeEnrollmentBusy} runtimeEnrollmentMessage={runtimeEnrollmentMessage} runtimeEnrollmentError={runtimeEnrollmentError} onEnrollLocalRuntime={enrollLocalRuntime} onRefreshRuntimeBindings={() => refreshRuntimeBindings(selectedWorkspaceId)} workspaces={workspaces} workspaceListState={workspaceListState} workspaceError={workspaceError} refreshWorkspaces={refreshWorkspaces} workspaceName={workspaceName} setWorkspaceName={setWorkspaceName} createWorkspace={createWorkspace} workspaceCreateBusy={workspaceCreateBusy} workspaceCreatePending={pendingWorkspaceRequest !== null} selectedWorkspaceId={selectedWorkspaceId} onSelectWorkspace={selectWorkspace} onUpdatePolicy={updateWorkspacePolicy} policyBusy={workspacePolicyBusy} policyRetryPending={workspacePolicyRequests.some(request => request.workspaceId === selectedWorkspaceId && request.expectedVersion === workspaces.find(item => item.workspaceId === selectedWorkspaceId)?.version && request.replicationPolicy === "LOCAL_ONLY")} onArchiveWorkspace={archiveWorkspace} archiveBusy={workspaceArchiveBusy} onSetDefaultAgentBinding={setWorkspaceDefaultAgent} defaultAgentBusy={workspaceDefaultAgentBusy} instructions={instructionText} onInstructionsChange={changeWorkspaceInstructions} instructionHistory={workspaceInstructions} instructionMessage={instructionMessage} instructionBusy={instructionBusy} onSaveInstructions={saveWorkspaceInstructions} latestInstructionsAfterConflict={latestInstructionsAfterConflict} onUseLatestInstructions={useLatestWorkspaceInstructions} />
+          <SettingsView localPreferences={localPreferences} onChangeLocalPreferences={changeLocalPreferences} runtime={runtime} runtimeLifecycle={runtimeLifecycle?.identity === `${runtime?.runtimeId}:${runtime?.localIncarnationId}` ? runtimeLifecycle.view : null} runtimeLifecycleLoading={runtimeLifecycleLoading} runtimeLifecycleError={runtimeLifecycleError} runtimeError={runtimeError} runtimeBusy={runtimeBusy} startRuntime={startRuntime} refreshRuntime={refreshRuntime} agents={agentInstallations} agentError={agentInstallationError} refreshAgents={refreshAgentInstallations} agentProfiles={agentProfiles} agentProfileError={agentProfileError} runtimeInventoryStreamStatus={runtimeInventoryStreamStatus} agentBindings={agentBindings} agentBindingError={agentBindingError} agentActionMessage={agentActionFeedbackForWorkspace(agentActionFeedback, selectedWorkspaceId).message} agentActionError={agentActionFeedbackForWorkspace(agentActionFeedback, selectedWorkspaceId).error} agentActionBusy={agentActionFeedbackForWorkspace(agentActionFeedback, selectedWorkspaceId).busy} onProbeCodex={probeCodexProfile} onProbeOpenCode={probeOpenCodeProfile} onRefreshAgentProfiles={() => refreshAgentProfiles(selectedWorkspaceId)} onRefreshAgentBindings={async () => { await refreshAgentBindings(selectedWorkspaceId); }} onCreateAgentBinding={createAgentBinding} onEnableAgentBinding={enableAgentBinding} onDisableAgentBinding={disableAgentBinding} runtimeBindings={runtimeBindings} runtimeBindingError={runtimeBindingError} runtimeBindingsLoading={runtimeBindingsLoading} runtimeEnrollmentBusy={runtimeEnrollmentBusy} runtimeEnrollmentMessage={runtimeEnrollmentMessage} runtimeEnrollmentError={runtimeEnrollmentError} onEnrollLocalRuntime={enrollLocalRuntime} onRefreshRuntimeBindings={() => refreshRuntimeBindings(selectedWorkspaceId)} workspaces={workspaces} workspaceListState={workspaceListState} workspaceError={workspaceError} refreshWorkspaces={refreshWorkspaces} workspaceName={workspaceName} setWorkspaceName={setWorkspaceName} createWorkspace={createWorkspace} workspaceCreateBusy={workspaceCreateBusy} workspaceCreatePending={pendingWorkspaceRequest !== null} selectedWorkspaceId={selectedWorkspaceId} onSelectWorkspace={selectWorkspace} onUpdatePolicy={updateWorkspacePolicy} policyBusy={workspacePolicyBusy} policyRetryPending={workspacePolicyRequests.some(request => request.workspaceId === selectedWorkspaceId && request.expectedVersion === workspaces.find(item => item.workspaceId === selectedWorkspaceId)?.version && request.replicationPolicy === "LOCAL_ONLY")} onArchiveWorkspace={archiveWorkspace} archiveBusy={workspaceArchiveBusy} onRenameWorkspace={renameWorkspace} renameBusy={workspaceRenameBusy} renameError={workspaceRenameError} onClearRenameError={() => setWorkspaceRenameError(null)} onSetDefaultAgentBinding={setWorkspaceDefaultAgent} defaultAgentBusy={workspaceDefaultAgentBusy} instructions={instructionText} onInstructionsChange={changeWorkspaceInstructions} instructionHistory={workspaceInstructions} instructionMessage={instructionMessage} instructionBusy={instructionBusy} onSaveInstructions={saveWorkspaceInstructions} latestInstructionsAfterConflict={latestInstructionsAfterConflict} onUseLatestInstructions={useLatestWorkspaceInstructions} />
         ) : (
           <PlaceholderPage page={page} onSettings={() => requestPageNavigation("Settings")} />
         )}

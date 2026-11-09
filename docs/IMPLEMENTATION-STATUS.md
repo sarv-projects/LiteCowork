@@ -49,11 +49,11 @@ The composed Operator router is built in apps/litecoworkd/src/operator.rs and me
 
 The inventory currently records:
 
-- 173 OpenAPI operations registered by the composed Operator router.
+- 174 OpenAPI operations registered by the composed Operator router.
 - One authenticated local-only workspace-root selection route outside OpenAPI.
-- 57 OpenAPI operations that remain target-only and are not registered by the daemon router.
+- 56 OpenAPI operations that remain target-only and are not registered by the daemon router.
 
-This is a route-registration inventory, not a claim that 173 product capabilities are fully integrated. Individual handlers may deliberately fail closed, return a read-only projection, expose a readiness check, or persist only a pre-execution record. A route count must never be substituted for a qualified-feature count.
+This is a route-registration inventory, not a claim that 174 product capabilities are fully integrated. Individual handlers may deliberately fail closed, return a read-only projection, expose a readiness check, or persist only a pre-execution record. A route count must never be substituted for a qualified-feature count.
 
 The target-only operations include important Task execution/control and placement surfaces, runtime lifecycle management, remote/runtime enrollment operations, connections, some channel operations, workspace root mutation and backup/restore. Consult the machine inventory for the exact method, path and operation ID instead of duplicating those lists here.
 
@@ -250,7 +250,7 @@ Validation evidence from the connected Windows development machine:
 | `CARGO_BUILD_JOBS=1 cargo test --workspace --locked` | **PASS — exit code 0; 0 failed targets** | Full Windows workspace run completed in 1,383.28 seconds. `litecoworkd` 359 passed / 1 ignored; CLI 4; `storage-core` 110; `storage-sqlite` 555; `agent_registry_cache` integration 2; Windows local security 36; local staging 24; operator IPC 18; domain and browser integration targets all passed. The deterministic backup failure-path test passed in the full SQLite target. Two tests were intentionally ignored (daemon-declared ignore and Windows Credential Manager side-effecting integration). The single-job Windows workspace run completed successfully |
 | `litecoworkd` unit target | **359 passed, 0 failed, 1 ignored** | Includes the six Windows WorkspaceRoot route tests and Windows local-filesystem locator/reopen tests |
 | `litecoworkd --test cli` | **4 passed, 0 failed** | Help and CLI behavior distinguish native Conversation dispatch from managed Task execution and Runtime lifecycle readiness |
-| Composed Operator route inventory | Passed; matches **173 served / 1 local-only / 57 target-only** | Registration only, not integration/qualification |
+| Composed Operator route inventory | Passed; matches **174 served / 1 local-only / 56 target-only** | Registration only, not integration/qualification |
 | Architecture/schema validator | Passed active checks; one warning | 148 typed events, JSON Schemas, error codes, OpenAPI structure, SQLite, Gateway names, canonical concepts, product naming and active Markdown links pass. Optional `openapi-spec-validator` is not installed, so its external meta-schema pass was not run |
 | Cross-owner consistency guard | Passed **36 assertions** | Checks only the explicit design invariants encoded in the script |
 | V1 contract/route/UI audit | Passed **0 findings** | Structural crosswalk only |

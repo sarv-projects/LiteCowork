@@ -1208,6 +1208,13 @@
     },
     {
       "method": "PUT",
+      "path": "/v1/workspaces/{workspace_id}/name",
+      "openapi_path": "/workspaces/{workspaceId}/name",
+      "operation_id": "renameWorkspace",
+      "source": "apps/litecoworkd/src/operator.rs"
+    },
+    {
+      "method": "PUT",
       "path": "/v1/workspaces/{workspace_id}/suggestion-preferences/{kind}",
       "openapi_path": "/workspaces/{workspaceId}/suggestion-preferences/{kind}",
       "operation_id": "setSuggestionPreference",
@@ -1501,11 +1508,6 @@
       "method": "PUT",
       "path": "/workspaces/{workspaceId}/delegation-settings",
       "operation_id": "setWorkspaceDelegationSettings"
-    },
-    {
-      "method": "PUT",
-      "path": "/workspaces/{workspaceId}/name",
-      "operation_id": "renameWorkspace"
     }
   ]
 }

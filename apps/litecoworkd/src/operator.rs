@@ -29,8 +29,8 @@ use domain_workspace::AddWorkspaceRoot;
 use domain_workspace::{
     ArchiveWorkspace, BeginContextDocumentPurge, ChangeReplicationPolicy,
     ChangeWorkspaceRootStatus, CreateResourceRevisionUploadSession, CreateResourceUploadSession,
-    CreateWorkspace, CreateWorkspaceInstructionRevision, EventContext, ResourceService,
-    ResourceUploadService, SetContextDocumentStatus as SetContextDocumentStatusCommand,
+    CreateWorkspace, CreateWorkspaceInstructionRevision, EventContext, RenameWorkspace,
+    ResourceService, ResourceUploadService, SetContextDocumentStatus as SetContextDocumentStatusCommand,
     SetWorkspaceDefaultAgentBinding, WorkspaceRootService, WorkspaceService,
 };
 use http_body::Body as HttpBody;
@@ -939,6 +939,12 @@ struct CreateWorkspaceBody {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct RenameWorkspaceBody {
+    name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct UpdateWorkspacePolicyBody {
     replication_policy: ReplicationPolicy,
     #[serde(default)]
@@ -1491,10 +1497,12 @@ fn workspace_policy_routes() -> Router<WorkspacePolicyApiState> {
 }
 
 fn workspace_archive_routes() -> Router<WorkspaceArchiveApiState> {
-    Router::new().route(
-        "/v1/workspaces/{workspace_id}/archive",
-        post(archive_workspace),
-    )
+    Router::new()
+        .route(
+            "/v1/workspaces/{workspace_id}/archive",
+            post(archive_workspace),
+        )
+        .route("/v1/workspaces/{workspace_id}/name", put(rename_workspace))
 }
 
 #[cfg(test)]
@@ -8065,6 +8073,151 @@ async fn archive_workspace(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "INTERNAL",
                 "Workspace could not be archived",
+            ),
+        })?;
+    let mut response = Json(committed.workspace).into_response();
+    if let Ok(value) = header::HeaderValue::from_str(&committed.event.correlation_id) {
+        response
+            .headers_mut()
+            .insert(header::HeaderName::from_static("x-correlation-id"), value);
+    }
+    Ok(response)
+}
+
+async fn rename_workspace(
+    State(state): State<WorkspaceArchiveApiState>,
+    headers: HeaderMap,
+    Path(workspace_id): Path<String>,
+    Json(body): Json<RenameWorkspaceBody>,
+) -> Result<Response, Response> {
+    if selected_workspace(&headers)? != workspace_id {
+        return Err(operator_error(
+            StatusCode::FORBIDDEN,
+            "FORBIDDEN",
+            "Workspace access is unavailable",
+        ));
+    }
+    let workspace = ensure_workspace_owner_for(&state.store, &state.principal_id, &workspace_id)?;
+    let expected_version = headers
+        .get(header::IF_MATCH)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.trim().trim_matches('"').parse::<u64>())
+        .transpose()
+        .map_err(|_| {
+            operator_error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "If-Match must contain a Workspace version",
+            )
+        })?
+        .ok_or_else(|| {
+            operator_error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "If-Match is required",
+            )
+        })?;
+    let request_id = headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| {
+            !value.is_empty()
+                && value.len() <= 200
+                && value.bytes().all(|byte| byte.is_ascii_graphic())
+        })
+        .ok_or_else(|| {
+            operator_error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "A valid Idempotency-Key is required",
+            )
+        })?;
+    let correlation_id = new_id("cor").map_err(|_| {
+        operator_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL",
+            "Workspace request could not be initialized",
+        )
+    })?;
+    let context = event_context(&state.runtime_id, &correlation_id).map_err(|_| {
+        operator_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL",
+            "Workspace request could not be initialized",
+        )
+    })?;
+    let name = body.name.trim().to_owned();
+    let request_payload = json!({
+        "operation": "workspace.rename.v1",
+        "workspace_id": workspace_id,
+        "expected_version": expected_version,
+        "name": name,
+    });
+    let committed = WorkspaceService::new(state.store.clone())
+        .rename_idempotent(
+            RenameWorkspace {
+                workspace_id: workspace.workspace_id.clone(),
+                expected_version,
+                name,
+                principal_id: state.principal_id.clone(),
+                event: context,
+            },
+            request_id.to_owned(),
+            request_payload,
+        )
+        .map_err(|error| match error {
+            StoreError::Invalid(message) if message == "an archived Workspace is read-only" => {
+                operator_error(
+                    StatusCode::CONFLICT,
+                    "WORKSPACE_ARCHIVED",
+                    "Archived Workspaces are read-only",
+                )
+            }
+            StoreError::Invalid(message)
+                if message == domain_workspace::WORKSPACE_NAME_INVALID_MESSAGE =>
+            {
+                operator_error(
+                    StatusCode::BAD_REQUEST,
+                    "WORKSPACE_NAME_INVALID",
+                    "Workspace name must be 1 to 200 characters without control characters",
+                )
+            }
+            StoreError::Invalid(_) => operator_error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "Workspace rename is invalid",
+            ),
+            StoreError::Conflict {
+                expected: None,
+                actual: None,
+            } => operator_error(
+                StatusCode::CONFLICT,
+                "CONFLICT",
+                "Idempotency key was already used for a different Workspace rename request",
+            ),
+            StoreError::Conflict { .. } => {
+                let current = state
+                    .store
+                    .get_workspace(&workspace_id)
+                    .ok()
+                    .flatten()
+                    .map(|latest| json!({"current_name": latest.name, "current_version": latest.version}));
+                operator_error_with_details(
+                    StatusCode::CONFLICT,
+                    "STALE_WORKSPACE_VERSION",
+                    "Workspace changed; refresh before renaming",
+                    current,
+                )
+            }
+            StoreError::NotFound => operator_error(
+                StatusCode::NOT_FOUND,
+                "NOT_FOUND",
+                "Workspace is unavailable",
+            ),
+            _ => operator_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL",
+                "Workspace could not be renamed",
             ),
         })?;
     let mut response = Json(committed.workspace).into_response();

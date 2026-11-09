@@ -29,6 +29,8 @@ export const SETTINGS_CONTROL_MAP: Readonly<Record<string, SettingsControlEntry>
   "workspaces-archive-cancel": { class: "LocalOnly", effect: "dismiss archive confirmation" },
   "workspaces-archive-confirm": { class: "OperatorServed", effect: "archive_workspace" },
   "workspaces-archive-begin": { class: "LocalOnly", effect: "open two-step archive confirmation" },
+  "workspaces-rename-name": { class: "OperatorServed", effect: "renameWorkspace draft" },
+  "workspaces-rename-submit": { class: "OperatorServed", effect: "renameWorkspace" },
   "runtime-start": { class: "Native", effect: "start_local_runtime desktop bridge" },
   "runtime-refresh": { class: "OperatorServed", effect: "getLocalRuntimeLifecycle" },
 };

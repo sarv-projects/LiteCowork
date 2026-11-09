@@ -18,6 +18,8 @@ mod resource_upload_archive_operator_tests;
 mod runtime_capability_hosts_tests;
 #[path = "workspace_idempotency_key_bounds_operator_tests.rs"]
 mod workspace_idempotency_key_bounds_operator_tests;
+#[path = "workspace_rename_operator_tests.rs"]
+mod workspace_rename_operator_tests;
 use super::runtime_offers_operator::{RuntimeOffersApiState, runtime_offers_router};
 use super::{
     AuthenticatedLocalPeer, OperatorIpcConnection, OperatorRequestSettlement,

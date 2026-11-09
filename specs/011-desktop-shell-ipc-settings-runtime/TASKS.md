@@ -139,7 +139,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T08 - Workspace rename and archive in Settings
 
-- **Status:** PARTIAL (archive: `SettingsView.tsx` confirm flow, Tauri `archive_workspace` in `apps/litecowork-ui/src-tauri/src/lib.rs`, Operator `archive_workspace` in `apps/litecoworkd/src/operator.rs`, storage `crates/storage-sqlite/src/workspace_archive.rs`; rename: absent)
+- **Status:** DONE for Linux (CODE, SERVED): `WorkspaceService::rename_idempotent` (domain-workspace) over the existing `commit_workspace_idempotent` transaction (no migration), Operator `PUT /v1/workspaces/{workspace_id}/name` (`rename_workspace` in `operator.rs`), `rename_workspace` Tauri command, `workspace-rename.ts` and an inline rename form in Settings. Evidence: `apps/litecoworkd/src/workspace_rename_operator_tests.rs` (5 tests incl. exactly-one-of-four concurrent). NOT verified: the Tauri crate does not compile in this container (gdk-3.0 missing), so the new command is reviewed but uncompiled; no packaged-app run
 - **Depends on:** T01, T06
 - **Cross-package prerequisites:** NONE
 - **Owner:** Workspace owner, Desktop UI
@@ -147,11 +147,11 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §7.2 `renameWorkspace`; AC-017
 - **Change intent:** Storage: CAS on `workspaces.version`, trim and bound the name, emit the promoted renamed event and idempotency receipt in one transaction. Operator: authenticated, Workspace-scoped, If-Match and Idempotency-Key required. UI: inline rename with pending, conflict (shows latest name, keeps draft) and archived read-only states; archive keeps its confirm.
 - **Acceptance:**
-  - [ ] Stale If-Match returns conflict with the current name; no write (AC-017).
-  - [ ] Same key and name returns the original receipt; same key, different name fails.
-  - [ ] Archived Workspace rejects rename and the UI shows read-only (AC-017).
-  - [ ] Two concurrent renames: exactly one commits.
-- **Command:** `cargo test -p storage-sqlite --locked workspace_rename` (filter to be added by this task) and `cargo test -p litecoworkd --locked workspace_rename` (filter to be added by this task) and `pnpm --dir apps/litecowork-ui test`
+  - [x] Stale If-Match returns conflict with the current name; no write (AC-017).
+  - [x] Same key and name returns the original receipt; same key, different name fails.
+  - [x] Archived Workspace rejects rename and the UI shows read-only (AC-017).
+  - [x] Two concurrent renames: exactly one commits.
+- **Command:** `cargo test -p litecoworkd --locked workspace_rename` (tests live in the daemon; no storage-sqlite change was needed) and `pnpm --dir apps/litecowork-ui test`
 - **Evidence:** test output; served-route inventory diff.
 - **Stop:** stop if rename would bypass the Workspace version.
 

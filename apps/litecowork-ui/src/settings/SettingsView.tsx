@@ -78,6 +78,10 @@ export type SettingsViewProps = {
   policyRetryPending: boolean;
   onArchiveWorkspace: () => Promise<void>;
   archiveBusy: boolean;
+  onRenameWorkspace: (name: string) => Promise<boolean>;
+  renameBusy: boolean;
+  renameError: string | null;
+  onClearRenameError: () => void;
   onSetDefaultAgentBinding: (agentBindingId: string | null) => Promise<void>;
   defaultAgentBusy: boolean;
   instructions: string;
@@ -93,6 +97,7 @@ export type SettingsViewProps = {
 export function SettingsView(props: SettingsViewProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("workspaces");
   const [archiveConfirmationFor, setArchiveConfirmationFor] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState<{ workspaceId: string; text: string } | null>(null);
   const runtimeHealth = deriveRuntimeHealthRows(
     {
       operatorReady: props.runtime?.operatorReady ?? false,
@@ -107,6 +112,8 @@ export function SettingsView(props: SettingsViewProps) {
     props.onChangeLocalPreferences({ ...props.localPreferences, ...patch });
 
   const selectedWorkspace = props.workspaces.find(ws => ws.workspaceId === props.selectedWorkspaceId);
+  const renameDraftText =
+    renameDraft && renameDraft.workspaceId === props.selectedWorkspaceId ? renameDraft.text : (selectedWorkspace?.name ?? "");
   const currentRuntimeBinding = props.runtimeBindings.find(
     binding => binding.workspaceId === props.selectedWorkspaceId && binding.runtimeId === props.runtime?.runtimeId && binding.status === "ACTIVE"
   ) ?? props.runtimeBindings.find(
@@ -329,6 +336,55 @@ export function SettingsView(props: SettingsViewProps) {
                       <dd>Rev {selectedWorkspace.version}</dd>
                     </div>
                   </dl>
+                )}
+
+                {selectedWorkspace && (
+                  <div className="settings-row">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Workspace Name</span>
+                      <span className="settings-row-desc">
+                        {selectedWorkspace.status === "ACTIVE"
+                          ? "Renaming changes the display name only; it does not move files or change access."
+                          : "This workspace is archived and read-only, so it cannot be renamed."}
+                      </span>
+                    </div>
+                    {selectedWorkspace.status === "ACTIVE" ? (
+                      <form
+                        className="settings-row-action"
+                        onSubmit={e => {
+                          e.preventDefault();
+                          void props.onRenameWorkspace(renameDraftText).then(renamed => {
+                            if (renamed) setRenameDraft(null);
+                          });
+                        }}
+                      >
+                        <input data-control-id="workspaces-rename-name"
+                          type="text"
+                          className="settings-select"
+                          aria-label="Workspace name"
+                          value={renameDraftText}
+                          maxLength={200}
+                          disabled={props.renameBusy}
+                          onChange={e => {
+                            props.onClearRenameError();
+                            setRenameDraft({ workspaceId: selectedWorkspace.workspaceId, text: e.target.value });
+                          }}
+                        />
+                        <button data-control-id="workspaces-rename-submit"
+                          className="settings-btn primary"
+                          type="submit"
+                          disabled={props.renameBusy || renameDraftText.trim() === "" || renameDraftText.trim() === selectedWorkspace.name || props.runtime?.operatorReady !== true}
+                        >
+                          {props.renameBusy ? "Renaming…" : "Rename"}
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="settings-badge">Read-only</span>
+                    )}
+                  </div>
+                )}
+                {props.renameError && (
+                  <p className="settings-error" role="alert" aria-live="assertive">{props.renameError}</p>
                 )}
               </section>
 

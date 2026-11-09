@@ -110,8 +110,8 @@ try:
         len(inventory.get("served_outside_openapi", [])),
         len(inventory.get("target_only", [])),
     )
-    if counts != (173, 1, 57):
-        issues.append(f"SERVED INVENTORY count drift: {counts}, expected (173, 1, 57)")
+    if counts != (174, 1, 56):
+        issues.append(f"SERVED INVENTORY count drift: {counts}, expected (174, 1, 56)")
 except (OSError, json.JSONDecodeError) as exc:
     issues.append(f"SERVED INVENTORY unreadable: {exc}")
 

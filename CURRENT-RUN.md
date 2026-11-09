@@ -232,6 +232,13 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 - Commands: `npx tsc --noEmit`, `pnpm run api:check`, `pnpm run build` pass; `pnpm test` 508 pass / 5 pre-existing failures.
 - 011-T06 follow-up (same day): settings-control-map.ts plus tests/settings-inert-control-audit.test.mjs landed (pnpm test 513 pass / 5 pre-existing failures). Still PARTIAL: AgentCatalogSettings controls and the category module split.
 
+### Wave 0 slice 5: 011-T08 Workspace rename (2026-11, CODE and SERVED)
+
+- Added domain rename service, Operator route PUT /v1/workspaces/{workspace_id}/name, Tauri `rename_workspace`, UI rename form and workspace-rename.ts. Route inventory is now 174 served / 1 local-only / 56 target-only (counts updated in three audit scripts and the docs that quote them).
+- Commands: `TMPDIR=/tmp cargo test -p litecoworkd workspace_rename` 5 pass; `cargo test -p domain-workspace` 7 pass; `cargo check --workspace` clean; `pnpm test` 518 pass / 5 pre-existing failures; `pnpm run build` and `api:check` pass; audit_served_routes and the four doc audits pass.
+- `cargo test -p litecoworkd workspace` shows 103 pass and 1 fail (`spawned_daemon_replays_workspace_create_after_lost_ack_and_restart`); it fails identically on the base state with my changes stashed, so it is pre-existing.
+- Not verified: src-tauri does not build here (missing gdk-3.0), so the `rename_workspace` command is uncompiled.
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.

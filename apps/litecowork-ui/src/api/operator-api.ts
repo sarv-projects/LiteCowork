@@ -138,7 +138,7 @@ export type paths = {
             cookie?: never;
         };
         get?: never;
-        /** @description Target-only until the handler lands. Renames an ACTIVE Workspace over the existing workspaces.name column; bumps Workspace.version and emits workspace.renamed.v1. Archived Workspaces are read-only. */
+        /** @description Renames an ACTIVE Workspace over the existing workspaces.name column; bumps Workspace.version and emits workspace.renamed.v1. Archived Workspaces are read-only. */
         put: operations["renameWorkspace"];
         post?: never;
         delete?: never;
