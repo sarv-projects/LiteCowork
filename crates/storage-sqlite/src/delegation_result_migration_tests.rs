@@ -35,12 +35,8 @@ fn delegation_result_migration_is_atomic_and_records_immutable_storage() {
         .expect("verify historical v24 migration receipt");
     verify_migration_record(&connection, 26, V26_MIGRATION_NAME, SQLITE_V26_DDL, false)
         .expect("verify latest v26 migration receipt");
-    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, false)
-        .expect("verify v27 migration receipt");
-    verify_migration_record(&connection, 28, V28_MIGRATION_NAME, SQLITE_V28_DDL, false)
-        .expect("verify v28 migration receipt");
-    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, true)
-        .expect("verify latest v29 migration receipt");
+    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, true)
+        .expect("verify latest v27 migration receipt");
 
     let version: i64 = connection
         .pragma_query_value(None, "user_version", |row| row.get(0))

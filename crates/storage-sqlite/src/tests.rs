@@ -1743,7 +1743,7 @@ fn upgrades_schema_v13_through_resource_index_registry_v19() {
     assert!(agent_registry_exists);
     assert!(!resource_index_exists);
 
-    migrate(&mut connection).expect("apply migrations v14 through the tip in order");
+    migrate(&mut connection).expect("apply migrations v14 through v27 in order");
 
     let version: i64 = connection
         .pragma_query_value(None, "user_version", |row| row.get(0))
@@ -1758,7 +1758,7 @@ fn upgrades_schema_v13_through_resource_index_registry_v19() {
         .expect("collect migration versions");
     assert_eq!(
         applied,
-        [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+        [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
     );
 }
 
@@ -1816,12 +1816,8 @@ fn v21_workspace_root_observation_migration_rolls_back_atomically_and_replays() 
         .expect("verify historical v24 migration receipt");
     verify_migration_record(&connection, 26, V26_MIGRATION_NAME, SQLITE_V26_DDL, false)
         .expect("verify historical v26 migration receipt");
-    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, false)
-        .expect("verify v27 migration receipt");
-    verify_migration_record(&connection, 28, V28_MIGRATION_NAME, SQLITE_V28_DDL, false)
-        .expect("verify v28 migration receipt");
-    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, true)
-        .expect("verify latest v29 migration receipt");
+    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, true)
+        .expect("verify latest v27 migration receipt");
 }
 
 #[test]
@@ -1965,34 +1961,6 @@ fn v19_resource_index_migration_rolls_back_atomically_and_replays() {
 
     connection
         .execute_batch(
-            "DROP INDEX IF EXISTS idx_conversation_usage_records_workspace;
-             DROP TABLE IF EXISTS conversation_usage_records;
-             DROP INDEX IF EXISTS uq_conversation_single_flight_turn;
-             DROP INDEX IF EXISTS idx_conversation_dispatch_intents_unclaimed;
-             DROP TABLE IF EXISTS conversation_dispatch_intents;
-             ALTER TABLE conversation_messages DROP COLUMN provider_response_id;
-             DELETE FROM schema_migrations WHERE version = 29;
-             PRAGMA user_version = 28;
-             DROP TRIGGER IF EXISTS coworker_revision_delegation_source_guard;
-             DROP TRIGGER IF EXISTS task_spec_delegation_policy_snapshot_guard;
-             DROP TRIGGER IF EXISTS workspace_delegation_settings_head_guard;
-             DROP TRIGGER IF EXISTS workspace_delegation_settings_default_on_insert;
-             DROP TRIGGER IF EXISTS workspace_delegation_settings_head_insert_guard;
-             DROP TRIGGER IF EXISTS workspace_delegation_settings_revision_immutable_delete;
-             DROP TRIGGER IF EXISTS workspace_delegation_settings_revision_immutable_update;
-             DROP TRIGGER IF EXISTS workspace_delegation_settings_revision_insert_guard;
-             DROP INDEX IF EXISTS idx_workspace_delegation_settings_revision;
-             DROP TABLE IF EXISTS workspace_delegation_settings_revisions;
-             ALTER TABLE delegation_profile_revisions DROP COLUMN worker_model_selection_policy;
-             ALTER TABLE task_spec_revisions DROP COLUMN delegation_policy_snapshot_json;
-             ALTER TABLE coworker_revisions DROP COLUMN delegation_policy_source;
-             ALTER TABLE workspaces DROP COLUMN current_delegation_settings_revision;
-             DELETE FROM schema_migrations WHERE version = 28;
-             PRAGMA user_version = 27;",
-        )
-        .expect("restore the v27 migration boundary without v28/v29 objects");
-    connection
-        .execute_batch(
             "DROP TRIGGER IF EXISTS task_automation_test_occurrence_exclusive;
              DROP TRIGGER IF EXISTS task_automation_test_run_immutable;
              DROP TRIGGER IF EXISTS task_automation_test_run_guard;
@@ -2093,7 +2061,7 @@ fn v19_resource_index_migration_rolls_back_atomically_and_replays() {
     let version: i64 = connection
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .expect("read replayed v19 version");
-    assert_eq!(version, SCHEMA_VERSION);
+    assert_eq!(version, V27_SCHEMA_VERSION);
     verify_migration_record(&connection, 19, V19_MIGRATION_NAME, SQLITE_V19_DDL, false)
         .expect("verify replayed v19 receipt");
     verify_migration_record(&connection, 20, V20_MIGRATION_NAME, SQLITE_V20_DDL, false)
@@ -2108,12 +2076,8 @@ fn v19_resource_index_migration_rolls_back_atomically_and_replays() {
         .expect("verify v24 receipt after v25 replay");
     verify_migration_record(&connection, 26, V26_MIGRATION_NAME, SQLITE_V26_DDL, false)
         .expect("verify historical v26 migration receipt");
-    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, false)
-        .expect("verify v27 migration receipt");
-    verify_migration_record(&connection, 28, V28_MIGRATION_NAME, SQLITE_V28_DDL, false)
-        .expect("verify v28 migration receipt");
-    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, true)
-        .expect("verify latest v29 migration receipt");
+    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, true)
+        .expect("verify latest v27 migration receipt");
 
     let (registry_count, size_bytes, state, reference_count): (i64, i64, String, i64) = connection
         .query_row(
@@ -2958,11 +2922,9 @@ fn v27_test_run_migration_rolls_back_and_replays() {
     let version: i64 = connection
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .expect("read replayed v27 version");
-    assert_eq!(version, SCHEMA_VERSION);
-    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, false)
+    assert_eq!(version, V27_SCHEMA_VERSION);
+    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, true)
         .expect("verify replayed v27 receipt");
-    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, true)
-        .expect("verify tip v29 receipt after v27 retry");
 }
 
 #[test]

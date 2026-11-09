@@ -242,36 +242,3 @@ fn runtime_offer_page_is_workspace_authorized_fresh_ordered_and_locator_free() {
         Err(storage_core::StoreError::Conflict { .. })
     ));
 }
-
-/// 002-T01 concurrency: two probes for the same profile (same endpoint offer
-/// reference under one incarnation) must converge to a single current offer and
-/// one endpoint binding, not duplicate rows. The probe publishes the offer by
-/// `(runtime, incarnation, offer_kind, offer_ref)`, so a second probe replaces
-/// the first observation rather than appending a second one.
-#[test]
-fn two_probes_for_the_same_profile_produce_one_current_offer() {
-    let (_directory, store, incarnation_id) = prepare_runtime("workspace-offer-concurrent");
-    publish_endpoint_offer(&store, &incarnation_id, "endpoint-shared", OBSERVED, EXPIRY);
-    publish_endpoint_offer(&store, &incarnation_id, "endpoint-shared", NOW, EXPIRY);
-
-    let offers = list_offers(
-        &store,
-        "owner-local",
-        "workspace-offer-concurrent",
-        Some(incarnation_id.clone()),
-        None,
-        10,
-    )
-    .expect("authorized offer page is read");
-    let shared: Vec<_> = offers
-        .iter()
-        .filter(|offer| offer.offer_ref == "endpoint-shared")
-        .collect();
-    assert_eq!(
-        shared.len(),
-        1,
-        "two probes for the same profile converge to one current offer"
-    );
-    // The surviving observation is the most recent probe, not a duplicate append.
-    assert_eq!(shared[0].observed_at, NOW);
-}

@@ -89,7 +89,7 @@ These are source-level UI findings, not a browser USER test. They require UI/API
 
 | ID | Topic | Next evidence needed | Owner |
 |---|---|---|---|
-| R-01 | OpenCode first-route protocol contract | PARTIALLY RESOLVED (2026-11, task 001-T04/T23/T24). See the R-01 envelope finding below. The exact v2.0.32 event envelope is now reconciled against the pinned reference and a committed redacted fixture; readiness/timeout/termination are wired through the new `AgentAdapter`. A live-server capture on Windows x64 remains BLOCKED. | Agent Runtime |
+| R-01 | OpenCode first-route protocol contract | Reconcile exact v2.0.32 Server request/event semantics, readiness, timeout and termination against version-pinned upstream contract and safe captured fixtures; active code does not implement generic Adapter 1.0 | Agent Runtime |
 | R-02 | Process/host lifecycle | Prove Windows spawn/attach/stop ownership, Job Object containment, cancellation, concurrency and host reuse; current Conversation path starts/stops OpenCode per turn | Agent Runtime/OS |
 | R-03 | Prompt input bound and compaction | Reconcile 4 MiB provider-neutral context with 256 KiB OpenCode input; define reviewable compaction/resource materialization and exact serialization tests | Product/Agent Runtime |
 | R-04 | Resource materialization | Supported ResourceRef content types, authorization, path safety, MIME/size, digest and provenance | Resource/Agent Runtime |
@@ -99,61 +99,4 @@ These are source-level UI findings, not a browser USER test. They require UI/API
 | R-08 | Desktop stop/retry interaction | Add authoritative turn version to the safe active-turn projection; bind Stop to that turn and a real supervisor stop request; add failed-turn retry action with idempotency/version handling; enforce all nonterminal statuses in composer admission; add rendered tests for no-stream, stale-version, repeated-send and racing settlement cases | Desktop UI / Operator / Conversation |
 
 No web research has been used to claim current upstream API behavior. Version-pinned native protocol research is a prerequisite task, not filled by assumptions.
-
-## 9. R-01 finding: OpenCode v2.0.32 turn event envelope (task 001-T23)
-
-Checked 2026-11 against the pinned reference implementation
-`repo_take/paseo/packages/server/src/server/agent/providers/opencode-agent.ts`
-(a production OpenCode v2 client) and encoded as the committed redacted fixture
-`apps/litecoworkd/src/agents/fixtures/opencode_v2_0_32_turn.jsonl`. No live
-OpenCode v2.0.32 server was reachable in this sandbox, so the fixture is
-constructed from the documented v2 envelope shape rather than a captured live
-turn; the live capture is recorded BLOCKED (retryable:false) below.
-
-R-01 as originally posed asked whether the turn uses top-level
-`delta`/`content`/`done` keys versus `session.text.delta` /
-`session.text.ended` / `session.idle`. The finding on the real v2.0.32 envelope:
-
-- REFUTED, both candidate name sets. The envelope discriminator is a top-level
-  `type` string, and the text-bearing names are `message.part.updated` and
-  `message.part.delta` (the part object carries `type: "text"` and `text`),
-  not `delta`/`content` and not `session.text.delta`/`session.text.ended`.
-- CONFIRMED, the core defect the register recorded (A-52): the supervisor's
-  former hand-parse waited for a top-level `message_completed` event and a
-  top-level `done` boolean, neither of which the v2.0.32 envelope ever emits,
-  so a turn never settled and agent output never rendered.
-- Turn completion is the `session.idle` event (confirmed). An error is
-  `session.error`. Reasoning is a part with `type: "reasoning"`.
-- Correlation: every session-scoped event carries `properties.sessionID`, and
-  each part carries its own `sessionID`. Correlation is on that envelope id,
-  never a top-level guess. An error object is nested under
-  `properties.error`; the provider error string is never trusted as authority.
-
-Exact captured envelope keys per event kind (redacted fixture):
-
-| Event kind | Envelope `type` | Correlation key | Payload keys used |
-|---|---|---|---|
-| Text delta | `message.part.delta` | `properties.part.sessionID` | `part.type=text`, `part.text` |
-| Text ended | `message.part.updated` | `properties.part.sessionID` | `part.type=text`, `part.text`, `part.time.end` |
-| Reasoning | `message.part.updated` | `properties.part.sessionID` | `part.type=reasoning` (never shown) |
-| Tool call | `message.part.updated` | `properties.part.sessionID` | `part.type=tool`, `part.tool`, `part.callID`, `part.state.status` |
-| File edit | `file.edited` | `properties.sessionID` | `properties.file` |
-| Permission ask | `permission.asked` | `properties.sessionID` | `properties.id` |
-| Todo | `todo.updated` | `properties.sessionID` | `properties.todos[]` |
-| Step/usage | `message.part.updated` | `properties.part.sessionID` | `part.type=step-start`/`step-finish`, `part.tokens`, `part.cost` |
-| Error | `session.error` | `properties.sessionID` | `properties.error.name` (classified, text redacted) |
-| Idle (complete) | `session.idle` | `properties.sessionID` | (none) |
-
-The normalizer `apps/litecoworkd/src/agents/normalizer.rs` maps exactly these
-names into the closed internal enum, counts and drops unknown/foreign/
-uncorrelated frames, and keeps reasoning out of the committed AGENT message.
-
-### Live evidence status (BLOCKED, retryable:false)
-
-A live OpenCode v2.0.32 turn capture and the Windows x64 release-row run
-(E2E-01 Windows) cannot be produced in this Linux sandbox: no Windows host and
-no reachable live OpenCode v2.0.32 server. The full code path (adapter,
-normalizer, idle/heartbeat watchdog, interrupt via `abort_session`) is
-implemented and proven by the redacted fixture; the live row stays BLOCKED
-with a typed reason rather than fabricated. No live envelope or run is claimed.
 
