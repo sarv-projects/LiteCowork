@@ -27,7 +27,7 @@ Do not create a second schema authority. Promote machine contracts in schemas/ a
 | Conversation and context | EXPERIENCE.md, CONTEXT.md, FLOWS.md, NATIVE-COMPOSER-LLD.md |
 | Durable Tasks and execution | TASK-RUNTIME.md, ENVIRONMENTS.md, TRUST.md, DELEGATION.md |
 | Security and provider trust boundaries | SECURITY.md, TRUST.md, NETWORK-SECURITY.md, CONNECTORS-WORKFLOWS.md |
-| UI and Workbench | V1-UI-SCREEN-CONTRACT.md, V1-UI-ACTION-STATE-LEDGER.md, SEMANTIC-SERVED-UI-MAP.md, SETTINGS-AND-SHELL-SURFACE-AUDIT.md, DESKTOP-SHELL-LLD.md, DESIGN-SYSTEM.md |
+| UI and Workbench | V1-UI-SCREEN-CONTRACT.md, V1-UI-ACTION-STATE-LEDGER.md, SEMANTIC-SERVED-UI-MAP.md, SETTINGS-AND-SHELL-SURFACE-AUDIT.md, UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md, DESKTOP-SHELL-LLD.md, DESIGN-SYSTEM.md |
 | LiteSPM | LITESPM-LITECOWORK-INTEROP-LLD.md, LITESPM-INTEGRATION-PLAN.md |
 | Connectors and workflow adapters | CONNECTORS-WORKFLOWS.md, CONNECTOR-FACTORY-DESIGN.md, OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md |
 | Automations and routines | AUTOMATION.md, ROUTINES.md, RESPONSIBILITIES.md |
@@ -46,6 +46,7 @@ Do not create a second schema authority. Promote machine contracts in schemas/ a
 - FEATURE-AND-UI-CONTRACT-COVERAGE.md: screen, API, owner, test and SDD coverage.
 - SEMANTIC-SERVED-UI-MAP.md: user-visible controls mapped to their actual owner operations and evidence state.
 - SETTINGS-AND-SHELL-SURFACE-AUDIT.md: source-level inventory of mounted Settings controls, unused props, unmounted alternate page and shell-surface boundaries.
+- [UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md](UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md): 2026-11-09 audit of agent-output rendering, Intelligent UI, every screen, every Settings control and architecture, with cowork-style recommendations and proposed tasks.
 - V1-FUNCTION-CONTRACT-LEDGER.md: user-facing function contracts.
 - V1-SETTINGS-CONTRACT-LEDGER.md: individual settings behavior and persistence.
 - V1-UI-ACTION-STATE-LEDGER.md: UI actions, eligibility, loading, empty, failure and recovery states.

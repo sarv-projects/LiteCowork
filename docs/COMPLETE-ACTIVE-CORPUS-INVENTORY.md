@@ -9,9 +9,9 @@ This is an inventory, not proof that every sentence is correct, implemented,
 integrated or qualified. The authority chain is in docs/README.md. Current source
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
-- Included files: 351
-- Included lines: 70974
-- Included bytes: 6094338
+- Included files: 352
+- Included lines: 71172
+- Included bytes: 6126354
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,7 +25,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 131 | 47241 |
+| docs/ | 132 | 47439 |
 | repository root | 6 | 1549 |
 | scripts/ | 1 | 14 |
 | specs/ | 201 | 21390 |
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 60 | 3726 | aa800aa8fda07635 |
-| CURRENT-RUN.md | 201 | 26387 | ecdbbb61977e1b77 |
+| CURRENT-RUN.md | 201 | 26387 | fd6989c9254ccfff |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 75 | 6169 | 3ecd058f34d1ee80 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -70,7 +70,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
 | docs/CONTEXT.md | 272 | 19955 | f80c31cda1a4c7aa |
-| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 160 | 64292 | 030af7c37eada246 |
+| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 162 | 65732 | b64bc04653d188be |
 | docs/COVERAGE-MATRIX.md | 174 | 25367 | 64c4380d1987ee75 |
 | docs/COWORKER-FLOWS.md | 166 | 20076 | 309015aa4fe4a14a |
 | docs/COWORKERS-TARGET.md | 456 | 58061 | 3afdfb6005644afe |
@@ -79,7 +79,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 9df4c5ceefc8c28c |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 499c0cd7d7757f1a |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 927 | 69198 | f6753a21cfcfe5eb |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
@@ -88,7 +88,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 297 | 58573 | c5d84d87a521417c |
+| docs/IMPLEMENTATION-STATUS.md | 297 | 58573 | 2dd58f164f6d33e8 |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -108,7 +108,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/PRODUCT-STRATEGY.md | 113 | 10724 | 8e39b7022710cfef |
 | docs/PRODUCT.md | 254 | 16913 | 76a270f4af39c91c |
 | docs/PROTOCOLS.md | 187 | 9391 | de2062d24c901037 |
-| docs/README.md | 84 | 7785 | cefd690ce33fd77a |
+| docs/README.md | 85 | 8118 | d36c67f9e807107e |
 | docs/REFERENCE-IMPLEMENTATIONS.md | 781 | 89959 | df5aa1b7462607c0 |
 | docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md | 264 | 24873 | f1d7303606da51da |
 | docs/RENDERING-CONFORMANCE-LLD.md | 271 | 16026 | c99abd47adbeda47 |
@@ -134,6 +134,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/TESTING.md | 534 | 46687 | 67c04dde69e438be |
 | docs/TRUST.md | 322 | 16569 | 04bebf938f0e49cf |
 | docs/UI-CORE-TYPED-CONTRACTS.md | 80 | 5371 | 6c5d71eca3083a28 |
+| docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md | 195 | 30243 | 9c4cb707c257814d |
 | docs/USER-EXPERIENCE-RESEARCH-AND-MAGNETIC-USE-CASES.md | 243 | 22769 | a52bb38efaeeb7d2 |
 | docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md | 150 | 18757 | a0a8dc909d4e831c |
 | docs/V1-AGENT-MEMORY-FAST-PATH-LLD.md | 104 | 10314 | 095643b94c54af62 |
