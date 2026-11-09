@@ -1,6 +1,8 @@
 # Research - Safe Task Path
 
-**Feature:** 005 | **Checked:** 2026-11-06
+**Feature:** 005 | **Checked:** 2026-11-06, grounding refreshed 2026-11-09
+
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Sources
 
@@ -70,6 +72,16 @@ These findings are source/route/UI inspection, not an end-to-end Task USER test.
 - Rival web pages were not re-fetched on 2026-11-06 for this package; use [COMPETITIVE-RESEARCH.md](../../docs/COMPETITIVE-RESEARCH.md) only for a future market-positioning decision.
 - No end-to-end Task execution was run: no plan acceptance, Attempt admission, Environment provisioning, Task-provider file modification or independent Effect verification occurred.
 
+## Windows provider research input (B-35, PROPOSED)
+
+- AppContainer gives per-profile filesystem and object-namespace confinement keyed by a package SID; resources must be explicitly ACL-granted to that SID.
+- A restricted token removes privileges and sets user and administrator groups deny-only.
+- A Job Object gives process-tree lifetime (KILL_ON_JOB_CLOSE), active-process, memory and CPU limits. It confines nothing on the filesystem or network by itself (B-09 caveat).
+- Windows Filtering Platform filters can block outbound traffic for an AppContainer package SID.
+- Only the combination, with each dimension observed after launch, can satisfy the four-dimension attestation. Exact Windows builds, required privileges for WFP filter install and cleanup after crash are open items for the owner decision task.
+
 ## Unresolved questions
 
-See SPEC section 5 blockers. Owners are named on the package README.
+- B-35 (Windows Environment provider) is PROPOSED and needs the owner.
+- The Linux-row planning harness and version (SPEC §18).
+- Whether a broker-only connector Step needs an admitted Environment (SPEC §18, shared with 006).

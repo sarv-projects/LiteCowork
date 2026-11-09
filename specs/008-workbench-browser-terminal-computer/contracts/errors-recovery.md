@@ -1,5 +1,7 @@
 # Errors and recovery - Workbench Browser Terminal and Computer
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Target Browser recovery
 
 - Browser provider or profile unavailable is an explicit `UNAVAILABLE`, `NEEDS_SETUP`, `OFFLINE` or `UNKNOWN` observation, not a ready session. Do not fall back to the Tauri WebView and call it Chrome.

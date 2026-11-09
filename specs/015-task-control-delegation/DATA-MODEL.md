@@ -1,0 +1,63 @@
+# Data Model - Task Control and Heterogeneous Delegation
+
+**Status:** IN_REVIEW - authored for owner review; does not authorize implementation. No migration ships until the package is accepted and TASKS T02 promotes it.
+
+Canonical entity definitions live in [docs/DATA-MODEL.md](../../docs/DATA-MODEL.md), [docs/STATE-MACHINES.md](../../docs/STATE-MACHINES.md), [docs/TASK-RUNTIME.md](../../docs/TASK-RUNTIME.md) and [docs/DELEGATION.md](../../docs/DELEGATION.md). This file maps them to this feature and names the new records.
+
+## 1. Existing durable records (reused)
+
+| Record | Location | Fields used here |
+|---|---|---|
+| `tasks` | `docs/schemas/sqlite-v1.sql` | status (text), version, lead agent binding, current spec revision, Coworker revision pin |
+| `task_spec_revisions` | `sqlite-v1.sql` | revision, `parent_revisions_json` (siblings for concurrent steering) |
+| `plan_revisions`, `steps` | `sqlite-v1.sql` | accepted plan pin, Step status READY |
+| `attempts` | `sqlite-v1.sql` | `parent_attempt_id`, `delegation_profile_id`, `delegation_profile_revision`, `execution_lease_id`, state (`AttemptState`) |
+| `execution_leases` | `sqlite-v1.sql` | `epoch` with `UNIQUE(step_id, epoch)` and immutable identity trigger |
+| `delegation_profiles`, `delegation_profile_revisions` | `sqlite-v1.sql` | status, `max_concurrency`, `max_host_delegation_depth`, policies |
+| `coworker_revisions` | `sqlite-v1.sql`, `sqlite-v28.sql` | `enabled_delegation_profile_ids_json`, `delegation_budget_policy_json` |
+| `delegation_results` | `sqlite-v24.sql` | ResultEnvelope per child Attempt |
+| `verification_runs` | `sqlite-v1.sql` | status PENDING, RUNNING, PASSED, FAILED, INCONCLUSIVE |
+| `event_journal`, `request_dedup` | `sqlite-v1.sql` | events and idempotency receipts |
+
+## 2. New records (accepted target after T02, not yet in source)
+
+| Record | Key | Fields | Rules |
+|---|---|---|---|
+| `task_control_requests` | `control_request_id` | workspace_id, task_id, command (PAUSE, RESUME, STEER, CANCEL), class (for STEER), requested_by, expected_task_version, idempotency key digest, state (ACCEPTED, WAITING_QUIESCENCE, SETTLED, SUPERSEDED, FAILED), outcome code, created_at, settled_at | One nonterminal PAUSE or CANCEL per Task; CANCEL may supersede PAUSE; rows are append-then-settle, never deleted while the Task exists |
+| `task_resume_packets` | `resume_packet_id` | task_id, task_spec_revision, current_plan_revision, source_attempt_id, packet digest, packet blob ref, generated_at | Immutable; contains no grant, lease, SecretLease or handle; digest checked on resume |
+| escalation `on_exhaustion` | stored with the delegation packet or profile revision | `RETURN_TO_LEAD` or `NEEDS_YOU` | Missing in legacy rows reads as `NEEDS_YOU` (B-39 item 4) |
+
+## 3. Lifecycles
+
+- **Task (control subset):** `READY|RUNNING|WAITING_USER|BLOCKED|VERIFYING -> PAUSE_REQUESTED -> PAUSED -> (prior state)`; any nonterminal including PAUSE_REQUESTED and PAUSED `-> CANCEL_REQUESTED -> CANCELLED`. No STEER state: steering produces spec revisions or notes.
+- **Attempt:** `CREATED -> PREPARING -> RUNNING -> ... -> COMPLETED|FAILED|ABANDONED|CANCEL_REQUESTED -> CANCELLED`. A replacement (handoff, escalation, resume continuation) is always a new Attempt id with lease epoch + 1.
+- **Control request:** `ACCEPTED -> WAITING_QUIESCENCE -> SETTLED | SUPERSEDED | FAILED`.
+- **VerificationRun:** `PENDING -> RUNNING -> PASSED | FAILED | INCONCLUSIVE`; none starts while the Task is PAUSE_REQUESTED or CANCEL_REQUESTED.
+
+## 4. Identity and fence invariants
+
+1. A ResultEnvelope, Effect receipt or completion claim is accepted only if its Attempt id is current for the Step, its lease epoch equals the live lease epoch and its `revision_at_start` matches the pinned revision; otherwise it is stored as a fenced observation.
+2. Child depth is computed from immutable `parent_attempt_id` links; V1 depth is 1 (B-39).
+3. `delegation_profile_id` and `delegation_profile_revision` are set together or not at all.
+4. The verifier Attempt's AgentBinding differs from the producing worker Attempt's AgentBinding (checked in storage).
+
+## 5. Atomic writes
+
+| Operation | Records in one transaction |
+|---|---|
+| Request pause | Task PAUSE_REQUESTED, control request, `task.pause.requested.v1`, receipt |
+| Confirm paused | Task PAUSED, ResumePacket row, lease releases, control request SETTLED, `task.paused.v1` |
+| Resume | Task prior state, Attempts ABANDONED, control request SETTLED, `task.resumed.v1`, receipt |
+| Steer (spec change) | TaskSpecRevision(n+1), control request, `task.steering.recorded.v1`, receipt |
+| Child admission | child Attempt CREATED, Step binding, ExecutionLease, budget reservation, `task.child_attempt.admitted.v1`, receipt |
+| Fence late result | fenced observation, `task.child_result.fenced.v1` |
+
+No transaction contains a native, Environment or network call.
+
+## 6. Privacy, retention and deletion
+
+Steering text is user content stored with the Task and deleted with it; it is never copied into events or logs (events carry ids and class only). ResumePackets follow the Task's retention. Fenced observations keep ids, digests and the denial class only.
+
+## 7. Migration and compatibility
+
+Additive migration only. Existing Tasks have no control requests and no resume packets. Stored statuses are parsed by `TaskStatus`; an unknown value fails closed. Legacy delegation packets without `on_exhaustion` remain valid (register A-37).

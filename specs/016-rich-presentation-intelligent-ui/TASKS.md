@@ -1,0 +1,343 @@
+# Tasks - Rich Presentation, Intelligent UI and Generated Media
+
+**Feature:** 016 | **Status:** IN_REVIEW - authored complete for owner review; implementation not authorized until owner acceptance (T01); tasks not started unless marked.
+**Spec revision:** 0.1 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
+**Owners:** Presentation Runtime, Conversation, Artifacts, Storage, Operator/API, Desktop UI, Security, Accessibility, Product.
+
+Cross-package task references inside task fields are written as "Feature NNN Txx" so that each hyphenated cross-package ID appears once in this file (the structural validator rejects a repeated task ID); the hyphenated IDs are listed once in "Cross-package dependencies" below.
+
+## Current baseline
+
+Verified against branch `docs/audit-competitor-superset`; highest migration `docs/schemas/sqlite-v28.sql`.
+
+- **Desktop validator:** `apps/litecowork-ui/src/presentation/rich-presentation.ts` with `MAX_DOCUMENT_BYTES = 512 * 1024`, `MAX_BLOCKS = 200`, `MAX_DEPTH = 8`, `MAX_JSON_VALUES = 30_000`, `MAX_JSON_DEPTH = 32`; accepts TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE; `renderer_contract_version` must be 1; `parseRichPresentationResponse`, `resolveRichResponseContent`.
+- **Rust validator:** `validate_metadata`, `validate_document`, `validate_block` in `crates/storage-sqlite/src/rich_presentations.rs` accept only TEXT_SLICE and LAYOUT; `MAX_RICH_PRESENTATION_BYTES = 1_048_576` in `crates/storage-core/src/rich_presentation.rs` (doc comment names a nonexistent DIVIDER kind). `publish_rich_presentation` is called only from tests in `apps/litecoworkd/src/presentation_operator.rs`.
+- **Served reads:** `GET /v1/rich-presentations/{presentation_id}` (`get_rich_presentation`), `GET /v1/conversations/{conversation_id}/presentation`, `POST /v1/stream`; Tauri `get_rich_presentation` in `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs`.
+- **Renderer:** `apps/litecowork-ui/src/presentation/RichResponseView.tsx` (used by `ConversationsPage.tsx`) with the "Read the original response" disclosure; no chart, media or Intelligent UI. `PresentationRuntime.tsx` shows MCP_APP as unavailable.
+- **Tests:** `apps/litecowork-ui/tests/presentation-runtime-fallback.test.mjs`, `rich-presentation.test.ts`, `rich-response-view-policy.test.ts`; Rust `crates/storage-sqlite/src/rich_presentation_tests.rs`.
+- **Absent:** a shared corpus, a Rust presentation crate, CalcAst, chart and calculator components, a production binder, media ingestion, `PRESENTATION_*` error codes, an Intelligent UI schema in `docs/schemas`, an Artifact create route (Feature 007 B-30), any Interactive Artifact Runtime code. CSP in `apps/litecowork-ui/src-tauri/tauri.conf.json` is `script-src 'self'` with `img-src 'self' asset: http://asset.localhost data:`.
+
+Gaps to V1: owner acceptance (B-40), validator drift, no producer, no chart or Intelligent UI component, no media path, no disable preference, no E2E-11 evidence on either row.
+
+## 016-T01 - Owner acceptance of SPEC and blockers
+
+- **Status:** BLOCKED - pending owner acceptance of SPEC revision 0.1 and blocker B-40 (owner: repository owner, sarv-projects; Presentation Runtime, Product and Security prepare the decision).
+- **Depends on:** NONE
+- **Cross-package prerequisites:** NONE
+- **Owner:** Product, Presentation Runtime, Security; decision by the repository owner.
+- **Allowed paths:** `specs/016-rich-presentation-intelligent-ui/` (status flip to ACCEPTED/LOCKED per the authoring brief section 2).
+- **Contract:** SPEC sections 5 and 17; AC-013; SPECIFICATION-STANDARD section 7.
+- **Change intent:** record the owner decision on B-40 (SAFE_CALCULATOR as the first component, CHART as static block, renderer contract version 2, Interactive Artifact Runtime PREVIEW_ONLY on both rows); flip SPEC and WIRING to ACCEPTED/LOCKED, bump to revision 1.0, add the owner-acceptance line.
+- **Acceptance:**
+  - [ ] Owner decision on B-40 recorded with date and any rider.
+  - [ ] All package banners updated together; validator PASS.
+  - [ ] Negative: no implementation task starts while this task is BLOCKED.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** owner decision reference in SPEC section 5; register row for B-40 closed by the orchestrator.
+- **Stop:** owner picks a different first component; revise SPEC sections 5, 7 and 14 before any other task.
+
+## 016-T02 - Promote accepted interfaces into owner docs and machine schemas
+
+- **Status:** NOT STARTED
+- **Depends on:** T01
+- **Cross-package prerequisites:** NONE
+- **Owner:** Presentation Runtime, API, Events, Schemas owners.
+- **Allowed paths:** `docs/RICH-RESPONSE.md`, `docs/PRESENTATION-RUNTIME.md`, `docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md`, `docs/INTERACTIVE-ARTIFACT-RUNTIME.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/rich-presentation.schema.json`, `docs/schemas/calc-ast.schema.json` (new), `docs/schemas/error-codes.schema.json`, `docs/schemas/domain-event.schema.json`, this package.
+- **Contract:** SPEC sections 5 (B-40), 7.2; AC-001, AC-002, AC-006.
+- **Change intent:** add renderer contract version 2 with `SAFE_CALCULATOR` and a V1 allowlist profile listing exactly TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE, CHART, SAFE_CALCULATOR; CHART binding restricted to `semantic_table_slice` in V1; new `calc-ast.schema.json` with node and depth limits; errors `PRESENTATION_REJECTED`, `MEDIA_TYPE_UNSUPPORTED`, `MEDIA_TOO_LARGE`; event `rich.presentation.rejected.v1`; record 512 KiB as the single document cap. Reconcile RICH-RESPONSE ("generated images or interactive controls" exclusion) with the accepted SAFE_CALCULATOR by owner prose, not by a parallel definition.
+- **Acceptance:**
+  - [ ] Every promoted name exists once in its owner doc and schema.
+  - [ ] Negative: the schema rejects a SAFE_CALCULATOR with 65 nodes and a CHART bound to an invocation result in V1 profile.
+  - [ ] No migration is needed (existing `rich_presentations` table); state so in the PR.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` and `python3 scripts/validate_architecture.py`
+- **Evidence:** PR link and output in Completion evidence.
+- **Stop:** an owner doc conflicts with the B-40 decision; resolve at the owner.
+
+## 016-T03 - Single Rust validator crate and drift fix
+
+- **Status:** PARTIAL - Rust validation exists inside `crates/storage-sqlite/src/rich_presentations.rs` (TEXT_SLICE and LAYOUT only, 1 MiB cap); no shared crate.
+- **Depends on:** T01, T02
+- **Cross-package prerequisites:** NONE
+- **Owner:** Presentation Runtime, Storage.
+- **Allowed paths:** `crates/domain-presentation/` (new crate: `Cargo.toml`, `src/lib.rs`, `src/blocks.rs`, `src/calc.rs`, `src/tests.rs`), `Cargo.toml` (workspace members), `Cargo.lock`, `crates/storage-sqlite/Cargo.toml`, `crates/storage-sqlite/src/rich_presentations.rs`, `crates/storage-sqlite/src/rich_presentation_tests.rs`, `crates/storage-core/src/rich_presentation.rs` (cap constant and doc comment).
+- **Contract:** SPEC G-01, G-02, section 7.2; AC-001, AC-002, AC-006.
+- **Change intent:** move the closed-object, canonical-bytes, digest, slice, depth and provenance checks from `rich_presentations.rs` into `domain_presentation::validate_document`, add CARD, CALLOUT, TABLE (exact semantic Markdown table match), CHART and SAFE_CALCULATOR checks, set `MAX_DOCUMENT_BYTES` to 512 KiB, and have `SqliteRichPresentationStore::publish_rich_presentation` call it. Remove the stale DIVIDER comment. Dependencies limited to `serde_json`, `serde_json_canonicalizer`, `sha2` (already in the lockfile); no `jsonschema` crate.
+- **Acceptance:**
+  - [ ] 512 KiB accepted, 512 KiB + 1 rejected with `TooLarge` (AC-001).
+  - [ ] Every non-allowlisted kind rejected with `UnsupportedBlock`; actions, citations, HOST_PROJECTION and MCP_APP rejected (AC-002, AC-006).
+  - [ ] Existing `rich_presentation_tests.rs` cases still pass after the move.
+- **Command:** `cargo test -p domain-presentation --locked` and `cargo test -p storage-sqlite --locked rich_presentation`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** the crate needs a storage dependency; keep it pure.
+
+## 016-T04 - Shared golden corpus and TypeScript parity
+
+- **Status:** PARTIAL - `rich-presentation.ts` and `tests/rich-presentation.test.ts` exist with inline fixtures; no shared corpus.
+- **Depends on:** T01, T03
+- **Cross-package prerequisites:** NONE
+- **Owner:** Presentation Runtime, Desktop UI.
+- **Allowed paths:** `crates/domain-presentation/tests/corpus/` (new JSON files), `crates/domain-presentation/src/tests.rs`, `apps/litecowork-ui/src/presentation/rich-presentation.ts`, `apps/litecowork-ui/tests/rich-presentation-corpus.test.ts` (new).
+- **Contract:** SPEC G-01; RENDERING-CONFORMANCE-LLD; AC-002, AC-003.
+- **Change intent:** one corpus directory of documents with an expected verdict file (accept or reject plus reason); both test suites iterate it. Update `rich-presentation.ts` to accept renderer contract version 2 and the CHART and SAFE_CALCULATOR kinds with the same bounds; keep its defensive checks (proxies, getters, cycles). Corpus includes boundary sizes, deep nesting, hostile strings, non-finite numbers and every rejected kind.
+- **Acceptance:**
+  - [ ] Both validators agree on every corpus file (AC-003).
+  - [ ] Unknown kinds render semantic text in the desktop (AC-002).
+- **Command:** `cargo test -p domain-presentation --locked corpus` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** both outputs in Completion evidence.
+- **Stop:** a disagreement is resolved by loosening either side; tighten instead.
+
+## 016-T05 - Restricted CalcAst validator (Rust) and pure reducer (TypeScript)
+
+- **Status:** NOT STARTED
+- **Depends on:** T01, T03
+- **Cross-package prerequisites:** NONE
+- **Owner:** Presentation Runtime.
+- **Allowed paths:** `crates/domain-presentation/src/calc.rs`, `apps/litecowork-ui/src/presentation/calc-reducer.ts` (new), `apps/litecowork-ui/tests/calc-reducer.test.ts` (new), `crates/domain-presentation/tests/corpus/`.
+- **Contract:** SPEC L-03, B-40; INTELLIGENT-UI section 3; AC-007.
+- **Change intent:** Rust `validate_calc_ast` checks node kinds, at most 64 nodes, depth at most 12, finite literals, arity of MIN, MAX, ROUND, ABS, CLAMP and that every VARIABLE names a declared input. TypeScript `evaluateCalc` is an iterative, allocation-light evaluator over a frozen state map, returning `DIVIDE_BY_ZERO` or `NON_FINITE` instead of NaN or Infinity. No string parsing of formulas anywhere.
+- **Acceptance:**
+  - [ ] Every rule has a Rust negative test (AC-007).
+  - [ ] Reducer property test: for random valid ASTs and finite inputs the result is finite or a typed reason; never throws (AC-007).
+- **Command:** `cargo test -p domain-presentation --locked calc` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** any path evaluates a string expression.
+
+## 016-T06 - CHART block with host SVG and table fallback
+
+- **Status:** NOT STARTED - PRESENTATION-RUNTIME records CHART as a text placeholder today.
+- **Depends on:** T01, T03, T04
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop UI, Accessibility.
+- **Allowed paths:** `apps/litecowork-ui/src/presentation/ChartBlock.tsx` (new), `apps/litecowork-ui/src/presentation/chart-model.ts` (new), `apps/litecowork-ui/src/presentation/RichResponseView.tsx`, `apps/litecowork-ui/src/presentation/rich-response.css`, `apps/litecowork-ui/tests/chart-block.test.ts` (new), `crates/domain-presentation/src/blocks.rs`.
+- **Contract:** SPEC L-04, G-04; RICH-RESPONSE "Tables and charts"; AC-008, AC-010.
+- **Change intent:** `chart-model.ts` turns the bound TABLE slice into series (pure, tested); `ChartBlock.tsx` draws BAR, LINE and AREA with React `<svg>`, `<rect>`, `<path>` elements and computed coordinates only (no model markup), `role="img"` with the accessible summary, and a "Show data table" toggle that renders the existing TABLE renderer. PIE and SCATTER are rejected in V1 profile unless the owner widens it. No chart library dependency.
+- **Acceptance:**
+  - [ ] Chart and its table show identical values (AC-008).
+  - [ ] Binding mismatch or non-finite cell renders the table fallback (AC-008).
+  - [ ] Table toggle reachable by keyboard; summary exposed to screen readers (AC-010).
+- **Command:** `pnpm --dir apps/litecowork-ui test` and `pnpm --dir apps/litecowork-ui run build`
+- **Evidence:** test output; screenshot in the evidence bundle.
+- **Stop:** a design needs model-supplied SVG or style.
+
+## 016-T07 - SAFE_CALCULATOR Intelligent UI component (B-40)
+
+- **Status:** NOT STARTED
+- **Depends on:** T01, T05, T06
+- **Cross-package prerequisites:** Feature 011 app-wide keyboard and focus baseline.
+- **Owner:** Desktop UI, Accessibility, Presentation Runtime.
+- **Allowed paths:** `apps/litecowork-ui/src/presentation/SafeCalculatorBlock.tsx` (new), `apps/litecowork-ui/src/presentation/RichResponseView.tsx`, `apps/litecowork-ui/src/presentation/rich-response.css`, `apps/litecowork-ui/tests/safe-calculator-block.test.ts` (new), `crates/domain-presentation/src/blocks.rs`.
+- **Contract:** SPEC B-40, G-03; INTELLIGENT-UI section 3.2 `SafeCalculatorNode`; AC-007, AC-009, AC-010.
+- **Change intent:** labelled `<input type="number">` fields (initial values from the bound table cells), output in an `aria-live="polite"` region formatted per `output_format`, "Reset to original values" button, fallback text always visible below. State lives in a `useReducer` inside the component; no store, no bridge call, no persistence.
+- **Acceptance:**
+  - [ ] A bridge-call spy records zero calls during interaction (AC-009).
+  - [ ] Divide by zero shows "Cannot calculate with these values" (AC-007).
+  - [ ] Inputs labelled; result announced; axe clean at serious and critical (AC-010).
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output and accessibility report in the evidence bundle.
+- **Stop:** the component needs to send values to the agent; that is a different, unaccepted feature.
+
+## 016-T08 - PresentationBinder and publish after semantic commit
+
+- **Status:** NOT STARTED - `publish_rich_presentation` has no production caller.
+- **Depends on:** T01, T03, T05
+- **Cross-package prerequisites:** Feature 001 T06 (final response settlement with stable identity in the supervisor).
+- **Owner:** Presentation Runtime, Conversation, Storage.
+- **Allowed paths:** `apps/litecoworkd/src/presentation_binder.rs` (new), `apps/litecoworkd/src/agents/supervisor.rs` (one call after the commit returns), `apps/litecoworkd/src/main.rs` (wiring only), `crates/storage-sqlite/src/rich_presentations.rs`, adjacent tests.
+- **Contract:** SPEC L-01, G-05, section 6 sequence; AC-004, AC-014, AC-017.
+- **Change intent:** after `commit_conversation_agent_response` returns, `bind_after_commit` derives a document from the committed semantic text (Markdown tables to TABLE, eligible numeric tables to CHART, validated PresentationIntent CALC elements to SAFE_CALCULATOR), validates it, and publishes in its own transaction with a deterministic presentation id from (message id, binder version) so replays are idempotent. Any error is counted and dropped; the turn is already settled.
+- **Acceptance:**
+  - [ ] Binder fault injection leaves the turn and message unchanged (AC-004).
+  - [ ] Replay returns the stored record; a different digest under the same id conflicts (AC-014).
+  - [ ] Only committed text and validated intent are used (AC-017).
+- **Command:** `cargo test -p litecoworkd --locked presentation_binder` (filter to be added by this task)
+- **Evidence:** test output in Completion evidence.
+- **Stop:** any binder path runs inside the final-commit transaction.
+
+## 016-T09 - Disable preference and semantic fallback (E2E-11)
+
+- **Status:** PARTIAL - `RichResponseView.tsx` already renders semantic text when no valid presentation exists and offers "Read the original response"; no preference to disable rich presentation.
+- **Depends on:** T01, T04
+- **Cross-package prerequisites:** Feature 011 T07 (applied and persisted local display preferences).
+- **Owner:** Desktop UI, Feature 011 shell.
+- **Allowed paths:** `apps/litecowork-ui/src/presentation/RichResponseView.tsx`, `apps/litecowork-ui/src/presentation/rich-presentation.ts` (`resolveRichResponseContent` gains the preference), `apps/litecowork-ui/src/conversations/ConversationsPage.tsx` (pass the preference only), `apps/litecowork-ui/src/settings/` (toggle row in the display preferences section owned by Feature 011), `apps/litecowork-ui/tests/rich-response-view-policy.test.ts`.
+- **Contract:** SPEC G-06; release contract section 4; AC-004, AC-018.
+- **Change intent:** a local preference `rich_presentation_enabled` (default true); when false, `resolveRichResponseContent` returns `primary: "SEMANTIC"` without fetching documents. The toggle is a labelled switch in Settings display preferences.
+- **Acceptance:**
+  - [ ] With the preference off, no `get_rich_presentation` call happens and the full semantic text shows (AC-004, AC-018).
+  - [ ] Preference survives restart; toggle keyboard operable (AC-018).
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output; E2E-11 step evidence in T16.
+- **Stop:** the preference is stored outside the Feature 011 preference owner.
+
+## 016-T10 - Generated media as provenance Artifacts
+
+- **Status:** NOT STARTED - no ingestion pipeline; no Artifact create route today.
+- **Depends on:** T01, T02
+- **Cross-package prerequisites:** Feature 007 T02 (atomic Artifact create store, B-30) and Feature 007 T08 (Conversation association of Artifacts); Feature 011 decision on image display scheme (CSP).
+- **Owner:** Artifacts, Presentation Runtime, Security.
+- **Allowed paths:** `apps/litecoworkd/src/media_ingestion.rs` (new), `apps/litecoworkd/src/agents/supervisor.rs` (hand off harness file outputs only), `apps/litecowork-ui/src/artifacts/ArtifactWorkbench.tsx` (image view only), `apps/litecowork-ui/tests/artifact-image-view.test.ts` (new), adjacent Rust tests.
+- **Contract:** SPEC L-05, G-07, section 10; INTELLIGENT-UI section 4; AC-011, AC-012, AC-015.
+- **Change intent:** `ingest_harness_file` reads an admitted Workspace path, sniffs magic bytes (PNG, JPEG, WebP, GIF), enforces at most 20 MiB and 16384 pixels per side, hashes to `blobs/<sha256>`, then asks Feature 007 to create an Artifact version with provenance (Conversation, turn, AgentSession, digest). SVG and URL-only references are rejected. The Workbench image view shows alt text from the harness or a "No description provided" label, never autoplays, and loads bytes only through the authorized Artifact content read.
+- **Acceptance:**
+  - [ ] Valid PNG produces one Artifact with full provenance (AC-011).
+  - [ ] SVG, oversize, mismatch and URL-only inputs are rejected with no Artifact and no network call (AC-012).
+  - [ ] Crash between blob write and Artifact commit: sweep removes the orphan blob (AC-015).
+- **Command:** `cargo test -p litecoworkd --locked media_ingestion` (filter to be added by this task) and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** any path fetches a URL.
+
+## 016-T11 - Interactive Artifact Runtime kept PREVIEW_ONLY and inert
+
+- **Status:** PARTIAL - no runtime code exists and `PresentationRuntime.tsx` renders MCP_APP as unavailable; the Library/Workbench has no explicit inert preview for interactive Artifacts.
+- **Depends on:** T01
+- **Cross-package prerequisites:** Feature 007 T10 (declared format capability matrix rendering).
+- **Owner:** Artifacts, Desktop UI, Security.
+- **Allowed paths:** `apps/litecowork-ui/src/artifacts/ArtifactWorkbench.tsx`, `apps/litecowork-ui/src/artifacts/interactive-preview.ts` (new), `apps/litecowork-ui/tests/interactive-artifact-preview.test.ts` (new).
+- **Contract:** SPEC L-06, B-40 item 3; INTERACTIVE-ARTIFACT-RUNTIME "Lifecycle" PREVIEW_ONLY; AC-013.
+- **Change intent:** for an interactive Artifact show title, exact version, provenance, package validation result and a source view (text only); no Run control; the text "Running interactive apps is not available in this version." No iframe, no `srcdoc`, no script.
+- **Acceptance:**
+  - [ ] No Run control and no iframe in the rendered tree (AC-013).
+  - [ ] Source shown as escaped text (AC-013).
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output; packaged check on both rows in T16.
+- **Stop:** any proposal enables Run before E08-S09 evidence and a new accepted revision.
+
+## 016-T12 - No-executable-content gate, hostile corpus and CSP check
+
+- **Status:** PARTIAL - `presentation-runtime-fallback.test.mjs` covers escaping and unsupported kinds for `PresentationRuntime.tsx`; no static gate for the presentation directory; CSP is not tested.
+- **Depends on:** T01, T06, T07
+- **Cross-package prerequisites:** Feature 019 CSP audit of `tauri.conf.json`.
+- **Owner:** Security, Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/tests/presentation-no-exec-gate.test.mjs` (new), `apps/litecowork-ui/tests/presentation-hostile-corpus.test.ts` (new), `crates/domain-presentation/tests/corpus/`.
+- **Contract:** SPEC L-07, L-08, G-09, section 10; AC-005, AC-006.
+- **Change intent:** a test that scans `apps/litecowork-ui/src/presentation/` for `dangerouslySetInnerHTML`, `eval(`, `new Function`, `innerHTML`, `srcdoc`; a hostile corpus (script tags, `javascript:` text, event-handler strings, forged APPROVED states) rendered through every block; a check that `tauri.conf.json` keeps `script-src 'self'` and no `unsafe-eval`; a bridge-call spy proving no rendered element invokes a state-changing command.
+- **Acceptance:**
+  - [ ] Gate test fails on an injected forbidden token and passes on the clean tree (AC-005).
+  - [ ] Hostile strings render as text; no bridge call (AC-006).
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** any exception is requested for a forbidden API.
+
+## 016-T13 - Failure and recovery suite
+
+- **Status:** NOT STARTED
+- **Depends on:** T01, T08, T10
+- **Cross-package prerequisites:** NONE
+- **Owner:** Presentation Runtime, Storage.
+- **Allowed paths:** `apps/litecoworkd/tests/rich_presentation_intelligent_ui.rs` (new), `crates/storage-sqlite/src/rich_presentation_tests.rs`, `apps/litecowork-ui/tests/presentation-stream.test.ts`.
+- **Contract:** SPEC section 11; contracts/errors-recovery.md; AC-014, AC-015.
+- **Change intent:** concurrency test of two publishes for one message; replay test; crash injection between blob write and record commit for presentations and media; stream gap followed by resync from `GET /v1/conversations/{conversation_id}/presentation` with no duplicate messages; daemon restart with a published presentation still readable.
+- **Acceptance:**
+  - [ ] Exactly one of two racing publishes commits (AC-014).
+  - [ ] Orphan blobs removed; stream resync has no duplicates (AC-015).
+- **Command:** `cargo test -p litecoworkd --test rich_presentation_intelligent_ui --locked recovery` (target and filter to be added by this task) and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** a recovery path rewrites a semantic message.
+
+## 016-T14 - Performance budgets
+
+- **Status:** NOT STARTED
+- **Depends on:** T01, T03, T04, T06, T07
+- **Cross-package prerequisites:** Feature 019 release-row reference machines.
+- **Owner:** Presentation Runtime, Release.
+- **Allowed paths:** `crates/domain-presentation/tests/perf.rs` (new; plain timed test, no benchmark crate added), `apps/litecowork-ui/tests/rich-presentation-perf.test.ts` (new).
+- **Contract:** SPEC section 14; AC-016.
+- **Change intent:** benchmark the Rust validator on the largest corpus file and a 512 KiB synthetic file; measure TypeScript validation time and the longest main-thread task while rendering 200 blocks; record results per release row. If the TypeScript budget fails, move slice digest checks to a single pass over the encoded bytes before considering a Web Worker.
+- **Acceptance:**
+  - [ ] Rust p95 at most 50 ms; TypeScript p95 at most 150 ms; no task over 100 ms on render (AC-016).
+- **Command:** `cargo test -p domain-presentation --release --locked --test perf -- --nocapture` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** numbers per row in the evidence bundle.
+- **Stop:** budgets are met only by skipping validation.
+
+## 016-T15 - Cross-layer traces for every user-visible operation
+
+- **Status:** NOT STARTED
+- **Depends on:** T01, T06-T13
+- **Cross-package prerequisites:** NONE
+- **Owner:** Product, component owners.
+- **Allowed paths:** `specs/016-rich-presentation-intelligent-ui/contracts/ui-behavior.md`, `specs/016-rich-presentation-intelligent-ui/WIRING.yaml`, `docs/V1-UI-ACTION-STATE-LEDGER.md`, `docs/SEMANTIC-SERVED-UI-MAP.md`.
+- **Contract:** AGENTS.md section 4; AC-004, AC-018.
+- **Change intent:** trace rich answer view, chart table toggle, calculator use, disable preference, image Artifact view and interactive Artifact preview from control to owner record and evidence test.
+- **Acceptance:**
+  - [ ] Every control maps to an owner route or is documented as view-local (calculator, chart toggle).
+  - [ ] Each trace cites a passing test.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` and `python3 scripts/audit_v1_contracts.py`
+- **Evidence:** trace table in contracts/ui-behavior.md.
+- **Stop:** a control has no owner and is not view-local.
+
+## 016-T16 - Release-row qualification (E2E-11) on Windows x64 then Linux x64
+
+- **Status:** NOT STARTED
+- **Depends on:** T01-T15
+- **Cross-package prerequisites:** Feature 001 T09 (qualified native Conversation route; a real answer is needed); Feature 011 T17 (packaged qualification of the shell); Feature 019 release matrix and evidence bundle.
+- **Owner:** Product, Release, repository owner (USER evidence).
+- **Allowed paths:** `apps/litecoworkd/tests/rich_presentation_intelligent_ui.rs`, `apps/litecowork-ui/tests/` (E2E driver for this journey), evidence bundle path defined by Feature 019, `CURRENT-RUN.md`.
+- **Contract:** ACCEPTANCE-AND-E2E-PLAN E2E-11; SPEC section 15; AC-004, AC-005, AC-010, AC-013.
+- **Change intent:** create the canonical test target; on the packaged desktop with OpenCode v2.0.32, ask a question whose answer has a numeric table: verify table, chart and calculator; disable rich presentation and verify full semantic text; inject a malicious presentation and verify fallback with no host-state change; open an interactive Artifact and verify inert preview; ingest a generated image and verify the Artifact provenance. Windows x64 first, then Linux x64.
+- **Acceptance:**
+  - [ ] Canonical command passes on each row with recorded build, OS and harness version.
+  - [ ] Owner USER evidence for E2E-11 on each row, including the malicious-presentation and disabled cases.
+- **Command:** `cargo test -p domain-presentation --locked && cargo test -p litecoworkd --test rich_presentation_intelligent_ui --locked -- --nocapture && pnpm --dir apps/litecowork-ui test`
+- **Evidence:** evidence bundle entries; IMPLEMENTATION-STATUS rows per row.
+- **Stop:** any malicious case changes host state.
+
+## 016-T17 - Documentation and ledger sync
+
+- **Status:** NOT STARTED
+- **Depends on:** T01, T15, T16
+- **Cross-package prerequisites:** NONE (orchestrator owns shared docs).
+- **Owner:** Documentation owner, orchestrator.
+- **Allowed paths:** `docs/IMPLEMENTATION-STATUS.md`, `docs/PRESENTATION-RUNTIME.md` (current-state lines only, for example the CHART placeholder note), `docs/V1-UI-ACTION-STATE-LEDGER.md`, `docs/schemas/served-route-inventory.json`, `CURRENT-RUN.md`.
+- **Contract:** AGENTS.md sections 3 and 5; AC-013.
+- **Change intent:** update the five-layer output rows (semantic, rich presentation, generated media, Intelligent UI, interactive Artifact) with exact evidence class per row; keep Interactive Artifact Runtime TARGET with PREVIEW_ONLY posture; regenerate the route inventory (no new public route expected).
+- **Acceptance:**
+  - [ ] No row claims more than its evidence.
+  - [ ] Route inventory unchanged or regenerated consistently.
+- **Command:** `python3 scripts/audit_served_routes.py` and `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** PR diff.
+- **Stop:** a status upgrade lacks evidence.
+
+## 016-T18 - Package VERIFIED for V1
+
+- **Status:** NOT STARTED
+- **Depends on:** T01-T17
+- **Cross-package prerequisites:** Feature 019 release evidence bundle accepted.
+- **Owner:** Product, repository owner.
+- **Allowed paths:** `specs/016-rich-presentation-intelligent-ui/`.
+- **Contract:** SPECIFICATION-STANDARD lifecycle; AC-001 to AC-018.
+- **Change intent:** assemble the evidence bundle; move ACCEPTED/LOCKED to IMPLEMENTING when T02 starts and to VERIFIED when all tasks close and the owner signs off.
+- **Acceptance:**
+  - [ ] Every AC has a passing test reference on both rows.
+  - [ ] Owner sign-off recorded.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** Completion evidence table below.
+- **Stop:** any AC lacks evidence.
+
+## Dependency order
+
+T01 -> T02 -> T03 -> (T04, T05 in parallel). T04 -> T06; T05 + T06 -> T07; T03 + T05 -> T08; T04 -> T09; T02 -> T10; T01 -> T11 (independent of the validator work). T06 + T07 -> T12; T08 + T10 -> T13; T03 + T04 + T06 + T07 -> T14. T06-T13 -> T15 -> T16 -> T17 -> T18.
+
+## Cross-package dependencies
+
+| This task | Other package task | Reason |
+|---|---|---|
+| T08 | 001-T06 | Binder runs after the final response commit with stable identity |
+| T16 | 001-T09 | A qualified native Conversation route produces the real answers E2E-11 uses |
+| T10 | 007-T02 | Atomic Artifact create with provenance (B-30) |
+| T10 | 007-T08 | Conversation association of Artifacts |
+| T11 | 007-T10 | Declared format capability matrix and read-only rendering |
+| T09 | 011-T07 | Local display preference owner |
+| T16 | 011-T17 | Packaged shell qualification on Windows x64 then Linux x64 |
+| T07 | Feature 011 app-wide keyboard and focus baseline | Calculator and chart toggle accessibility |
+| T10 | Feature 011 image display scheme in CSP | Media display without weakening CSP |
+| T12, T14, T16, T18 | Feature 019 CSP audit, reference machines, release matrix and evidence bundle | Security and qualification are per release row |
+
+Feature 019 task plans are being written in the same release-planning pass, so those rows name the outcome; the orchestrator resolves them to task IDs in the traceability index.
+
+## Completion evidence
+
+For each task append a row when it closes: task, code revision (SHA), exact command, result (pass/fail with counts), OS and build (Windows 11/10 x64 or Linux x64 distribution), WebView (WebView2 or WebKitGTK version), harness and version (OpenCode v2.0.32), evidence class reached (CODE, SYSTEM, USER), report path and reviewer. Statuses above are source-audit classifications at this revision, not qualification.
+
+| Task | Revision | Command | Result | OS/build | Harness/version | Class | Reviewer |
+|---|---|---|---|---|---|---|---|
+| (none yet) | | | | | | | |

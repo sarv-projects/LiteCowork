@@ -1,6 +1,6 @@
 # Data model - Golden Connection and One Capability Write
 
-**Feature:** 006 | **Status:** DRAFT
+**Feature:** 006 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 Identities and lifecycles stay in the canonical owner documents. This file lists the records this slice reads or commits. It does not authorize new tables by itself.
 
@@ -29,7 +29,7 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-None in this revision. Blockers in SPEC section 5 must be closed before a migration is designed.
+None shipped yet. The `connections` table already exists in `docs/schemas/sqlite-v1.sql` (status CHECK without `REVOKED`, `secret_refs_json`) and has no Rust store. T01 designs a forward-only migration that rebuilds it with `REVOKED` and a remote-revocation field and adds `auth_attempts` (state, expiry, digests only). T07 replaces the `sqlite-v15.sql` Invocation creation and DISPATCHED triggers with guards that admit only the combined dispatch transaction. Token bytes never enter SQLite; only SecretRef ids do.
 
 ## Current implementation boundary (2026-11-06)
 

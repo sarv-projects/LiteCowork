@@ -3,10 +3,12 @@
 # 002 - Native Agent Install, Auth and Binding
 
 **ID:** 002
-**Status:** DRAFT
+**Status:** ACCEPTED/LOCKED
 **Owners:** Agent Runtime, Security/Trust, Desktop UI, Product
-**Updated:** 2026-11-06
-**Revision:** 0.3
+**Updated:** 2026-11-09
+**Revision:** 1.0 (revision 1.0 adds V1 gap coverage per owner acceptance 2026-11-09: OpenCode binding admission fix, AgentControlDescriptor producer, native sign-in observation, descriptor-declared composer options/commands and Claude Code CLI as the second module; new AC-013 to AC-017)
+**Owner acceptance:** accepted 2026-11-09 by the repository owner (sarv-projects) via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md) (PR #1), including each "ACCEPT (scoped)" caveat as a binding condition.
+**Change control:** this contract is locked. Any change to a locked decision, interface or acceptance criterion requires a new revision and renewed owner approval (docs/SPECIFICATION-STANDARD.md §7).
 **Target release:** V1 local desktop
 **Dependencies:** root ARCHITECTURE.md, docs/V1-PRODUCT-RELEASE-CONTRACT.md, docs/IMPLEMENTATION-MASTER-PLAN.md, and the owner documents named in RESEARCH.md. Feature 001 remains the Conversation send authority.
 
@@ -47,7 +49,19 @@ The active checkout has partial, source-backed Agent Registry, installation-inve
 | Install/update and native config | OpenAPI target operations exist | `POST /agent-registry/{id}/install`, `/update`, native-config open and auth-begin have no served handlers in the active composed router. |
 | Desktop UI | `AgentCatalogSettings` renders 15 curated candidates, ACP Registry results, local inventory, Codex/OpenCode probes, observed profiles, Workspace bindings/default lead and worker-profile controls | No install/update or native sign-in flow. Auth remains explicitly unknown; Inspect native controls reaches the unavailable descriptor route. This is a catalogue/probe/binding surface, not a complete agent lifecycle UI. |
 
-Code or a route alone does not qualify the feature. This package remains DRAFT until its named owners accept the decisions and supporting contracts.
+Code or a route alone does not qualify the feature. The §5 decisions are owner-accepted and this package is ACCEPTED/LOCKED; implementation and qualification status are unchanged by acceptance and are tracked in this §4 and in [docs/IMPLEMENTATION-STATUS.md](../../docs/IMPLEMENTATION-STATUS.md).
+
+### 4a. Source-verified detail of the OpenCode binding break (checked 2026-11-09)
+
+The OpenCode row above was re-traced through source for the V1 P1 prerequisite. These are current-state facts, not fixes:
+
+- `probe_local_opencode_profile` in `apps/litecoworkd/src/operator.rs` always publishes its `RuntimeOfferRecord` with `compatible: false`, and with readiness `DEGRADED` even for a complete probe (otherwise `UNAVAILABLE`). `opencode_endpoint_capabilities()` declares every capability `false` and `protocol_version: null`. `OpenCodeProfileProbe::profile_admission_supported` in `apps/litecoworkd/src/agents/opencode_profile_probe.rs` is fixed `false`, and the OpenAPI/generated TypeScript type (`apps/litecowork-ui/src/api/operator-api.ts`) declares it as the constant `false`.
+- Binding create and enable (`create_agent_binding_transaction`, `enable_agent_binding_transaction` in `crates/storage-sqlite/src/lib.rs`) call `has_fresh_compatible_endpoint`, whose query requires `runtime_offers.compatible = 1` and readiness `AVAILABLE`, `STARTABLE` or `READY`. Conversation admission (`resolve_conversation_session_host_in_transaction` in `crates/storage-sqlite/src/conversations.rs`) applies the same filter. Both gates therefore reject every OpenCode offer, and `AgentCatalogSettings.tsx` disables Create binding when `observation.compatible === false`.
+- The probe records the profile with `provider_key: "OPENCODE"`, but `execute_agent_turn` in `apps/litecoworkd/src/agents/supervisor.rs` matches the lowercase literal `"opencode"`. If only the offer flag were flipped, dispatch would still fall into the `other =>` unsupported arm.
+- The probe resolves the executable with `resolve_local_executable("opencode")`, which joins the bare name onto each `PATH` entry, so on Windows an npm `opencode.cmd` or `opencode.exe` is not found and the probe returns `404 AGENT_UNAVAILABLE`. The supervisor separately re-resolves the executable with `find_opencode_executable` (which does check `.exe`/`.cmd`) and ignores the `endpoint_ref` the probe registered through `register_local_endpoint_binding`. The probed and dispatched executables can therefore differ.
+- The probe accepts OpenCode 2.0.26, 2.0.28 and 2.0.32 (`OpenCodeServerProtocol::for_cli_version`), while the supervisor always dispatches with `OpenCodeServerProtocol::V2_0_32`. Only 2.0.32 is the accepted first route.
+
+002-T01 is the first implementation task and closes all five points without weakening the storage gates.
 
 ## 5. LOCKED and FLEXIBLE decisions
 
@@ -65,25 +79,25 @@ Code or a route alone does not qualify the feature. This package remains DRAFT u
 - Module file layout and private helper names, provided the transactions and secret boundaries stay intact.
 - Presentation copy, provided state distinctions remain visible.
 
-### Open decisions
+### Previously open decisions (resolved 2026-11-09)
 
-- Which exact OS/harness/version/auth tuple is the first GA route (P0 exit, shared with 001 B-02).
-- Which credential slots on the first qualified module use NATIVE_AGENT versus LITECOWORK_SECRET_STORE. The closed rules are already locked: a NATIVE_AGENT slot is never a SecretRef; a LITECOWORK_SECRET_STORE slot stores bytes only in SecretStore.
+- First GA route (shared with Feature 001 B-02, owner rider): Windows 11/10 `x86_64-pc-windows-msvc` with **OpenCode v2.0.32**, the only harness the supervisor dispatches today, wrapped behind the target Adapter 1.0 framed transport contract. Claude Code CLI is the second module (B-11). Codex is a later module. The Linux x86_64 desktop row (0600/0700 socket) is the second release-matrix row (B-28).
+- Credential slot ownership per module is pinned in that module's conformance fixture during 002-T03. The closed rules are already locked: a NATIVE_AGENT slot is never a SecretRef; a LITECOWORK_SECRET_STORE slot stores bytes only in SecretStore. For OpenCode v2.0.32 and Claude Code CLI the expected default is harness-managed native pass-through auth (NATIVE_AGENT) per the B-02 text.
 
-### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
+### ACCEPTED DECISIONS AND ARCHITECTURAL CONTRACTS (owner-accepted 2026-11-09)
 
-These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. Both blockers remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md). B-02 is shared with Feature 001 and stays owned there.
+These resolutions were accepted as written by the repository owner on 2026-11-09 through [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md); "ACCEPT (scoped)" caveats are binding conditions. The register of record is [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md) (maintained by the orchestrator). B-02 is shared with Feature 001 and stays owned there.
 
-| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+| ID | Topic | Accepted resolution and architectural contract | Canonical authority and consequence |
 |---|---|---|---|
-| B-11 | Additional V1 AgentModules after the first qualified native route | **RECOMMENDED: Qualify exactly one additional module after the first route, matching the Feature 001 B-02 pair (if OpenCode is first, Claude Code CLI is the second), and no more in V1.** Each additional module repeats the full independent lifecycle (installation, auth, descriptor freshness, binding, session readiness); none inherits qualification from the first route. The V1 matrix is therefore two modules, each separately qualified on the declared OS/Runtime. | [AGENT-CONTROL.md](../../docs/AGENT-CONTROL.md), [AGENT-ACCOUNT-ROUTE-MATRIX.md](../../docs/AGENT-ACCOUNT-ROUTE-MATRIX.md). Prevents catalog-wide claims from one route; the exact second module stays owner-pinned (and aligns with Feature 004 B-16 relay). |
-| B-12 | Descriptor freshness TTL and probe budget by AgentModule | **PROPOSED: A per-module `AgentControlDescriptor` TTL of 15 minutes with a bounded probe budget of at most 3 descriptor refresh probes per minute per module, both module-overridable downward in the conformance fixture.** A descriptor older than its TTL is stale: it blocks new binding admission and new session readiness and offers refresh while preserving the composer draft. The TTL and probe budget are pinned per module in its conformance fixture; a generic value is never inferred from a brand. | [AGENT-CONTROL.md](../../docs/AGENT-CONTROL.md) §12, [V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md](../../docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md). Any promoted TTL/budget value must land in the owner doc and conformance fixture together before this leaves PROPOSED. |
+| B-11 | Additional V1 AgentModules after the first qualified native route | **ACCEPTED (2026-11-09), scoped: OpenCode v2.0.32 is the first route and Claude Code CLI is the second module; Codex is a later module, not V1.** Original resolution: Qualify exactly one additional module after the first route, matching the Feature 001 B-02 pair (if OpenCode is first, Claude Code CLI is the second), and no more in V1.** Each additional module repeats the full independent lifecycle (installation, auth, descriptor freshness, binding, session readiness); none inherits qualification from the first route. The V1 matrix is therefore two modules, each separately qualified on the declared OS/Runtime. | [AGENT-CONTROL.md](../../docs/AGENT-CONTROL.md), [AGENT-ACCOUNT-ROUTE-MATRIX.md](../../docs/AGENT-ACCOUNT-ROUTE-MATRIX.md). Prevents catalog-wide claims from one route; the exact second module stays owner-pinned (and aligns with Feature 004 B-16 relay). |
+| B-12 | Descriptor freshness TTL and probe budget by AgentModule | **ACCEPTED (2026-11-09).** Resolution: A per-module `AgentControlDescriptor` TTL of 15 minutes with a bounded probe budget of at most 3 descriptor refresh probes per minute per module, both module-overridable downward in the conformance fixture.** A descriptor older than its TTL is stale: it blocks new binding admission and new session readiness and offers refresh while preserving the composer draft. The TTL and probe budget are pinned per module in its conformance fixture; a generic value is never inferred from a brand. | [AGENT-CONTROL.md](../../docs/AGENT-CONTROL.md) §12, [V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md](../../docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md). The promoted TTL/budget values land in the owner doc and conformance fixture together (002-T02, 002-T03). |
 
-Both rows are declared design positions only. This package stays DRAFT; owner acceptance and the exact first/second route are not complete. Do not infer owner sign-off from the presence of a decision row.
+Both rows are owner-accepted and the package is ACCEPTED/LOCKED. Acceptance authorizes implementation only; no route, module or behavior becomes SERVED, INTEGRATED or QUALIFIED by acceptance. Current status stays in §4 and docs/IMPLEMENTATION-STATUS.md.
 
-### Settings surface ownership (A-35, PROPOSED, pending owner)
+### Settings surface ownership (A-35, ACCEPTED 2026-11-09)
 
-Per the A-35 PROPOSED resolution in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md), the normative **Settings -> Agents screen surface** (control table, layout, categories, shell wiring) is owned by **Feature 011**. Feature 002 owns only the agent install/auth/binding **operations** that the screen invokes. The §18 UI and lifecycle material below is feature-specific operation/lifecycle design that LINKS to Feature 011's normative control table; it does not republish or compete with that owner. Where this SPEC lists control rows, treat them as the operations Feature 002 supplies, not the screen's normative control contract.
+Per the A-35 accepted resolution in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md), the normative **Settings -> Agents screen surface** (control table, layout, categories, shell wiring) is owned by **Feature 011**. Feature 002 owns only the agent install/auth/binding **operations** that the screen invokes. The §18 UI and lifecycle material below is feature-specific operation/lifecycle design that LINKS to Feature 011's normative control table; it does not republish or compete with that owner. Where this SPEC lists control rows, treat them as the operations Feature 002 supplies, not the screen's normative control contract. The screen itself is specified in [Feature 011](../011-desktop-shell-ipc-settings-runtime/SPEC.md); 002 tasks link to it and do not republish it.
 
 ## 6. High-level design
 
@@ -137,22 +151,23 @@ Trust boundary: the desktop UI is untrusted; the authenticated Operator is the o
 
 ## 7. Low-level design
 
-Operator routes in docs/AGENT-CONTROL.md §12 and docs/API.md are the authority. This package does not invent operationIds. The active checkout already mounts partial registry, inventory, profile-probe and binding routes. Proposed work must close the missing install/update/auth-begin/native-config operations and the unavailable descriptor/credential producers without duplicating existing routes. Any new field is PROPOSED until promoted into AGENT-CONTROL and the OpenAPI document in the same reviewed change.
+Operator routes in docs/AGENT-CONTROL.md §12 and docs/API.md are the authority. This package does not invent operationIds. The active checkout already mounts partial registry, inventory, profile-probe and binding routes. Proposed work must close the missing install/update/auth-begin/native-config operations and the unavailable descriptor/credential producers without duplicating existing routes. Any new field is an accepted target interface (not yet in source) until promoted into AGENT-CONTROL and the OpenAPI document in the same reviewed change.
 
-Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
+Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Accepted target payload fields stay target-only until the canonical owner document and machine schema change together.
 
 ### 7.1 Existing signatures (CODE)
 
 - Served: `GET /v1/agent-registry`, `POST /v1/agent-registry/refresh`, `GET /v1/agent-installations`, `GET /v1/agent-profiles`, `POST /v1/agent-profiles/probe` (Codex/OpenCode), binding list/get/create/enable/disable.
 - Mounted but fail-closed: `GET`/`POST` AgentControlDescriptor and credential-slot routes return `503 DEPENDENCY_UNAVAILABLE`.
-- Target-only: `POST /agent-registry/{id}/install`, `/update`, native-config open, native auth-begin.
+- Target-only: `POST /agent-registry/{id}/install`, `/update`, native-config open (`openAgentNativeConfiguration`), native auth-begin (`beginAgentAuthentication`), `getAgentSessionOptions` and `getAgentHarnessCapabilities` exist in `docs/schemas/operator-api.openapi.yaml` but are listed as target-only in `docs/schemas/served-route-inventory.json`.
+- Relevant existing symbols: `probe_local_opencode_profile`, `opencode_endpoint_capabilities` and `resolve_local_executable` (`apps/litecoworkd/src/operator.rs`); `probe_opencode_profile`, `OpenCodeProfileProbe` (`apps/litecoworkd/src/agents/opencode_profile_probe.rs`); `AgentControlDescriptor` and its validator (`apps/litecoworkd/src/agents/control_descriptor.rs`); `AgentModuleRegistry`, `AgentModuleManifest` (`apps/litecoworkd/src/agents/module_registry.rs`, currently `dead_code`); `get_control_descriptor`, `refresh_control_descriptor`, `unavailable_descriptor` (`apps/litecoworkd/src/agent_control_operator.rs`); `CurrentAgentDescriptorSource` with the stub `NoAgentDescriptorSource` (`apps/litecoworkd/src/agent_credentials_routes.rs`); `submit_agent_credential` (`apps/litecoworkd/src/agent_credentials_operator.rs`); `has_fresh_compatible_endpoint` (`crates/storage-sqlite/src/lib.rs`); `CLAUDE_CODE` inventory candidate (`apps/litecoworkd/src/agents/native_cli.rs`).
 
-### 7.2 PROPOSED signatures (not yet served)
+### 7.2 Accepted target signatures (not yet in source)
 
-Every signature below is PROPOSED and is not promotable until AGENT-CONTROL and the OpenAPI/schema change together.
+Every signature below is an accepted target interface (not yet in source). It is promoted only when AGENT-CONTROL and the OpenAPI/schema change together.
 
 ```rust
-// PROPOSED: fresh descriptor gate for enable (AC-004).
+// Accepted target: fresh descriptor gate for enable (AC-004).
 pub struct EnableBindingWithDescriptor {
     pub principal_id: String,
     pub workspace_id: String,
@@ -162,23 +177,46 @@ pub struct EnableBindingWithDescriptor {
     pub idempotency_key: String,                   // 1..=200 printable ASCII
 }
 
-// PROPOSED: replay-safe credential submission into SecretStore.
+// Accepted target: replay-safe credential submission into SecretStore.
 pub trait CredentialBroker: Send + Sync {
     fn submit_slot(
         &self, slot_id: &str, bytes: SecretBytes, idempotency_key: &str,
     ) -> Result<SecretRef, CredentialError>;   // same key + changed body => conflict
 }
 
-// PROPOSED: per-module descriptor freshness (B-12).
+// Accepted target: per-module descriptor freshness (B-12).
 pub struct AgentControlDescriptorFreshness {
     pub module_version: String,
     pub issued_at: Timestamp,
-    pub ttl_seconds: u32,                       // PROPOSED default 900
-    pub probe_budget_per_minute: u8,            // PROPOSED default 3
+    pub ttl_seconds: u32,                       // accepted default 900 (B-12)
+    pub probe_budget_per_minute: u8,            // accepted default 3 (B-12)
+}
+
+// Accepted target (002-T01): closed provider identity parsed once at the boundary,
+// replacing the string match in agents/supervisor.rs::execute_agent_turn.
+pub enum NativeProviderKey { OpenCode, ClaudeCode, Codex }
+impl NativeProviderKey {
+    pub fn from_profile_key(stored: &str) -> Option<Self>; // canonical stored form is upper case
+}
+
+// Accepted target (002-T01): offer compatibility is computed, never hard-coded.
+fn opencode_offer_admission(probe: &OpenCodeProfileProbe) -> OfferAdmission; // compatible only for 2.0.32 + Complete + host stop observed
+
+// Accepted target (002-T05): replaces NoAgentDescriptorSource.
+pub struct StoredAgentDescriptorSource { /* Runtime-local descriptor store + AgentModuleRegistry */ }
+impl CurrentAgentDescriptorSource for StoredAgentDescriptorSource { /* fresh, validated, digest-bound */ }
+
+// Accepted target (002-T07): native sign-in observation, never secret bytes.
+pub struct AgentAuthObservation {
+    pub agent_profile_id: String,
+    pub auth_method_id: String,
+    pub state: AgentAuthState,                  // existing closed enum in control_descriptor.rs
+    pub observed_at: Timestamp,
+    pub expires_at: Timestamp,
 }
 ```
 
-Typed errors (PROPOSED): `BindingError::{DescriptorStale, OfferIncompatible, NotLeadEligible}`; `CredentialError::{DescriptorStale, ReplayConflict, Unsupported}`.
+Typed errors (accepted target, not yet in source): `BindingError::{DescriptorStale, OfferIncompatible, NotLeadEligible}`; `CredentialError::{DescriptorStale, ReplayConflict, Unsupported}`; `AuthError::{MethodNotDeclared, Cancelled, Expired, Denied}`.
 
 ## 8. Data
 
@@ -228,7 +266,7 @@ Recovery:
 
 Boundary:
 - **AC-007:** IF the module reports native-only MCP or hooks outside LiteSPM, THEN THE SYSTEM SHALL label them as native harness state and SHALL NOT claim a Core Effect. Verify: native-state labeling test.
-- **AC-008:** WHEN a descriptor is older than its per-module TTL (PROPOSED 15 minutes), THE SYSTEM SHALL treat it as stale, block new binding admission and offer refresh while preserving the draft. Verify: TTL-boundary test.
+- **AC-008:** WHEN a descriptor is older than its per-module TTL (accepted default 15 minutes, B-12), THE SYSTEM SHALL treat it as stale, block new binding admission and offer refresh while preserving the draft. Verify: TTL-boundary test.
 
 Security:
 - **AC-009:** WHEN a credential slot is submitted, THE SYSTEM SHALL store bytes only in SecretStore for a `LITECOWORK_SECRET_STORE` slot, never echo them, and a `NATIVE_AGENT` slot SHALL never become a SecretRef. Verify: secret-custody and redaction tests.
@@ -242,13 +280,20 @@ UI and accessibility:
 Performance:
 - **AC-012:** WHEN one module's probe is slow, THE SYSTEM SHALL bound it to the per-module probe budget and SHALL NOT block other cards or the page. Verify: per-section probe-budget test.
 
+V1 gap coverage (revision 1.0):
+- **AC-013:** WHEN the owner probes OpenCode v2.0.32 on an enrolled Runtime (Windows x86_64 or Linux x86_64) and the probe completes with host stop observed, THE SYSTEM SHALL publish a fresh compatible `STARTABLE` AgentEndpoint offer whose stored provider key and executable identity are exactly the ones the Conversation supervisor dispatches, so that a disabled Workspace AgentBinding can be created; IF the version is not exactly 2.0.32, the probe is partial or host stop is unobserved, THEN THE SYSTEM SHALL keep `compatible=false` and SHALL NOT admit a binding. Verify: probe-to-binding integration test on each release-matrix OS.
+- **AC-014:** WHEN a qualified AgentModule descriptor producer exists for a profile, THE SYSTEM SHALL serve a validated, digest-bound, non-secret AgentControlDescriptor from `getAgentControlDescriptor` and `refreshAgentProfileControl`; IF no qualified module exists, THEN THE SYSTEM SHALL keep returning `503 DEPENDENCY_UNAVAILABLE` and SHALL NOT manufacture a descriptor from a catalog or RuntimeOffer. Verify: descriptor route test.
+- **AC-015:** WHEN the composer renders model, effort or native command affordances for a selected binding, THE SYSTEM SHALL show only the options and commands declared by that binding's fresh descriptor and SHALL render each undeclared or stale affordance as unavailable with its reason. Verify: composer render and accessibility test.
+- **AC-016:** WHEN the owner begins native sign-in, THE SYSTEM SHALL launch only a descriptor-declared native auth method and record a redacted, time-bounded auth observation in the closed AgentAuthState set (UNKNOWN, NEEDS_AUTH, AUTHENTICATING, AUTHENTICATED, EXPIRED, DEGRADED, ERROR), independent of installation and binding state. Verify: auth observation and cancellation test.
+- **AC-017:** WHEN Claude Code CLI is added as the second AgentModule, THE SYSTEM SHALL require its own installation, auth, descriptor, binding and session-readiness evidence on each release-matrix row and SHALL NOT inherit qualification from OpenCode. Verify: module independence test and second-row qualification record.
+
 ## 16. Executable acceptance command
 
 ```bash
 python3 .specify/scripts/validate_feature_package.py specs/002-native-agent-install-auth-binding
 ```
 
-Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. They are not evidence until run on a recovered source tree.
+Implementation gates are the cargo and pnpm commands named per task in TASKS.md. They are evidence only when run at an identified revision and recorded per TASKS.md "Completion evidence".
 
 ## 17. Out-of-bounds
 
@@ -258,10 +303,11 @@ Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. The
 
 ## 18. Assumptions and open questions
 
-- First GA agent route remains an owner decision shared with feature 001.
+- First GA agent route is accepted (2026-11-09): Windows x64 + OpenCode v2.0.32, shared with feature 001 B-02. Claude Code CLI is the second module.
+- The exact Claude Code CLI version, transport flags and auth method are pinned in its conformance fixture by 002-T12; they are not inferred from the inventory candidate in `native_cli.rs`.
 - The active checkout has partial served registry/inventory/profile/binding handlers. Install/update, native auth-begin and native-config open remain target-only; descriptor refresh and credential submission routes are mounted but fail closed with 503. See §4 and docs/IMPLEMENTATION-STATUS.md.
 
-Each blocker has the owners named above. Resolution gate: owner decision recorded in this SPEC before status leaves DRAFT. Implementation tasks: 002-T01, 002-T02, 002-T03, 002-T04.
+Each blocker was resolved by owner acceptance on 2026-11-09. Implementation is ordered in TASKS.md, starting with the OpenCode binding fix in 002-T01 and ending with 002-T17 (package VERIFIED).
 
 ## 7a. Owner facts incorporated 2026-11-01
 
@@ -300,19 +346,23 @@ Read from AGENT-CONTROL, AGENT-FABRIC, AGENT-ACCOUNT-ROUTE-MATRIX, V1-AGENT-DISC
 
 | Requirement | Canonical contract | Task | Acceptance | Verification method |
 |---|---|---|---|---|
-| Registry discovery not readiness | AGENT-CONTROL, V1-AGENT-DISCOVERY-AND-CATALOG-LLD | 002-T02 | AC-001 | Registry projection test |
-| Install observation not a binding | AGENT-CONTROL | 002-T02 | AC-002 | Inventory observation test |
-| Cancelled auth preserves state | AGENT-CONTROL, SECURITY | 002-T03 | AC-003 | Cancelled-auth test |
-| Enable requires fresh descriptor | AGENT-CONTROL | 002-T03 | AC-004 | Enable-gate test |
-| Stale option rejects admission | AGENT-CONTROL, STATE-MACHINES | 002-T04 | AC-005 | Stale-option test |
-| Independent restart revalidation | AGENT-CONTROL | 002-T03 | AC-006 | Restart matrix |
-| Native state not a Core Effect | AGENT-CONTROL, CAPABILITY-FABRIC | 002-T04 | AC-007 | Native-state labeling test |
-| Descriptor TTL freshness (B-12) | AGENT-CONTROL | 002-T03 | AC-008 | TTL boundary test |
-| Secret custody and redaction | SECURITY, AGENT-CONTROL | 002-T03 | AC-009 | Secret-custody tests |
-| Credential replay/conflict | AGENT-CONTROL, STORAGE | 002-T03 | AC-010 | Replay/conflict test |
-| Independent Settings status axes | Feature 011 screen contract; contracts/ui-behavior.md | 002-T05 | AC-011 | Screen render + a11y test |
-| Bounded per-module probe budget | AGENT-CONTROL | 002-T02 | AC-012 | Probe-budget test |
-
+| Registry discovery not readiness | AGENT-CONTROL, V1-AGENT-DISCOVERY-AND-CATALOG-LLD | 002-T11 | AC-001 | Registry projection test |
+| Install observation not a binding | AGENT-CONTROL | 002-T11 | AC-002 | Inventory observation test |
+| Cancelled auth preserves state | AGENT-CONTROL, SECURITY | 002-T07 | AC-003 | Cancelled-auth test |
+| Enable requires fresh descriptor | AGENT-CONTROL | 002-T06 | AC-004 | Enable-gate test |
+| Stale option rejects admission | AGENT-CONTROL, STATE-MACHINES | 002-T06 | AC-005 | Stale-option test |
+| Independent restart revalidation | AGENT-CONTROL | 002-T13 | AC-006 | Restart matrix |
+| Native state not a Core Effect | AGENT-CONTROL, CAPABILITY-FABRIC | 002-T10 | AC-007 | Native-state labeling test |
+| Descriptor TTL freshness (B-12) | AGENT-CONTROL | 002-T04 | AC-008 | TTL boundary test |
+| Secret custody and redaction | SECURITY, AGENT-CONTROL | 002-T08 | AC-009 | Secret-custody tests |
+| Credential replay/conflict | AGENT-CONTROL, STORAGE | 002-T08 | AC-010 | Replay/conflict test |
+| Independent Settings status axes | Feature 011 screen contract; contracts/ui-behavior.md | 002-T10 | AC-011 | Screen render + a11y test |
+| Bounded per-module probe budget | AGENT-CONTROL | 002-T04 | AC-012 | Probe-budget test |
+| OpenCode v2.0.32 offer is bindable and dispatch-consistent | AGENT-CONTROL, Feature 001 B-02 | 002-T01 | AC-013 | Probe-to-binding integration test |
+| Descriptor producer serves validated descriptor | AGENT-CONTROL §12 | 002-T05 | AC-014 | Descriptor route test |
+| Composer shows only descriptor-declared options and commands | AGENT-CONTROL §14.4, NATIVE-COMPOSER-LLD | 002-T09 | AC-015 | Composer render + a11y test |
+| Native sign-in observation | AGENT-CONTROL, AGENT-ACCOUNT-ROUTE-MATRIX | 002-T07 | AC-016 | Auth observation test |
+| Claude Code CLI independent second module (B-11) | AGENT-CONTROL, AGENT-ACCOUNT-ROUTE-MATRIX | 002-T12 | AC-017 | Module independence test |
 
 ## V1 model and effort picker details — 2026-11-06
 
@@ -322,7 +372,7 @@ Model and effort choices are descriptor-bound `{optionId, providerModelId, descr
 
 For Task creation, user chooses the eligible Coworker/AgentBinding first; any supported model/effort option is nested under that selected binding. A locally remembered default may preselect but is never admission authority. Server validates Workspace, binding status, descriptor freshness, grants and eligible runtime before creating the Task.
 
-Current route remains target-only: ControlDescriptor endpoints are 503, Codex is not currently dispatched by the Conversation supervisor despite binding support, and OpenCode's current profile probe is incompatible. No active model/effort picker may appear until one exact send path and descriptor is qualified.
+Current route remains target-only: ControlDescriptor endpoints are 503, Codex is not currently dispatched by the Conversation supervisor despite binding support, and OpenCode's current profile probe is incompatible. No active model/effort picker may appear until one exact send path and descriptor is qualified. Descriptor-declared native commands follow the same rule (AC-015): a command renders only when the fresh descriptor's `input_surface` declares it; otherwise the command affordance is shown as unavailable and the placeholder "/ for actions" copy is not an operation. Feature 001 keeps its non-goal of general native command execution; 002 supplies only the declared-command projection.
 
 ## V1 UI and lifecycle contract — 2026-11-06
 

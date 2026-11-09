@@ -1,5 +1,7 @@
 # UI behavior - Professional Artifacts One Format
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs/V1-UI-SCREEN-CONTRACT.md). Control classes: [V1-SETTINGS-CONTRACT-LEDGER.md](../../../docs/V1-SETTINGS-CONTRACT-LEDGER.md) and [SEMANTIC-SERVED-UI-MAP.md](../../../docs/SEMANTIC-SERVED-UI-MAP.md). Action states: [V1-UI-ACTION-STATE-LEDGER.md](../../../docs/V1-UI-ACTION-STATE-LEDGER.md).
 
 ## Target user journey
@@ -11,6 +13,9 @@ Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs
 5. Export selects an exact version and destination class, runs the format engine outside SQLite, validates exported bytes, and records a separate ExportReceipt. Native Save As is labeled as a local file save and is not presented as that receipt.
 6. Closing and reopening LiteCowork loads exact committed version bytes and provenance. Version compare uses stored exact immutable versions, not an unsaved buffer.
 7. If rich presentation fails, the semantic source text or exact artifact source remains accessible; interactive app execution remains disabled unless the separate Artifact Runtime qualifies it.
+
+8. Every view/edit/export/compare control reads the daemon capability matrix (SPEC §5). DOCX, XLSX, PPTX and PDF show a metadata card with "Read-only" or "Not supported in this version" and Save original; no editor or export button is rendered for them (AC-016).
+9. Library offers "New Markdown document"; a committed Conversation message offers "Save as Artifact". The Artifact shows "From conversation" with a link, and the Conversation lists its Artifacts (AC-017, AC-018).
 
 ## Current implementation crosswalk (not the target)
 

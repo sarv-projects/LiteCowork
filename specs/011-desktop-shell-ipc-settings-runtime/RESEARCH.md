@@ -1,6 +1,7 @@
 # Research - Desktop Shell IPC Settings and Runtime Health
 
-**Feature:** 011 | **Checked:** 2026-11-06 (source crosswalk and NeuralAgent screenshot comparison).
+**Feature:** 011 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Checked:** 2026-11-06 (source crosswalk and NeuralAgent screenshot comparison); re-checked 2026-11-09 for the V1 task plan.
 
 ## Sources and authorities
 
@@ -53,3 +54,18 @@ The current route/source search found no complete historical usage projection/da
 ## Validation limitation
 
 This is a source and document audit plus screenshot comparison. No Notification OS provider, keep-awake native integration, generic resume workflow, AgentModule install/auth route or Usage projection was executed as part of this documentation pass. Those remain implementation and OS qualification work.
+
+## Source re-check and implementation notes (2026-11-09)
+
+- IPC: `crates/operator-ipc/src/windows.rs` (`WindowsEndpoint::derive/bind`, eight pending pipe instances, per-connection admission) uses `windows_local_security::create_operator_pipe` and `current_logon_sid`. `crates/operator-ipc/src/unix.rs` enforces 0700 directory and 0600 socket and captures `PeerCredentials` before any frame read. Limits live in `crates/operator-ipc/src/lib.rs` (`MAX_HEADER_BYTES`, `MAX_BODY_BYTES`, `DEFAULT_MAX_IN_FLIGHT_BODY_BYTES`). `apps/litecoworkd/src/runtime_windows_security_tests.rs` covers state-directory DACL and reparse rejection; no DACL-failure no-fallback or remote-client test was found.
+- Stop: `apps/litecoworkd/src/runtime.rs` reaches drain only from the process-supervisor signal and says not to wire an Operator route until Task/Attempt, Effect, lease and local service-reference settlement is proven. `previewLocalRuntimeStop` and `requestLocalRuntimeStop` exist only as OpenAPI targets.
+- Runtime start: `apps/litecowork-ui/src-tauri/src/lib.rs` `start_local_runtime` uses `systemd_user_service::start` and `verify_active` on Linux and spawns the daemon directly elsewhere. `runtime_lifecycle_bridge::get_runtime_lifecycle` decodes the lifecycle view and rejects foreign identities.
+- Settings: `apps/litecowork-ui/src/settings/SettingsView.tsx` (611 lines) receives about 60 props from `App.tsx` (4523 lines). Theme/density/text-scale/reduced-motion are `useState` only; Ctrl + N, Ctrl + W and Ctrl + K are `<kbd>` labels with no matching handler in `App.tsx` (its keydown handlers cover Escape and Tab focus trapping only). Archive exists with confirmation (`archiveWorkspace`); rename does not. `updateWorkspacePolicy` accepts only replication fields.
+- Keep-awake: no power-assertion code exists in `apps/` or `crates/`.
+
+Implementation language and optimization notes:
+
+- Keep-awake belongs in the Rust daemon (it knows when admitted work runs): Windows `PowerCreateRequest`/`PowerSetRequest` through `windows-sys` in `crates/windows-local-security`, Linux logind `Inhibit` (D-Bus) or `systemd-inhibit`. The UI only renders the observed state.
+- The stop/update gate belongs in Rust (`runtime.rs` plus a new settlement module); the updater in Feature 019 calls it.
+- Settings UI: split `SettingsView.tsx` into one module per category and pass a typed context object instead of 60 props; that removes re-render of every category on each `App.tsx` state change and makes the inert-control audit testable per category.
+- Keyboard: one shortcut registry in TypeScript so labels are generated from registered handlers; this makes "label only when handler exists" structural rather than reviewed.

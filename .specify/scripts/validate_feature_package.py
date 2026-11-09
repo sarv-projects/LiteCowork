@@ -166,10 +166,12 @@ def check_feature(folder: Path) -> list[str]:
     tasks = tasks_path.read_text(encoding="utf-8")
     wiring = wiring_path.read_text(encoding="utf-8")
 
-    if not re.search(
+    status_match = re.search(
         r"\*\*Status:\*\*\s*(DRAFT|IN_REVIEW|ACCEPTED/LOCKED|IMPLEMENTING|VERIFIED|BLOCKED|SUPERSEDED)",
         spec,
-    ):
+    )
+    spec_status = status_match.group(1) if status_match else None
+    if not status_match:
         errors.append(f"{folder.name}: SPEC has no recognized status")
 
     for label, pattern in SECTIONS.items():
@@ -249,8 +251,20 @@ def check_feature(folder: Path) -> list[str]:
 
     if re.search(r"(?m)^\s*external_calls_inside:\s*true\s*$", wiring):
         errors.append(f"{folder.name}: external call placed inside transaction")
-    if not re.search(r'status:\s*"DRAFT"', wiring):
-        errors.append(f"{folder.name}: WIRING status must remain DRAFT until acceptance")
+    # WIRING lifecycle must follow the SPEC lifecycle. A package that is still being authored or
+    # reviewed keeps its wiring at DRAFT/IN_REVIEW; an owner-accepted package carries the same
+    # accepted (or later) status in WIRING so the dependency graph is not left looking unreviewed.
+    wiring_match = re.search(r'(?m)^status:\s*"([^"]+)"', wiring)
+    wiring_status = wiring_match.group(1) if wiring_match else None
+    if spec_status in (None, "DRAFT", "IN_REVIEW"):
+        allowed = {"DRAFT", "IN_REVIEW"}
+    else:
+        allowed = {spec_status}
+    if wiring_status not in allowed:
+        errors.append(
+            f"{folder.name}: WIRING status {wiring_status!r} must match SPEC status {spec_status!r} "
+            f"(allowed: {sorted(allowed)})"
+        )
 
     return errors
 

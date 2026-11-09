@@ -1,7 +1,7 @@
 feature_id: "001"
 name: "Conversation Session Supervisor and Native Turn Execution"
-status: "DRAFT"
-spec_revision: "1.0"
+status: "ACCEPTED/LOCKED"
+spec_revision: "1.1"
 nodes:
   - id: "desktop-ui"
     owner: "Conversation UI"

@@ -1,5 +1,6 @@
 feature_id: "012"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
+spec_revision: "1.0"
 nodes:
   - id: "ui"
     owner: Desktop UI
@@ -66,4 +67,4 @@ recovery:
 
 # Implementation evidence boundary (2026-11-08)
 
-This YAML is the DRAFT target dependency graph, not a description of currently working wiring. In the active daemon there is no take-control or side-chat path; the cancel edge exists (Feature 001) but does not observe native quiescence (register A-25). The native stop/quiescence step on `e-supervisor-host` happens outside the `tx-take-control` transaction; do not place any native call inside a SQLite transaction. Do not mark these edges served or integrated until take-control and side-chat are wired, qualified and covered by the USER path, and until the Feature 001 Stop/quiescence fixes land.
+This YAML is the accepted (ACCEPTED/LOCKED, 2026-11-09) target dependency graph, not a description of currently working wiring. In the active daemon there is no take-control or side-chat path; the cancel edge exists (Feature 001) but does not observe native quiescence (register A-25). The native stop/quiescence step on `e-supervisor-host` happens outside the `tx-take-control` transaction; do not place any native call inside a SQLite transaction. Do not mark these edges served or integrated until take-control and side-chat are wired, qualified and covered by the USER path, and until the Feature 001 Stop/quiescence fixes land.

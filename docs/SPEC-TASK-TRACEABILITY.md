@@ -1,6 +1,6 @@
 # Spec, Build TASKS, and USER Test Traceability
 
-**Updated:** 2026-11-06
+**Updated:** 2026-11-09
 
 **Purpose:** one crosswalk between **global build tasks** ([LITECOWORK-BUILD-TASKS.md](LITECOWORK-BUILD-TASKS.md)), **feature SDD tasks** (`specs/NNN-*/TASKS.md`), **acceptance IDs** (SPEC EARS), and **competitor USER cases** ([COMPETITOR-PROMOTED-USE-CASES.md](COMPETITOR-PROMOTED-USE-CASES.md)).
 
@@ -25,7 +25,7 @@
 | [specs/001-.../README.md](../specs/001-conversation-session-supervisor/README.md) | 28 | Scope, owners, links |
 | [SPEC.md](../specs/001-conversation-session-supervisor/SPEC.md) | 354 | EARS, HLD/LLD, blockers B-01–B-10 |
 | [PLAN.md](../specs/001-conversation-session-supervisor/PLAN.md) | 106 | Phases, DAG |
-| [TASKS.md](../specs/001-conversation-session-supervisor/TASKS.md) | 161 | 001-T01–T09 executable commands |
+| [TASKS.md](../specs/001-conversation-session-supervisor/TASKS.md) | see file | 001-T01..T23 V1 task plan |
 | [DATA-MODEL.md](../specs/001-conversation-session-supervisor/DATA-MODEL.md) | 78 | Records, B-04 boundary |
 | [RESEARCH.md](../specs/001-conversation-session-supervisor/RESEARCH.md) | 101 | Evidence, rivals |
 | [WIRING.yaml](../specs/001-conversation-session-supervisor/WIRING.yaml) | 236 | Components, transactions |
@@ -35,25 +35,62 @@
 
 **Validator:** `python3 .specify/scripts/validate_feature_package.py` (the validator walks every package under specs/; it takes no package argument)
 
-## Features 002–012
+## All packages: V1 task plans (2026-11-09)
 
-Each package is a DRAFT (README, SPEC, PLAN, TASKS, DATA-MODEL, RESEARCH, WIRING, and required contracts). Status is not ACCEPTED/LOCKED. Blockers live in the owning SPEC. Task ids are package-specific; always read the current TASKS.md rather than assume a fixed upper bound. Feature 002 now includes 002-T06 for a descriptor-bound model/effort picker (blocked on exact native dispatch). Feature 010 includes 010-T05 for future qualified external WorkflowBackend Routine mapping (blocked) and 010-T06 for provider-authoring evaluation (deferred; not V1 authorization).
+Owner acceptance for 001-012 was recorded on 2026-11-09. Each TASKS.md now runs to a final "Package VERIFIED for V1" task, and 019-T23 is the V1 go/no-go that lists every package's VERIFIED task. Cross-package dependencies are written as "Feature NNN Txx" so the validator does not read them as local tasks. Feature 010 renumbered its WorkflowBackend items: the external Routine mapping is now 010-T18 and the provider-authoring evaluation is 010-T19; both sit outside the V1 gate. Always read the current TASKS.md rather than assume a fixed upper bound.
 
-| SDD | Build phase | USER themes | Blockers to close before lock |
-|---|---|---|---|
-| 002 | BT agent matrix | UC agent install/auth | B-11, B-12, shared first route (B-11/B-12 have PROPOSED resolutions in specs/002 §5, still open pending owner) |
-| 003 | P2 / BT roots | UC files and citations | B-13, B-14 (PROPOSED resolutions in specs/003 §5, still open pending owner) |
-| 004 | P3 | UC relay A→B→A | B-15, B-16 (PROPOSED resolutions in specs/004 §5, still open pending owner) |
-| 005 | P4 | UC one safe task edit | B-17, B-18 (PROPOSED resolutions in specs/005 §5, still open pending owner) |
-| 006 | P5 | UC one connection write | B-19, B-20 (PROPOSED resolutions in specs/006 §5, still open pending owner) |
-| 007 | P6 | UC one professional format, Artifact create and export | B-21, B-30, B-31 (PROPOSED resolutions in specs/007 §5, still open pending owner) |
-| 008 | P7 | UC browser, terminal and optional Computer use | B-22, B-23, B-32 (PROPOSED resolutions in specs/008 §5, still open pending owner; managed-Chromium adapter disables ambient-CDP/profile-copy) |
-| 009 | P8 | UC optional coworker chat and scoped memory | B-24, B-25 (PROPOSED resolutions in specs/009 §5, still open pending owner, aligned to the single A-34 learning vocabulary); T02 Coworker origin + owner-scoped ContextDocument; T03 retrieval/restart fence; T04 optional New Chat/first Coworker chat |
-| 010 | P9 | UC schedule exactly once; future provider-owned workflow mapping | B-26, B-27 (PROPOSED resolutions in specs/010 §5, still open pending owner; 010 owns the A-35 quiet-hours surface); T05 depends on qualified Features 005/006; T06 deferred |
-| 011 | P0–P11 shell | UC settings honesty and health | B-28, B-29, B-33 (PROPOSED resolutions in specs/011 §5, still open pending owner; 011 owns the A-35 Settings->Agents screen and links 010 for quiet-hours) |
-| 012 | P1 chat | UC co-edit / take-control on one Conversation | B-34 (PROPOSED resolution in specs/012 §5, still open pending owner; maps co-edit onto a Conversation take-control/side-chat UX, no new durable-Task type); research gate RV-14 (Claude Duet, URL unresolved, cited as RESEARCH); 012-T02 take-control depends on the Feature 001 Stop/quiescence fixes (register A-25) |
+| SDD | Status | Tasks | Qualification / VERIFIED | E2E | USER themes | Wave |
+|---|---|---|---|---|---|---|
+| 001 | ACCEPTED/LOCKED 2026-11-09 (B-01..B-10; B-02 rider: OpenCode v2.0.32 first, Windows x64 first row) | T01..T23 | 001-T09, 001-T23 | E2E-01 | UC-CHAT-01..06 | W1 |
+| 002 | ACCEPTED/LOCKED 2026-11-09 (B-11, B-12) | T01..T17 | 002-T15, 002-T17 | E2E-01, E2E-02 | UC agent install/auth | W1 |
+| 003 | ACCEPTED/LOCKED 2026-11-09 (B-13, B-14 with Windows scanner rider) | T01..T17 | 003-T15, 003-T17 | E2E-03 | UC files and citations | W1 |
+| 004 | ACCEPTED/LOCKED 2026-11-09 (B-15, B-16) | T01..T12 | 004-T10, 004-T12 | E2E-02 | UC relay A to B to A | W4 |
+| 005 | ACCEPTED/LOCKED 2026-11-09 (B-17 Linux-first rider, B-18); B-35 Windows provider PROPOSED | T01..T20 | 005-T15, 005-T18, 005-T20 | E2E-04 | UC one safe task edit | W2 |
+| 006 | ACCEPTED/LOCKED 2026-11-09 (B-19, B-20); 006-T02 BLOCKED on the client_secret finding | T01..T17 | 006-T15, 006-T17 | E2E-05 | UC one connection write | W3 |
+| 007 | ACCEPTED/LOCKED 2026-11-09 (B-21, B-30, B-31); 007-T06 BLOCKED on the export receipt class | T01..T17 | 007-T15, 007-T17 | E2E-07 | UC one professional format | W2 |
+| 008 | ACCEPTED/LOCKED 2026-11-09 (B-22, B-23, B-32 deferred) | T01..T19 | 008-T17, 008-T19 | E2E-08 | UC browser and terminal | W3 |
+| 009 | ACCEPTED/LOCKED 2026-11-09 (B-24, B-25) | T01..T18 | 009-T16, 009-T18 | E2E-09 | UC optional Coworker chat and memory | W2 |
+| 010 | ACCEPTED/LOCKED 2026-11-09 (B-26, B-27); CONNECTOR_EVENT trigger kind pending owner confirmation | T01..T19 (T18/T19 outside the V1 gate) | 010-T15, 010-T17 | E2E-10 | UC schedule exactly once | W5 |
+| 011 | ACCEPTED/LOCKED 2026-11-09 (B-28 Windows-first rider, B-29, B-33) | T01..T19 | 011-T17, 011-T19 | E2E-01 shell portion | UC settings honesty and health | W0 |
+| 012 | ACCEPTED/LOCKED 2026-11-09 (B-34 model; implementation waits on the 001 Stop fix) | T01..T11 | 012-T09, 012-T11 | E2E-01 extension | UC co-edit / take-control | W1 (after 001-T07) |
+| 013 | IN_REVIEW (new 2026-11-09); B-36, B-37 PROPOSED | T01..T20 | 013-T18, 013-T20 | E2E-06 | UC discover and install a package | W2 observe, W3 plan/apply |
+| 014 | IN_REVIEW (new); B-38 PROPOSED | T01..T19 | 014-T17, 014-T19 | E2E-14 (proposed) | UC find, rename, archive, delete chats | W1 |
+| 015 | IN_REVIEW (new); B-39 PROPOSED | T01..T20 | 015-T17, 015-T18, 015-T20 | E2E-15 (proposed) | UC steer, pause and delegate a Task | W4 |
+| 016 | IN_REVIEW (new); B-40 PROPOSED | T01..T18 | 016-T16, 016-T18 | E2E-11 | UC rich answer with fallback | W2 |
+| 017 | IN_REVIEW (new); B-41 PROPOSED | T01..T18 | 017-T16, 017-T18 | E2E-12 | UC back up and restore | W6 |
+| 018 | IN_REVIEW (new); B-42 PROPOSED | T01..T18 | 018-T16, 018-T18 | E2E-16 (proposed) | UC usage and support bundle | W6 |
+| 019 | IN_REVIEW (new); B-43, B-44 PROPOSED | T01..T23 | 019-T22, 019-T23 (V1 go/no-go) | all rows | UC install, update, sign-off | W0 skeleton, W6 qualification |
+| 020 | IN_REVIEW (new); D-01, B-45 PROPOSED | T01..T17 | 020-T15, 020-T17 | E2E-17 (proposed) | UC quiet learning on a Coworker | W4 |
 
-When an owner resolves a blocker, edit that SPEC and leave status DRAFT until explicit acceptance.
+### Build task to package task crosswalk
+
+| Build task | Package tasks |
+|---|---|
+| BT-00.1..BT-00.6 | 019-T03, 019-T04, 019-T05, 001-T22 and each package's documentation-sync task |
+| BT-01.1, BT-01.2 | 001-T10 (outbox), 001-T11 (single-flight), 001-T08 (restart recovery) |
+| BT-01.3 | 001-T04 (OpenCode v2.0.32 adapter), 002-T01 (bindable profile), 001-T09 |
+| BT-01.4 | 001-T19, 002-T06 |
+| BT-01.5 | 001-T13, 016-T08, 016-T09 |
+| BT-01.6 | 001-T01, 001-T21 |
+| BT-02.1..BT-02.5 | 003-T02..003-T08, 003-T13 |
+| BT-03.1, BT-03.4 | 002-T03..002-T09 |
+| BT-03.2 | 002-T12 (Claude Code second module) |
+| BT-03.3 | 004-T03..004-T10 |
+| BT-04.1..BT-04.6 | 005-T03..005-T15; Windows row 005-T16..005-T18 |
+| BT-05.1..BT-05.3 | 013-T02..013-T11 (moved from 006 to the new LiteSPM package) |
+| BT-05.4, BT-05.5 | 006-T03..006-T15, 013-T14 |
+| BT-06.1, BT-06.2 | 007-T02..007-T15 |
+| BT-06.3..BT-06.5 | 016-T03..016-T12 (moved from 007 to the new presentation package) |
+| BT-07.1..BT-07.6 | 008-T02..008-T17 |
+| BT-08.1..BT-08.5 | 009-T02..009-T16 |
+| BT-09.1..BT-09.5 | 010-T03..010-T15 |
+| BT-10.1..BT-10.4 | 011-T05..011-T15 |
+| BT-10.5 | 019-T14, 019-T15, 019-T23 |
+| BT-11.* (history) | 014-T03..014-T17 |
+| BT-12.* (Task control) | 015-T03..015-T18 |
+| BT-13.* (backup, usage, diagnostics) | 017-T03..017-T16, 018-T03..018-T16 |
+| BT-14.* (proactivity, learning) | 020-T03..020-T15 |
+| BT-15.* (release engineering) | 019-T03..019-T22 |
 
 ## .specify templates (copy source for new packages)
 

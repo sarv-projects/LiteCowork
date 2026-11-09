@@ -1,5 +1,7 @@
 # API and events - Workbench Browser Terminal and Computer
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Current served API surface
 
 The composed daemon route inventory contains no BrowserSession create/list/get/close, browser tab/navigation/capture/action, BrowserControlLease/takeover/return, terminal profile discovery, TerminalSession create/input/resize/stop/reconnect, or Computer observation/input operation. `takeEnvironmentControl` and `returnEnvironmentControl` are OpenAPI target-only Task/Attempt Environment operations; they are not browser-control handlers and no current Workbench call site invokes them.
@@ -33,3 +35,7 @@ Require explicit OS permission and Workspace-scoped consent; verify excluded sen
 ## Events and error boundary
 
 Use the exact event contracts owned by `docs/EVENTS.md` and `docs/schemas/domain-event.schema.json`, including `environment.control.lease.changed.v1` only when its owner operation is served. BrowserActionReceipt, TerminalSessionReceipt and EnvironmentControlLease remain target records until promoted. Reuse canonical error codes; do not invent local error strings as API contract.
+
+## Accepted target interfaces (not yet in source, 2026-11-09)
+
+BrowserSession, BrowserControlLease (take/return), BrowserActionReceipt, TerminalSession (create/input/resize/stop/attach), CommandReceipt, Workbench Activity read and RevisionDiff read are accepted target interfaces. Their operationIds, payloads, events and error codes are promoted into CHROME-BROWSER-LLD, V1-INTEGRATED-TERMINAL-LLD, `docs/schemas/operator-api.openapi.yaml`, `docs/EVENTS.md`, `docs/schemas/domain-event.schema.json` and `docs/schemas/error-codes.schema.json` by 008-T01 in one change. Until then none is served and no name here is a route.

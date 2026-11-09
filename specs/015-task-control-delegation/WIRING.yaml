@@ -1,0 +1,209 @@
+feature_id: "015"
+name: "Task Control and Heterogeneous Delegation"
+status: "IN_REVIEW"
+spec_revision: "0.1"
+notes: "All edges are TARGET unless marked existing. Served today: lead-agent change (CAS only) and verification-runs read. Execution edges require Feature 005 and qualify on the Linux row first; Windows stays UNAVAILABLE until Feature 005 B-35."
+nodes:
+  - id: "work-ui"
+    owner: "Desktop UI (Work screen)"
+    kind: "component"
+    responsibility: "Controls enabled from allowed_commands, Activity timeline, Workers view, all UI states"
+    inputs: ["Task projection", "activity page", "workers projection", "task stream frames"]
+    outputs: ["typed Tauri commands"]
+  - id: "task-control-bridge"
+    owner: "Tauri bridge"
+    kind: "IPC client"
+    responsibility: "pause_task, resume_task, steer_task, change_task_lead, list_task_activity, list_task_workers, list_task_verification_runs; identifier validation"
+    implementation_status: "TARGET_ONLY: no bridge exists for these commands"
+    inputs: ["UI command"]
+    outputs: ["authenticated Operator request"]
+  - id: "operator"
+    owner: "litecoworkd Operator"
+    kind: "authenticated boundary"
+    responsibility: "Authentication, Workspace owner check, If-Match, Idempotency-Key, body limits, typed errors"
+    inputs: ["IPC request"]
+    outputs: ["validated command", "projection"]
+  - id: "task-control-service"
+    owner: "TaskControlService"
+    kind: "domain service"
+    responsibility: "Pause, resume, steer, Task-level cancel fan-out, quiescence orchestration"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["validated control command"]
+    outputs: ["storage commands", "Attempt stop requests"]
+  - id: "lead-handoff-service"
+    owner: "TaskLeadHandoffService + lead_handoff_attempt"
+    kind: "domain service"
+    responsibility: "Lead change CAS (existing) then replacement lead Attempt after prior lease release (target)"
+    implementation_status: "PARTIAL: CAS route served; no replacement Attempt"
+    inputs: ["owner or policy handoff"]
+    outputs: ["committed lead change", "replacement Attempt request"]
+  - id: "delegation-admission-service"
+    owner: "DelegationAdmissionService"
+    kind: "domain service"
+    responsibility: "Child admission from the current parent session, allowlist, depth, concurrency, budget, ATTEMPT_PRIVATE rule, escalation"
+    implementation_status: "PARTIAL: decide_child_attempt_admission exists without production caller"
+    inputs: ["normalized delegate request", "durable snapshot"]
+    outputs: ["committed child Attempt", "typed denial"]
+  - id: "delegation-result-service"
+    owner: "DelegationResultService"
+    kind: "domain service"
+    responsibility: "ResultEnvelope validation and Attempt id / lease epoch / revision fence"
+    inputs: ["normalized ResultEnvelope"]
+    outputs: ["accepted result", "fenced observation"]
+  - id: "verification-service"
+    owner: "IndependentVerificationService"
+    kind: "domain service"
+    responsibility: "Verifier Attempt on a distinct AgentBinding with read-only Environment; VerificationRun settle"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["child result"]
+    outputs: ["VerificationRun"]
+  - id: "attempt-service-005"
+    owner: "Feature 005 TaskAttemptService"
+    kind: "external feature service"
+    responsibility: "Attempt admission with attestation, Environment attach, Effects, single-Attempt cancel and quiescence"
+    inputs: ["admission request"]
+    outputs: ["Attempt lifecycle observations"]
+  - id: "session-supervisor"
+    owner: "AgentSessionSupervisor"
+    kind: "runtime supervisor"
+    responsibility: "Native lead (OpenCode) and worker (Claude Code) sessions; normalization of untrusted output"
+    inputs: ["session request"]
+    outputs: ["normalized observations"]
+  - id: "sqlite-store"
+    owner: "Storage"
+    kind: "transaction boundary"
+    responsibility: "CAS, idempotency, atomic records, lease epochs, fences"
+    inputs: ["typed storage command"]
+    outputs: ["committed result"]
+  - id: "presentation-operator"
+    owner: "Presentation Operator"
+    kind: "projection"
+    responsibility: "Task projection with allowed_commands, activity pages, workers projection, stream frames"
+    inputs: ["committed records"]
+    outputs: ["projections"]
+edges:
+  - id: "e-ui-bridge"
+    from: "work-ui"
+    to: "task-control-bridge"
+    kind: "Tauri command"
+  - id: "e-bridge-operator"
+    from: "task-control-bridge"
+    to: "operator"
+    kind: "authenticated IPC"
+  - id: "e-operator-control"
+    from: "operator"
+    to: "task-control-service"
+    kind: "pause/resume/steer/cancel"
+  - id: "e-operator-handoff"
+    from: "operator"
+    to: "lead-handoff-service"
+    kind: "POST /v1/tasks/{task_id}/lead-agent (existing)"
+  - id: "e-control-store"
+    from: "task-control-service"
+    to: "sqlite-store"
+    kind: "control transactions"
+  - id: "e-control-attempts"
+    from: "task-control-service"
+    to: "attempt-service-005"
+    kind: "stop at safe boundary / cancel (outside transaction)"
+  - id: "e-handoff-attempts"
+    from: "lead-handoff-service"
+    to: "attempt-service-005"
+    kind: "replacement Attempt after prior lease release"
+  - id: "e-supervisor-delegation"
+    from: "session-supervisor"
+    to: "delegation-admission-service"
+    kind: "untrusted delegate request from parent session"
+  - id: "e-delegation-store"
+    from: "delegation-admission-service"
+    to: "sqlite-store"
+    kind: "child admission transaction"
+  - id: "e-delegation-attempts"
+    from: "delegation-admission-service"
+    to: "attempt-service-005"
+    kind: "attach ATTEMPT_PRIVATE Environment and start worker after commit"
+  - id: "e-attempts-supervisor"
+    from: "attempt-service-005"
+    to: "session-supervisor"
+    kind: "start native session"
+  - id: "e-supervisor-results"
+    from: "session-supervisor"
+    to: "delegation-result-service"
+    kind: "untrusted ResultEnvelope"
+  - id: "e-results-store"
+    from: "delegation-result-service"
+    to: "sqlite-store"
+    kind: "accept or fence"
+  - id: "e-results-verify"
+    from: "delegation-result-service"
+    to: "verification-service"
+    kind: "verify accepted child result"
+  - id: "e-verify-attempts"
+    from: "verification-service"
+    to: "attempt-service-005"
+    kind: "verifier Attempt with read-only Environment"
+  - id: "e-verify-store"
+    from: "verification-service"
+    to: "sqlite-store"
+    kind: "VerificationRun settle"
+  - id: "e-store-projection"
+    from: "sqlite-store"
+    to: "presentation-operator"
+    kind: "committed records"
+  - id: "e-projection-ui"
+    from: "presentation-operator"
+    to: "work-ui"
+    kind: "projection and stream (via operator and bridge)"
+transactions:
+  - id: "tx-request-pause"
+    owner: "TaskControlService via Storage"
+    atomic_records: ["Task PAUSE_REQUESTED", "task_control_requests row", "task.pause.requested.v1", "idempotency receipt"]
+    external_calls_inside: false
+  - id: "tx-confirm-paused"
+    owner: "TaskControlService via Storage"
+    atomic_records: ["Task PAUSED", "task_resume_packets row", "lease releases", "control request SETTLED", "task.paused.v1"]
+    external_calls_inside: false
+  - id: "tx-resume"
+    owner: "TaskControlService via Storage"
+    atomic_records: ["Task prior state", "interrupted Attempts ABANDONED", "control request SETTLED", "task.resumed.v1", "idempotency receipt"]
+    external_calls_inside: false
+  - id: "tx-steer"
+    owner: "TaskControlService via Storage"
+    atomic_records: ["TaskSpecRevision n+1 or steering note", "control request", "task.steering.recorded.v1", "idempotency receipt"]
+    external_calls_inside: false
+  - id: "tx-cancel-settle"
+    owner: "TaskControlService via Storage"
+    atomic_records: ["Task CANCELLED", "control request SETTLED", "task cancel event"]
+    external_calls_inside: false
+  - id: "tx-lead-handoff"
+    owner: "TaskLeadHandoffService via TaskStore::commit_task_lead_handoff (existing)"
+    atomic_records: ["Task lead binding", "task.lead_agent.changed.v1", "idempotency receipt"]
+    external_calls_inside: false
+  - id: "tx-child-admission"
+    owner: "DelegationAdmissionService via StepAttemptCoordinator"
+    atomic_records: ["child Attempt CREATED", "Step binding", "ExecutionLease epoch n+1", "budget reservation", "task.child_attempt.admitted.v1", "idempotency receipt"]
+    external_calls_inside: false
+  - id: "tx-fence-result"
+    owner: "DelegationResultService via Storage"
+    atomic_records: ["fenced observation", "task.child_result.fenced.v1"]
+    external_calls_inside: false
+  - id: "tx-verification-settle"
+    owner: "IndependentVerificationService via Storage"
+    atomic_records: ["VerificationRun terminal state", "Evidence ref", "verification event"]
+    external_calls_inside: false
+external_boundaries:
+  - id: "native-lead-session"
+    owner: "AgentSessionSupervisor (OpenCode v2.0.32)"
+    input_trust: "untrusted"
+    timeout: "bounded; value pinned at T08"
+    retry: "reconcile before replacement; never replay"
+  - id: "native-worker-session"
+    owner: "AgentSessionSupervisor (Claude Code CLI)"
+    input_trust: "untrusted"
+    timeout: "bounded; timeout-after-dispatch leaves Effect AMBIGUOUS"
+    retry: "escalation admits a new Attempt only after settlement"
+  - id: "environment-provider"
+    owner: "Feature 005 Linux bubblewrap provider"
+    input_trust: "attested observation"
+    timeout: "bounded attach and quiescence wait"
+    retry: "fail closed on any UNKNOWN isolation dimension"

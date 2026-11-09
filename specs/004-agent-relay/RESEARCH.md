@@ -1,6 +1,8 @@
 # Research - Agent Relay on One Conversation
 
-**Feature:** 004 | **Checked:** 2026-11-06
+**Feature:** 004 | **Checked:** 2026-11-06; re-checked 2026-11-09 for the Claude Code arm and desktop producer path.
+
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Sources
 
@@ -34,10 +36,10 @@ Inspected the composed Conversation route in `apps/litecoworkd/src/conversation_
 - The backend message projection carries `agent_binding_id` and `agent_session_id`, but the desktop `ConversationMessageView` type omits both. `parseConversationSnapshot` reconstructs each message using only message ID, role, timestamp, content and rich-presentation reference, dropping the producer/session identity even if the response contains it. The transcript renderer therefore cannot resolve or display the producing agent; AC-005 is not implemented.
 - The composer includes an `Add context or file` button with a title, but it has no click handler. It does not attach a Resource or file to the next turn.
 - The storage layer builds `ConversationContextPackage` through the exact committed USER-message event revision, orders by aggregate revision, excludes `SYSTEM_NOTICE`, and carries prior AGENT messages' source binding identity. The native prompt encoder rejects any nonempty `resource_refs` and RESOURCE content using `ResourceMaterializationRequired`; no Resource materializer is wired into this relay path.
-- Internal bounds are 1,024 source messages / 4 MiB for the context package and 256 KiB for the encoded native text prompt. These are implementation constants, not an owner-approved portable-context schema/retention policy; blocker B-15 remains unresolved.
+- Internal bounds are 1,024 source messages / 4 MiB for the context package and 256 KiB for the encoded native text prompt. B-15 was accepted on 2026-11-09 with these as the V1 bounds; they are not yet promoted into SCHEMAS.md/OpenAPI (004-T01).
 - Changing the Conversation binding commits Conversation state only. It does not create a Task, Attempt, DelegationProfile, Environment, lease, grant or Task lead-handoff event. This matches the intended separation between ordinary relay and delegated Task execution.
 
-These are source/route/UI findings. No second-provider native Conversation, Resource materialization, rendered producer-label flow, or A→B→A USER journey was executed. Feature 004 remains DRAFT.
+These are source/route/UI findings. No second-provider native Conversation, Resource materialization, rendered producer-label flow, or A→B→A USER journey was executed. Feature 004 is ACCEPTED/LOCKED (2026-11-09); none of these behaviors is implemented by acceptance.
 
 ## Alternatives
 
@@ -52,3 +54,14 @@ These are source/route/UI findings. No second-provider native Conversation, Reso
 ## Unresolved questions
 
 See SPEC section 5 blockers. Owners are named on the package README.
+
+
+## Implementation efficiency and language-placement observations (2026-11-09)
+
+Source-grounded notes for the implementer; each is folded into the task named and none changes a locked decision.
+
+- **Provider dispatch should be a closed enum (Rust).** Adding Claude Code as a second string arm in `execute_agent_turn` would repeat the `OPENCODE`/`opencode` mismatch. Use Feature 002's `NativeProviderKey` and give each arm its own function (`run_opencode_turn`, `run_claude_code_turn`) instead of growing the 250-line inline match (004-T05).
+- **Per-turn host spawn.** The OpenCode arm spawns a full `opencode serve` process for every turn (`hosting_mode: LOCAL_PER_SESSION`). That satisfies fresh-session-per-turn but costs a server start each turn. SPEC §7 allows host reuse as a host-supervisor choice as long as the AgentSession and native session are new per turn; a warm per-incarnation host is a Feature 001 host-supervisor optimization, measured before adoption. Claude Code's non-interactive mode is a per-invocation process by nature, so no host pool is proposed for it (004-T05 note only).
+- **Producer identity belongs in the typed parse (TypeScript).** The Tauri bridge forwards `serde_json::Value`, so no Rust change is needed to preserve producer fields; the fix is in `parseConversationSnapshot`. Validating the two fields there (bounded id or null) keeps one parser as the trust boundary (004-T02).
+- **Picker gating should consume a daemon projection.** `deriveConversationAgentSurface` reimplements descriptor/auth checks in TypeScript without a production caller. The daemon should report per-binding dispatchability and freshness (Feature 002 descriptor projection) and the picker should only render it (004-T06).
+- **Portable export ordering.** The export is a pure function over a revision-ordered committed prefix; build it with one bounded indexed query capped at 1,024 messages rather than loading full history and trimming in memory (004-T03, AC-011).

@@ -1,161 +1,468 @@
 # Tasks - Conversation Session Supervisor and Native Turn Execution
 
-**Feature:** 001 | **Status:** IN_REVIEW - implementation and qualification status reconciled to active source.
-**Spec revision:** 1.0 | **Owners:** domain owners named in SPEC.md.
+**Feature:** 001 | **Status:** ACCEPTED/LOCKED - implementation authorized; tasks not started unless marked.
+**Spec revision:** 1.1 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
+**Owners:** domain owners named in SPEC.md. Owner acceptance: 2026-11-09 via docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md.
 
-## 001-T01 - Resolve first-provider and Conversation admission decisions
+## Current baseline
 
-- **Status:** PARTIAL / OWNER REVIEW REQUIRED.
-- **Depends on:** NONE.
-- **Owners:** Product, Conversation, Agent Runtime, Security.
-- **Allowed paths:** this feature package; owner docs only after decision.
-- **Contract:** SPEC sections 5, 6, 7.2, 7.4, 7.6, 9, 10, 15.
-- **Change intent:** resolve B-01, B-02, B-03, B-05, B-07, B-08, B-09 and B-10; identify one exact OS/build/harness/adapter/auth route; freeze concurrency, readiness, input/attachment, event and process lifecycle contract. Apply the existing Conversation-scoped UserRequest continuation contract; do not create a competing flow.
+Verified against the checkout on branch `docs/audit-competitor-superset` (after commit 8129420).
+
+- **Operator:** `apps/litecoworkd/src/conversation_operator.rs` mounts `POST/GET /v1/conversations`, `POST /v1/conversations/{conversation_id}/turns` (`submit_conversation_turn`), `.../turns/{turn_id}/retry` (`retry_conversation_turn`), `.../turns/{turn_id}/cancel` (`cancel_conversation_turn`), `PATCH .../agent-binding` and `GET /v1/conversations/{conversation_id}`. Submit commits USER message + OPEN turn + receipt through `create_conversation_turn`, then starts `AgentSessionSupervisor::dispatch_turn` in a detached `tokio::spawn`; a dispatch error is only printed with `eprintln!`. The module header comment (lines 1-2) still says turn dispatch is "intentionally absent", which is stale.
+- **Supervisor:** `apps/litecoworkd/src/agents/supervisor.rs` `AgentSessionSupervisor::dispatch_turn` runs the whole turn inside `spawn_blocking`: `resolve_conversation_session_host_for_turn`, creates a `LOCAL_PER_SESSION` `AgentHostInstanceRecord` if missing, reserves STARTING with `start_conversation_agent_session`, then `execute_agent_turn` matches only `provider_key == "opencode"`. That branch calls `OpenCodeServer::spawn` per turn, `create_session`, `activate_conversation_agent_session`, `load_conversation_context_for_turn`, `send_conversation_context_async`, polls `next_event` every 500 ms up to a hard-coded 60 s deadline, calls `server.stop()` and commits with `commit_conversation_agent_response`. The commit request id is `req-commit-{final_message_id}` with a freshly generated message id, so a repeated commit attempt is not idempotent; `expected_session_version: 2` and the message event `entity_revision: 3` are hard-coded.
+- **Adapter:** `apps/litecoworkd/src/agents/opencode_server.rs` pins `OpenCodeServerProtocol::V2_0_32`, caps a request at `MAX_REQUEST_BYTES` (512 KiB) and has `abort_session` (`/api/session/{session_id}/interrupt`) with no caller.
+- **Storage:** `crates/storage-core/src/conversation.rs` defines `CommitConversationAgentResponse` without retry ordinal or provider-response identity, plus `build_conversation_context_package`. `crates/storage-sqlite/src/conversations.rs` `create_conversation_turn` does not check for another nonterminal turn (the test `conversation_turn_creation_serializes_appends_from_the_same_stale_snapshot` in `crates/storage-sqlite/src/conversation_turn_tests.rs` still admits two OPEN turns). `transition_conversation_turn` accepts `TurnCommand::Retry` only when an ACTIVE session with the new id already exists (`CONVERSATION_SESSION_NOT_READY`), while `retry_conversation_turn` generates a brand-new session id, so the retry route cannot succeed; `crates/domain-conversation/src/lib.rs` moves Retry straight to RUNNING. `list_starting_conversation_agent_sessions` and `mark_starting_conversation_agent_session_lost` exist (tests in `crates/storage-sqlite/src/agent_binding_tests.rs`) but no daemon startup caller exists; `recover_and_persist_startup_blockers` in `apps/litecoworkd/src/runtime.rs` is the startup recovery hook that does not call them. No dispatch outbox, no usage record table, and no `CONVERSATION_TURN_IN_PROGRESS` code in `docs/schemas/error-codes.schema.json`. Migration chain ends at `docs/schemas/sqlite-v28.sql`.
+- **Tauri:** `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs` has `submit_conversation_turn`, `retry_conversation_turn` and `cancel_conversation_turn` (both send `If-Match` from `expected_version`) and `get_conversation_presentation`; `apps/litecowork-ui/src-tauri/src/conversation_stream_bridge.rs` has `subscribe_conversation_stream` and `acknowledge_conversation_stream_frame` for the durable projection stream (no native TURN_DELTA producer).
+- **UI:** `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`. Commit 8129420 added the `sendEligible` / `bindingEligibleForSend` gate (register A-24) and the truthful empty state (register A-26 empty-state part), guarded by `apps/litecowork-ui/tests/conversation-empty-state-truthfulness.test.mjs`. Still broken: `isTurnRunning` checks only RUNNING plus transient STREAMING/RECONNECTING turns; `cancelTurn` searches `transientTurns` and sends `expectedVersion: 1`; no `retry_conversation_turn` call site; submit always sends `resourceRefs: []`; the "+" (Add context or file), Voice Input, More options and Turbo controls have no handlers; the agent `<select>` falls back to the fabricated label "Gemini 3.8 Flash Low" and the header falls back to "AI Capabilities Overview". `apps/litecowork-ui/src/conversations/conversation-view.ts` types `active_turn` as `{ status }` only (no version or retry ordinal).
+- **Tests today:** `apps/litecoworkd/src/conversation_operator_tests.rs` (for example `conversation_turn_submit_returns_accepted_receipt_with_active_session_supervisor`), `crates/storage-sqlite/src/agent_binding_tests.rs` (`conversation_activation_commits_session_turn_and_local_host_binding_atomically`, `conversation_agent_response_commit_settles_turn_and_session_atomically`), `crates/storage-sqlite/src/conversation_turn_tests.rs`, UI `tests/conversation-stream.test.ts`, `tests/conversation-view.test.ts`. `apps/litecoworkd/tests/` contains only `cli.rs`; the canonical target `--test conversation_session_supervisor` does not exist.
+
+Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, no storage single-flight, B-04 identity fields, attachments, usage records, composer fencing and inert controls, and no CODE/SYSTEM/USER qualification on either release row. Cross-package: the Feature 002 OpenCode probe records `compatible=false`, so the desktop cannot create the OpenCode binding this package needs.
+
+## 001-T01 - Record owner acceptance and promote accepted contracts into owner docs and schemas
+
+- **Status:** PARTIAL - owner acceptance of B-01 to B-10 recorded 2026-11-09 (this revision); no accepted interface is promoted yet (`CONVERSATION_TURN_IN_PROGRESS` absent from `docs/schemas/error-codes.schema.json`; no dispatch-intent or usage tables after `sqlite-v28.sql`).
+- **Depends on:** NONE
+- **Cross-package prerequisites:** NONE (Feature 018 must agree the usage record shape it will read; record its review in the PR).
+- **Owner:** Conversation, Storage, API, Events owners; Product for B-02 rider.
+- **Allowed paths:** `docs/API.md`, `docs/EVENTS.md`, `docs/STORAGE.md`, `docs/SCHEMAS.md`, `docs/STATE-MACHINES.md`, `docs/SERVICES.md`, `docs/AGENT-CONTROL.md`, `docs/OBSERVABILITY.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/domain-event.schema.json`, `docs/schemas/operator-stream.schema.json`, `docs/schemas/sqlite-v29.sql` (new; use the next free number at implementation time), this package.
+- **Contract:** SPEC sections 5, 7, 10, 12; AC-016, AC-023; SPECIFICATION-STANDARD section 7.
+- **Change intent:** in one reviewed change promote: error `CONVERSATION_TURN_IN_PROGRESS` (409) for B-01; `retry_ordinal` and `provider_response_id` on the final-response commit and its receipt (B-04); `active_turn.version` and `active_turn.retry_ordinal` in the Conversation presentation snapshot; the durable dispatch-intent record and its states (UNCLAIMED, CLAIMED, SETTLED) for the outbox; the usage record (turn id, attribution_source PROVIDER_REPORTED / ESTIMATED_LOCAL / UNKNOWN, input/output token counts); the transient `turn.delta` frame correlation fields for B-05; the Adapter 1.0 handshake names from B-03 as the target contract the OpenCode adapter is wrapped behind. Each is labelled "accepted target interface (not yet in source)" until its implementing task lands. One forward-only migration with checksum/fingerprint update.
 - **Acceptance:**
-  - [ ] B-01 through B-10 have consistent owner acceptance and source-backed enforcement.
-  - [ ] The declared first OS/harness/adapter/auth tuple matches the active implementation (the source currently dispatches only OpenCode Server v2.0.32).
-  - [ ] Context bounds, process ownership and cancellation/quiescence behavior are proven on the declared target.
-- **Command:** `python3 .specify/scripts/validate_feature_package.py`
-- **Stop:** any handshake/host identity ambiguity leaves feature blocked.
+  - [x] B-01 to B-10 owner acceptance recorded with the B-02 rider and B-04/B-07/B-09 caveats (SPEC section 5).
+  - [ ] Every promoted name exists exactly once in its owner doc and machine schema; no parallel definition in this package.
+  - [ ] The new migration is the next immutable `sqlite-vNN.sql`, older migrations are byte-identical, and the schema fingerprint test passes.
+  - [ ] Negative: schema validators reject a commit receipt missing `retry_ordinal` and a frame missing turn/retry/session correlation.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` and `python3 scripts/validate_architecture.py` and `cargo test -p storage-sqlite --locked schema` (filter to be added by this task for the fingerprint check)
+- **Evidence:** PR link and command output in Completion evidence below; register rows for B-01 to B-10 closed by the orchestrator.
+- **Stop:** a promoted name conflicts with an existing owner definition; resolve at the owner, not here.
 
-## 001-T02 - Complete and qualify atomic final Agent response commit
+## 001-T02 - Harden the atomic final Agent response commit (B-04 caveat)
 
-- **Status:** PARTIAL — typed port, SQLite transaction and supervisor call exist; contract/negative/fault-injection coverage remains.
-- **Depends on:** T01.
-- **Owner:** Storage and Conversation.
-- **Allowed paths:** after approval, `crates/storage-core/src/conversation.rs`, `crates/storage-sqlite/src/conversations.rs`, related typed event/schema/docs/tests.
-- **Contract:** SPEC 7.3, DATA-MODEL, contracts/api-events.md.
-- **Change intent:** define one typed storage port and SQLite IMMEDIATE transaction for AGENT message + terminal turn + snapshots + events + receipt. Exact public payload/version must match canonical event and schema.
+- **Status:** PARTIAL - `CommitConversationAgentResponse` / `CommittedConversationAgentResponse` in `crates/storage-core/src/conversation.rs` and the IMMEDIATE transaction in `crates/storage-sqlite/src/conversations.rs` exist and are called by the supervisor; test `conversation_agent_response_commit_settles_turn_and_session_atomically` covers stale turn/session versions, foreign principal, success and exact replay. Missing: retry ordinal, provider-response identity, author validation, wrong-Workspace/session and fault-injection coverage.
+- **Depends on:** T01
+- **Cross-package prerequisites:** NONE
+- **Owner:** Storage, Conversation.
+- **Allowed paths:** `crates/storage-core/src/conversation.rs`, `crates/storage-core/src/lib.rs`, `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/agent_binding_tests.rs`, `crates/storage-sqlite/src/conversation_turn_tests.rs`.
+- **Contract:** SPEC 7.3, B-04, AC-009, AC-026; DATA-MODEL section 5.
+- **Change intent:** add `retry_ordinal: u32` and `provider_response_id: String` to `CommitConversationAgentResponse`; verify `retry_ordinal` equals the turn's current ordinal inside the transaction; derive the receipt identity from (turn_id, retry_ordinal, provider_response_id) instead of a caller-generated message id; validate `message.author` is `{kind: AGENT, agent_binding_id}` matching the turn-pinned binding; derive event revisions from loaded aggregate versions rather than trusting caller-supplied `entity_revision`.
 - **Acceptance:**
   - [x] Typed request/result and SQLite operation exist and are invoked by the OpenCode supervisor.
-  - [ ] Storage/Conversation owners accept the exact field and event contract; retry ordinal and stable provider-response identity are explicitly protected.
-  - [ ] Foreign owner, wrong Workspace, wrong active session, stale version and wrong retry ordinal fail with no partial writes.
-  - [ ] Duplicate exact final result returns one stable receipt/message; conflicting replay fails.
-  - [ ] Crash/rollback tests prove atomicity.
-- **Command:** `cargo test -p storage-sqlite --locked conversation_agent_response_commit` (test filter to be added).
-- **Stop:** never expose final answer as complete without commit receipt.
+  - [ ] Exact replay with the same turn, retry ordinal and provider-response id returns the stored receipt and message (AC-026).
+  - [ ] Same identity with different content digest, different retry ordinal or different author fails with no partial write (AC-026).
+  - [ ] Foreign owner, wrong Workspace, wrong or non-ACTIVE session and stale versions fail with no partial write (AC-009).
+  - [ ] Fault injection after each insert (message, turn, session, host binding delete, events, receipt) rolls back everything.
+  - [ ] Two concurrent commits for one turn: exactly one wins, the other gets a conflict or the stored receipt.
+- **Command:** `cargo test -p storage-sqlite --locked conversation_agent_response_commit`
+- **Evidence:** test names and output recorded below; IMPLEMENTATION-STATUS.md Conversation final-commit row.
+- **Stop:** any path exposes a final answer as complete without the commit receipt.
 
 ## 001-T03 - Complete bounded AgentSessionSupervisor and AgentHostSupervisor lifecycle
 
-- **Status:** PARTIAL — per-turn AgentSessionSupervisor code exists; separate host ownership and recovery lifecycle are not complete.
-- **Depends on:** T01.
-- **Scheduling:** Independent of T02; T02 and T03 may proceed in parallel after T01 locks shared interfaces. Both are prerequisites for T06.
+- **Status:** PARTIAL - per-turn `AgentSessionSupervisor` in `apps/litecoworkd/src/agents/supervisor.rs` reserves STARTING and activates; it also creates the host record and starts/stops `OpenCodeServer` itself, so host and session ownership are not separate, there is no idle TTL, and the Job Object/cgroup lifetime control from B-09 is absent.
+- **Depends on:** T01
+- **Cross-package prerequisites:** Feature 011 Runtime incarnation/readiness foundation (Wave 0).
 - **Owner:** Agent Runtime.
-- **Allowed paths:** focused `apps/litecoworkd/src/agents/` and dedicated tests.
-- **Contract:** SPEC 5, 6, 7.1-7.2, 8; SERVICES; STATE-MACHINES; AGENT-CONTROL.
-- **Change intent:** introduce supervisor interfaces, bounded startup, exact host/Runtime pin revalidation, STARTING reservation, activation, normalized lifecycle, quiescence, CLOSE/LOST, local handle lifetime, startup recovery enumeration.
+- **Allowed paths:** `apps/litecoworkd/src/agents/supervisor.rs`, `apps/litecoworkd/src/agents/mod.rs`, `apps/litecoworkd/src/agents/host_supervisor.rs` (new), `apps/litecoworkd/src/attempt_process_scope.rs` (read for reuse only unless a shared helper is extracted), `crates/windows-local-security/`, `crates/linux-process-scope/`, adjacent tests.
+- **Contract:** SPEC sections 5 (B-03, B-09), 6, 7.1-7.2, 8; L-04 to L-07; AC-003, AC-004, AC-005, AC-012, AC-013; SERVICES; STATE-MACHINES.
+- **Change intent:** introduce `AgentHostSupervisor` (new module) owning `AgentHostInstanceRecord` lifecycle, the OpenCode server process under a Windows Job Object or Linux cgroup (process lifetime only, never described as isolation), live use references and the 10-minute idle TTL with graceful stop, 5 s wait, then kill of LiteCowork-owned processes only. `AgentSessionSupervisor` keeps STARTING reservation, readiness check, `activate_conversation_agent_session`, quiescence and CLOSED/LOST. Replace the hard-coded `expected_session_version: 2` with the committed session version. Move the blocking per-turn flow off a single long `spawn_blocking` call (see optimization notes).
 - **Acceptance:**
-  - [ ] Host process ownership and session ownership remain separate.
-  - [ ] No native call occurs inside SQLite.
-  - [ ] Only observed exact readiness activates.
-  - [ ] Handle is never returned/serialized/logged; binding is deleted only after CLOSED/LOST.
-  - [ ] Foreign, stale, degraded and wrong-incarnation host cases fail closed.
-- **Command:** `cargo test -p litecoworkd --locked conversation_session_supervisor_lifecycle` (filter to be added).
-- **Stop:** unknown provider lifecycle or unbounded queue halts admission.
+  - [ ] Host process ownership and session ownership are separate types; no turn aggregate write from either supervisor (AC-004).
+  - [ ] No native call occurs inside a SQLite transaction (code review plus test with a store that panics if called re-entrantly).
+  - [ ] Only an observed native session handshake activates; Runtime/AgentHost READY alone never reports RUNNING (AC-005).
+  - [ ] The turn-pinned binding is used even after the selector changes mid-dispatch (AC-003).
+  - [ ] Handle never serialized, logged or returned; host binding deleted only after CLOSED/LOST (AC-013).
+  - [ ] Foreign, stale, degraded and wrong-incarnation hosts fail closed; an externally owned process is never killed.
+  - [ ] Idle TTL stops the owned process after the last reference with no zombie child (Windows and Linux).
+- **Command:** `cargo test -p litecoworkd --locked conversation_session_supervisor_lifecycle` (filter to be added by this task)
+- **Evidence:** test output; Windows and Linux process-tree check recorded in Completion evidence.
+- **Stop:** unknown provider lifecycle or an unbounded queue halts admission.
 
-## 001-T04 - Qualify one native AgentAdapter
+## 001-T04 - Qualify the OpenCode v2.0.32 AgentAdapter behind the Adapter 1.0 contract
 
-- **Status:** BLOCKED FOR QUALIFICATION — OpenCode Server v2.0.32 code path exists; the declared Adapter 1.0/first-route contract and exact OS/auth/USER evidence do not match or qualify it.
-- **Depends on:** T01, T03.
+- **Status:** PARTIAL - OpenCode Server v2.0.32 helper (`OpenCodeServer`, `OpenCodeServerProtocol::V2_0_32`) and the supervisor call path exist; no Adapter 1.0 wrapper, `abort_session` has no caller, the read loop uses a hard-coded 60 s deadline, and no Windows or USER evidence exists.
+- **Depends on:** T01, T03
+- **Cross-package prerequisites:** Feature 002 OpenCode probe fix so the binding is creatable (probe currently records `compatible=false`).
 - **Owner:** Agent Runtime.
-- **Allowed paths:** one selected adapter module, adapter contracts and fixtures.
-- **Contract:** SPEC 7.4, 8, 10; AGENT-FABRIC; NATIVE-COMPOSER-LLD.
-- **Change intent:** wrap one version-pinned harness transport behind AgentAdapter; implement startup/readiness, context prompt dispatch, bounded events, interrupt and stop/quiescence.
+- **Allowed paths:** `apps/litecoworkd/src/agents/opencode_server.rs`, `apps/litecoworkd/src/agents/conversation_prompt.rs`, `apps/litecoworkd/src/agents/adapter.rs` (new), `apps/litecoworkd/src/agents/supervisor.rs`, adapter fixtures and tests.
+- **Contract:** SPEC 7.4, 8, 10; B-02 rider, B-03, B-05; AC-005, AC-008, AC-015; AGENT-FABRIC; NATIVE-COMPOSER-LLD.
+- **Change intent:** define an `AgentAdapter` trait (version probe, create session, send context, bounded event stream, interrupt, shutdown) matching the B-03 phases and implement it for OpenCode v2.0.32 by wrapping the existing helper; wire `abort_session` as the interrupt; replace the fixed 60 s deadline and 500 ms poll with named finite configuration values; correlate every SSE event to the native session and drop uncorrelated frames.
 - **Acceptance:**
-  - [ ] Exact session and host identity matches reservation.
-  - [ ] Prompt dispatch occurs only after activation commit.
-  - [ ] Duplicate/out-of-order/malformed/oversized events cannot mutate state.
-  - [ ] Provider timeout-after-dispatch is reconciled, not blindly resent.
-  - [ ] Auth/model/setup failure never auto-falls back.
-- **Command:** `cargo test -p litecoworkd --locked selected_adapter_conversation` (filter to be added).
-- **Stop:** if native API can't prove readiness or safe stop, do not qualify.
+  - [ ] Exact session and host identity match the STARTING reservation; prompt dispatch only after activation commit.
+  - [ ] Duplicate, out-of-order, malformed, oversized (`MAX_SSE_EVENT_BYTES`) and foreign-session events cannot mutate state or projection (AC-008).
+  - [ ] Timeout after dispatch is reconciled through the native session state, never resent blindly.
+  - [ ] Missing executable, unsupported version, auth failure or startup failure produce a typed FAILED turn with the USER message kept and no fallback (AC-015).
+  - [ ] Interrupt via `abort_session` is observed and reported as a stop observation, not as settlement.
+- **Command:** `cargo test -p litecoworkd --locked selected_adapter_conversation` (filter to be added by this task) and `cargo test -p litecoworkd --locked opencode`
+- **Evidence:** fixture-based test output plus one recorded live OpenCode v2.0.32 run on Windows x64 in Completion evidence.
+- **Stop:** if the native API cannot prove readiness or safe stop, the route is not qualified.
 
-## 001-T05 - Complete bounded context dispatch and supported resources
+## 001-T05 - Complete bounded context dispatch and confirm the first adapter budget (B-07 caveat)
 
-- **Status:** PARTIAL — bounded context is loaded and sent on the OpenCode path; supported ResourceRef materialization and provider-bound qualification remain.
-- **Depends on:** T01, T03, T04.
-- **Owners:** Conversation, Resource, Agent Runtime.
-- **Allowed paths:** focused context materializer and adapter tests.
-- **Contract:** SPEC 7.5, 8, 10; STORAGE; SCHEMAS; TRUST.
-- **Change intent:** consume ConversationContextPackage from immutable turn boundary; reauthorize ResourceRefs and project supported content to selected adapter under its exact bound.
+- **Status:** PARTIAL - `load_conversation_context_for_turn` and `build_conversation_context_package` (1,024 messages / 4 MiB, refuses oversize with `CONVERSATION_CONTEXT_LIMIT_EXCEEDED`) and `encode_conversation_context_prompt` in `apps/litecoworkd/src/agents/conversation_prompt.rs` exist; OpenCode caps requests at 512 KiB; the B-07 sliding window and truncation receipt are not implemented and the real OpenCode budget is unconfirmed.
+- **Depends on:** T01, T03, T04
+- **Cross-package prerequisites:** NONE
+- **Owner:** Conversation, Agent Runtime.
+- **Allowed paths:** `crates/storage-core/src/conversation.rs`, `crates/storage-sqlite/src/conversations.rs`, `apps/litecoworkd/src/agents/conversation_prompt.rs`, `apps/litecoworkd/src/agents/opencode_server.rs`, adjacent tests.
+- **Contract:** SPEC 7.5, 8, 10, B-07; AC-006, AC-007; CONTEXT; SCHEMAS.
+- **Change intent:** measure and record the OpenCode v2.0.32 accepted request size; implement the B-07 window (pinned preamble, selected refs, recent contiguous messages to 80% of the confirmed budget) with the explicit omission notice and a recorded reduction receipt; keep refusal when even the pinned part does not fit.
 - **Acceptance:**
-  - [ ] Only committed same-Workspace transcript prefix is provided.
-  - [ ] Prior AGENT messages retain source binding provenance.
-  - [ ] Resource revision/root/location checked before bytes materialize.
-  - [ ] Unsupported/oversize content fails visibly or uses owner-approved reviewed reduction.
-  - [ ] Never silently truncate or cross provider private context.
-- **Command:** `cargo test -p litecoworkd --locked conversation_context_dispatch` (filter to be added).
+  - [ ] Only the committed same-Workspace prefix through the submitted USER message is sent; prior AGENT messages keep source binding provenance (AC-006).
+  - [ ] Over-budget context is reduced only by the B-07 rule with a visible notice, or refused with a typed error; never silent truncation (AC-007).
+  - [ ] Boundary tests at exactly the budget, one byte over, 1,024 and 1,025 messages.
+  - [ ] Confirmed OpenCode budget value and measurement method recorded in RESEARCH.md and Completion evidence.
+- **Command:** `cargo test -p litecoworkd --locked conversation_context_dispatch` (filter to be added by this task) and `cargo test -p storage-core --locked context`
+- **Evidence:** test output; measured budget in Completion evidence.
+- **Stop:** budget cannot be measured on the pinned version.
 
-## 001-T06 - Complete final response and terminal settlement
+## 001-T06 - Wire final response settlement with stable identity in the supervisor
 
-- **Status:** PARTIAL — atomic SQLite operation and OpenCode supervisor call exist; strengthen provenance validation, retry identity and crash/rollback tests.
-- **Depends on:** T02, T03, T04, T05.
-- **Owners:** Conversation, Storage.
-- **Allowed paths:** Conversation result writer, storage ports/SQLite adapter and adjacent tests.
-- **Contract:** SPEC 7.3, AC-009; EVENTS; STORAGE; STATE-MACHINES.
-- **Change intent:** persist one final AGENT message with exact session/binding/retry provenance and turn terminal state in the same transaction.
+- **Status:** PARTIAL - the supervisor calls `commit_conversation_agent_response`, but the request id comes from a freshly generated message id, the message event revision is hard-coded to 3, and a failed commit is returned as an error string that then marks the turn FAILED.
+- **Depends on:** T02, T03, T04, T05
+- **Cross-package prerequisites:** NONE
+- **Owner:** Conversation, Agent Runtime.
+- **Allowed paths:** `apps/litecoworkd/src/agents/supervisor.rs`, `apps/litecoworkd/src/agents/opencode_server.rs`, adjacent tests.
+- **Contract:** SPEC 7.3, B-04; AC-009, AC-026; EVENTS; STATE-MACHINES.
+- **Change intent:** derive the commit request id and `provider_response_id` deterministically from turn id, retry ordinal and the native message id; on an uncertain commit outcome, re-read the stored receipt before any retry of the local commit; never resend the prompt to repair a DB write; failed/cancelled turns never promote partial deltas to a durable message.
 - **Acceptance:**
-  - [ ] Message, terminal turn, snapshots, events and receipt commit atomically.
-  - [ ] Repeated provider final or retry returns one committed message only.
-  - [ ] Failed commit is reconciled by stable result identity without provider resend.
-  - [ ] Failed/cancelled turns do not promote partial deltas to durable answer.
-- **Command:** `cargo test -p storage-sqlite --locked conversation_agent_response_commit` (filter to be added).
+  - [ ] Repeated provider final or a repeated commit attempt returns one committed message (AC-026).
+  - [ ] Injected commit failure is reconciled from the stored receipt without provider resend (AC-009).
+  - [ ] Failed or cancelled turns leave no AGENT message.
+- **Command:** `cargo test -p litecoworkd --locked conversation_final_settlement` (filter to be added by this task)
+- **Evidence:** test output in Completion evidence.
+- **Stop:** a final answer is visible as complete before commit.
 
-## 001-T07 - Complete stop, retry, provider input and stream integration
+## 001-T07 - Make Stop effective with observed quiescence and fix the Retry lifecycle (daemon)
 
-- **Status:** PARTIAL / BLOCKED — routes and some storage transitions exist; retry currently changes the turn to RUNNING before STARTING reservation, and stop/quiescence plus provider-input/stream integration are not qualified.
-- **Depends on:** T01, T03, T04, T06.
-- **Owners:** Conversation, Agent Runtime, UI.
-- **Allowed paths:** Conversation Operator, supervisor, Tauri stream bridge, `apps/litecowork-ui/src/conversations/` and relevant tests.
-- **Contract:** SPEC 7.2, 7.6, AC-010/011/014/017/018/019; API; EVENTS; STATE-MACHINES; STORAGE; TRUST.
-- **Change intent:** connect cancel/retry and Conversation-scoped UserRequest continuation; reuse durable projection cursor and optionally bounded transient frames. No separate UI event transport.
+- **Status:** NOT STARTED - `cancel_conversation_turn` writes CANCEL_REQUESTED then CANCELLED in two transitions with no native interrupt; `retry_conversation_turn` cannot succeed because `transition_conversation_turn` requires an ACTIVE session for the newly generated id, and the domain `TurnCommand::Retry` moves FAILED straight to RUNNING, which conflicts with STARTING reservation.
+- **Depends on:** T03, T04, T06
+- **Cross-package prerequisites:** NONE (Feature 012 take-control waits on this task).
+- **Owner:** Conversation, Agent Runtime.
+- **Allowed paths:** `apps/litecoworkd/src/conversation_operator.rs`, `apps/litecoworkd/src/conversation_operator_tests.rs`, `apps/litecoworkd/src/agents/supervisor.rs`, `crates/domain-conversation/src/lib.rs`, `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/conversation_turn_tests.rs`.
+- **Contract:** SPEC L-11, L-12, 7.2; AC-010, AC-011; STATE-MACHINES; API.
+- **Change intent:** cancel on RUNNING commits only CANCEL_REQUESTED and signals the session supervisor (per-turn cancellation handle keyed by turn id and retry ordinal); the supervisor calls the adapter interrupt, waits for observed quiescence with a finite deadline, then settles CANCELLED, or keeps the winning COMPLETED/FAILED. Retry changes FAILED to OPEN with incremented `retry_ordinal` and no session (new domain transition), then dispatch reserves a fresh STARTING session; storage `Retry` precondition updated to match.
 - **Acceptance:**
-  - [ ] Cancel waits for observed adapter stop/quiescence.
-  - [ ] Winning completion/failure is preserved.
-  - [ ] Retry uses new session and retry ordinal; no message duplication.
-  - [ ] A valid Conversation-scoped response is immutable and moves the exact WAITING_USER turn to WAITING_DEPENDENCY before continuation is enqueued.
-  - [ ] MCP update acknowledgement is not acceptance; reconcile the exact request key through the provider task, and do not start a fresh AgentSession before provider acceptance and session readiness.
-  - [ ] Rejection that remains INPUT_REQUIRED closes the old request, creates a new one for the current key and returns the turn to WAITING_USER; ambiguity remains WAITING_DEPENDENCY without a new session.
-  - [ ] Stream reconnect/resync uses durable snapshot and never concatenates across gaps.
-- **Command:** `pnpm test -- conversation-stream` plus daemon lifecycle integration (exact workspace command to be confirmed from source).
+  - [ ] Cancel returns 202 with CANCEL_REQUESTED; CANCELLED is committed only after observed quiescence (AC-010).
+  - [ ] Race: completion arriving during interrupt stays COMPLETED with its message; failure stays FAILED (AC-010).
+  - [ ] Quiescence deadline exceeded leaves CANCEL_REQUESTED with a typed recovery state, never a fabricated CANCELLED.
+  - [ ] Retry with current version and new key: fresh session, retry ordinal + 1, earlier provenance kept, no duplicate USER message (AC-011).
+  - [ ] Stale If-Match returns 412; retry of a non-FAILED turn returns 409; duplicate retry key replays the receipt.
+- **Command:** `cargo test -p litecoworkd --locked conversation_stop_retry` (filter to be added by this task) and `cargo test -p domain-conversation --locked`
+- **Evidence:** test output; register A-25 daemon part closed in IMPLEMENTATION-STATUS.md by T22.
+- **Stop:** the adapter cannot report quiescence; keep Stop marked unavailable for that route.
 
-## 001-T08 - Implement daemon restart and orphan recovery
+## 001-T08 - Implement daemon restart and orphan recovery sweep
 
-- **Status:** NOT STARTED — storage enumeration/LOST primitives exist, but no Conversation startup recovery sweep or durable dispatch-outbox replay is wired.
-- **Depends on:** T03, T04, T06, T07.
-- **Owners:** Agent Runtime, Storage, Conversation.
-- **Allowed paths:** bounded startup recovery scanner, supervisor and storage tests.
-- **Contract:** SPEC 7.2, 9, AC-012; STATE-MACHINES; FAILURE-RECOVERY.
-- **Change intent:** reconcile STARTING/ACTIVE/INTERRUPTING/CLOSING records against exact Runtime incarnation/process/adapter evidence; mark LOST or finish close safely.
+- **Status:** NOT STARTED - `list_starting_conversation_agent_sessions` and `mark_starting_conversation_agent_session_lost` exist with tests but no caller in `recover_and_persist_startup_blockers` (`apps/litecoworkd/src/runtime.rs`) or elsewhere at startup.
+- **Depends on:** T03, T06, T07, T10
+- **Cross-package prerequisites:** Feature 011 Runtime incarnation and startup-blocker reporting.
+- **Owner:** Agent Runtime, Storage, Conversation.
+- **Allowed paths:** `apps/litecoworkd/src/runtime.rs`, `apps/litecoworkd/src/agents/conversation_recovery.rs` (new), `apps/litecoworkd/src/runtime_recovery_tests.rs`, `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/lib.rs`.
+- **Contract:** SPEC 7.2, 9; AC-012, AC-022; STATE-MACHINES; FAILURE-RECOVERY.
+- **Change intent:** at startup, before Operator admission, page prior-incarnation STARTING sessions to LOST, reconcile ACTIVE/INTERRUPTING/CLOSING sessions (no same-incarnation resume in V1, so mark LOST and settle the turn FAILED with a typed reason), settle CANCEL_REQUESTED turns, and hand UNCLAIMED dispatch intents (T10) to the dispatcher or settle them FAILED. Report counts as startup recovery facts.
 - **Acceptance:**
-  - [ ] Prior-incarnation STARTING becomes LOST unless safe same-incarnation resume is positively proved.
-  - [ ] Unknown ACTIVE session state cannot be reported as completed.
-  - [ ] Orphan handles and host-use references are released only after safe close/loss settlement.
-  - [ ] Restart and repeated recovery sweeps are idempotent.
-- **Command:** `cargo test -p litecoworkd --locked conversation_session_recovery` (filter to be added).
+  - [ ] Prior-incarnation STARTING becomes LOST (AC-012).
+  - [ ] Unknown ACTIVE state is never reported as completed; the turn shows a typed failure and Retry is offered.
+  - [ ] Crash in each window (after admission, after STARTING, after activation, after final commit) recovers to a single consistent state (AC-022).
+  - [ ] Running the sweep twice is idempotent; host bindings released only after LOST/CLOSED.
+- **Command:** `cargo test -p litecoworkd --locked conversation_session_recovery` (filter to be added by this task)
+- **Evidence:** test output; restart scenario recorded in Completion evidence.
+- **Stop:** a crash window produces two dispatches or a lost USER message.
 
-## 001-T09 - Qualify one end-to-end native Conversation route and gate Send
+## 001-T09 - Qualify the end-to-end native Conversation route on the release matrix and gate Send
+
+- **Status:** NOT STARTED - no `apps/litecoworkd/tests/conversation_session_supervisor.rs`; no Windows or Linux SYSTEM/USER evidence.
+- **Depends on:** T01-T08, T10-T18
+- **Cross-package prerequisites:** Feature 002 OpenCode binding creatable; Feature 011 Windows named-pipe IPC and packaged sidecar; Feature 019 release matrix rows and evidence bundle process.
+- **Owner:** Product, Agent Runtime, Conversation, UI, Security.
+- **Allowed paths:** `apps/litecoworkd/tests/conversation_session_supervisor.rs` (new), `apps/litecowork-ui/tests/` (new E2E driver files), `apps/litecowork-ui/src/conversations/ConversationsPage.tsx` (eligibility only), this package.
+- **Contract:** SPEC 7-15; AC-001 to AC-026; G-09; docs/ACCEPTANCE-AND-E2E-PLAN.md E2E-01.
+- **Change intent:** create the canonical target with daemon + SQLite + adapter fixture; run packaged desktop E2E-01 (fresh install, Workspace, select OpenCode lead, new Conversation, send, stream, stop, retry, reload) on Windows x64 with OpenCode v2.0.32 first, then on Linux x64; Send eligibility becomes true only for the qualified tuple.
+- **Acceptance:**
+  - [ ] `cargo test -p litecoworkd --test conversation_session_supervisor --locked -- --nocapture` exists and passes (AC-001 to AC-016).
+  - [ ] CODE, SYSTEM and owner USER evidence on Windows x64 + OpenCode v2.0.32 covers positive, denial (foreign owner, unauthenticated pipe peer), timeout-after-dispatch, duplicate replay, cancel race, crash, restart and reconnect.
+  - [ ] Same evidence on Linux x64 (0600/0700 socket) recorded as a separate row; WSL2 is not accepted for either row.
+  - [ ] No prompt, handle or secret in logs, events or projections (AC-013); no fallback (AC-015).
+  - [ ] An unqualified tuple keeps Send disabled with a named reason (AC-016).
+- **Command:** `cargo test -p litecoworkd --test conversation_session_supervisor --locked -- --nocapture` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** dated evidence bundle per row (build SHA, OS build, OpenCode version, auth route, reviewer) referenced from IMPLEMENTATION-STATUS.md.
+- **Stop:** any unqualified OS/agent/auth tuple stays unavailable even if another tuple passes.
+
+## 001-T10 - Add a durable dispatch outbox for admitted turns
+
+- **Status:** NOT STARTED - submit commits USER + OPEN + receipt, then `tokio::spawn`; nothing durable records that dispatch is owed or claimed, and exact replay returns the 202 receipt without re-admitting dispatch.
+- **Depends on:** T01
+- **Cross-package prerequisites:** NONE
+- **Owner:** Storage, Conversation.
+- **Allowed paths:** `docs/schemas/sqlite-v29.sql` (new, as promoted by T01), `crates/storage-core/src/conversation.rs`, `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/lib.rs`, `apps/litecoworkd/src/conversation_operator.rs`, `apps/litecoworkd/src/agents/supervisor.rs`, adjacent tests.
+- **Contract:** SPEC DATA-MODEL section 6; AC-022; STORAGE; FAILURE-RECOVERY.
+- **Change intent:** insert one dispatch-intent row (turn id, retry ordinal, UNCLAIMED) in the same transaction as `create_conversation_turn` and as the Retry transition; the dispatcher claims it by CAS (UNCLAIMED to CLAIMED with Runtime incarnation) before `start_conversation_agent_session`; settlement marks it SETTLED. Submit and retry both enqueue instead of spawning ad hoc.
+- **Acceptance:**
+  - [ ] Intent row commits atomically with the turn; rollback test removes both.
+  - [ ] Two dispatchers racing on one intent: exactly one claim wins.
+  - [ ] Crash after admission and before claim leaves an UNCLAIMED intent that the T08 sweep handles (AC-022).
+  - [ ] Exact submit replay does not create a second intent.
+- **Command:** `cargo test -p storage-sqlite --locked conversation_dispatch_intent` (filter to be added by this task)
+- **Evidence:** test output; migration checksum recorded.
+- **Stop:** the claim cannot be made atomic with STARTING reservation ordering.
+
+## 001-T11 - Enforce single-flight admission in storage (B-01)
+
+- **Status:** NOT STARTED - `create_conversation_turn` has no nonterminal-turn check; the UI fence alone is not authority.
+- **Depends on:** T01
+- **Cross-package prerequisites:** NONE
+- **Owner:** Storage, Conversation, API.
+- **Allowed paths:** `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/conversation_turn_tests.rs`, `docs/schemas/sqlite-v29.sql` (shared with T10), `apps/litecoworkd/src/conversation_operator.rs` (`map_store_error`), `apps/litecoworkd/src/conversation_operator_tests.rs`.
+- **Contract:** SPEC B-01; AC-023; STATE-MACHINES; API.
+- **Change intent:** inside the IMMEDIATE transaction reject when any turn of the Conversation is OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED, backed by a partial unique index on nonterminal turns per Conversation; map to `CONVERSATION_TURN_IN_PROGRESS` 409; update `conversation_turn_creation_serializes_appends_from_the_same_stale_snapshot` to assert one admission and one rejection.
+- **Acceptance:**
+  - [ ] Second submit during an active turn returns 409 and writes no message, turn, event or receipt (AC-023).
+  - [ ] Two concurrent submits from the same stale snapshot: one 202, one 409.
+  - [ ] Exact replay of the admitted submit still returns its receipt (receipt check runs before the single-flight check).
+  - [ ] Submit after the active turn settles succeeds.
+- **Command:** `cargo test -p storage-sqlite --locked conversation_turn_creation` and `cargo test -p litecoworkd --locked conversation_turn_submit`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** the index conflicts with existing turn rows during migration; repair forward, never delete user messages.
+
+## 001-T12 - Wire Conversation-scoped UserRequest continuation (B-06)
+
+- **Status:** NOT STARTED - `apps/litecoworkd/src/user_request_operator.rs` and the domain WAITING_USER/WAITING_DEPENDENCY transitions exist (domain test `rejected_provider_input_returns_waiting_dependency_to_waiting_user`); the OpenCode adapter does not surface provider input requests to this path.
+- **Depends on:** T04, T07, T10
+- **Cross-package prerequisites:** NONE
+- **Owner:** Conversation, Agent Runtime, Trust.
+- **Allowed paths:** `apps/litecoworkd/src/user_request_operator.rs`, `apps/litecoworkd/src/agents/supervisor.rs`, `apps/litecoworkd/src/agents/opencode_server.rs`, `crates/storage-sqlite/src/user_request_details.rs`, `crates/domain-conversation/src/lib.rs`, adjacent tests.
+- **Contract:** SPEC B-06; AC-017, AC-018, AC-019; STATE-MACHINES; TRUST.
+- **Change intent:** map an OpenCode input request to a Conversation-scoped UserRequest correlated by a Runtime-local provider input key; the answer commits the immutable response and moves the turn to WAITING_DEPENDENCY; acceptance by the provider allows a fresh STARTING session; rejection or ambiguity follows AC-019. If OpenCode v2.0.32 exposes no input request, record that and keep the path unavailable for this route.
+- **Acceptance:**
+  - [ ] Valid answer is immutable and moves WAITING_USER to WAITING_DEPENDENCY before continuation (AC-017).
+  - [ ] Acknowledgement alone is not acceptance; RUNNING only after readiness (AC-018).
+  - [ ] Rejection returns to WAITING_USER with a new request; ambiguity keeps WAITING_DEPENDENCY with no new session (AC-019).
+  - [ ] No Task, Attempt or Coworker is created (AC-002).
+- **Command:** `cargo test -p litecoworkd --locked conversation_user_request_continuation` (filter to be added by this task)
+- **Evidence:** test output; provider capability finding in RESEARCH.md.
+- **Stop:** the provider cannot correlate an input key; mark unavailable for the route.
+
+## 001-T13 - Emit bounded transient TURN_DELTA frames with resync (B-05)
+
+- **Status:** PARTIAL - durable projection stream exists (`subscribe_conversation_stream`, `acknowledge_conversation_stream_frame`, `tests/conversation-stream.test.ts`); `turn.delta` is named in `docs/schemas/operator-stream.schema.json` but the Operator does not emit it, and the supervisor accumulates text without projecting it.
+- **Depends on:** T04, T06
+- **Cross-package prerequisites:** NONE
+- **Owner:** Agent Runtime, Presentation Operator, Desktop bridge, UI.
+- **Allowed paths:** `apps/litecoworkd/src/agents/supervisor.rs`, `apps/litecoworkd/src/presentation_operator.rs`, `apps/litecowork-ui/src-tauri/src/conversation_stream_bridge.rs`, `apps/litecowork-ui/src/conversations/conversation-stream.ts`, `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/tests/conversation-stream.test.ts`.
+- **Contract:** SPEC B-05, 7.6; AC-008, AC-014; PRESENTATION-RUNTIME.
+- **Change intent:** publish correlated (Workspace, Conversation, turn, retry ordinal, session, sequence) coalesced deltas through a bounded in-memory channel to the Operator stream; never persist them; the UI drops the buffer and re-reads `get_conversation_presentation` on a sequence gap or reconnect; the committed AGENT message replaces the transient text.
+- **Acceptance:**
+  - [ ] Gap or reconnect triggers resync and no duplicated or concatenated text (AC-014).
+  - [ ] Frames from a stale retry ordinal or another session are dropped (AC-008).
+  - [ ] Slow consumer: channel stays bounded and the daemon never blocks the native read loop.
+  - [ ] Committed message supersedes transient text on reload.
+- **Command:** `cargo test -p litecoworkd --locked conversation_turn_delta` (filter to be added by this task) and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** frames would need persistence to work; keep durable-only progress (F-04).
+
+## 001-T14 - Composer attachments and B-08 resource materialization
+
+- **Status:** NOT STARTED - the "+" button in `ConversationsPage.tsx` has no handler, submit sends `resourceRefs: []`, `validate_turn_resource_ref` in `conversation_operator.rs` accepts same-Workspace refs, and `encode_conversation_context_prompt` refuses non-empty refs with `ConversationPromptError::ResourceMaterializationRequired`.
+- **Depends on:** T05
+- **Cross-package prerequisites:** Feature 003 ResourceRef authority, persisted ContextAttachment and Context Used surface; Feature 003 Windows WorkspaceRoot add for the Windows row.
+- **Owner:** Conversation, Resource, Agent Runtime, UI.
+- **Allowed paths:** `apps/litecoworkd/src/agents/conversation_prompt.rs`, `apps/litecoworkd/src/agents/resource_materializer.rs` (new), `apps/litecoworkd/src/conversation_operator.rs`, `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/src/conversations/conversation-attachments.ts` (new), `apps/litecowork-ui/tests/conversation-attachments.test.ts` (new), adjacent Rust tests.
+- **Contract:** SPEC B-08, L-09; AC-006, AC-020; STORAGE; TRUST.
+- **Change intent:** in Rust, reauthorize each ref at dispatch, then materialize text inline with a delimited checksummed header and binary as a canonicalized read-only path inside the admitted WorkspaceRoot passed through the adapter's file input; reject symlink escape, `..` traversal and non-admitted roots. In the UI, wire "+" to a picker that lists only Feature 003 ResourceRefs and shows chips with remove.
+- **Acceptance:**
+  - [ ] Attached text resource reaches the prompt with header and checksum; binary passes as an admitted path (AC-020).
+  - [ ] External path, traversal, symlink escape, revoked root and changed revision are rejected before dispatch; the draft and chips stay (AC-020).
+  - [ ] Picker is keyboard operable and each chip has an accessible name.
+  - [ ] No attachment control renders on a route whose adapter declares no file input.
+- **Command:** `cargo test -p litecoworkd --locked conversation_resource_materialization` (filter to be added by this task) and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** the OpenCode adapter has no verified file input; keep binary attachments unavailable.
+
+## 001-T15 - Write usage records at turn settlement (B-10)
+
+- **Status:** NOT STARTED - no usage record table or writer exists in any Rust source.
+- **Depends on:** T01, T06
+- **Cross-package prerequisites:** Feature 018 owns the reader and dashboard.
+- **Owner:** Conversation, Observability.
+- **Allowed paths:** `docs/schemas/sqlite-v29.sql` (shared with T10), `crates/storage-core/src/conversation.rs`, `crates/storage-sqlite/src/conversations.rs`, `apps/litecoworkd/src/agents/supervisor.rs`, adjacent tests.
+- **Contract:** SPEC B-10; AC-021; OBSERVABILITY; docs/V1-TELEMETRY-USAGE-RESILIENCE-LLD.md.
+- **Change intent:** write one usage row in the final-response transaction (and for FAILED/CANCELLED settlements with whatever was observed): PROVIDER_REPORTED when OpenCode reports tokens, else ESTIMATED_LOCAL `max(1, utf8_bytes / 4)`, else UNKNOWN; no cost field is inferred.
+- **Acceptance:**
+  - [ ] Reported, estimated and unknown cases each write the right attribution (AC-021).
+  - [ ] Missing telemetry never blocks or fails settlement.
+  - [ ] Replay of a final commit writes no second usage row.
+- **Command:** `cargo test -p storage-sqlite --locked conversation_usage_record` (filter to be added by this task)
+- **Evidence:** test output in Completion evidence.
+- **Stop:** usage write would need to leave the settlement transaction.
+
+## 001-T16 - Bind Stop to the projected active turn and real aggregate version
+
+- **Status:** NOT STARTED - `cancelTurn` searches `transientTurns` (not emitted on the OpenCode path) and sends `expectedVersion: 1`; `active_turn` carries only `{ status }` in `conversation-view.ts`.
+- **Depends on:** T01, T07
+- **Cross-package prerequisites:** NONE
+- **Owner:** UI, Presentation Operator.
+- **Allowed paths:** `apps/litecoworkd/src/presentation_operator.rs`, `apps/litecowork-ui/src/conversations/conversation-view.ts`, `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/src/conversations/conversation-turn-state.ts` (new), `apps/litecowork-ui/tests/conversation-view.test.ts`, `apps/litecowork-ui/tests/conversation-turn-state.test.ts` (new).
+- **Contract:** SPEC AC-024; contracts/ui-behavior.md; NATIVE-COMPOSER-LLD.
+- **Change intent:** add `turn_id`, `version` and `retry_ordinal` to the projected `active_turn`; `cancelTurn` uses them through `cancel_conversation_turn`; show "Stopping" for CANCEL_REQUESTED until the terminal state is projected; on 412 refresh the snapshot and let the owner retry Stop.
+- **Acceptance:**
+  - [ ] Stop on an OpenCode RUNNING turn sends the projected turn id and version (AC-024).
+  - [ ] Stale version shows a recoverable message and refreshes; no silent failure.
+  - [ ] Stop has an accessible name and is reachable by keyboard; focus returns to the composer after settlement.
+- **Command:** `pnpm --dir apps/litecowork-ui test` and `cargo test -p litecoworkd --locked conversation_snapshot`
+- **Evidence:** test output; register A-25 UI part closed by T22.
+- **Stop:** projection version cannot be read in the same snapshot as status.
+
+## 001-T17 - Add the failed-turn Retry UI
+
+- **Status:** NOT STARTED - `retry_conversation_turn` exists in `conversation_bridge.rs` but has no call site in `apps/litecowork-ui/src`.
+- **Depends on:** T07, T16
+- **Cross-package prerequisites:** NONE
+- **Owner:** UI.
+- **Allowed paths:** `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/src/conversations/conversation-turn-state.ts`, `apps/litecowork-ui/tests/conversation-turn-state.test.ts`.
+- **Contract:** SPEC AC-011, AC-025; contracts/ui-behavior.md.
+- **Change intent:** render Retry on the latest FAILED turn with its typed reason; invoke `retry_conversation_turn` with current version and a fresh idempotency key; disable while pending; keep the original USER message visible once.
+- **Acceptance:**
+  - [ ] Retry appears only for a FAILED latest turn and sends the current version (AC-025).
+  - [ ] Double click sends one request; stale version refreshes (AC-011).
+  - [ ] Accessible name includes the failure reason.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** the daemon retry path (T07) is not green.
+
+## 001-T18 - Fence the composer for every nonterminal state and remove inert or fabricated composer controls
+
+- **Status:** PARTIAL - `sendEligible` gate and truthful empty state landed at 8129420; `isTurnRunning` ignores OPEN, WAITING_USER, WAITING_DEPENDENCY and CANCEL_REQUESTED; Voice Input, More options and Turbo are inert; "@ to mention, / for actions" placeholder, the "Gemini 3.8 Flash Low" fallback option label and the "AI Capabilities Overview" title fallback are fabricated copy.
+- **Depends on:** T16
+- **Cross-package prerequisites:** Feature 002 descriptor-declared commands and model/effort (render only when declared); Feature 003 @-reference picker; Feature 011 app-wide keyboard and focus baseline.
+- **Owner:** UI.
+- **Allowed paths:** `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/src/conversations/conversation-turn-state.ts`, `apps/litecowork-ui/src/conversations/conversations-page.css`, `apps/litecowork-ui/tests/conversation-turn-state.test.ts`, `apps/litecowork-ui/tests/conversation-empty-state-truthfulness.test.mjs`.
+- **Contract:** SPEC AC-016, AC-024, AC-025; V1-UI-SCREEN-CONTRACT; NATIVE-COMPOSER-LLD.
+- **Change intent:** move `isTurnRunning`, `sendEligible` and `statusLabel` into a pure `conversation-turn-state.ts` module covering every nonterminal status; keep the local sending flag until the projected turn leaves OPEN; hide or disable-with-reason Voice Input, More options, Turbo and the placeholder hints until an owner route exists; replace the fabricated fallback labels with the real Workspace default name or "No agent selected" and the Conversation title or "Untitled conversation".
+- **Acceptance:**
+  - [ ] Send is fenced for OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY and CANCEL_REQUESTED, including the gap after 202 (AC-024).
+  - [ ] No control without an owner route is clickable; each disabled control has an "unavailable" accessible name (AC-025).
+  - [ ] No fabricated model or title string remains (extend the truthfulness test).
+  - [ ] Existing A-24 guard still passes (AC-016).
+- **Command:** `pnpm --dir apps/litecowork-ui test` and `pnpm --dir apps/litecowork-ui run build`
+- **Evidence:** test output; register A-26 remaining part updated by T22.
+- **Stop:** NONE beyond test failure.
+
+## 001-T19 - Keep the Send disabled-until-qualified UI gate and truthful empty state
+
+- **Status:** DONE (UI gate only) - commit 8129420: `sendEligible` / `bindingEligibleForSend` in `apps/litecowork-ui/src/conversations/ConversationsPage.tsx` gate the `sendTurn` guard and `disabled={!sendEligible}`; the empty state is LiteCowork-branded with no unsupported claims; guarded by `apps/litecowork-ui/tests/conversation-empty-state-truthfulness.test.mjs`. This is not G-09 route qualification, which stays in T09.
+- **Depends on:** NONE
+- **Cross-package prerequisites:** NONE
+- **Owner:** UI.
+- **Allowed paths:** `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/tests/conversation-empty-state-truthfulness.test.mjs`.
+- **Contract:** SPEC G-09; AC-016; register A-24, A-26 (empty-state part).
+- **Change intent:** none now; regression ownership only. T09 later ties eligibility to the qualified tuple.
+- **Acceptance:**
+  - [x] Send is disabled without a qualified binding, draft, Operator readiness or while sending/running (AC-016).
+  - [x] Empty state has no third-party branding or capability claims.
+  - [ ] Guard test is part of the T23 evidence run.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** commit 8129420 and the guard test.
+- **Stop:** guard test fails; revert the regressing change.
+
+## 001-T20 - Fix the stale Operator header and extract the shared dispatch admission path
+
+- **Status:** NOT STARTED - `conversation_operator.rs` lines 1-2 claim dispatch is absent; `submit_conversation_turn` and `retry_conversation_turn` each hold a copied `tokio::spawn` + `eprintln!` dispatch block, and no `AgentTurnCoordinator` exists (SPEC L-07 target).
+- **Depends on:** T10
+- **Cross-package prerequisites:** NONE
+- **Owner:** Conversation, Agent Runtime.
+- **Allowed paths:** `apps/litecoworkd/src/conversation_operator.rs`, `apps/litecoworkd/src/agents/turn_coordinator.rs` (new), `apps/litecoworkd/src/agents/mod.rs`, `apps/litecoworkd/src/conversation_operator_tests.rs`.
+- **Contract:** SPEC 6 (ownership), 7.2, L-07; AC-001, AC-022.
+- **Change intent:** correct the module header to describe the OpenCode-only dispatch path; add `AgentTurnCoordinator` that consumes claimed dispatch intents (T10) and drives `AgentSessionSupervisor`, so the Operator only admits and returns 202; replace `eprintln!` with structured redacted diagnostics carrying correlation ids only.
+- **Acceptance:**
+  - [ ] Operator handlers contain no direct `dispatch_turn` call.
+  - [ ] Admission still commits before any native work (AC-001); the outbox path covers crash recovery (AC-022).
+  - [ ] Diagnostics contain no prompt text or handle (log capture test).
+- **Command:** `cargo test -p litecoworkd --locked conversation_turn` and `cargo clippy -p litecoworkd --locked -- -D warnings`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** NONE beyond test failure.
+
+## 001-T21 - Record the cross-layer trace for each user-visible operation
 
 - **Status:** NOT STARTED.
-- **Depends on:** T01-T08.
-- **Owners:** Product, Agent Runtime, Conversation, UI, Security.
-- **Allowed paths:** targeted tests, qualification report, eligibility gates and docs.
-- **Contract:** SPEC 7-15; AC-001/002/003/004/005/006/007/008/009/010/011/012/013/014/015/016/017/018/019; ACCEPTANCE-AND-E2E-PLAN; TESTING.
-- **Change intent:** exercise the exact pinned OS/build/harness/version/auth path; enable Send only for a qualified tuple.
+- **Depends on:** T07, T12-T18
+- **Cross-package prerequisites:** NONE
+- **Owner:** Conversation, UI, Agent Runtime.
+- **Allowed paths:** `specs/001-conversation-session-supervisor/contracts/ui-behavior.md`, `specs/001-conversation-session-supervisor/WIRING.yaml`.
+- **Contract:** AGENTS.md section 4; AC-001 to AC-026.
+- **Change intent:** for Send, Stop, Retry, Reload, Answer UserRequest and Attach, record: user outcome, exact control in `ConversationsPage.tsx`, Tauri command (`submit_conversation_turn`, `cancel_conversation_turn`, `retry_conversation_turn`, `get_conversation_presentation`, `subscribe_conversation_stream`), Operator route, authorization, service owner, transaction/version/fence, aggregate/event/receipt, projection/stream, restart/recovery behavior and the evidence test.
 - **Acceptance:**
-  - [ ] The future e2e target `cargo test -p litecoworkd --test conversation_session_supervisor --locked -- --nocapture` exists and passes.
-  - [ ] CODE, SYSTEM and owner USER evidence covers positive, denial, timeout, duplicate, cancel race, crash, restart and reconnect.
-  - [ ] No prompt/handle/secret leaks or automatic fallback.
-  - [ ] UI and API eligibility match actual qualified capability.
-  - [ ] Current evidence report is dated and version-pinned.
-- **Command:** cargo test -p litecoworkd --test conversation_session_supervisor --locked -- --nocapture (target to be created).
-- **Stop:** any unqualified OS/agent/auth tuple remains unavailable even if another tuple passes.
+  - [ ] Every operation has a complete row and no backend route lacks a UI path or vice versa.
+  - [ ] WIRING edges are marked served only where T09 evidence exists.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** updated contracts/ui-behavior.md.
+- **Stop:** a hop is missing; open the gap as a task instead of documenting it as present.
+
+## 001-T22 - Synchronize status documents and inventories
+
+- **Status:** NOT STARTED.
+- **Depends on:** T09, T21
+- **Cross-package prerequisites:** NONE (orchestrator owns shared ledgers; this task supplies the edits for review).
+- **Owner:** Conversation, Documentation owners.
+- **Allowed paths:** `docs/IMPLEMENTATION-STATUS.md`, `docs/schemas/served-route-inventory.json`, `docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md`, `docs/V1-UI-ACTION-STATE-LEDGER.md`, `docs/V1-UI-SCREEN-CONTRACT.md`, `CURRENT-RUN.md`, this package.
+- **Contract:** AGENTS.md sections 4-5; SPEC section 4.
+- **Change intent:** regenerate the served-route inventory, update the Conversation rows (Send, Stop, Retry, attachments, usage, recovery) with exact evidence class per release row, close register A-24, A-25 and the A-26 remainder where evidence exists, and refresh SPEC section 4.
+- **Acceptance:**
+  - [ ] `python3 scripts/audit_served_routes.py` output matches the committed inventory.
+  - [ ] No row claims QUALIFIED without the T09 bundle for that exact row.
+- **Command:** `python3 scripts/audit_served_routes.py` and `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** diff of the status documents.
+- **Stop:** evidence and claim disagree; downgrade the claim.
+
+## 001-T23 - Package VERIFIED for V1
+
+- **Status:** NOT STARTED.
+- **Depends on:** T01-T22
+- **Cross-package prerequisites:** Feature 019 evidence bundle process and release qualification matrix.
+- **Owner:** Product (sign-off), Conversation, Agent Runtime, Security.
+- **Allowed paths:** this package; `docs/IMPLEMENTATION-STATUS.md`.
+- **Contract:** SPEC sections 12-13; AC-001 to AC-026; SPECIFICATION-STANDARD lifecycle.
+- **Change intent:** assemble the evidence bundle (per-task revision, command, result, OS, harness, reviewer), move the package ACCEPTED/LOCKED to IMPLEMENTING at the first implementation merge and to VERIFIED after owner sign-off on both release rows.
+- **Acceptance:**
+  - [ ] Canonical command passes on Windows x64 + OpenCode v2.0.32 and on Linux x64.
+  - [ ] Owner USER sign-off recorded for E2E-01 on each row, including denial and recovery.
+  - [ ] SPEC and WIRING status equal VERIFIED and the validator passes.
+- **Command:** `cargo test -p litecoworkd --test conversation_session_supervisor --locked -- --nocapture` and `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** evidence bundle path referenced from IMPLEMENTATION-STATUS.md.
+- **Stop:** any row lacks USER evidence; that row stays unqualified.
+
+## Implementation and optimization notes (Rust and TypeScript)
+
+These are findings from reading the source, folded into the tasks above. They do not add scope.
+
+- **Per-turn process spawn (Rust, T03):** `execute_agent_turn` calls `OpenCodeServer::spawn` and `server.stop()` for every turn, so each message pays full server startup and health checks. `AgentHostSupervisor` with host reuse (F-02) and the B-09 idle TTL removes that cost.
+- **Blocking thread per turn (Rust, T03/T04):** the whole turn runs in one `spawn_blocking` call for up to 60 s while polling `next_event` every 500 ms. Prefer a dedicated reader thread feeding a bounded `tokio::sync::mpsc` channel (or an async HTTP/SSE client) so cancellation (T07) can interrupt promptly and deltas (T13) can be forwarded without blocking.
+- **Hand-built events (Rust, T02/T06):** supervisor and cancel handler build many `EventDraft` JSON payloads by hand with hard-coded revisions (`entity_revision: 3`, `expected_session_version: 2`). Typed event constructors in `crates/storage-core` that derive revisions from loaded aggregates remove a class of version bugs and shrink `supervisor.rs` and `cancel_conversation_turn` (three near-identical branches).
+- **Single-flight in SQL (Rust/SQLite, T11):** a partial unique index on nonterminal turns per Conversation enforces B-01 in the database itself and costs one index lookup per insert.
+- **Duplicated dispatch spawn (Rust, T20):** submit and retry copy the same spawn block; the coordinator plus outbox replaces both.
+- **UI state predicates (TypeScript, T16/T18):** turn-state logic lives inline in the 1,040-line `ConversationsPage.tsx`. A pure `conversation-turn-state.ts` module makes it unit-testable with the existing `node --test` runner. Keep this UI logic in TypeScript; authority (single-flight, versions, materialization, usage estimation) stays in the Rust daemon, never in the WebView.
 
 ## Dependency order
 
-T01 -> T02 -> T03 -> T04 -> T05 -> T06 -> T07/T08 -> T09. T03 may be developed in parallel with T02 only after T01 locks interfaces and with no conflicting storage mutation. T04 may not dispatch before T03 readiness/activation contract exists.
+T19 is done and independent. T01 -> (T02, T03, T10, T11 in parallel) -> T04 (after T03) -> T05 -> T06 (after T02-T05) -> T07 (after T03, T04, T06) -> T08 (after T07, T10). T10 -> T20. T12 after T04, T07, T10. T13 after T04, T06. T14 after T05. T15 after T01, T06. T16 after T01, T07 -> T17 and T18. T21 after T07 and T12-T18. T09 after T01-T08 and T10-T18. T22 after T09 and T21. T23 after everything.
+
+## Cross-package dependencies
+
+| This task | Other package task | Reason |
+|---|---|---|
+| T03, T08 | Feature 011 Runtime incarnation and startup-blocker foundation (Wave 0) | Recovery sweep and host ownership need the Runtime incarnation identity |
+| T04, T09 | Feature 002 OpenCode probe fix (binding creatable) | The probe records `compatible=false`, so the OpenCode binding cannot be created and Send is unreachable |
+| T09 | Feature 011 Windows named-pipe IPC and packaged sidecar | E2E-01 runs on the packaged desktop |
+| T09, T23 | Feature 019 release matrix rows and evidence bundle | Qualification is per release row |
+| T14 | Feature 003 ResourceRef authority, ContextAttachment, Context Used, Windows WorkspaceRoot add | Attachments need admitted roots and authorized refs |
+| T15 | Feature 018 usage dashboard | 018 reads the usage records this task writes |
+| T18 | Feature 002 descriptor commands and model/effort; Feature 003 @-reference picker; Feature 011 keyboard baseline | Composer controls render only when an owner route declares them |
+| T07 | Feature 012 take-control (downstream) | 012 implementation waits on effective Stop with observed quiescence (B-34 caveat) |
+
+Cross-package task IDs are named by outcome because the other packages' task plans are being renumbered in the same release-planning pass; the orchestrator resolves them to IDs in the traceability index.
 
 ## Completion evidence
 
-Record per-task code revision, exact command, result, target OS/harness/auth, test report and reviewer in this file. No commit or push is implied by task completion. Statuses above are source-audit classifications, not owner acceptance or release qualification.
+For each task append a row here when it closes: task, code revision (SHA), exact command, result (pass/fail with counts), OS and build (Windows 11/10 x64 or Linux x64 distribution), harness and version (OpenCode v2.0.32), auth route, evidence class reached (CODE, SYSTEM, USER), report path and reviewer. No commit or push is implied by task completion. Statuses above are source-audit classifications at the date of this revision, not qualification.
 
+| Task | Revision | Command | Result | OS/build | Harness/version | Class | Reviewer |
+|---|---|---|---|---|---|---|---|
+| T19 | 8129420 | `pnpm --dir apps/litecowork-ui test` (guard test) | recorded in docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md A-24/A-26 | not recorded | n/a | CODE (UI gate) | repository owner |

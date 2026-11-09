@@ -1,7 +1,7 @@
 # Research - Coworkers and Scoped Memory
 
 **Feature:** 009 | **Checked:** 2026-11-06
-**Status:** Source-backed implementation crosswalk; Feature 009 remains DRAFT.
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification. This file is a source-backed implementation crosswalk (current-state evidence only).
 
 ## Canonical authorities
 

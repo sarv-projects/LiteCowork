@@ -1,6 +1,6 @@
 # Data model - Coworkers and Scoped Memory
 
-**Feature:** 009 | **Status:** DRAFT
+**Feature:** 009 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 Identities and lifecycles stay in the canonical owner documents. This file lists the records this slice reads or commits. It does not authorize new tables by itself.
 
@@ -41,4 +41,4 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-None in this DRAFT revision. No LearningCandidate/MemoryRecord migration or Coworker-owned ContextDocument table exists. Blockers in SPEC §5 must be closed before a migration is designed; any accepted owner-scoped records must be added through the canonical Resource/Coworker/Conversation owners rather than a second memory database.
+No migration has shipped for this package yet, and no LearningCandidate/MemoryRecord migration or Coworker-owned ContextDocument create path exists. B-24 and B-25 are accepted (2026-11-09); the accepted records (Conversation `owner_coworker_id`/`owner_coworker_revision`, COWORKER_NOTES create ownership, CoworkerCapabilityAssignment, responsibility proposals) land as the next immutable `docs/schemas/sqlite-vNN.sql` in TASKS.md T02, T04, T11 and T12. The automatic LearningCandidate store belongs to Feature 020; any accepted owner-scoped records must be added through the canonical Resource/Coworker/Conversation owners rather than a second memory database.

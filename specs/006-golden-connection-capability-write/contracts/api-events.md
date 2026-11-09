@@ -1,5 +1,7 @@
 # API and events - Golden Connection and One Capability Write
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Currently served operations
 
 - `GET /v1/discover/search` and `GET /v1/discover/items/{item_id}`: Workspace-scoped catalog/Runtime-observation read projections. Catalog items are `authoritative=false`; a package row is not a Connection, installation receipt, grant or permission.
@@ -23,7 +25,7 @@ After B-20 closes, the golden read requires an exact-scope CapabilityGrant. The 
 
 ## Canonical events
 
-Use existing owner event schemas only: `connection.state.changed.v1`, `approval.resolved.v1`, `capability.invocation.created`, `capability.invocation.dispatched`, `capability.invocation.status.changed`, and the relevant `effect.*` and `evidence.created.v1` events. No new event or schema is introduced by this DRAFT. Preserve exact event version/payload names from `docs/EVENTS.md`.
+Use existing owner event schemas only: `connection.state.changed.v1`, `approval.resolved.v1`, `capability.invocation.created`, `capability.invocation.dispatched`, `capability.invocation.status.changed`, and the relevant `effect.*` and `evidence.created.v1` events. This package adds no event beyond these unless T01 finds one missing; new request bodies are accepted target interfaces (not yet in source) promoted by T01. Preserve exact event version/payload names from `docs/EVENTS.md`.
 
 ## Compatibility and error semantics
 

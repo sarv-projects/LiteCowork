@@ -1,5 +1,7 @@
 # Errors and recovery - Professional Artifacts One Format
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Target recovery rules
 
 - Artifact create first verifies the exact source bytes and digest outside SQLite. Initial Artifact, backing ARTIFACT Resource, ResourceRevision, version 1, provenance/dependency edges, aggregate snapshots, events and receipt are committed together. If any transaction step fails, no partial owner record is visible; unreferenced staged blobs are eligible for cleanup.
@@ -10,6 +12,10 @@
 - Native desktop Save As is a local OS file operation and remains separate from the durable export receipt. A canceled picker fetches no bytes or touches a destination. Failed staged write cleans its temporary file and does not claim SAVED.
 - Restart reloads last committed Artifact/Resource state and immutable versions. An uncommitted edit remains a local draft only if the UI has retained it; the server does not infer a save from editor state.
 - Archived Artifacts and Workspaces are read-only for new content publication. Historical authorized versions remain readable according to retention rules.
+
+- A Markdown save whose parse and re-serialize round trip is not byte-stable fails with `ValidationFailed` and leaves the head unchanged (AC-019).
+- Create from a Conversation message that is not committed, or belongs to another Workspace, is refused before any blob is staged (AC-017).
+- An operation the capability matrix declares UNSUPPORTED returns `UNSUPPORTED_MEDIA_TYPE`; the UI never sends it (AC-016).
 
 ## Current implementation gaps
 

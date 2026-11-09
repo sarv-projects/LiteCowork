@@ -1,5 +1,7 @@
 # API and events - Professional Artifacts One Format
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Currently served Artifact operations
 
 - `GET /v1/artifacts`: authenticated Workspace-scoped Artifact list with optional Library status / Task filters and cursor pagination.
@@ -17,6 +19,13 @@
 - There is no general managed binary/format publication operation. The version write store stages only UTF-8 `text/plain` bytes up to 1 MiB and appends to an already-existing Artifact.
 - There is no format-specific editor/export handler and no durable ExportReceipt record/event/route. Native `artifact_save_as` is a separate Tauri local write returning only SAVED/CANCELLED; it creates no Artifact/Resource revision or domain event.
 - Do not generate TypeScript/OpenAPI operations for create/export until the Artifact owner contract and `docs/schemas/` are changed together and a composed handler is served.
+
+## Accepted target operations (not yet in source)
+
+- `POST /v1/artifacts` (B-30): create with source class UserAuthored, Imported or TaskGenerated, optional `conversation_origin {conversation_id, message_id}`, `Idempotency-Key`; emits `artifact.created.v1`.
+- Markdown version publish: the existing `text-version` append generalized to `text/markdown` through the B-21 adapter, or a sibling route fixed in TASKS T01; same `If-Match` and parent-revision pins.
+- `POST /v1/artifacts/{artifact_id}/exports` (B-31): exact version, export format, destination class; commits `ArtifactExportReceipt` and `artifact.exported.v1` (event to be registered in EVENTS.md and `domain-event.schema.json`).
+- Format capability matrix read (route name fixed in T01) and `GET /v1/artifacts?conversation_id=` filter for the Conversation association.
 
 ## Canonical event boundary
 

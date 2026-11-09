@@ -1,6 +1,6 @@
 # API, Event and Presentation Contract - Feature 001
 
-**Status:** DRAFT; links to global owners are normative.  
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification. Links to global owners are normative.  
 **Canonical owners:** [API](../../../docs/API.md), [Events](../../../docs/EVENTS.md), [Schemas](../../../docs/SCHEMAS.md), [Storage](../../../docs/STORAGE.md), [Presentation Runtime](../../../docs/PRESENTATION-RUNTIME.md).
 
 ## 1. Existing submit route
@@ -23,7 +23,7 @@ Existing routes also include:
 - The idempotency key is stable for one submit payload and principal scope. Exact replay returns original commit; changed payload under same key conflicts.
 - A committed USER message is retained when downstream admission fails. UI must distinguish saved-but-not-sent/failure from successful agent response.
 - Binding is pinned by the immutable `conversation.turn.created.v2` event. Later selector/default changes never reroute it.
-- No new public route or response field is approved by this DRAFT.
+- No new public route or response field exists in source for this package yet. Accepted target interfaces (CONVERSATION_TURN_IN_PROGRESS, active-turn version/retry ordinal in the projection, final-response identity fields, dispatch-intent records, usage records) are not yet in source and are promoted into the owner docs and docs/schemas by TASKS T01 before use.
 
 ## 3. Existing event families
 

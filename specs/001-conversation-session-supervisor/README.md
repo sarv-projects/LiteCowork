@@ -1,7 +1,7 @@
 # 001 - Conversation Session Supervisor and Native Turn Execution
 
-- **Status:** IN_REVIEW — core decisions B-01 through B-10 are locked; dependent UI and error/recovery contracts still require owner acceptance.
-- **Revision:** 1.0 | **Updated:** 2026-11-06
+- **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+- **Revision:** 1.1 | **Updated:** 2026-11-09 | **Owner acceptance:** B-01 to B-10 accepted 2026-11-09 via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md); first route to qualify is OpenCode v2.0.32 on Windows x64 (B-02 rider).
 - **Owners:** Conversation, Agent Runtime, Storage, Operator/API, Desktop UI, Security/Trust and Product.
 
 ## User outcome
@@ -10,7 +10,7 @@ A user can send an ordinary LiteCowork Conversation message through the exact se
 
 ## Current truth
 
-The active source contains an OpenCode-only supervisor path that reserves and activates a Conversation AgentSession, loads/sends bounded context, consumes the OpenCode response stream and commits the final AGENT message with terminal turn/session settlement. This is CODE-level integration evidence, not a qualified Windows desktop Send journey. The mounted UI nevertheless exposes Send despite the target disabled-until-qualified gate; Stop is ineffective for the OpenCode path, Retry has no UI call site, composer attachments/voice/more-options are inert, and the empty state contains Antigravity placeholder copy. The commit-to-spawn crash window has no durable dispatch outbox/recovery sweep; some supervisor errors are only logged; retry transitions to RUNNING before a reservation path that requires OPEN; and the storage submit path does not enforce the accepted single-flight policy. Keep Send/release claims gated until those issues and exact provider/OS/UI qualification are resolved.
+The active source contains an OpenCode-only supervisor path that reserves and activates a Conversation AgentSession, loads/sends bounded context, consumes the OpenCode response stream and commits the final AGENT message with terminal turn/session settlement. This is CODE-level integration evidence, not a qualified Windows desktop Send journey. Since commit 8129420 the mounted UI gates Send behind the `sendEligible` predicate (register A-24, a UI gate only, not G-09 qualification) and the empty state is truthful and LiteCowork-branded (register A-26 empty-state part); both are guarded by `apps/litecowork-ui/tests/conversation-empty-state-truthfulness.test.mjs`. Stop is still ineffective for the OpenCode path, Retry has no UI call site, and composer attachments/voice/more-options remain inert. The commit-to-spawn crash window has no durable dispatch outbox/recovery sweep; some supervisor errors are only logged; retry transitions to RUNNING before a reservation path that requires OPEN; and the storage submit path does not enforce the accepted single-flight policy. Keep Send/release claims gated until those issues and exact provider/OS/UI qualification are resolved.
 
 ## Package
 

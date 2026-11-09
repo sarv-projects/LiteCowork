@@ -1,5 +1,5 @@
 feature_id: "005"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
 nodes:
   - id: "ui"
     owner: Desktop UI
@@ -14,8 +14,11 @@ nodes:
     owner: Storage
     kind: store
   - id: "env"
-    owner: Environment provider
+    owner: Environment provider (Linux bubblewrap first; Windows B-35 PROPOSED)
     kind: external
+  - id: "reconciler"
+    owner: Effect Reconciler and independent Verifier
+    kind: service
 edges:
   - id: "e-ui-op"
     from: "ui"
@@ -41,6 +44,14 @@ edges:
     from: "env"
     to: "owner"
     kind: result
+  - id: "e-owner-reconciler"
+    from: "owner"
+    to: "reconciler"
+    kind: request
+  - id: "e-reconciler-storage"
+    from: "reconciler"
+    to: "storage"
+    kind: transaction
 transactions:
   - id: "tx-task"
     owner: TaskService
@@ -49,6 +60,14 @@ transactions:
   - id: "tx-attempt"
     owner: Task Runtime
     atomic_records: ["attempt","lease","grant","idempotency_receipt"]
+    external_calls_inside: false
+  - id: "tx-plan-accept"
+    owner: TaskService
+    atomic_records: ["plan_revision","steps","task_plan_revised_event","idempotency_receipt"]
+    external_calls_inside: false
+  - id: "tx-effect-settle"
+    owner: Effect Reconciler
+    atomic_records: ["effect","evidence","verification_run"]
     external_calls_inside: false
 external_boundaries:
   - id: "outside-sqlite"
@@ -70,3 +89,10 @@ recovery:
 # journaling is staged/dead-code. Plan submission, Attempt, Effect and Environment
 # provision/control routes are target-only. Do not mark the env/effect edges INTEGRATED
 # or QUALIFIED until the real provider and end-to-end write/reconciliation tests exist.
+
+# Owner acceptance 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md): status ACCEPTED/LOCKED
+# authorizes implementation of this target wiring. It does not make any edge SERVED, INTEGRATED
+# or QUALIFIED. Every edge above remains TARGET until TASKS.md evidence exists. The env node is
+# the Linux bubblewrap provider first; on the Windows row the env edges stay unavailable until
+# B-35 (PROPOSED, pending owner) is accepted and qualified. tx-plan-accept, tx-effect-settle and
+# the reconciler node are accepted target wiring added in revision 1.0, not yet in source.

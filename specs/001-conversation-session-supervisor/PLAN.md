@@ -1,8 +1,9 @@
 # Implementation Plan - Conversation Session Supervisor and Native Turn Execution
 
-**Feature:** 001 | **Status:** IN_REVIEW | **Spec:** SPEC.md revision 1.0
-**Updated:** 2026-11-01  
-**Rule:** This plan is under owner review. Implementation evidence is recorded separately from qualification; no feature-level acceptance is implied.
+**Feature:** 001 | **Spec:** SPEC.md revision 1.1
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Updated:** 2026-11-09  
+**Rule:** Implementation evidence is recorded separately from qualification. The authoritative ordered work list is [TASKS.md](TASKS.md) (T01 to T23); the phase table below is the summary view.
 
 ## 1. Delivery strategy
 
@@ -33,14 +34,14 @@ flowchart TD
 
 | Phase | Tasks | Outcome | Exit gate |
 |---|---|---|---|
-| A - contract lock | T01 | Blocking decisions B-01 to B-05 and B-07 to B-10 resolved or explicitly scoped; inherited B-06 owner contract confirmed | Owner sign-off; SPEC accepted/locked; validator/link/schema pass |
+| A - contract lock and promotion | T01 | B-01 to B-10 owner-accepted 2026-11-09 (done); accepted interfaces promoted into owner docs and docs/schemas | Promotion reviewed; validator/link/schema pass |
 | B - durable completion boundary | T02, T06 design | Typed result commit, message+turn transaction and event/receipt semantics frozen | Storage review; transaction/rollback/idempotency tests specified |
 | C - lifecycle supervisor | T03 | Bounded supervisor/host/session lifecycle, STARTING -> activation -> quiescence/close/recovery | State transition and crash-window matrix passes |
 | D - one adapter | T04 | Version-pinned adapter handshake, prompt transport, normalized terminal/delta/error/stop observations | Provider conformance fixtures and exact readiness proof |
 | E - context dispatch | T05 | Same-Workspace bounded transcript, supported resource preparation and explicit oversize behavior | Context/resource boundary and prompt delivery tests |
 | F - durable result | T06 | Atomic AGENT message + terminal turn + event/snapshot/receipt | Failure injection at every transaction boundary passes |
-| G - user lifecycle and recovery | T07, T08 | Stop/retry/UserRequest continuation, stream/reconnect, daemon restart and orphan recovery | UI/daemon/DB integration, race and restart tests |
-| H - qualification | T09 | One actual OS/build/harness/auth route accepted | Full CODE/SYSTEM/USER/recovery report; only then enable Send |
+| G - user lifecycle and recovery | T07, T08, T10-T18 | Effective Stop/Retry, durable dispatch outbox, single-flight, UserRequest continuation, stream/reconnect, attachments, usage records, composer UI, daemon restart and orphan recovery | UI/daemon/DB integration, race and restart tests |
+| H - qualification and VERIFIED | T09, T19-T23 | Windows x64 + OpenCode v2.0.32 route qualified, then Linux x64; trace, docs sync, VERIFIED | Full CODE/SYSTEM/USER/recovery report; only then enable Send for that tuple |
 
 ## 4. Scope and file ownership (candidate paths, re-inspect before implementation)
 
@@ -102,5 +103,5 @@ Stop immediately on unresolved binding, missing handshake proof, unexpected prov
 
 ## 9. Handoff
 
-The first implementation handoff is blocked until SPEC status is ACCEPTED/LOCKED, blocking decisions B-01 through B-05 and B-07 through B-10 are resolved or scoped with named exclusions, the inherited B-06 owner contract is confirmed, the storage owner approves B-04 and the first harness/OS tuple is fixed. The implementation task must name the accepted spec revision and SHA, exact clean worktree, first task ID and exact acceptance command. No commit/push is included in this plan.
+SPEC status is ACCEPTED/LOCKED (2026-11-09): B-01 to B-10 are accepted, the first tuple is fixed as Windows x64 + OpenCode v2.0.32, and the B-04, B-07 and B-09 caveats are binding conditions on T02/T06, T05 and T03. The implementation task must name the accepted spec revision and SHA, exact clean worktree, first task ID and exact acceptance command. No commit/push is included in this plan.
 

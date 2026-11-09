@@ -1,8 +1,13 @@
 feature_id: "007"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
+# ACCEPTED/LOCKED (owner-accepted 2026-11-09) authorizes implementation of this graph.
+# Edges are the accepted target wiring, not a claim that they are served.
 nodes:
   - id: "ui"
     owner: Desktop UI
+    kind: component
+  - id: "conversation-ui"
+    owner: Feature 001 Conversation view (Save as Artifact entry point)
     kind: component
   - id: "operator"
     owner: authenticated Operator
@@ -10,21 +15,35 @@ nodes:
   - id: "owner"
     owner: domain owner service
     kind: service
+  - id: "capabilities"
+    owner: ArtifactStore format capability matrix
+    kind: service
   - id: "storage"
     owner: Storage
     kind: store
   - id: "editor"
     owner: format editor engine
     kind: external
+  - id: "savefs"
+    owner: owner-selected local destination (native picker)
+    kind: external
 edges:
   - id: "e-ui-op"
     from: "ui"
+    to: "operator"
+    kind: command
+  - id: "e-convui-op"
+    from: "conversation-ui"
     to: "operator"
     kind: command
   - id: "e-op-owner"
     from: "operator"
     to: "owner"
     kind: request
+  - id: "e-op-capabilities"
+    from: "operator"
+    to: "capabilities"
+    kind: query
   - id: "e-owner-storage"
     from: "owner"
     to: "storage"
@@ -32,6 +51,10 @@ edges:
   - id: "e-storage-ui"
     from: "storage"
     to: "ui"
+    kind: projection
+  - id: "e-storage-convui"
+    from: "storage"
+    to: "conversation-ui"
     kind: projection
   - id: "e-owner-editor"
     from: "owner"
@@ -41,7 +64,15 @@ edges:
     from: "editor"
     to: "owner"
     kind: bytes
+  - id: "e-owner-savefs"
+    from: "owner"
+    to: "savefs"
+    kind: export-write
 transactions:
+  - id: "tx-create"
+    owner: ArtifactStore
+    atomic_records: ["artifact","artifact_resource","resource_revision","artifact_version","provenance","conversation_origin","event","idempotency_receipt"]
+    external_calls_inside: false
   - id: "tx-version"
     owner: ArtifactStore
     atomic_records: ["artifact_version","provenance"]
@@ -56,19 +87,26 @@ external_boundaries:
     input_trust: untrusted
     timeout: bounded
     retry: reconcile-before-retry
+  - id: "native-save"
+    owner: Desktop UI (Tauri)
+    input_trust: untrusted
+    timeout: user-bounded
+    retry: owner-initiated
 recovery:
   owner: domain owner
   source_of_truth: durable-owner-records
   restart_action: reload-last-commit-and-reconcile
 
-# Current implementation evidence checked 2026-11-06
+# Current implementation evidence checked 2026-11-06, re-checked 2026-11-09
 # Target graph above is not fully wired in the active checkout.
 # Present path: ArtifactLibrary/ArtifactWorkbench -> Tauri artifact_read/edit-head/
 # text-version/promote/archive/SaveAs bridge -> authenticated artifact_operator ->
 # ArtifactReadStore, ArtifactLibraryWriteStore and narrow ArtifactVersionWriteStore.
 # text-version appends only to an existing managed text/plain Artifact <=1 MiB.
-# SaveAs is a native local file write <=10 MiB and emits no durable ExportReceipt.
-# Missing target edges: initial Artifact create command/transaction; selected professional
-# format editor/parser/round-trip; durable export command/receipt; Task-produced artifact
-# integration (blocked by Feature005 Task dispatch). Do not label owner/editor/export
+# SaveAs (artifact_save_as, resource_save_as) is a native local file write <=10 MiB and
+# emits no durable ExportReceipt.
+# Missing target edges: tx-create and POST /v1/artifacts; capability matrix producer;
+# Markdown format adapter; durable export command/receipt; conversation-ui entry point and
+# Conversation association (ArtifactRecord has task_id only); Task-produced artifact
+# integration (blocked by Feature 005 Task dispatch). Do not label owner/editor/export
 # edges INTEGRATED or QUALIFIED based on the existing text editor or Office probe.

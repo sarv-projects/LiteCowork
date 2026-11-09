@@ -1,6 +1,7 @@
 # Research - Workbench Browser Terminal and Computer
 
-**Feature:** 008 | **Checked:** 2026-11-06 (active source, route composition, Tauri bridge and visible Workbench UI)
+**Feature:** 008 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Checked:** 2026-11-06 (active source, route composition, Tauri bridge and visible Workbench UI); re-checked 2026-11-09 for register A-51 (see SPEC §4).
 
 ## Sources inspected
 
@@ -55,9 +56,17 @@ No OpenHands, DeepSeek Harness or browser-use code is imported; all are read at 
 - Preserve fake terminal success for design polish: rejected. Unsupported or unavailable must be visible, and arbitrary commands must never return fabricated exit code 0.
 - Build a separate browser/terminal security engine in the UI: rejected. Provider processes and actions belong behind daemon/Environment/Trust owners.
 
-## Unresolved decisions
+## Decisions (accepted 2026-11-09)
 
-See SPEC §5 blockers B-22 (exact browser provider/mode and real session surface), B-23 (exact PTY/ConPTY provider, shell profile and Environment/process lifecycle), and B-32 (include or defer Computer use and exact OS provider/permission contract).
+SPEC §5 blockers B-22 (`MANAGED_CHROMIUM`, isolated profile), B-23 (daemon-owned PTY/ConPTY under an admitted Environment; Linux row first, Windows UNAVAILABLE until Feature 005 B-35) and B-32 (Computer deferred, UNAVAILABLE) are owner-accepted. The Workbench React findings above predate A-51 for the Terminal, Diffs and Browser default; SPEC §4 records the 2026-11-09 source state.
+
+## Implementation language and reuse notes (2026-11-09)
+
+- Diffs: `apps/litecowork-ui/src/artifacts/text-version-diff-model.ts` `lineDiff` is a bounded O(n x m) LCS table (`Uint16Array` rows) run on the UI thread. It is adequate for small Artifact previews. For Workbench exact-revision and VCS diffs, compute in the Rust daemon with a Myers/histogram algorithm (for example the `similar` crate, license to be checked at T15) under the same line/byte bounds, and send rows to the UI. This keeps untrusted revision bytes off the WebView thread and makes counts authoritative.
+- PTY: Linux `openpty` is available through `rustix` (already a `litecoworkd` dependency with `fs`/`process` features; the `pty` feature must be added). Windows ConPTY uses `windows-sys` `CreatePseudoConsole` in `crates/windows-local-security`, which already has `spawn_kill_on_drop_job`, `kill_tree` and `wait_for_job_quiescence`. Prefer these over adding `portable-pty`, so containment receipts stay in one crate.
+- Browser: REF-BROWSER-HARNESS is Python with pinned CDP dependencies. Do not ship a Python runtime inside the daemon for V1; implement the allowlisted CDP session in Rust (`tokio` WebSocket client) and reuse only the harness mechanics as reference. The existing Rust policy modules `browser_consent.rs` and `browser_control_service.rs` become the admission layer.
+- Terminal rendering stays in TypeScript (a terminal emulator component in the WebView); scrollback ring buffer, backpressure and receipts live in Rust.
+- `WorkbenchPanel.tsx` (608 lines) mixes five views; split per view and lazy-load Browser and Terminal panes so the unavailable path costs no bundle weight.
 
 ## Upstream reference: OpenHands command receipts and terminal observations — PROPOSAL (2026-11-06)
 

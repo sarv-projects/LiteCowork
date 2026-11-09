@@ -1,6 +1,8 @@
 # Research - Golden Connection and One Capability Write
 
-**Feature:** 006 | **Checked:** 2026-11-06 (source, composed routes and desktop UI)
+**Feature:** 006 | **Checked:** 2026-11-06 (source, composed routes and desktop UI); provider docs re-checked 2026-11-09
+
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Sources
 
@@ -61,6 +63,24 @@ These are source/route/UI findings. No LiteCowork account Connection was created
 - Rival web pages were not re-fetched on 2026-11-06 for this package; LiteSPM upstream bridge evidence remains pinned to commit `111fd9b8e84573f8fce76b6374b4ff9639502539` as checked on 2026-11-05, not as proof of LiteCowork integration.
 - No LiteCowork runtime or end-to-end bridge integration was executed. The upstream source review is static and commit-pinned; it does not qualify a local LiteCowork process launch, IPC identity, host mutation, or receipt/recovery path.
 
+## Provider documentation check (2026-11-09)
+
+| Source | Finding | Effect on this package |
+|---|---|---|
+| [GitHub: Authorizing OAuth apps](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps) | PKCE supported with `S256` only; loopback `redirect_uri` on any port at `127.0.0.1` is accepted; `client_secret` is listed as required for the web-flow code exchange and for refresh unless the token came from the device flow; the device flow needs no client secret; token exchange is at `github.com/login/oauth/access_token`. | B-19's loopback-PKCE recipe still needs a client secret, so B-19's stop clause applies until the owner decides (TASKS T02). The OAuth token endpoint must be a separate allowlisted auth host. |
+| [GitHub REST: OAuth authorizations](https://docs.github.com/en/rest/apps/oauth-applications) | `DELETE /applications/{client_id}/token` requires Basic auth with the client secret. | Remote revocation is not possible without a client secret; revoke is local first and remote revoke may be an owner action (AC-015). |
+
+Content was rephrased for compliance with licensing restrictions.
+
+## Implementation placement notes
+
+- Keep OAuth, token custody and brokered HTTP in the Rust daemon (`apps/litecoworkd`), not in TypeScript or the Tauri shell, so verifiers and tokens never reach the WebView process. The daemon already has `reqwest` with rustls.
+- Reuse `OsSecretStore` and its `keyring` backends; add a crate-private resolver and a delete rather than a second secret store.
+- Reuse `SqliteCapabilityDispatchStore::admit_capability_dispatch` rather than writing a second admission path.
+- Keep UI state logic in small TypeScript modules (`connections-state.ts`) so it is testable with the existing `node --test` runner.
+
 ## Unresolved questions
 
-See SPEC section 5 blockers. Owners are named on the package README.
+- OAuth recipe after the client-secret finding (TASKS T02, owner).
+- Whether the Task-scoped golden write needs an admitted Environment (SPEC §18; affects the Windows row through 005 B-35).
+- Confirmation of the golden read operation (proposed: list issue comments), recorded in T01.

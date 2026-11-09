@@ -1,5 +1,7 @@
 # Conversation Session Supervisor Contracts
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 These documents bind this feature to global authorities without duplicating them.
 
 - [API, event and presentation contracts](api-events.md)

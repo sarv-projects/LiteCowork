@@ -1,5 +1,5 @@
 feature_id: "004"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
 nodes:
   - id: "ui"
     owner: Desktop UI
@@ -66,4 +66,4 @@ recovery:
 
 # Implementation evidence boundary (2026-11-06)
 
-This YAML is the DRAFT target dependency graph, not a description of currently working provider wiring. In the active daemon, the `harness_a`/OpenCode dispatch edge is the only Conversation execution path. `harness_b` is target-only: Codex App Server profile-probe code is not connected to `AgentSessionSupervisor`. Do not mark the `harness_b` edge served or integrated until the second adapter is wired, qualified and covered by the A→B→A USER path.
+This YAML is the ACCEPTED/LOCKED (2026-11-09) target dependency graph, not a description of currently working provider wiring. Acceptance does not mark any edge served. In the active daemon, the `harness_a`/OpenCode dispatch edge is the only Conversation execution path. `harness_b` is target-only: the accepted agent B is Claude Code CLI, which has no supervisor arm yet (004-T05); Codex App Server profile-probe code is also not connected to `AgentSessionSupervisor`. Do not mark the `harness_b` edge served or integrated until the second adapter is wired, qualified and covered by the A→B→A USER path.

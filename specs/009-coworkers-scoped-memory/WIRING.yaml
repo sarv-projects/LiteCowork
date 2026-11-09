@@ -1,5 +1,7 @@
 feature_id: "009"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
+# Owner-accepted 2026-11-09. Edges below are accepted target wiring unless a comment says
+# the path is served today; acceptance is not evidence that an edge is served.
 nodes:
   - id: "ui"
     owner: Desktop UI

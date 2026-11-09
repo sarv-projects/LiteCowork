@@ -1,8 +1,8 @@
 # 004 - Agent Relay on One Conversation
 
-**Status:** DRAFT - review required; does not authorize implementation.
-**Revision:** 0.2 | **Updated:** 2026-11-06
-**Owners to approve:** Conversation, Agent Runtime, Product.
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Revision:** 1.0 | **Updated:** 2026-11-09
+**Owners:** Conversation, Agent Runtime, Product. Accepted by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
 
 ## User outcome
 
@@ -10,7 +10,13 @@ On one Conversation the owner runs a committed turn on agent A, a later turn on 
 
 ## Current truth
 
-The active checkout contains the Rust daemon, Tauri desktop application and shared crates. This package remains DRAFT and does not authorize implementation until owner decisions and supporting contracts are accepted. Its current implementation boundary is mapped in docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
+The active checkout contains the Rust daemon, Tauri desktop application and shared crates. B-15 and B-16 are owner-accepted (2026-11-09) and implementation is authorized. Today the supervisor has one dispatch arm (OpenCode), no Claude Code arm, and the desktop drops producer identity in `parseConversationSnapshot`; there is no selectable A→B→A pair (SPEC §4). The implementation boundary is mapped in docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
+
+## Lifecycle, scope and dependencies
+
+- Lifecycle: ACCEPTED/LOCKED (2026-11-09). IMPLEMENTING when the first TASKS.md task starts; VERIFIED only through the final task with owner sign-off.
+- Relay pair: agent A OpenCode v2.0.32, agent B Claude Code CLI. Release matrix: Windows x64 first, Linux x64 second.
+- Depends on [Feature 001](../001-conversation-session-supervisor/SPEC.md) (turn admission, settlement, recovery), [Feature 002](../002-native-agent-install-auth-binding/SPEC.md) (OpenCode binding fix, descriptor, Claude Code module) and [Feature 003](../003-workspace-roots-context-ingestion/SPEC.md) (Resource materialization). Delivery wave 4 (gate E).
 
 ## Package
 

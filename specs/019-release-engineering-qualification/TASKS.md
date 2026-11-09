@@ -1,0 +1,453 @@
+# Tasks - Release Engineering and V1 Qualification
+
+**Feature:** 019 | **Status:** IN_REVIEW - not owner-accepted; no task is authorized until T01 records owner acceptance. Tasks not started unless marked.
+**Spec revision:** 0.1 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
+**Owners:** Release Engineering, Security, Desktop Shell, Runtime (Feature 011 interface), QA/Accessibility, Product.
+
+## Current baseline
+
+Verified against the checkout on branch `docs/audit-competitor-superset` (HEAD 234c564).
+
+- **CI:** none. `.github/` does not exist. The only gate is `scripts/check.sh` (pinned uv/Python/Rust 1.98.1; fmt, clippy, `cargo test --workspace`, build, Python unit tests, contract audits with freshness checks, `scripts/audit_served_routes.py`, `scripts/validate_architecture.py`, `git diff --check`). It does not run `.specify/scripts/validate_feature_package.py`, `pnpm --dir apps/litecowork-ui test`/`run build`, the secret scan, the packaging check, or the separate Cargo workspace at `apps/litecowork-ui/src-tauri` (own `[workspace]` and `Cargo.lock`).
+- **Bundle:** `apps/litecowork-ui/src-tauri/tauri.conf.json` (identifier `app.litecowork.desktop`, version 0.1.0, `bundle.targets: "all"`, CSP `default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; script-src 'self'`), `tauri.bundle.conf.json` (`externalBin: ["binaries/litecoworkd"]`), `capabilities/default.json` (`core:default` only). `apps/litecowork-ui/scripts/build-daemon-sidecar.mjs` builds and copies `litecoworkd-<triple>[.exe]`. `apps/litecowork-ui/scripts/run-tauri.mjs` `tauriBuildArgs` appends `--config src-tauri/tauri.bundle.conf.json`, defaults Linux to `--bundles deb` and refuses AppImage. No signing config, no `tauri-plugin-updater` in `src-tauri/Cargo.toml`, no `plugins.updater`.
+- **Release scripts (no owner until this package):** `scripts/v1_packaging_check.py` (Windows-unaware: looks for `target/release/litecoworkd` without `.exe`; permission check greps `0o700`/`0o600` in `apps/litecoworkd/src/runtime.rs`), `scripts/v1_platform_matrix.py` (default `--out implementation/QUALIFICATION-MATRIX.md` in the retired tree, OS-only rows, macOS aarch64 listed, no WSL2 detection), `scripts/v1_resilience_matrix.py` (imports `fcntl`, Python `sqlite3` only), `scripts/v1_soak_harness.py` (Python `sqlite3` via `scripts/v1_store_probe.py`), `scripts/v1_secret_scan.py` (redacted reporting, not gated). `scripts/packaging/systemd/litecoworkd.service` exists.
+- **IPC:** `crates/operator-ipc/src/windows.rs`, `crates/operator-ipc/src/unix.rs`, `crates/windows-local-security/src/lib.rs`; qualification belongs to Feature 011.
+- **Licensing:** no `LICENSE`, no `license` field in any `Cargo.toml` or `apps/litecowork-ui/package.json`.
+- **Frontend:** main bundle 1.05 MB minified / 287 KB gzip with Vite warning; `apps/litecowork-ui/src/App.tsx` is 4,523 lines with no route-level code splitting. A11y-related tests exist (`tests/settings-accessibility.test.mjs`, `tests/responsive-layout.test.ts`, `tests/artifact-editor-focus.test.ts`, motion guards); `scripts/check-rendered-ui.mjs` drives the rendered UI.
+
+Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware matrix, evidence bundle process, a11y/performance/resilience qualification on both rows, and the go/no-go.
+
+## 019-T01 - Owner acceptance of SPEC and blockers B-43, B-44
+
+- **Status:** BLOCKED (pending owner acceptance of SPEC revision 0.1, B-43 signing identity and update channel, B-44 licensing/packaging decision; owner: repository owner, sarv-projects).
+- **Depends on:** NONE
+- **Cross-package prerequisites:** NONE
+- **Owner:** Product (repository owner), Security, Release Engineering.
+- **Allowed paths:** `specs/019-release-engineering-qualification/` (status, revision, blocker rows only).
+- **Contract:** SPEC sections 5, 14; SPECIFICATION-STANDARD section 7; AC-017, AC-020.
+- **Change intent:** record the owner decision on B-43 and B-44 (accept, amend or reject each), move SPEC and WIRING to ACCEPTED/LOCKED with an owner-acceptance metadata line, bump revision to 1.0. The orchestrator updates the global register rows.
+- **Acceptance:**
+  - [ ] B-43 and B-44 rows say ACCEPTED (date) or carry the owner's amendment; no author self-approval.
+  - [ ] SPEC and WIRING status match; validator passes.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** owner decision record link (review packet or PR) in Completion evidence.
+- **Stop:** owner rejects or defers a blocker; dependent tasks stay BLOCKED.
+
+## 019-T02 - Promote release contracts into owner docs and schemas
+
+- **Status:** NOT STARTED.
+- **Depends on:** T01
+- **Cross-package prerequisites:** NONE (Feature 011 must review the updater call contract against its update quiescence gate).
+- **Owner:** Release Engineering, QA, Security; Documentation owners.
+- **Allowed paths:** `docs/ACCEPTANCE-AND-E2E-PLAN.md`, `docs/TESTING.md`, `docs/SECURITY.md`, `docs/NETWORK-SECURITY.md`, `docs/LITECOWORK-BUILD-TASKS.md`, `docs/schemas/release-evidence-bundle.schema.json` (new), `docs/schemas/release-matrix-row.schema.json` (new), `docs/adr/` (new licensing/packaging ADR number at implementation time), `docs/release/README.md` (new), this package.
+- **Contract:** SPEC sections 5, 7.2, 8; ACCEPTANCE sections 6, 7; AC-012, AC-013, AC-017.
+- **Change intent:** in one reviewed change: add the JSON Schemas for EvidenceBundle and ReleaseRow (fields from ACCEPTANCE section 6 plus row tuple id, `counted` flag and `not_counted_reason`); add the licensing/packaging ADR skeleton with the accepted B-44 text; add to ACCEPTANCE section 7 the declared V1 rows and the NOT_COUNTED rule; add to TESTING a "Release gates" section naming the CI jobs; add to SECURITY the signing-key custody and updater trust rules from B-43; map BT-00 and BT-10.5 rows to this package's tasks. No SQLite migration: this package owns no daemon table. Each new name is labelled "accepted target interface (not yet in source)" until its task lands.
+- **Acceptance:**
+  - [ ] Each schema validates a positive fixture and rejects fixtures missing SHA, OS/build, agent version, negative cases or reviewer (AC-013).
+  - [ ] ACCEPTANCE names exactly two V1 rows and states WSL2/container/CI image runs are NOT_COUNTED (AC-002, AC-012).
+  - [ ] No definition is duplicated between the owner docs and this package.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` and `uv run --locked python scripts/audit_v1_contracts.py --strict` and `uv run --locked python -m unittest discover -s tests -v` (schema fixture test to be added by this task)
+- **Evidence:** PR link; validator output.
+- **Stop:** a field conflicts with an owner definition elsewhere; resolve at that owner.
+
+## 019-T03 - CI skeleton on a native Linux runner (Wave 0)
+
+- **Status:** NOT STARTED (no `.github/` directory exists).
+- **Depends on:** T01
+- **Cross-package prerequisites:** NONE
+- **Owner:** Release Engineering.
+- **Allowed paths:** `.github/workflows/ci.yml` (new; added via pull request only), `.github/CODEOWNERS` (new; via pull request only), `scripts/check.sh` (add a `--ci` flag only if needed), `tests/test_check_script.py`.
+- **Contract:** SPEC sections 2 (G-01), 10, 12; BT-00.2, BT-00.5, BT-00.6; AC-001.
+- **Change intent:** add a workflow, introduced only through a reviewed pull request (never a direct push), with jobs on `ubuntu-24.04`: `scripts/check.sh` full gate; `python3 .specify/scripts/validate_feature_package.py`; `pnpm --dir apps/litecowork-ui install --frozen-lockfile`, `pnpm --dir apps/litecowork-ui test`, `pnpm --dir apps/litecowork-ui run build`; `cargo test --manifest-path apps/litecowork-ui/src-tauri/Cargo.toml --locked`. Permissions default `contents: read`; every third-party action pinned to a full commit SHA; `concurrency` cancels superseded runs; no secrets on `pull_request` from forks. CODEOWNERS requires Release Engineering review for `.github/` and Security review for `apps/litecowork-ui/src-tauri/tauri.conf.json` and `capabilities/`.
+- **Acceptance:**
+  - [ ] A PR with an injected failing Rust test, failing UI test, broken spec link or stale generated ledger is blocked (AC-001).
+  - [ ] Negative: a workflow step referencing an action by tag instead of SHA fails the pinning check.
+  - [ ] Negative: a fork PR run cannot read any repository secret.
+  - [ ] Stage durations are printed per stage (reuse `run_stage`).
+- **Command:** `actionlint .github/workflows/ci.yml` (tool pinned by this task) and `uv run --locked python -m unittest tests.test_check_script -v`
+- **Evidence:** CI run URLs for a passing and a deliberately failing PR in Completion evidence.
+- **Stop:** the workflow needs a secret on PR runs; redesign instead of granting it.
+
+## 019-T04 - Native Windows x64 CI runner
+
+- **Status:** NOT STARTED.
+- **Depends on:** T01, T03
+- **Cross-package prerequisites:** 011-T02 (Feature 011 Windows named-pipe DACL qualification consumes this runner).
+- **Owner:** Release Engineering, Runtime.
+- **Allowed paths:** `.github/workflows/ci.yml`, `.github/workflows/windows.yml` (new; via pull request only), `scripts/check.ps1` (new, PowerShell equivalent of the Rust stages of `scripts/check.sh`).
+- **Contract:** SPEC sections 4, 12; TESTING "Host qualification checklist (B-28)"; AC-001, AC-002.
+- **Change intent:** add a Windows job on a native Windows runner (hosted `windows-2025` for CODE; a self-hosted Windows 11 x64 runner labelled `win11-x64-release` for packaged jobs, O-01) running `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked` (including `-p windows-local-security` and `-p operator-ipc`), the src-tauri workspace tests and `pnpm --dir apps/litecowork-ui test`. The job records `systeminfo` OS build. Any WSL step is forbidden in this workflow.
+- **Acceptance:**
+  - [ ] `cargo test -p windows-local-security --locked` and `cargo test -p operator-ipc --locked` run on Windows, not skipped by `cfg(windows)` (AC-001).
+  - [ ] Negative: a job that runs inside WSL2 is flagged and its results are recorded NOT_COUNTED (AC-002).
+  - [ ] Hosted Windows Server results are labelled CODE/SYSTEM only, never USER.
+- **Command:** `pwsh -File scripts/check.ps1` (script to be added by this task) and `cargo test -p windows-local-security --locked`
+- **Evidence:** Windows CI run URL with OS build string.
+- **Stop:** a test is red only on the hosted image; re-run on the self-hosted Windows 11 runner before treating it as a regression (TESTING B-28 rule).
+
+## 019-T05 - Secret scan and dependency audit as release gates
+
+- **Status:** PARTIAL - `scripts/v1_secret_scan.py` exists with redacted reporting and `--source`/`--extra-path`; nothing runs it; no dependency advisory or licence audit exists; no `deny.toml`.
+- **Depends on:** T01, T03
+- **Cross-package prerequisites:** NONE
+- **Owner:** Security.
+- **Allowed paths:** `scripts/v1_secret_scan.py`, `tests/test_secret_scan.py` (new), `deny.toml` (new), `apps/litecowork-ui/src-tauri/deny.toml` (new), `.github/workflows/ci.yml`, `docs/SECURITY.md` (exceptions table).
+- **Contract:** SPEC section 10; SECURITY "Secrets", "Supply chain"; AC-003, AC-004.
+- **Change intent:** wire `v1_secret_scan.py --source` into every PR and `--extra-path <bundle dir>` plus each evidence bundle into the release job; add a seeded fake-token fixture test; add `cargo deny check advisories licenses bans sources` for the root workspace and for `apps/litecowork-ui/src-tauri`, and `pnpm --dir apps/litecowork-ui audit --prod` with a reviewed exceptions table (id, reason, expiry date, reviewer). The licence allowlist comes from the accepted B-44 decision.
+- **Acceptance:**
+  - [ ] Seeded token in source, in a bundle file and in an evidence file each fail the gate, and the report shows only a redacted preview (AC-003).
+  - [ ] A pinned crate with a known advisory fails `cargo deny` unless an unexpired reviewed exception exists (AC-004).
+  - [ ] Both Cargo lockfiles and the pnpm lockfile are covered; removing one from the job fails a self-check.
+  - [ ] Negative: an expired exception fails the gate.
+- **Command:** `uv run --locked python scripts/v1_secret_scan.py --source --json` and `cargo deny check` and `cargo deny --manifest-path apps/litecowork-ui/src-tauri/Cargo.toml check` and `pnpm --dir apps/litecowork-ui audit --prod`
+- **Evidence:** gate outputs in CI artifacts; exceptions table in SECURITY.md.
+- **Stop:** a real secret is found; rotate it with its owner before continuing.
+
+## 019-T06 - CSP and Tauri capability hardening audit
+
+- **Status:** PARTIAL - CSP and `capabilities/default.json` exist; `v1_packaging_check.py` only checks that a CSP string is present.
+- **Depends on:** T01, T02, T05
+- **Cross-package prerequisites:** Feature 008 decision on any iframe preview origin (O-04); Feature 016 server-side presentation validation stays the content boundary.
+- **Owner:** Security, Desktop Shell.
+- **Allowed paths:** `apps/litecowork-ui/src-tauri/tauri.conf.json` (`app.security` only), `apps/litecowork-ui/src-tauri/capabilities/default.json`, `scripts/v1_csp_audit.py` (new), `tests/test_csp_audit.py` (new), `scripts/v1_packaging_check.py` (`check_bundle_configuration`).
+- **Contract:** SPEC section 10; NETWORK-SECURITY "Interactive Artifact renderer", "Rich response content and media"; AC-005.
+- **Change intent:** add `object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'` to the CSP; record why `style-src 'unsafe-inline'` remains (React inline `style` props) and open a follow-up to replace it with hashes; keep `script-src 'self'` and forbid `unsafe-eval`, `unsafe-inline` scripts, `http:`/`https:` script origins and `dangerousDisableAssetCspModification`. `v1_csp_audit.py` parses the CSP and capability files and fails on regression; the packaging check calls it.
+- **Acceptance:**
+  - [ ] Audit passes on the hardened config and fails on fixtures adding `unsafe-eval`, a remote script origin, a `shell:` or `fs:` permission, or removing `object-src 'none'` (AC-005).
+  - [ ] Packaged app smoke on both rows renders every top-level page with zero CSP violations in the WebView console.
+  - [ ] Rich presentation fallback (E2E-11) still renders semantic text with the hardened CSP.
+- **Command:** `uv run --locked python scripts/v1_csp_audit.py` (script to be added by this task) and `pnpm --dir apps/litecowork-ui run test:browser`
+- **Evidence:** audit output; console capture from both rows.
+- **Stop:** a feature needs a CSP relaxation; it must come with a reviewed owner reason, not be added silently.
+
+## 019-T07 - IPC peer-identity negative tests on the packaged build
+
+- **Status:** NOT STARTED (source IPC exists; packaged negative tests do not).
+- **Depends on:** T01, T04
+- **Cross-package prerequisites:** 011-T03 (Feature 011 Linux 0600/0700 socket profile); Feature 011 Windows DACL qualification (see T04).
+- **Owner:** Security, Runtime.
+- **Allowed paths:** `apps/litecoworkd/tests/ipc_release_negative.rs` (new), `scripts/qualify-ipc-peer-identity.ps1` (new), `scripts/qualify-ipc-peer-identity.sh` (new).
+- **Contract:** SPEC section 10; LOCAL-OPERATOR-IPC qualification gates; NETWORK-SECURITY "Local Operator IPC"; AC-006.
+- **Change intent:** scripted negative tests against the installed daemon: a second local Windows account (`runas` with a test user) opening the pipe; a remote `\\host\pipe\...` client; a Linux process under another UID connecting to the socket; a loopback HTTP request to any port the daemon might open (must find none). Each must fail before frame parsing; the daemon logs a safe classification only.
+- **Acceptance:**
+  - [ ] Other-user, remote-client and other-UID connections are rejected on their row with no request processed (AC-006).
+  - [ ] No TCP listener is opened by the daemon (port scan of the process).
+  - [ ] Rejection is logged without peer secrets or tokens.
+- **Command:** `pwsh -File scripts/qualify-ipc-peer-identity.ps1` and `bash scripts/qualify-ipc-peer-identity.sh` (scripts to be added by this task) and `cargo test -p litecoworkd --test ipc_release_negative --locked` (target to be added by this task)
+- **Evidence:** per-row script output in the evidence bundle.
+- **Stop:** any connection is accepted; release is NO-GO until Feature 011 fixes it.
+
+## 019-T08 - Windows x86_64-pc-windows-msvc installer (NSIS per-user, MSI)
+
+- **Status:** PARTIAL - `tauri.conf.json` bundle block, icons (`icon.ico`, `icon.png`), `tauri.bundle.conf.json` externalBin and `build-daemon-sidecar.mjs` exist; targets are `"all"`; no Windows installer options; `v1_packaging_check.py` cannot find a Windows daemon binary.
+- **Depends on:** T01, T02, T03
+- **Cross-package prerequisites:** Feature 011 packaged sidecar start and Runtime readiness on Windows.
+- **Owner:** Release Engineering, Desktop Shell.
+- **Allowed paths:** `apps/litecowork-ui/src-tauri/tauri.conf.json` (`bundle` only), `apps/litecowork-ui/src-tauri/tauri.bundle.conf.json`, `apps/litecowork-ui/scripts/run-tauri.mjs`, `apps/litecowork-ui/scripts/build-daemon-sidecar.mjs`, `apps/litecowork-ui/tests/run-tauri.test.mjs` (new or existing equivalent), `scripts/v1_packaging_check.py`, `scripts/qualify-windows-installer.ps1` (new).
+- **Contract:** SPEC sections 5 (B-44 item 4), 12; V1 release contract Area 10; AC-007.
+- **Change intent:** set `bundle.targets` to `["nsis", "msi"]` on Windows (keep `deb` for Linux via `run-tauri.mjs`); configure `bundle.windows.nsis.installMode: "currentUser"`, `webviewInstallMode: { type: "embedBootstrapper" }`, a stable MSI `upgradeCode`; make `v1_packaging_check.py` look for `litecoworkd.exe` and `src-tauri/binaries/litecoworkd-x86_64-pc-windows-msvc.exe` on Windows and replace the `0o700` grep with a call into the daemon's own Windows ACL self-check on the state directory. `qualify-windows-installer.ps1` installs, launches, checks first run and Runtime READY, upgrades from the previous build, uninstalls, and verifies the user data directory survives unless the owner opted in to removal.
+- **Acceptance:**
+  - [ ] Clean Windows 11 and Windows 10 22H2 x64: install without elevation, first run reaches Runtime READY, Start menu entry and uninstaller registered (AC-007).
+  - [ ] Upgrade in place keeps the data directory and the daemon runs forward migrations once.
+  - [ ] Uninstall removes binaries and keeps user data by default; explicit removal option deletes it (AC-007).
+  - [ ] Negative: installing while the old daemon runs does not corrupt the database; the installer waits or fails with a clear message.
+  - [ ] Packaging check passes on Windows.
+- **Command:** `pnpm --dir apps/litecowork-ui tauri build --target x86_64-pc-windows-msvc --bundles nsis,msi` and `pwsh -File scripts/qualify-windows-installer.ps1` (script to be added by this task) and `uv run --locked python scripts/v1_packaging_check.py --json`
+- **Evidence:** installer digests, script output and OS build in the Windows row bundle.
+- **Stop:** installer needs elevation for the per-user path; revisit B-44 item 4 with the owner.
+
+## 019-T09 - Windows code signing (B-43)
+
+- **Status:** BLOCKED (B-43 pending owner; owner: repository owner with Security).
+- **Depends on:** T01, T08
+- **Cross-package prerequisites:** NONE
+- **Owner:** Security, Release Engineering.
+- **Allowed paths:** `apps/litecowork-ui/src-tauri/tauri.conf.json` (`bundle.windows.signCommand`, `digestAlgorithm`, `timestampUrl`), `.github/workflows/release.yml` (new; via pull request only), `scripts/sign-windows.ps1` (new wrapper that calls the signing service), `scripts/verify-signatures.ps1` (new).
+- **Contract:** SPEC section 5 (B-43 items 1, 5), 10; AC-008.
+- **Change intent:** sign `LiteCowork.exe`, `litecoworkd-x86_64-pc-windows-msvc.exe` (sign the sidecar before it is embedded) and both installers through `signCommand`, SHA-256 digest, RFC 3161 timestamp; release job runs only on protected tags of the default branch with environment approval; `verify-signatures.ps1` runs `signtool verify /pa /all` and `Get-AuthenticodeSignature` on every PE inside the installed tree; About shows `UNSIGNED-DEV` when the running binary has no valid signature.
+- **Acceptance:**
+  - [ ] Every shipped PE and installer verifies with a timestamped signature (AC-008).
+  - [ ] Negative: an unsigned sidecar or a tampered installer fails the release job (AC-008).
+  - [ ] Negative: a PR or fork run cannot reach the signing environment.
+  - [ ] Key never appears in logs (secret scan of job logs passes).
+- **Command:** `pwsh -File scripts/verify-signatures.ps1 -Path <install-dir>` (script to be added by this task)
+- **Evidence:** verification output and certificate thumbprint (public) in the Windows bundle.
+- **Stop:** signing requires exporting a private key to the runner; stop and redesign with the signing service.
+
+## 019-T10 - Linux x64 deb package with signed checksums
+
+- **Status:** PARTIAL - `run-tauri.mjs` defaults Linux to `deb` and refuses AppImage; `scripts/packaging/systemd/litecoworkd.service` exists (0700 StateDirectoryMode, UMask 0077) and is checked by `v1_packaging_check.py`; no checksum signing.
+- **Depends on:** T01, T02, T03
+- **Cross-package prerequisites:** Feature 011 Linux socket profile (see T07).
+- **Owner:** Release Engineering.
+- **Allowed paths:** `apps/litecowork-ui/src-tauri/tauri.conf.json` (`bundle.linux` only), `scripts/packaging/systemd/litecoworkd.service`, `scripts/qualify-linux-package.sh` (new), `.github/workflows/release.yml`.
+- **Contract:** SPEC sections 5 (B-43 item 4), 12; AC-019.
+- **Change intent:** declare deb dependencies (WebKitGTK 4.1), install `litecoworkd` to `/usr/bin`, ship the systemd unit disabled, publish `SHA256SUMS` signed with the release key; `qualify-linux-package.sh` installs on a clean Ubuntu 24.04 x64 desktop, checks 0700/0600 permissions on the state directory and database, runs `systemd-analyze verify`, upgrades and removes.
+- **Acceptance:**
+  - [ ] Install, launch to Runtime READY, upgrade and remove on a native Linux desktop (AC-019).
+  - [ ] Permissions are 0700 directory and 0600 database; the unit is not enabled by install (AC-019).
+  - [ ] Negative: a modified package fails checksum signature verification.
+- **Command:** `pnpm --dir apps/litecowork-ui tauri build --target x86_64-unknown-linux-gnu --bundles deb` and `bash scripts/qualify-linux-package.sh` (script to be added by this task)
+- **Evidence:** Linux row bundle.
+- **Stop:** AppImage requested before the daemon path is persistent; keep it refused.
+
+## 019-T11 - Updater gated on Feature 011 quiescence (B-43)
+
+- **Status:** BLOCKED (B-43 pending owner; Feature 011 authenticated stop and update quiescence gate not in source, owner Runtime).
+- **Depends on:** T01, T08, T09
+- **Cross-package prerequisites:** 011-T13 (authenticated Operator stop with settlement proof), 011-T14 (stop/update UI and `check_update_quiescence` command).
+- **Owner:** Desktop Shell, Release Engineering, Runtime (gate owner).
+- **Allowed paths:** `apps/litecowork-ui/src-tauri/Cargo.toml`, `apps/litecowork-ui/src-tauri/Cargo.lock`, `apps/litecowork-ui/src-tauri/src/updater_bridge.rs` (new), `apps/litecowork-ui/src-tauri/src/lib.rs` (command registration only), `apps/litecowork-ui/src-tauri/tauri.conf.json` (`plugins.updater`, `bundle.createUpdaterArtifacts`), `apps/litecowork-ui/src-tauri/capabilities/default.json` (reviewed updater permissions only), `scripts/v1_packaging_check.py` (`check_installer_metadata`).
+- **Contract:** SPEC sections 5 (B-43 items 2, 3), 6 (update sequence), 7.2, 10; ACCEPTANCE stop/update gate; AC-009, AC-010, AC-011, AC-018.
+- **Change intent:** add `tauri-plugin-updater` (Rust side only; the WebView never calls the plugin directly) and implement `check_for_update` and `install_update` in `updater_bridge.rs` with the ordering verify manifest, `check_update_quiescence`, download, verify artifact, authenticated Runtime stop, installer handoff. Persist an `UpdateAttempt` record (request id, from/to version, state) in the app data directory for interrupted-install detection. A process-wide `tokio::sync::Mutex` makes install single-flight. Change `check_installer_metadata` so an endpoint passes only with an embedded public key, an `https://` pinned origin and the gate wired.
+- **Acceptance:**
+  - [ ] NotQuiescent or gate unavailable: no download-to-install; reasons listed; Retry offered (AC-009).
+  - [ ] Tampered manifest, tampered artifact, downgrade, channel mismatch and non-pinned endpoint are refused and the installed version is unchanged (AC-010).
+  - [ ] Kill during download, during Runtime stop and during installer run: next launch runs a consistent version and the database passes `PRAGMA integrity_check` (AC-011).
+  - [ ] Two concurrent installs, or install racing a stop: exactly one proceeds, the other gets AlreadyInProgress (AC-018).
+  - [ ] Packaging check passes only with key, HTTPS pinned origin and gate present.
+- **Command:** `cargo test --manifest-path apps/litecowork-ui/src-tauri/Cargo.toml --locked updater` (filter to be added by this task) and `uv run --locked python scripts/v1_packaging_check.py --json`
+- **Evidence:** test output; interrupted-install journey in the Windows bundle.
+- **Stop:** any path installs without positive quiescence; remove the path.
+
+## 019-T12 - Update panel UI states hosted in the Feature 011 Advanced tab
+
+- **Status:** NOT STARTED.
+- **Depends on:** T01, T11
+- **Cross-package prerequisites:** Feature 011 desktop stop and update UI task (host surface); Feature 018 About and Diagnostics (version display).
+- **Owner:** Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/src/updates/UpdatePanel.tsx` (new), `apps/litecowork-ui/src/updates/update-state.ts` (new), `apps/litecowork-ui/src/updates/desktop-update-api.ts` (new), `apps/litecowork-ui/tests/update-panel.test.mjs` (new), `apps/litecowork-ui/tests/update-state.test.ts` (new).
+- **Contract:** SPEC section 6; [contracts/ui-behavior.md](contracts/ui-behavior.md); AC-009, AC-015.
+- **Change intent:** a component Feature 011 mounts in Settings > Advanced (this package defines no Settings category). Pure reducer `update-state.ts` maps `UpdateCheckOutcome`/`UpdateInstallOutcome`/`UpdateError` to states IDLE, CHECKING, UP_TO_DATE, CHECK_FAILED, AVAILABLE, REFUSED_NOT_QUIESCENT, INSTALLING, HANDOFF, FAILED, OFFLINE, UNSIGNED_DEV. Install is disabled with a visible reason outside AVAILABLE. Refusal lists the running/unknown items from the gate and offers Retry.
+- **Acceptance:**
+  - [ ] Every state renders a specific explanation; no "Up to date" when the check failed or was offline (AC-009).
+  - [ ] Keyboard: all controls reachable, focus moves to the result message, `aria-live` announces state changes, reduced motion honored (AC-015).
+  - [ ] Negative: double activation of Install sends one request id.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output; screenshots per state in the Windows bundle.
+- **Stop:** the panel would need its own quiescence logic; it must only render the gate's result.
+
+## 019-T13 - Licensing/packaging decision record and third-party notices (B-44)
+
+- **Status:** BLOCKED (B-44 pending owner; owner: repository owner).
+- **Depends on:** T01, T02
+- **Cross-package prerequisites:** NONE
+- **Owner:** Product, Release Engineering.
+- **Allowed paths:** `LICENSE` (new), `Cargo.toml` (`[workspace.package] license`), member `Cargo.toml` files (`license.workspace = true` only), `apps/litecowork-ui/src-tauri/Cargo.toml` (`license` only), `apps/litecowork-ui/package.json` (`license` only), `docs/adr/` (the ADR from T02), `scripts/generate-third-party-notices.py` (new), `apps/litecowork-ui/src-tauri/tauri.conf.json` (`bundle.resources` for notices), `scripts/v1_packaging_check.py`.
+- **Contract:** SPEC section 5 (B-44); V1 release contract section 1; AC-017.
+- **Change intent:** finalize the ADR with the accepted licence; add `LICENSE` and licence fields; generate `THIRD-PARTY-NOTICES.txt` from `Cargo.lock`, `apps/litecowork-ui/src-tauri/Cargo.lock` and `apps/litecowork-ui/pnpm-lock.yaml`; bundle it; add packaging checks that the installer contains LICENSE and notices and contains no file matching a known native harness executable name from `AGENT_EXECUTABLES` in `v1_platform_matrix.py`.
+- **Acceptance:**
+  - [ ] Release gate fails without the ADR, LICENSE or notices (AC-017).
+  - [ ] Negative: a fixture bundle containing an `opencode` or `claude` executable fails the packaging check (AC-017).
+  - [ ] No licence-check network call exists (grep plus packaged network observation).
+- **Command:** `uv run --locked python scripts/generate-third-party-notices.py --check` (script to be added by this task) and `uv run --locked python scripts/v1_packaging_check.py --json`
+- **Evidence:** ADR link; notices digest.
+- **Stop:** a dependency licence is incompatible with the chosen licence; replace the dependency or return to the owner.
+
+## 019-T14 - Row-aware release qualification matrix
+
+- **Status:** PARTIAL - `scripts/v1_platform_matrix.py` probes the host truthfully but writes to the retired `implementation/` path, has OS-only rows, lists macOS aarch64 and has no WSL2 detection or E2E cells.
+- **Depends on:** T01, T02, T04
+- **Cross-package prerequisites:** NONE (each package supplies its E2E evidence through its own qualification task).
+- **Owner:** QA, Release Engineering.
+- **Allowed paths:** `scripts/v1_platform_matrix.py`, `scripts/v1_release_matrix_rows.json` (new), `tests/test_platform_matrix.py` (new), `docs/release/QUALIFICATION-MATRIX.md` (new, generated), `docs/release/QUALIFICATION-MATRIX.json` (new, generated).
+- **Contract:** SPEC sections 7.2, 8; ACCEPTANCE sections 3, 7; AC-002, AC-012.
+- **Change intent:** read declared rows (`windows-x64-opencode-v2.0.32`, `linux-x64-opencode-v2.0.32`, later `*-claude-code-*` rows marked NOT_RUN); detect WSL2 (`WSL_DISTRO_NAME`, `/proc/sys/kernel/osrelease` containing `microsoft`), containers (`/.dockerenv`, cgroup markers) and CI images (`CI=true` without the release-host label) and mark the run NOT_COUNTED; emit a cell per E2E-01..E2E-12 and per capability that links to an evidence bundle digest or carries NOT_RUN/BLOCKED/UNAVAILABLE with a reason (for example Task execution and terminal UNAVAILABLE on the Windows row until B-35 qualifies); keep macOS as UNSUPPORTED; move default output to `docs/release/`; update the stale roster comment.
+- **Acceptance:**
+  - [ ] Simulated WSL2, container and CI markers produce NOT_COUNTED with no PASSED cell (AC-002).
+  - [ ] A cell is PASSED only with a linked, schema-valid bundle observed on that host (AC-012).
+  - [ ] Windows row shows Task execution (E2E-04) and terminal (E2E-08 terminal half) UNAVAILABLE until the B-35 provider qualifies.
+  - [ ] Generated Markdown and JSON are deterministic for the same inputs.
+- **Command:** `uv run --locked python -m unittest tests.test_platform_matrix -v` (test to be added by this task) and `uv run --locked python scripts/v1_platform_matrix.py --rows scripts/v1_release_matrix_rows.json --skip-slow-probes`
+- **Evidence:** generated matrix committed per release candidate.
+- **Stop:** a PASSED cell lacks a bundle; the generator must refuse to write it.
+
+## 019-T15 - Evidence bundle process and owner USER sign-off record
+
+- **Status:** NOT STARTED (ACCEPTANCE section 6 lists fields; no schema or tool).
+- **Depends on:** T01, T02, T14
+- **Cross-package prerequisites:** NONE
+- **Owner:** QA, Product (USER sign-off), Security (redaction).
+- **Allowed paths:** `scripts/v1_evidence_bundle.py` (new), `tests/test_evidence_bundle.py` (new), `docs/release/evidence/INDEX.md` (new), `docs/release/USER-SIGNOFF-TEMPLATE.md` (new).
+- **Contract:** SPEC sections 8, 10; ACCEPTANCE sections 2, 6; AC-013, AC-014.
+- **Change intent:** `v1_evidence_bundle.py assemble --journey E2E-01 --row windows-x64-opencode-v2.0.32` collects SHA and dirty status, OS build, agent version (`opencode --version`), protocol, CODE command outputs, SYSTEM trace (request ids, event sequences, receipt refs), USER artifact digests and negative cases; validates against `release-evidence-bundle.schema.json`; runs the secret scan on the bundle; writes only a redacted index entry to the repository while screenshots/video stay in owner storage referenced by SHA-256. The USER sign-off template captures reviewer, date, what remained blocked or unknown, and an explicit "not a green row" note for partial journeys.
+- **Acceptance:**
+  - [ ] Missing SHA, OS, agent version, negative cases or reviewer rejects the bundle (AC-013).
+  - [ ] A seeded token in a log attachment rejects the bundle (AC-013).
+  - [ ] A journey without USER sign-off stays below QUALIFIED in the matrix (AC-014).
+  - [ ] Bundle references are content digests; changing an attachment invalidates the bundle.
+- **Command:** `uv run --locked python -m unittest tests.test_evidence_bundle -v` (test to be added by this task) and `uv run --locked python scripts/v1_evidence_bundle.py validate docs/release/evidence/INDEX.md`
+- **Evidence:** example bundle for a dry-run journey.
+- **Stop:** a bundle would require committing user content; keep it out of the repository.
+
+## 019-T16 - App-wide accessibility qualification
+
+- **Status:** PARTIAL - focused a11y tests exist (`apps/litecowork-ui/tests/settings-accessibility.test.mjs`, `tests/artifact-editor-focus.test.ts`, `tests/coworker-focus-plan.test.ts`, motion guards) and `scripts/check-rendered-ui.mjs` drives the rendered UI; no app-wide audit; the browser a11y run timed out (gap analysis).
+- **Depends on:** T01, T08, T14
+- **Cross-package prerequisites:** 011-T11 (app-wide keyboard and focus baseline); each package's UI tasks for its screens.
+- **Owner:** QA/Accessibility, Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/scripts/check-rendered-ui.mjs`, `apps/litecowork-ui/tests/app-accessibility-audit.test.mjs` (new), `apps/litecowork-ui/package.json` (dev dependency only if F-03 chooses axe-core), `docs/release/A11Y-WALKTHROUGH.md` (new).
+- **Contract:** SPEC sections 2 (G-09), 14; V1 release contract Area 10 and invariant 8; AC-015.
+- **Change intent:** extend the rendered-UI script with a bounded per-page timeout and an audit pass over every top-level page (Conversations, Work, Library, Discover, Needs You, Ideas, Coworkers, Goals, Notifications, Routines, Automations, Settings) checking accessible names, focus order, visible focus, contrast and `prefers-reduced-motion`; define the Narrator (Windows) and Orca (Linux) walkthrough script for E2E-01, E2E-03, E2E-07 and E2E-09 on the packaged app. Defects are filed against the owning package.
+- **Acceptance:**
+  - [ ] Zero serious or critical automated violations on every top-level page (AC-015).
+  - [ ] Every page completes within its timeout; a timeout is a failure, not a skip.
+  - [ ] Owner walkthrough recorded on each row with keyboard only and a screen reader (AC-015).
+- **Command:** `pnpm --dir apps/litecowork-ui run test:browser` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** audit report and walkthrough record per row.
+- **Stop:** a violation belongs to another package; file it there and keep the cell BLOCKED.
+
+## 019-T17 - Performance and soak qualification
+
+- **Status:** PARTIAL - `scripts/v1_soak_harness.py` exists (Python `sqlite3`, not the daemon); BENCHMARKS budgets exist; no measurement of the packaged app or daemon.
+- **Depends on:** T01, T08, T14
+- **Cross-package prerequisites:** Feature 001 qualified OpenCode v2.0.32 Send route (for composer and mediation measurements); Feature 018 usage and diagnostics for daemon metrics.
+- **Owner:** QA, Desktop UI, Runtime.
+- **Allowed paths:** `scripts/v1_soak_harness.py`, `crates/storage-sqlite/tests/soak.rs` (new), `apps/litecowork-ui/vite.config.ts`, `apps/litecowork-ui/src/App.tsx` (route-level `React.lazy` boundaries only), `scripts/v1_perf_probe.py` (new), `docs/release/PERFORMANCE.md` (new).
+- **Contract:** SPEC section 12; BENCHMARKS "Desktop responsiveness and mediation overhead", B82, B87, B88; AC-016.
+- **Change intent:** measure on named hardware profiles (O-05) p50/p95 for composer acknowledgement, local admission receipt, mediation overhead before adapter dispatch and small artifact first paint; add a Rust soak test that drives `storage-sqlite` itself (`#[ignore]`, bounded by env vars) so the numbers describe shipped code; record daemon RSS, handle/fd count and DB/WAL size over a 4-hour run; split the 1.05 MB main bundle with route-level lazy imports and set a CI budget on the main chunk.
+- **Acceptance:**
+  - [ ] Each budget reported with p50/p95, sample count and cause for any miss (AC-016).
+  - [ ] Soak keeps memory and disk bounded and ends with `PRAGMA integrity_check` ok on both rows (AC-016).
+  - [ ] Native agent startup and provider latency are reported separately from LiteCowork overhead.
+  - [ ] Main JS chunk under the agreed budget without Vite size warnings.
+- **Command:** `cargo test -p storage-sqlite --release --locked --test soak -- --ignored` (target to be added by this task) and `pnpm --dir apps/litecowork-ui run build` and `uv run --locked python scripts/v1_soak_harness.py --duration-seconds 600 --report docs/release/soak.json`
+- **Evidence:** PERFORMANCE.md per row.
+- **Stop:** a gate is weakened to improve a number; revert.
+
+## 019-T18 - Resilience matrix on both rows against shipped storage code
+
+- **Status:** PARTIAL - `scripts/v1_resilience_matrix.py` implements five cases on Python `sqlite3` and imports `fcntl` (POSIX only).
+- **Depends on:** T01, T04, T14
+- **Cross-package prerequisites:** Feature 017 restore path for the failed-migration recovery case.
+- **Owner:** QA, Storage.
+- **Allowed paths:** `scripts/v1_resilience_matrix.py`, `crates/storage-sqlite/tests/resilience.rs` (new), `apps/litecoworkd/tests/startup_recovery_release.rs` (new).
+- **Contract:** SPEC section 11; TESTING "Fault injection"; ACCEPTANCE section 5; AC-021, AC-011.
+- **Change intent:** port the five cases to Rust integration tests over `storage-sqlite` (restart mid-write, kill during WAL, disk full via `max_page_count`, corrupt blob envelope, stale single-instance lock using the daemon's own lock path) so they run on Windows and Linux; add the upgrade cases (new binary on old database, failed migration leaves the database at the previous version and the daemon DEGRADED with a startup blocker). Keep the Python script as a thin runner that reports BLOCKED where a case cannot run.
+- **Acceptance:**
+  - [ ] All cases run natively on Windows and Linux; none silently skipped (AC-021).
+  - [ ] Failed migration leaves a consistent previous-version database (AC-011).
+  - [ ] Negative: a case that cannot run reports BLOCKED with the reason, never PASSED (AC-021).
+- **Command:** `cargo test -p storage-sqlite --locked --test resilience` and `cargo test -p litecoworkd --locked --test startup_recovery_release` (targets to be added by this task)
+- **Evidence:** resilience report per row.
+- **Stop:** a case reveals data loss; release is NO-GO until Storage fixes it.
+
+## 019-T19 - Desktop stop/update qualification gate journey on the packaged app
+
+- **Status:** NOT STARTED (ACCEPTANCE marks the gate future and blocked).
+- **Depends on:** T01, T11, T12
+- **Cross-package prerequisites:** 001-T07 (effective Stop with observed quiescence); Feature 005 Attempt/Effect/lease settlement on the Linux row; Feature 008 terminal and browser session settlement.
+- **Owner:** QA, Runtime, Desktop Shell.
+- **Allowed paths:** `scripts/qualify-stop-update-gate.ps1` (new), `scripts/qualify-stop-update-gate.sh` (new), `docs/release/evidence/INDEX.md`.
+- **Contract:** ACCEPTANCE "Desktop stop/update qualification gate"; SPEC section 6; AC-009, AC-018.
+- **Change intent:** script the gate journey on the installed app: idle stop; active Conversation turn; dispatched unresolved Effect (Linux row); outstanding leases; child process outliving its parent; pending cleanup; simultaneous stop and update; admission racing drain; crash and timeout; restart and recovery. Assert admission fenced, owners settle or report UNKNOWN, update refused without positive quiescence, and the UI shows what is still running.
+- **Acceptance:**
+  - [ ] Every listed case recorded with its observed result per row (AC-009).
+  - [ ] Simultaneous stop and update: one proceeds, the other reports in progress (AC-018).
+  - [ ] Window close never reports Runtime stopped.
+- **Command:** `pwsh -File scripts/qualify-stop-update-gate.ps1` and `bash scripts/qualify-stop-update-gate.sh` (scripts to be added by this task)
+- **Evidence:** gate journey bundle per row.
+- **Stop:** an owner lacks a settlement hook; the gate stays BLOCKED and update stays unavailable.
+
+## 019-T20 - Cross-layer trace for release-owned user operations
+
+- **Status:** NOT STARTED.
+- **Depends on:** T01, T08, T11, T12, T19
+- **Cross-package prerequisites:** NONE
+- **Owner:** Release Engineering, Desktop UI.
+- **Allowed paths:** `specs/019-release-engineering-qualification/contracts/ui-behavior.md`, `specs/019-release-engineering-qualification/WIRING.yaml`.
+- **Contract:** AGENTS.md section 4; AC-007, AC-009.
+- **Change intent:** for Install, First run, Check for updates, Install update, Uninstall and About version, record user outcome, exact control, Tauri command (`check_for_update`, `install_update`, `check_update_quiescence`), Operator route (authenticated stop), authorization, owner, ordering/fence, receipt (UpdateAttempt, installer exit code), projection, restart/recovery and evidence test.
+- **Acceptance:**
+  - [ ] Every operation has a complete row; no control without an owner command and no command without a control.
+  - [ ] WIRING edges are marked served only where T11/T19 evidence exists.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** updated ui-behavior.md.
+- **Stop:** a hop is missing; open a task rather than documenting it as present.
+
+## 019-T21 - Documentation and ledger sync
+
+- **Status:** NOT STARTED.
+- **Depends on:** T01, T14, T15, T20
+- **Cross-package prerequisites:** NONE (orchestrator owns shared ledgers; this task supplies edits for review).
+- **Owner:** Documentation owners, Release Engineering.
+- **Allowed paths:** `docs/IMPLEMENTATION-STATUS.md`, `docs/LITECOWORK-BUILD-TASKS.md`, `docs/schemas/served-route-inventory.json`, `docs/V1-UI-ACTION-STATE-LEDGER.md`, `CURRENT-RUN.md`, this package.
+- **Contract:** AGENTS.md sections 4, 5; SPEC section 4; AC-012.
+- **Change intent:** mark BT-00.2/00.5/00.6 and BT-10.5 with their CI jobs and evidence; update the Area 10 rows (install/update, a11y, performance) with exact evidence class per row; regenerate the served-route inventory; refresh SPEC section 4.
+- **Acceptance:**
+  - [ ] `python3 scripts/audit_served_routes.py` matches the committed inventory.
+  - [ ] No row claims QUALIFIED without a bundle for that exact row.
+- **Command:** `python3 scripts/audit_served_routes.py` and `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** diff of status documents.
+- **Stop:** evidence and claim disagree; downgrade the claim.
+
+## 019-T22 - Package VERIFIED for V1
+
+- **Status:** NOT STARTED.
+- **Depends on:** T01-T21
+- **Cross-package prerequisites:** NONE
+- **Owner:** Product (sign-off), Release Engineering, Security, QA.
+- **Allowed paths:** this package; `docs/IMPLEMENTATION-STATUS.md`.
+- **Contract:** SPEC sections 14, 15; AC-001 to AC-021; SPECIFICATION-STANDARD lifecycle.
+- **Change intent:** assemble this package's evidence (CI runs, signed artifacts, updater journeys, matrix, bundles, a11y, performance, resilience), move SPEC/WIRING ACCEPTED/LOCKED to IMPLEMENTING at the first implementation merge and to VERIFIED after owner sign-off on both rows. VERIFIED here means the release machinery is qualified; it is not the V1 release decision (T23).
+- **Acceptance:**
+  - [ ] AC-001 to AC-019 and AC-021 evidenced on both rows (Linux row has no updater by B-43 item 4).
+  - [ ] Owner USER sign-off for install, update and uninstall on the Windows row.
+  - [ ] SPEC and WIRING status equal VERIFIED and the validator passes.
+- **Command:** `uv run --locked python scripts/v1_platform_matrix.py --rows scripts/v1_release_matrix_rows.json` and `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** bundle path referenced from IMPLEMENTATION-STATUS.md.
+- **Stop:** any row lacks USER evidence; that row stays unqualified.
+
+## 019-T23 - V1 release go/no-go
+
+- **Status:** NOT STARTED.
+- **Depends on:** T22
+- **Cross-package prerequisites:** every package's "Package VERIFIED for V1" task: 001-T23, 002-T17, 003-T17, 004-T12, 005-T20, 006-T17, 007-T17, 008-T19, 009-T18, 010-T17, 011-T19, 012-T11, 013-T20, 014-T19, 015-T20, 016-T18, 017-T18, 018-T18, this package's T22, and 020-T17 (IDs read from each package's TASKS.md on 2026-11-09; re-check at execution time).
+- **Owner:** Product (repository owner, final decision), Release Engineering, Security, QA.
+- **Allowed paths:** `scripts/v1_release_gate.py` (new), `tests/test_release_gate.py` (new), `docs/release/V1-GO-NO-GO.md` (new), `docs/IMPLEMENTATION-STATUS.md`.
+- **Contract:** V1 release contract sections 3 and 7 (gate G); BT-10.5; SPEC section 15; AC-020, AC-014.
+- **Change intent:** `v1_release_gate.py` reads the generated matrix JSON, the evidence index and each package SPEC status; it prints GO only when every package 001 to 020 is VERIFIED for each row it claims, every claimed cell has a bundle with USER sign-off, every unsupported optional integration is visibly UNAVAILABLE, and the security gates (T05, T06, T07) are green on the release commit; otherwise it prints NO-GO with each missing package, row and cell. The owner records the decision, date and release commit in `V1-GO-NO-GO.md`.
+- **Acceptance:**
+  - [ ] Fixture with one package not VERIFIED returns NO-GO naming it (AC-020).
+  - [ ] Fixture with a claimed cell lacking USER sign-off returns NO-GO (AC-014).
+  - [ ] Fixture where a WSL2 run is the only Windows evidence returns NO-GO.
+  - [ ] Real run on the release commit returns GO and the owner decision is recorded, or NO-GO with the list.
+- **Command:** `uv run --locked python scripts/v1_release_gate.py --rows scripts/v1_release_matrix_rows.json --matrix docs/release/QUALIFICATION-MATRIX.json --strict` (script to be added by this task)
+- **Evidence:** `docs/release/V1-GO-NO-GO.md` with the gate output and owner signature.
+- **Stop:** any listed prerequisite is not VERIFIED; the decision is NO-GO, never an exception.
+
+## Implementation and optimization notes (Rust and TypeScript)
+
+Findings from reading the source, folded into the tasks above. They do not add scope.
+
+- **Store harnesses measure Python, not the daemon (T17, T18):** `v1_soak_harness.py` and `v1_resilience_matrix.py` build a Python `sqlite3` store from `docs/schemas`; they never run `crates/storage-sqlite`. Rust integration tests (`crates/storage-sqlite/tests/soak.rs`, `resilience.rs`) measure the code that ships, run on Windows (no `fcntl`) and reuse the crate's real lock and migration code. Keep Python only as orchestration and report writers.
+- **Updater logic belongs in Rust (T11):** use the official `tauri-plugin-updater` from the Rust side and keep the quiescence call, single-flight mutex and ordering in `updater_bridge.rs`. The WebView only renders a pure TypeScript reducer (`update-state.ts`); it never holds the updater permission set, which keeps the capability file at `core:default` plus the minimum.
+- **Frontend bundle size (T17):** `App.tsx` is 4,523 lines and imports every page eagerly, producing a 1.05 MB main chunk. Route-level `React.lazy` boundaries for heavy pages (Artifacts, Workbench, Automations, Settings) split the chunk without changing behavior; the CI budget keeps it from regressing.
+- **Packaging check is Unix-shaped (T08):** the binary lookup lacks `.exe` and the permission check greps source for `0o700`. Asking the built daemon to self-report its state-directory ACL (Windows) or mode (Linux) replaces a string grep with a behavioral check.
+- **Two Cargo workspaces (T03, T05):** `apps/litecowork-ui/src-tauri` has its own `[workspace]` and `Cargo.lock`, so `cargo test --workspace`, clippy and dependency audits at the root never see it. CI must run each explicitly.
+- **Matrix generator (T14):** `run()` calls are sequential with a 900 s timeout each; probes that do not depend on each other (agent `--version` checks, browser lookups) can run in a bounded thread pool to cut matrix time without changing results.
+
+## Dependency order
+
+T01 -> T02 and T03. T03 -> T04, T05. T02 + T05 -> T06. T04 -> T07. T02 + T03 -> T08 -> T09 -> T11 -> T12. T02 + T03 -> T10. T02 -> T13. T02 + T04 -> T14 -> T15. T08 + T14 -> T16, T17. T04 + T14 -> T18. T11 + T12 -> T19. T08, T11, T12, T19 -> T20. T14, T15, T20 -> T21. T01-T21 -> T22 -> T23. Wave 0 subset (per the delivery waves): T03, T04, T05 and the row file of T14 can start as soon as T01 is accepted.
+
+## Cross-package dependencies
+
+| This task | Other package | Reason |
+|---|---|---|
+| T04, T07, T10 | Feature 011 IPC profiles (Windows DACL, Linux socket) | 011 qualifies IPC; this package provides native runners and packaged negative tests |
+| T08, T11, T12, T19 | Feature 011 Runtime readiness, authenticated stop, update quiescence gate and Advanced tab host | The updater must call the gate and stop the daemon before replacing files |
+| T06 | Feature 008 preview origin; Feature 016 presentation validation | CSP changes must not break or widen their surfaces |
+| T12 | Feature 018 About and Diagnostics | Version and update receipt display |
+| T17 | Feature 001 qualified Send route; Feature 018 metrics | Composer and mediation measurements need a real route |
+| T18 | Feature 017 restore | Failed-migration recovery uses restore |
+| T19 | Feature 001 Stop quiescence; Feature 005 settlement; Feature 008 session settlement | Gate journey cases |
+| T23 | All packages 001 to 020 (VERIFIED tasks listed in T23) | V1 go/no-go |
+| Inbound | Packages 001 to 018 and 020 qualification tasks | They consume the release matrix rows, installer and evidence bundle process from T08, T14 and T15 |
+
+## Completion evidence
+
+For each task append a row when it closes: task, code revision (SHA), exact command, result (pass/fail with counts), OS and build (Windows 11/10 x64 build number or Linux distribution and kernel), runner kind (self-hosted native, hosted, never WSL2), harness and version where relevant (OpenCode v2.0.32), evidence class reached (CODE, SYSTEM, USER), bundle digest and reviewer. No commit or push is implied by task completion. Statuses above are source-audit classifications at the date of this revision, not qualification.
+
+| Task | Revision | Command | Result | OS/build | Runner | Class | Reviewer |
+|---|---|---|---|---|---|---|---|

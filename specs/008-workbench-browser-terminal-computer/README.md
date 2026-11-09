@@ -1,8 +1,8 @@
 # 008 - Workbench Browser Terminal and Computer
 
-**Status:** DRAFT - review required; does not authorize implementation.
-**Revision:** 0.3 | **Updated:** 2026-11-06
-**Owners to approve:** Desktop shell, Environments, Browser provider, Trust, Desktop UI.
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Revision:** 1.0 | **Updated:** 2026-11-09 | **Owner acceptance:** repository owner, 2026-11-09, via [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)
+**Component owners:** Desktop shell, Environments, Browser provider, Trust, Desktop UI.
 
 ## User outcome
 
@@ -10,7 +10,9 @@ The owner uses the right Workbench to finish real browser and terminal work, tak
 
 ## Current truth
 
-The active Workbench Files pane is a Resource projection/preview, not a live filesystem. Browser is a sandboxed iframe preview, not Chrome or a browser-control provider. Terminal launches no process or IPC: built-in commands print samples and arbitrary commands display a fabricated successful exit code while the UI claims ConPTY/Job Object containment. Diffs are synthetic; Activity has no rendered branch; Computer capture/input is unavailable. No BrowserSession, PTY or Computer route/provider exists. The terminal's fabricated-success and containment claims are a UI truthfulness defect to remove, not a capability to qualify by documentation. This package remains DRAFT.
+The active Workbench Files pane is a Resource projection/preview, not a live filesystem. Browser is an empty-by-default embedded iframe preview labelled as such, not Chrome or a browser-control provider. After register A-51 the Terminal pane (`TerminalPane`) and Review pane (`ReviewPane`) in `apps/litecowork-ui/src/workbench/WorkbenchPanel.tsx` render honest unavailable notices with no fabricated output, exit codes or containment labels. Activity has no rendered branch (the `activity` tab value falls through to Review); Computer capture/input is unavailable and has no status surface. No BrowserSession, PTY, Activity, Diff or Computer route/provider exists.
+
+Accepted decisions (2026-11-09): B-22 `MANAGED_CHROMIUM` with an isolated profile, ambient-CDP discovery and default-profile copy disabled; B-23 one daemon-owned PTY/ConPTY per tab under an admitted Environment with ordered receipts and timeout-as-receipt, qualifying on the Linux x64 row first and visibly UNAVAILABLE on Windows until Feature 005 B-35; B-32 Computer use deferred and explicitly UNAVAILABLE. Revision 1.0 adds the Workbench Activity view and exact-revision/VCS Diffs to scope. The V1 plan is in [TASKS.md](TASKS.md).
 
 ## Package
 

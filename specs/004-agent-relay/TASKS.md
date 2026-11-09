@@ -1,53 +1,239 @@
 # Tasks - Agent Relay on One Conversation
 
-**Feature:** 004 | **Status:** DRAFT - do not execute before SPEC is ACCEPTED/LOCKED.
+**Feature:** 004 | **Status:** ACCEPTED/LOCKED - implementation authorized; tasks not started unless marked.
+**Spec revision:** 1.0 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
 
-**Spec revision:** 0.2
+## Current baseline
 
-## 004-T01 - Lock portable context contract
+Verified against source on 2026-11-09. Served: `PATCH /v1/conversations/{conversation_id}/agent-binding` (`setConversationAgentBinding`) in `apps/litecoworkd/src/conversation_operator.rs`, Tauri `set_conversation_agent_binding` in `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs`, and `conversation.turn.created.v2` pinning `agent_binding_id`. CODE: `build_conversation_context_package` and `CONVERSATION_CONTEXT_MAX_BYTES` in `crates/storage-core/src/conversation.rs`, read by `load_conversation_context_for_turn` in `crates/storage-sqlite/src/conversations.rs`; `encode_conversation_context_prompt` in `apps/litecoworkd/src/agents/conversation_prompt.rs` (256 KiB, rejects resources with `ResourceMaterializationRequired`); `AgentSessionSupervisor` and `execute_agent_turn` in `apps/litecoworkd/src/agents/supervisor.rs` with a single `"opencode"` arm. Desktop: `ConversationsPage.tsx` picker via `buildConversationAgentChoices`; `deriveConversationAgentSurface` in `conversation-agent-surface.ts` has no production caller; `ConversationMessageView` and `parseConversationSnapshot` in `conversation-view.ts` drop `agent_binding_id`/`agent_session_id`. Gaps: no Claude Code arm (B-16); the existing arm is unreachable from a probe-created profile (`OPENCODE` vs `opencode`, Feature 002 SPEC §4a); no producer label; no truncation receipt; no `CONVERSATION_TURN_IN_PROGRESS` single-flight error in source (owned by Feature 001); picker not gated on dispatchability or descriptor freshness.
 
-- **Status:** BLOCKED
+## 004-T01 - Promote portable-context bounds, truncation receipt and relay errors
+
+- **Status:** NOT STARTED
 - **Depends on:** NONE
-- **Owner:** Conversation and Agent Runtime
-- **Allowed paths:** this package
-- **Contract:** SPEC §5
-- **Change intent:** Resolve B-15 and B-16.
-- **Acceptance:** Conversation and Agent Runtime owners approve B-15's portable-context schema, message/resource/artifact reference policy and size/retention bounds; Feature 002 owner records the exact second AgentModule ID, OS/version/auth route and qualification evidence for B-16. No schema or provider identity is inferred from current implementation constants or probe code.
-- **Command:** `python3 .specify/scripts/validate_feature_package.py`
-- **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
+- **Cross-package prerequisites:** Feature 001 contract promotion of context dispatch and the B-07 adapter budget confirmation; orchestrator migration numbering if the receipt is made durable.
+- **Owner:** Conversation, Agent Runtime, API/schema owner.
+- **Allowed paths:** `docs/CONTEXT.md`, `docs/SCHEMAS.md`, `docs/API.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-vNN.sql` (new, only if the receipt is durable), `apps/litecowork-ui/src/api/operator-api.ts` (regenerated), this package.
+- **Contract:** SPEC §5 B-15, §7.2 (`PortableRelayExport`, `PortableContextMaterializer`, `RelayExportError`), AC-002, AC-007, AC-008, AC-011.
+- **Change intent:** Promote the accepted bounds (1,024 messages, 4 MiB package, the smaller of 256 KiB and the adapter's declared text budget), the allowed reference kinds (`ResourceRef`, durable `ArtifactRef`), the exclusion list (`SYSTEM_NOTICE`, drafts, native handles, credentials, harness-private transcripts), the truncation receipt shape, and `RelayExportError` codes mapped to canonical error codes. Decide in this task whether the truncation receipt is a durable record or part of the turn's committed receipt; prefer the latter to avoid a migration.
+- **Acceptance:**
+  - [ ] One normative home per bound and per error; OpenAPI/JSON Schema match; `api:check` passes.
+  - [ ] No relay-only route or event is introduced.
+  - [ ] SPEC §7.2 entries promoted are relabelled in a new SPEC revision with owner approval.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` ; `python3 scripts/audit_v1_contracts.py` ; `pnpm --dir apps/litecowork-ui run api:check`
+- **Evidence:** reviewed docs/schema diff; command output in CURRENT-RUN.md.
+- **Stop:** stop if a bound would need to differ from the Feature 001 package bound without a 001 revision.
 
-## 004-T02 - Export portable context
+## 004-T02 - Preserve producer identity through the desktop message types
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL (Operator and OpenAPI `ConversationMessage` carry nullable `agent_binding_id` and `agent_session_id`; the Tauri bridge forwards the JSON unchanged; `parseConversationSnapshot` drops both).
+- **Depends on:** NONE
+- **Cross-package prerequisites:** NONE (no new contract; can run in Wave 1).
+- **Owner:** Desktop UI, Conversation.
+- **Allowed paths:** `apps/litecowork-ui/src/conversations/conversation-view.ts`, `apps/litecowork-ui/src/conversations/conversation-stream.ts` (merge of streamed messages only), `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs` (tests only, asserting pass-through), `apps/litecowork-ui/tests/conversation-view.test.ts`, `apps/litecowork-ui/tests/conversation-stream.test.ts`, `crates/storage-sqlite/src/conversations.rs` (provenance test only).
+- **Contract:** SPEC §4, §7.2 `ConversationMessageView`, AC-014, AC-012; docs/schemas/operator-api.openapi.yaml `ConversationMessage`.
+- **Change intent:** Add `agent_binding_id: string | null` and `agent_session_id: string | null` to `ConversationMessageView`; in `parseConversationSnapshot` accept `null` or a bounded id matching the existing id rule and throw "Conversation history contains an invalid message." otherwise; carry both through `mergeConversationStreamSnapshot` and `sameCommittedMessage` so a stream merge never erases them. Add a storage test that a committed AGENT message keeps `source_agent_binding_id` after later turns on other bindings.
+- **Acceptance:**
+  - [ ] AC-014: a snapshot with producer fields round-trips into `ConversationMessageView`; a malformed id is rejected, not dropped.
+  - [ ] AC-012: after A, B, A turns, each committed AGENT message keeps its own producer binding.
+  - [ ] Negative: a USER or SYSTEM_NOTICE message with null producer parses; a native handle-like value never appears in the type.
+  - [ ] Pagination: an older page loaded after a newer one keeps producer fields on both.
+- **Command:** `pnpm --dir apps/litecowork-ui test` ; `cargo test -p litecowork-ui --locked conversation_bridge` ; `cargo test -p storage-sqlite --locked conversation_message_provenance` (filter to be added by this task)
+- **Evidence:** test names; docs/IMPLEMENTATION-STATUS.md 004 row "producer identity parsed".
+- **Stop:** stop if the Operator response shape differs from the OpenAPI `ConversationMessage` schema.
+
+## 004-T03 - Portable relay export with filtering, bounds and truncation receipt
+
+- **Status:** PARTIAL (`build_conversation_context_package` orders by event revision, excludes `SYSTEM_NOTICE`, carries `source_agent_binding_id`, enforces 1,024 messages / 4 MiB; no truncation receipt, no cross-Workspace reference check, no adapter-budget input).
 - **Depends on:** T01
-- **Owner:** Conversation
-- **Allowed paths:** context export
-- **Contract:** SPEC LLD
-- **Change intent:** Build the export filter and tests for secret exclusion and budget handling.
-- **Acceptance:** AC-002, AC-007, AC-008, AC-011; the export excludes native handles, private transcripts, credentials and cross-Workspace refs, refuses or receipts an over-budget prefix, and builds within a bounded budget.
-- **Command:** `cargo test -p litecoworkd --locked portable_context_export`
-- **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
+- **Cross-package prerequisites:** Feature 003 Resource materializer for non-empty `resource_refs` (until then refs stay refused with `ResourceMaterializationRequired`).
+- **Owner:** Conversation, Storage.
+- **Allowed paths:** `crates/storage-core/src/conversation.rs`, `crates/storage-sqlite/src/conversations.rs` (`load_conversation_context_for_turn`), `apps/litecoworkd/src/agents/conversation_prompt.rs`, related unit tests in those files.
+- **Contract:** SPEC §5 B-15, §7, §10, AC-002, AC-007, AC-008, AC-011.
+- **Change intent:** Implement `PortableContextMaterializer::export_for_relay` over the existing builder: take the target adapter text budget as input, select the most recent contiguous committed prefix within the smaller bound, and either refuse with `OverBudget` or emit a truncation receipt naming the first included revision; reject any reference whose Workspace differs (`CrossWorkspaceRef`); assert no private field is present (`PrivateFieldPresent`). Read the prefix with one bounded, index-ordered query capped at 1,024 rows instead of loading full history.
+- **Acceptance:**
+  - [ ] AC-002: the export for B contains committed messages and allowed refs only; no A session id, native handle or transcript.
+  - [ ] AC-007: an over-budget history returns a truncation receipt or a refusal, never a silent drop.
+  - [ ] AC-008: a cross-Workspace ref is rejected; credentials and handles never reach the encoder.
+  - [ ] AC-011: building over a 10,000-message Conversation reads at most 1,024 rows (query-count assertion).
+- **Command:** `cargo test -p storage-core --locked conversation_context` ; `cargo test -p storage-sqlite --locked portable_context_export` (filter to be added by this task) ; `cargo test -p litecoworkd --locked conversation_prompt`
+- **Evidence:** test names in CURRENT-RUN.md.
+- **Stop:** stop if the export would need any field from a native session record.
 
-## 004-T03 - Admit relay turns on one Conversation
+## 004-T04 - Relay admission: fresh revalidation, no fallback, single-flight, no Task writes
 
-- **Status:** NOT STARTED
-- **Depends on:** T02
-- **Owner:** Agent Runtime
-- **Allowed paths:** supervisor turn admission
-- **Contract:** 001 supervisor plus this SPEC
-- **Change intent:** After T01 is accepted, execute A→B→A on one Conversation using a new durable Conversation AgentSession per turn and a distinct qualified native adapter for B; reconcile Feature 001 admission/settlement dependencies first.
-- **Acceptance:** AC-001, AC-003, AC-004, AC-006, AC-009, AC-010; A→B→A admits each turn with fresh revalidation and a new session, rejects concurrent submits, keeps the draft on stale B, creates no Task/Attempt/lease/grant, and reloads only committed turns after restart.
-- **Command:** `cargo test -p litecoworkd --locked conversation_agent_relay`
-- **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
-
-## 004-T04 - Show per-turn producer
-
-- **Status:** NOT STARTED
+- **Status:** PARTIAL (`setConversationAgentBinding` commits future-turn selection with CAS and idempotency; admission checks a fresh compatible offer through `resolve_conversation_session_host_in_transaction`; single-flight and the descriptor gate are not enforced).
 - **Depends on:** T03
-- **Owner:** Desktop UI
-- **Allowed paths:** conversation transcript
-- **Contract:** ui-behavior
-- **Change intent:** Render producer without implying shared native memory.
-- **Acceptance:** AC-005, AC-012; each committed turn resolves and displays its `source_agent_binding_id` and earlier-turn provenance is preserved.
+- **Cross-package prerequisites:** Feature 001 single-flight in storage and durable dispatch outbox; Feature 002 fresh-descriptor gate on enable and admission.
+- **Owner:** Conversation, Agent Runtime.
+- **Allowed paths:** `crates/storage-sqlite/src/conversations.rs` (turn admission only), `apps/litecoworkd/src/conversation_operator.rs` (submit path validation only), `apps/litecoworkd/src/conversation_operator_tests.rs`, `apps/litecoworkd/tests/conversation_agent_relay.rs` (new).
+- **Contract:** SPEC §5 B-16, §7, §11, AC-001, AC-003, AC-004, AC-006, AC-009.
+- **Change intent:** At turn admission, revalidate the turn's pinned binding (enabled, lead-eligible, fresh offer, fresh descriptor once Feature 002 serves it) inside the admission transaction; on failure settle the request as rejected with the canonical unavailable code and keep the draft; never substitute the previous binding or Workspace default. Rely on Feature 001's single-flight for concurrent submits and add relay-specific tests. Assert no Task, Attempt, DelegationProfile, Environment, lease, grant or `task.lead_agent.changed.v1` row is written.
+- **Acceptance:**
+  - [ ] AC-001: switching A to B then submitting admits B only after revalidation.
+  - [ ] AC-004: a stale or disabled B fails admission, zero native dispatch to A, draft preserved.
+  - [ ] AC-009: an A turn still RUNNING makes a B submit fail with the Feature 001 in-progress code.
+  - [ ] AC-006: Task/Attempt/lease/grant row counts are unchanged across A→B→A.
+  - [ ] AC-003: returning to A shows B's committed messages in history.
+  - [ ] Race: a binding switch committed while a submit is in flight affects only the next turn (pinned binding wins).
+- **Command:** `cargo test -p litecoworkd --locked conversation_agent_relay` (filter to be added by this task) ; `cargo test -p storage-sqlite --locked conversation_turn_admission` (filter to be added by this task)
+- **Evidence:** test names; docs/IMPLEMENTATION-STATUS.md relay admission row.
+- **Stop:** stop if admission would need a network or process call inside the transaction.
+
+## 004-T05 - Claude Code dispatch arm in AgentSessionSupervisor (B-16)
+
+- **Status:** NOT STARTED (`execute_agent_turn` has one `"opencode"` arm and an `other =>` unsupported arm).
+- **Depends on:** T03
+- **Cross-package prerequisites:** Feature 002 OpenCode binding fix and `NativeProviderKey` (Wave 1); Feature 002 Claude Code CLI second module with pinned version, transport and auth (Wave 4); Feature 001 final-response commit with retry ordinal and provider-response identity (B-04 caveat) and native stop/quiescence.
+- **Owner:** Agent Runtime, Conversation.
+- **Allowed paths:** `apps/litecoworkd/src/agents/supervisor.rs`, `apps/litecoworkd/src/agents/claude_code.rs` (new adapter), `apps/litecoworkd/src/agents/mod.rs`, `apps/litecoworkd/src/agents/conversation_prompt.rs` (adapter budget input only), `apps/litecoworkd/tests/claude_code_conversation.rs` (new).
+- **Contract:** SPEC §5 B-16, §7, §7.2 dispatch match, §10, AC-013, AC-002, AC-010; Feature 002 B-11; docs/AGENT-CONTROL.md.
+- **Change intent:** Refactor `execute_agent_turn` to match `NativeProviderKey` and move the existing body into `run_opencode_turn`. Add `run_claude_code_turn`: resolve the executable from the binding's registered `endpoint_ref`, start the CLI in the non-interactive streaming mode pinned by the Feature 002 fixture with a cleared environment allow list (as `OpenCodeEnvironment::from_current_process` does), a new native session every turn and no resume flag, the Workspace root as working directory, the portable prompt on stdin, bounded stdout framing behind the Adapter 1.0 framed transport contract, process lifetime under Job Object (Windows) or process group (Linux) as lifetime control only, never an isolation claim. Normalize output as untrusted, then activate the session and commit through `commit_conversation_agent_response` exactly like the OpenCode arm. Unknown keys and Codex keep failing closed.
+- **Acceptance:**
+  - [ ] AC-013: a Claude Code binding turn creates a fresh AgentSession and native session and commits one AGENT message with `source_agent_binding_id` = the Claude Code binding, on Windows x64 and Linux x64.
+  - [ ] AC-013 negative: Codex and unknown keys fail the turn with the unsupported reason and no native spawn; no fallback to OpenCode.
+  - [ ] AC-002: the stdin payload contains only the portable prompt (captured in test).
+  - [ ] Timeout-after-dispatch and malformed output settle the turn FAILED with the session marked lost; no partial message committed.
+  - [ ] Security: no credential, cookie or native session handle is written to logs or projections.
+- **Command:** `cargo test -p litecoworkd --locked claude_code_conversation` (filter to be added by this task) ; `cargo test -p litecoworkd --locked supervisor`
+- **Evidence:** test names; per-OS transcript in CURRENT-RUN.md with CLI version.
+- **Stop:** stop if the CLI cannot run non-interactively without credential copying, or if a fresh native session per turn cannot be guaranteed.
+
+## 004-T06 - Picker gated on dispatchability and descriptor freshness
+
+- **Status:** PARTIAL (`buildConversationAgentChoices` filters Workspace, enabled and lead-eligible; `deriveConversationAgentSurface` exists with tests and no production caller).
+- **Depends on:** T05
+- **Cross-package prerequisites:** Feature 002 descriptor producer and composer option projection (shared picker gating).
+- **Owner:** Desktop UI, Agent Runtime.
+- **Allowed paths:** `apps/litecowork-ui/src/conversations/conversation-agent-selection.ts`, `apps/litecowork-ui/src/conversations/conversation-agent-surface.ts`, `apps/litecowork-ui/src/conversations/ConversationsPage.tsx` (picker region only), `apps/litecowork-ui/tests/conversation-agent-selection.test.ts`, `apps/litecowork-ui/tests/conversation-agent-surface.test.ts`.
+- **Contract:** contracts/ui-behavior.md "Target flows and states", AC-015, AC-004.
+- **Change intent:** Feed the picker from the daemon's per-binding projection (dispatchable provider + descriptor freshness) and wire `deriveConversationAgentSurface` into production, reduced to rendering that projection. Non-selectable bindings render disabled with reason text ("No Conversation adapter for this agent", "Descriptor stale - refresh", "Sign-in required").
+- **Acceptance:**
+  - [ ] AC-015: a Codex binding and a stale-descriptor binding are visible but disabled with reasons; an OpenCode or Claude Code binding with a fresh descriptor is selectable.
+  - [ ] AC-004: selecting a binding that turns stale before Send results in rejection with the draft kept.
+  - [ ] Accessibility: disabled options expose `aria-disabled` plus the reason as description; keyboard navigation skips nothing silently.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** UI test names.
+- **Stop:** stop if the projection would have to be computed in TypeScript from raw descriptors.
+
+## 004-T07 - Relay UI states and producer label
+
+- **Status:** NOT STARTED
+- **Depends on:** T02, T06
+- **Cross-package prerequisites:** Feature 011 app-wide keyboard and focus baseline.
+- **Owner:** Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/src/conversations/ConversationsPage.tsx` (transcript message header and picker notice), `apps/litecowork-ui/src/conversations/conversations-page.css`, `apps/litecowork-ui/tests/conversation-relay-ui.test.ts` (new).
+- **Contract:** contracts/ui-behavior.md, AC-005, AC-004, AC-014.
+- **Change intent:** Render on each committed AGENT message a producer label resolved from its stored `agent_binding_id` to the binding/profile display name, falling back to a neutral "Unknown agent" plus the binding id; never use the current picker value. Show the switch notice "Applies to your next message; the running reply keeps its agent". Show loading, empty, error, denied, offline, stale and recovery states for the picker and transcript.
+- **Acceptance:**
+  - [ ] AC-005: after reload, three turns A, B, A show OpenCode, Claude Code, OpenCode labels.
+  - [ ] A deleted or disabled binding still labels its historical messages (neutral fallback).
+  - [ ] Accessibility: the label is text (not color only), part of the message's accessible name, and readable by screen readers; contrast meets the 011 baseline.
+- **Command:** `pnpm --dir apps/litecowork-ui test` ; `pnpm --dir apps/litecowork-ui run build`
+- **Evidence:** UI test names; V1-UI-ACTION-STATE-LEDGER rows updated by T11.
+- **Stop:** stop if the label would need data not present in the committed message.
+
+## 004-T08 - Relay failure and recovery
+
+- **Status:** NOT STARTED
+- **Depends on:** T04, T05
+- **Cross-package prerequisites:** Feature 001 durable dispatch outbox, startup sweep, UNKNOWN reconciliation and effective Stop with observed quiescence.
+- **Owner:** Conversation, Agent Runtime.
+- **Allowed paths:** `apps/litecoworkd/tests/conversation_agent_relay.rs`, `apps/litecoworkd/tests/claude_code_conversation.rs`, plus fixes inside files owned by T03-T05.
+- **Contract:** SPEC §11, §12, contracts/errors-recovery.md, AC-010, AC-004, AC-009.
+- **Change intent:** Exercise: daemon restart with a B turn RUNNING (reload committed only, session lost, no A replay, no uncommitted B output); B partial stream then switch back to A; timeout after dispatch on B reconciled through the 001 outbox as UNKNOWN then settled; duplicate submit replay returns the original turn; Stop on B racing a binding switch; Claude Code process killed mid-turn.
+- **Acceptance:**
+  - [ ] AC-010: after restart only committed turns load; A's prior session is never reused.
+  - [ ] UNKNOWN outcomes are shown as unknown until reconciled; never as success.
+  - [ ] Duplicate replay creates no second turn or message.
+- **Command:** `cargo test -p litecoworkd --locked conversation_agent_relay` ; `python3 scripts/v1_resilience_matrix.py`
+- **Evidence:** recovery report in CURRENT-RUN.md.
+- **Stop:** stop if recovery depends on the native process still being alive.
+
+## 004-T09 - Cross-layer trace for relay operations
+
+- **Status:** NOT STARTED
+- **Depends on:** T07, T08
+- **Cross-package prerequisites:** NONE
+- **Owner:** Conversation, Desktop UI.
+- **Allowed paths:** this package (`contracts/ui-behavior.md`, `WIRING.yaml`), `docs/V1-UI-ACTION-STATE-LEDGER.md` (relay rows).
+- **Contract:** AGENTS.md §4; AC-001, AC-005, AC-013, AC-015.
+- **Change intent:** For Switch agent, Send on B, Return to A and Reload history, record control -> Tauri command (`set_conversation_agent_binding`, turn submit) -> Operator route -> authorization -> ConversationService -> transaction/CAS -> event (`conversation.agent_binding.changed.v1`, `conversation.turn.created.v2`, settlement) -> projection -> restart -> evidence. Replace the generic WIRING nodes (`owner`, `harness_b`) with named owners and the Claude Code edge.
+- **Acceptance:**
+  - [ ] Every relay control has a complete trace with real symbol names and a test id.
+  - [ ] WIRING edges name the real services and keep `external_calls_inside: false`.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` ; `python3 scripts/audit_served_routes.py`
+- **Evidence:** trace tables in contracts/ui-behavior.md.
+- **Stop:** stop if a trace step cannot be named from source.
+
+## 004-T10 - E2E-02 qualification on the release matrix
+
+- **Status:** NOT STARTED
+- **Depends on:** T09
+- **Cross-package prerequisites:** Feature 002 qualification of both modules; Feature 001 E2E-01; Feature 019 packaged installer and release matrix.
+- **Owner:** Conversation, Product (owner USER evidence).
+- **Allowed paths:** evidence only: `CURRENT-RUN.md`, `docs/IMPLEMENTATION-STATUS.md` (004 rows).
+- **Contract:** docs/ACCEPTANCE-AND-E2E-PLAN.md E2E-02; AC-001 to AC-015.
+- **Change intent:** On the packaged desktop, Windows x64: OpenCode 2.0.32 turn, switch to Claude Code, turn, switch back, turn, reload, restart. Repeat on Linux x64. Include denial (stale B, unsupported binding), duplicate replay, timeout-after-dispatch and restart. WSL2 is not evidence.
+- **Acceptance:**
+  - [ ] CODE: all task commands green at one recorded revision.
+  - [ ] SYSTEM: packaged run per row with real harnesses.
+  - [ ] USER: owner performs E2E-02 per row and records pass/fail.
+  - [ ] Evidence shows no private transcript or credential transfer (export capture).
+- **Command:** `python3 scripts/v1_platform_matrix.py` ; `cargo test -p litecoworkd --locked conversation_agent_relay`
+- **Evidence:** evidence bundle per row (build, OS, both harness versions, auth routes).
+- **Stop:** stop if either harness is not qualified on the row under Feature 002.
+
+## 004-T11 - Documentation and ledger sync
+
+- **Status:** NOT STARTED
+- **Depends on:** T10
+- **Cross-package prerequisites:** orchestrator-owned register and traceability updates.
+- **Owner:** Conversation, documentation owner.
+- **Allowed paths:** `docs/IMPLEMENTATION-STATUS.md`, `docs/schemas/served-route-inventory.json` (regenerated), `docs/V1-UI-ACTION-STATE-LEDGER.md`, this package.
+- **Contract:** AGENTS.md §1 item 6; SPEC §4.
+- **Change intent:** Update SPEC §4 and IMPLEMENTATION-STATUS to the evidence level recorded in T10, regenerate the served-route inventory, update UI ledgers, and ask the orchestrator to close B-15/B-16 register rows as implemented.
+- **Acceptance:**
+  - [ ] No claim exceeds T10 evidence; the inventory matches source.
+- **Command:** `python3 scripts/audit_served_routes.py` ; `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** diffs of status and inventory.
+- **Stop:** stop if a doc would claim a higher level than recorded.
+
+## 004-T12 - Package VERIFIED for V1
+
+- **Status:** NOT STARTED
+- **Depends on:** T01-T11
+- **Cross-package prerequisites:** Feature 001 and Feature 002 VERIFIED records for shared rows.
+- **Owner:** Product (owner sign-off), Conversation.
+- **Allowed paths:** this package (status lines), `CURRENT-RUN.md`.
+- **Contract:** AGENTS.md §3 lifecycle; AC-001 to AC-015.
+- **Change intent:** Assemble the evidence bundle (per-task revision, command, result, OS, harness versions, auth routes, reviewer), move status ACCEPTED/LOCKED -> IMPLEMENTING -> VERIFIED and record owner sign-off.
+- **Acceptance:**
+  - [ ] Every AC-001 to AC-015 maps to a passing recorded test and, where user-visible, a USER record.
+  - [ ] Owner sign-off recorded with date and revision.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
-- **Stop:** stop if a blocker in SPEC section 5 is unresolved or a contract change lacks owner promotion.
+- **Evidence:** evidence bundle index in CURRENT-RUN.md.
+- **Stop:** stop if any release-matrix row lacks USER evidence.
+
+## Dependency order
+
+T01 and T02 start in parallel (T02 needs no new contract). T01 -> T03 -> T04 and T03 -> T05. T05 -> T06. T02 + T06 -> T07. T04 + T05 -> T08. T07 + T08 -> T09 -> T10 -> T11 -> T12.
+
+## Cross-package dependencies
+
+Cross-package task numbers are being re-authored in parallel, so this table names the owning package and outcome instead of a task number.
+
+| This task | Other package (outcome) | Reason |
+|---|---|---|
+| T01 | Feature 001 (context dispatch contract, B-07 budget) | The relay reuses 001's package bounds. |
+| T03 | Feature 003 (Resource materializer) | Non-empty `resource_refs` stay refused until materialized. |
+| T04 | Feature 001 (single-flight, outbox), Feature 002 (fresh-descriptor gate) | Admission semantics are owned there. |
+| T05 | Feature 002 (OpenCode binding fix, `NativeProviderKey`, Claude Code module), Feature 001 (final-response commit, stop/quiescence) | The arm needs a pinned module and a durable commit path. |
+| T06 | Feature 002 (descriptor projection, composer option gating) | Shared picker gating. |
+| T07 | Feature 011 (keyboard and focus baseline) | App-wide accessibility baseline. |
+| T08 | Feature 001 (outbox, startup sweep, UNKNOWN reconciliation, Stop) | Recovery is 001-owned; 004 adds relay cases. |
+| T10 | Feature 002 (both modules qualified), Feature 019 (release matrix, installer) | Packaged E2E-02 rows. |
+
+## Completion evidence
+
+For each task record in CURRENT-RUN.md: task id, git revision, exact command(s), result (pass/fail with test counts), OS and build (Windows 11/10 x86_64-pc-windows-msvc or Linux x86_64), harness versions (OpenCode 2.0.32 and the pinned Claude Code CLI version), auth routes, reviewer and date. A task is DONE only when its acceptance boxes are checked against that record. Evidence levels follow AGENTS.md §5.

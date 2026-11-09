@@ -1,8 +1,8 @@
 # 011 - Desktop Shell IPC Settings and Runtime Health
 
-**Status:** DRAFT - review required; does not authorize implementation.
-**Revision:** 0.2 | **Updated:** 2026-11-06
-**Owners to approve:** Runtime, Operator IPC, Desktop UI, Product, Security/Trust.
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Revision:** 1.0 | **Updated:** 2026-11-09 | **Owner acceptance:** repository owner, 2026-11-09, via [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)
+**Component owners:** Runtime, Operator IPC, Desktop UI, Product, Security/Trust.
 
 ## User outcome
 
@@ -17,6 +17,8 @@ The target includes General, Notifications, Workspaces, Agents, Connections & To
 ## Current truth
 
 The mounted SettingsView is a four-category partial surface: General, Workspaces, Agents and Runtime. Workspace selection/create/instruction revisions/archive, bounded agent catalogue/probe/binding actions and Runtime start/refresh/lifecycle observation are present. General appearance controls are inert component-local state; shortcut labels are display-only. WorkspaceRoot management, Workspace policy mutation and Runtime enrollment are not rendered by this component. The alternate SettingsPage in App.tsx is unmounted. Earlier nine-category and Browser/cache/TLS/Shell Engine/approval/Credential Store claims are stale; Workbench Browser/Terminal belong to Feature 008. See docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md and docs/IMPLEMENTATION-STATUS.md.
+
+Accepted decisions (2026-11-09): B-28 Windows 11/10 x64 named-pipe DACL profile first (OpenCode v2.0.32 the first route), Linux x64 0600/0700 socket second, WSL2 never counts; B-29/B-33 only served-owner Settings controls are interactive and inert controls are removed; A-35 this package owns the Settings -> Agents screen and links to Feature 010 for quiet hours. Revision 1.0 adds the authenticated Operator stop and update/quiescence gate, keep-awake, Workspace rename/archive in Settings and an app-wide keyboard/focus baseline. The authenticated stop route stays unmounted (`apps/litecoworkd/src/runtime.rs`) until settlement is proven. The V1 plan is in [TASKS.md](TASKS.md). Usage dashboards are owned by Feature 018; Backup by Feature 017.
 
 Usage projections and historical usage UI are not served. The telemetry LLD is normative target only. The new Settings specification does not authorize fake values or placeholder controls.
 

@@ -1,10 +1,12 @@
 # 003 - Workspace Roots and Context Ingestion
 
 **ID:** 003
-**Status:** DRAFT
+**Status:** ACCEPTED/LOCKED
 **Owners:** Resource, Conversation, Storage, Security/Trust, Desktop UI
-**Updated:** 2026-11-06
-**Revision:** 0.2
+**Updated:** 2026-11-09
+**Revision:** 1.0 (revision 1.0 adds V1 gap coverage per owner acceptance 2026-11-09: Windows WorkspaceRoot add and scan, Windows path-identity tests, persisted ContextAttachment, retrieval receipt called from Send, @-reference ResourceRef picker; AC-013 to AC-019)
+**Owner acceptance:** accepted 2026-11-09 by the repository owner (sarv-projects) via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md) (PR #1), including each scoped caveat as a binding condition. Acceptance authorizes implementation; it is not a claim of implementation, SERVED, INTEGRATED or QUALIFIED status.
+**Change control:** a change to a locked contract in this package from now on requires a new revision and renewed owner approval (SPECIFICATION-STANDARD §7).
 **Target release:** V1 local desktop
 **Dependencies:** root ARCHITECTURE.md, docs/V1-PRODUCT-RELEASE-CONTRACT.md, docs/IMPLEMENTATION-MASTER-PLAN.md, and the owner documents named in RESEARCH.md. Feature 001 remains the Conversation send authority.
 
@@ -19,6 +21,8 @@ Observable outcome: The owner attaches a folder as a persistent WorkspaceRoot, a
 - Create, pause, resume and revoke WorkspaceRoots with overlap rejection and private locators.
 - Ingest bounded Resources with revision and digest identity.
 - Expose Context Used only from actual ContextAttachments and retrieval receipts.
+- Qualify WorkspaceRoot add and manual metadata rescan on the first GA row (Windows 11/10 `x86_64-pc-windows-msvc`) and on the Linux x86_64 second row, with symlink, reparse-point and path-identity denial tests (V1 gap coverage, revision 1.0).
+- Persist ContextAttachments and a durable retrieval receipt from the Feature 001 Send path, and let the owner pick explicit ResourceRefs with an @-reference picker in the Feature 001 composer (V1 gap coverage, revision 1.0).
 - After revoke, exclude that root from future retrieval while retaining historical provenance that does not re-expose bytes.
 
 ## 3. Non-goals
@@ -45,7 +49,7 @@ The active checkout has partial WorkspaceRoot, Resource upload/index and local g
 | Context Used | No persisted ContextAttachment domain record/table/event or production UI call site was found; `CONTEXT_ATTACHMENT` appears only as an AgentControl capability enum | AC-006 is not implemented. The UI helper `resources/retrieval-grounding.ts` has no production call site; there is no Context Used surface. |
 | Desktop UI | `App.tsx` has Persistent folders list, Add, pause/resume/revoke, manual scan and `WorkspaceRootObservations`; Resource/Library/Workbench views show resource projections and read-only revision preview | Root observation UI explicitly says metadata only and no content read/watch/index. On Windows, Add remains clickable but fails with 503; Scan is attempted once, then `SCAN_UNSUPPORTED_PLATFORM` feedback disables further scans. No Context Used UI exists. |
 
-Code or a route alone does not qualify the feature. This package remains DRAFT until its named owners accept the decisions and supporting contracts.
+Code or a route alone does not qualify the feature. The design decisions are owner-accepted and the package is ACCEPTED/LOCKED (2026-11-09). Implementation and qualification status are unchanged by acceptance and are tracked in this section and in [docs/IMPLEMENTATION-STATUS.md](../../docs/IMPLEMENTATION-STATUS.md).
 
 ## 5. LOCKED and FLEXIBLE decisions
 
@@ -63,16 +67,16 @@ Code or a route alone does not qualify the feature. This package remains DRAFT u
 - Module file layout and private helper names, provided the transactions and secret boundaries stay intact.
 - Presentation copy, provided state distinctions remain visible.
 
-### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
+### ACCEPTED DECISIONS AND ARCHITECTURAL CONTRACTS
 
-These PROPOSED resolutions mirror the specs/001 §5 style and are authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. Both blockers remain open and pending owner decision in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md).
+These resolutions were accepted as written by the repository owner on 2026-11-09 via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). The register rows in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md) are closed by the orchestrator, not by this package.
 
-| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+| ID | Topic | Accepted resolution and architectural contract | Canonical authority and consequence |
 |---|---|---|---|
-| B-13 | First supported Workspace ingestion formats | **PROPOSED: Qualify exactly the already-allowlisted UTF-8 lexical text set first.** The first GA ingestion formats are the formats the local text index already bounds: TXT, Markdown, CSV, JSON, JSONL, NDJSON, Rust, Python, TOML, YAML, JavaScript, TypeScript and CSS, each capped at 1 MiB with the existing control-character and term-count bounds. PDF, Office, archive, image, audio and video stay opaque stored originals (no extraction/index) in this slice. ZIP contents remain unexpanded. Every ingested revision carries a content digest; a format outside the set is stored opaque and fails retrieval indexing, not the whole root. | [WORLD-RESOURCES.md](../../docs/WORLD-RESOURCES.md), [CONTEXT.md](../../docs/CONTEXT.md). Keeps ingestion bounded and qualifiable per format; this is a local lexical index, not embeddings/vector retrieval, until an owner promotes a second provider. |
-| B-14 | Watcher versus explicit rescan behavior | **RECOMMENDED: Explicit manual rescan is the GA default; no filesystem watcher ships in V1.** A rescan is an owner-initiated bounded metadata census (1,000 entries, depth 32, 1 MiB relative-locator budget, 8s deadline stopping traversal at 7s, two concurrent jobs); it commits FILE membership only and never silently tombstones unseen Resources. A watcher is target-only and deferred until OS notification semantics and invalidation are owned in WORLD-RESOURCES. Scan stays Linux-only; non-Linux returns `SCAN_UNSUPPORTED_PLATFORM`. | [WORLD-RESOURCES.md](../../docs/WORLD-RESOURCES.md), [STATE-MACHINES.md](../../docs/STATE-MACHINES.md). Avoids an unowned notification/invalidation contract; manual rescan is deterministic and already bounded in source. |
+| B-13 | First supported Workspace ingestion formats | **ACCEPTED (2026-11-09): Qualify exactly the already-allowlisted UTF-8 lexical text set first.** The first GA ingestion formats are the formats the local text index already bounds: TXT, Markdown, CSV, JSON, JSONL, NDJSON, Rust, Python, TOML, YAML, JavaScript, TypeScript and CSS, each capped at 1 MiB with the existing control-character and term-count bounds. PDF, Office, archive, image, audio and video stay opaque stored originals (no extraction/index) in this slice. ZIP contents remain unexpanded. Every ingested revision carries a content digest; a format outside the set is stored opaque and fails retrieval indexing, not the whole root. | [WORLD-RESOURCES.md](../../docs/WORLD-RESOURCES.md), [CONTEXT.md](../../docs/CONTEXT.md). Keeps ingestion bounded and qualifiable per format; this is a local lexical index, not embeddings/vector retrieval, until an owner promotes a second provider. |
+| B-14 | Watcher versus explicit rescan behavior | **ACCEPTED (2026-11-09): Explicit manual rescan is the GA default; no filesystem watcher ships in V1.** A rescan is an owner-initiated bounded metadata census (1,000 entries, depth 32, 1 MiB relative-locator budget, 8s deadline stopping traversal at 7s, two concurrent jobs); it commits FILE membership only and never silently tombstones unseen Resources. A watcher is target-only and deferred until OS notification semantics and invalidation are owned in WORLD-RESOURCES. Current source: scan is Linux-only and non-Linux returns `SCAN_UNSUPPORTED_PLATFORM`. **Rider (B-02/B-28):** the first GA row is Windows 11/10 `x86_64-pc-windows-msvc`, so V1 requires a Windows manual-rescan scanner with the same bounds (TASKS); macOS keeps returning `SCAN_UNSUPPORTED_PLATFORM` until separately qualified. | [WORLD-RESOURCES.md](../../docs/WORLD-RESOURCES.md), [STATE-MACHINES.md](../../docs/STATE-MACHINES.md). Avoids an unowned notification/invalidation contract; manual rescan is deterministic and already bounded in source. |
 
-Both rows are declared design positions only. This package stays DRAFT; owner acceptance and the exact GA OS are not complete. Do not infer owner sign-off from the presence of a decision row.
+Both decisions are owner-accepted and the package is ACCEPTED/LOCKED. The GA OS is fixed by the B-02/B-28 rider: Windows 11/10 `x86_64-pc-windows-msvc` with OpenCode v2.0.32 first, Linux x86_64 desktop second. Acceptance does not change the current-state evidence in §4; Windows add (503) and scan (501) remain unimplemented until their tasks land.
 
 ## 6. High-level design
 
@@ -127,7 +131,7 @@ Trust boundary: the desktop UI is untrusted; the authenticated Operator is the o
 
 ## 7. Low-level design and interfaces
 
-Follow WORLD-RESOURCES root creation, pause, resume and revoke transactions. ContextAttachments are explicit. Retrieval receipts record resource revision ids. Proposed indexing workers stay outside the admission transaction.
+Follow WORLD-RESOURCES root creation, pause, resume and revoke transactions. ContextAttachments are explicit. Retrieval receipts record resource revision ids. Accepted-target indexing workers stay outside the admission transaction.
 
 ### 7.1 Existing signatures (CODE)
 
@@ -138,12 +142,12 @@ Follow WORLD-RESOURCES root creation, pause, resume and revoke transactions. Con
 - Grounded retrieval: `POST /v1/resources/retrieval` returns revision/digest-bound citations or explicit insufficient evidence; read-only, commits no attachment.
 - Events: `workspace.root.created.v1`, `workspace.root.status.changed.v1`.
 
-### 7.2 PROPOSED signatures (not yet in source)
+### 7.2 Accepted target signatures (not yet in source)
 
-Every signature below is PROPOSED and is not promotable until its canonical owner document and the OpenAPI/schema change together.
+Every signature below is an accepted target interface (not yet in source). It is promoted into its canonical owner document and the OpenAPI/schema in the same change that implements it.
 
 ```rust
-// PROPOSED: commit an explicit ContextAttachment with a retrieval receipt.
+// Accepted target interface (not yet in source): commit an explicit ContextAttachment with a retrieval receipt.
 pub struct CommitContextAttachment {
     pub principal_id: String,
     pub workspace_id: String,
@@ -159,17 +163,41 @@ pub trait ContextAttachmentStore: Send + Sync {
     ) -> Result<CommittedContextAttachment, StoreError>;
 }
 
-// PROPOSED: Context Used projection for a grounded answer.
+// Accepted target interface (not yet in source): Context Used projection for a grounded answer.
 pub struct ContextUsedEntry {
     pub resource_ref: PinnedResourceRef,
     pub root_id: String,
     pub citation_span: Option<CitationSpan>,
 }
+
+// Accepted target interface (not yet in source): durable retrieval receipt written when Send
+// performs grounded retrieval (Feature 001 turn admission calls this owner port).
+pub struct CommitRetrievalReceipt {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub turn_id: String,
+    pub query_digest: ContentDigest,           // digest of the query text, not the text
+    pub provider_id: String,                   // current: local lexical parser id
+    pub citations: Vec<PinnedResourceRef>,     // exact revision + content_digest
+    pub outcome: RetrievalOutcome,             // GROUNDED | INSUFFICIENT_EVIDENCE | PROVIDER_UNAVAILABLE
+    pub idempotency_key: String,
+}
+
+// Accepted target interface (not yet in source): Windows root selection on the GA row.
+// Built on windows_local_security::open_directory_path_without_reparse,
+// VerifiedDirectory::identity (volume serial + 128-bit file id) and
+// windows_absolute_paths_overlap; replaces the cfg(not(linux|macos)) 503 fallback of
+// create_workspace_root_from_native_selection in apps/litecoworkd/src/operator.rs.
+#[cfg(windows)]
+async fn create_workspace_root_from_native_selection(
+    State(state): State<ApiState>, headers: HeaderMap, body: Bytes,
+) -> Result<Json<WorkspaceRootCreatedResponse>, Response>;
 ```
 
-Typed errors (PROPOSED): `ContextAttachmentError::{RootNotActive, RevisionConflicted, IntegrityFailure, OverBound}` reusing the existing `RESOURCE_CONFLICT`/`INTEGRITY_FAILURE` codes; `CONTEXT_ATTACHMENT`-specific codes stay PROPOSED until promoted into SCHEMAS.md and the error registry together.
+Typed errors (accepted target interface, not yet in source): `ContextAttachmentError::{RootNotActive, RevisionConflicted, IntegrityFailure, OverBound}` reusing the existing `RESOURCE_CONFLICT`/`INTEGRITY_FAILURE` codes; `CONTEXT_ATTACHMENT`-specific codes are accepted targets and are not usable until promoted into SCHEMAS.md and the error registry together.
 
-Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Proposed payload fields are PROPOSED until the canonical owner document and machine schema change together.
+Ordering: authorize, compare expected version, commit the durable receipt, then perform any external call, then reconcile. Accepted target payload fields are not served until the canonical owner document and machine schema change together.
 
 ## 8. Data
 
@@ -195,7 +223,7 @@ Reload the last committed owner records. Do not infer success from an intent. Re
 
 ## 13. Configuration and compatibility
 
-Linux and Windows locator encodings differ and both fail closed on malformed input. macOS qualification is separate. Watcher is target-only until B-14 is decided.
+Linux and Windows locator encodings differ and both fail closed on malformed input. Windows UNC, drive-relative, device (`\\.\`), alternate-data-stream and noncanonical component paths fail closed. macOS qualification is separate. B-14 is accepted: no filesystem watcher ships in V1; rescan is manual.
 
 OS qualification is per native desktop. WSL2 does not qualify Windows or Linux GUI behavior.
 
@@ -235,13 +263,22 @@ Performance:
 Integrity:
 - **AC-012:** IF a pinned ResourceRef digest no longer matches the committed content, THEN THE SYSTEM SHALL return `INTEGRITY_FAILURE` and SHALL NOT serve the stale bytes as a citation. Verify: digest-mismatch test.
 
+V1 gap coverage (revision 1.0):
+- **AC-013:** WHEN the owner adds a folder root on Windows x64, THE SYSTEM SHALL open the selected directory without following reparse points, bind the root to its exact volume serial number and file id, reject UNC, drive-relative, device and alternate-data-stream paths, and commit Resource, root, location and private binding in one transaction. Verify: Windows root-selection test matrix on the GA row.
+- **AC-014:** WHEN the owner runs a manual rescan on Windows x64, THE SYSTEM SHALL apply the same bounds as Linux (1,000 entries, depth 32, 1 MiB relative-locator budget, deadline, two concurrent jobs), SHALL NOT traverse junctions, symbolic links or mount points, and SHALL commit FILE membership only. Verify: Windows bounded-census test.
+- **AC-015:** WHILE root add or scan is not qualified on the running platform, THE SYSTEM SHALL disable the control before selection and state why, and SHALL NOT open the folder picker or report a successful scan. Verify: platform-availability render test.
+- **AC-016:** WHEN Send performs grounded retrieval for a turn, THE SYSTEM SHALL commit a durable retrieval receipt bound to the turn, its exact cited revisions and the outcome before dispatch, and an identical replay SHALL return the same receipt. Verify: retrieval-receipt send-path test.
+- **AC-017:** WHEN the owner types @ in the composer, THE SYSTEM SHALL offer only Resources of the current Workspace that are under an ACTIVE root or otherwise admitted, pin each choice to an exact revision, and expose the picker as a keyboard-operable labelled listbox. Verify: @-reference picker render and keyboard test.
+- **AC-018:** WHEN a turn with explicit ResourceRefs is admitted, THE SYSTEM SHALL persist one ContextAttachment per pinned ref with the turn, and after restart Context Used SHALL show the same attachments. Verify: ContextAttachment persistence and restart test.
+- **AC-019:** IF a root is paused or revoked after a ResourceRef was selected but before the turn dispatches, THEN THE SYSTEM SHALL refuse the attachment with a typed root-not-active error and SHALL NOT materialize its bytes to the agent. Verify: revoke-during-send race test.
+
 ## 16. Executable acceptance command
 
 ```bash
 python3 .specify/scripts/validate_feature_package.py specs/003-workspace-roots-context-ingestion
 ```
 
-Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. They are not evidence until run on a recovered source tree.
+Implementation gates are the cargo and pnpm commands named in TASKS.md. They are not evidence until run at an identified revision on the declared release-matrix row.
 
 ## 17. Out-of-bounds
 
@@ -254,9 +291,10 @@ Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. The
 - The active checkout has a real private local-only root-selection route, but its handler is available only on Linux/macOS; the Windows fallback returns 503. The public OpenAPI `POST /workspace-roots` remains target-only.
 - Root scan is explicitly Linux-only; Windows/macOS return 501 `SCAN_UNSUPPORTED_PLATFORM`. Windows lifecycle/status route tests do not qualify add-root or scan.
 - Root scanning is metadata-only. It does not ingest file contents or produce content revisions. The separate Resource upload/index and grounded-retrieval surfaces are not wired into Conversation ContextAttachments or a Context Used UI.
-- The exact first GA OS and ingestion formats remain open; the current Windows desktop cannot complete the root-add/scan journey.
+- The first GA OS (Windows x64, B-02/B-28 rider) and ingestion formats (B-13) are accepted; the current Windows desktop still cannot complete the root-add/scan journey until the Windows tasks land.
+- Open question for implementation: whether Windows 8.3 short names and case variants are normalized before overlap comparison or rejected; `windows_absolute_paths_overlap` currently compares components ordinal case-insensitively and fails closed on noncanonical components.
 
-Each blocker has the owners named above. Resolution gate: owner decision recorded in this SPEC before status leaves DRAFT. Implementation tasks: 003-T01, 003-T02, 003-T03, 003-T04.
+All section 5 decisions are owner-accepted. Implementation tasks run from 003-T01 through 003-T17 in TASKS.md.
 
 ## 7a. Owner facts incorporated 2026-11-01
 
@@ -280,13 +318,20 @@ Read from WORLD-RESOURCES, CONTEXT, and STATE-MACHINES.
 |---|---|---|---|---|
 | Atomic root/location/binding commit | WORLD-RESOURCES, STORAGE | 003-T02 | AC-001 | SQLite atomicity test |
 | Overlap rejection, no locator leak | WORLD-RESOURCES, TRUST | 003-T02 | AC-002 | Overlap rejection test |
-| Startup identity revalidation | WORLD-RESOURCES, STATE-MACHINES | 003-T02 | AC-003 | Startup matrix test |
+| Startup identity revalidation | WORLD-RESOURCES, STATE-MACHINES | 003-T04 | AC-003 | Startup matrix test |
 | Exclude PAUSED/UNAVAILABLE | CONTEXT, WORLD-RESOURCES | 003-T02 | AC-004 | Status-gating test |
 | Revoke fencing, no reactivation | WORLD-RESOURCES | 003-T02 | AC-005 | Revoke fencing test |
-| Context Used from receipts only | CONTEXT, STORAGE | 003-T03 | AC-006 | Projection test |
-| Per-resource ingestion bound | WORLD-RESOURCES, STORAGE | 003-T03 | AC-007 | Bound test |
-| No symlink follow, locator redaction | TRUST, WORLD-RESOURCES | 003-T02 | AC-008 | Symlink + redaction tests |
-| Bounded scan concurrency | WORLD-RESOURCES | 003-T02 | AC-009 | Concurrent-scan test |
-| Distinct status labels | PRESENTATION-RUNTIME, contracts/ui-behavior.md | 003-T04 | AC-010 | Render test |
-| Deadline-bounded census | WORLD-RESOURCES | 003-T02 | AC-011 | Deadline census test |
-| Digest-mismatch integrity failure | STORAGE, CONTEXT | 003-T03 | AC-012 | Digest-mismatch test |
+| Context Used from receipts only | CONTEXT, STORAGE | 003-T12 | AC-006 | Projection test |
+| Per-resource ingestion bound | WORLD-RESOURCES, STORAGE | 003-T07 | AC-007 | Bound test |
+| No symlink follow, locator redaction | TRUST, WORLD-RESOURCES | 003-T06 | AC-008 | Symlink + redaction tests |
+| Bounded scan concurrency | WORLD-RESOURCES | 003-T05 | AC-009 | Concurrent-scan test |
+| Distinct status labels | PRESENTATION-RUNTIME, contracts/ui-behavior.md | 003-T08 | AC-010 | Render test |
+| Deadline-bounded census | WORLD-RESOURCES | 003-T05 | AC-011 | Deadline census test |
+| Digest-mismatch integrity failure | STORAGE, CONTEXT | 003-T09 | AC-012 | Digest-mismatch test |
+| Windows root add with exact identity | WORLD-RESOURCES, SECURITY | 003-T03 | AC-013 | Windows root-selection matrix |
+| Windows bounded manual rescan | WORLD-RESOURCES | 003-T05 | AC-014 | Windows bounded-census test |
+| Platform-unavailable controls disabled | contracts/ui-behavior.md, V1-UI-ACTION-STATE-LEDGER | 003-T08 | AC-015 | Platform-availability render test |
+| Retrieval receipt from Send | CONTEXT, STORAGE, Feature 001 | 003-T10 | AC-016 | Retrieval-receipt send-path test |
+| @-reference ResourceRef picker | CONTEXT, NATIVE-COMPOSER-LLD | 003-T11 | AC-017 | Picker render and keyboard test |
+| Persisted ContextAttachment | CONTEXT, STORAGE | 003-T09 | AC-018 | Persistence and restart test |
+| Revoke-during-send fence | CONTEXT, WORLD-RESOURCES, FAILURE-RECOVERY | 003-T13 | AC-019 | Revoke-during-send race test |

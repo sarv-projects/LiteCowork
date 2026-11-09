@@ -1,5 +1,5 @@
 feature_id: "011"
-status: "DRAFT"
+status: "ACCEPTED/LOCKED"
 nodes:
   - id: "settings-ui"
     owner: SettingsView and category panels
@@ -23,8 +23,14 @@ nodes:
     owner: Observability UsageIngestor/projections (target only)
     kind: service
   - id: "usage-store"
-    owner: immutable inference and quota stores (target only)
+    owner: immutable inference and quota stores (target only; Feature 018 owns the dashboard)
     kind: store
+  - id: "stop-gate"
+    owner: Runtime lifecycle settlement and update quiescence gate (target; route unmounted until settlement proven)
+    kind: service
+  - id: "power"
+    owner: daemon-held OS power assertion provider (target)
+    kind: external
 edges:
   - id: "e-settings-ipc"
     from: "settings-ui"
@@ -62,6 +68,18 @@ edges:
     from: "usage"
     to: "usage-store"
     kind: immutable-inference-and-quota-projection-target-only
+  - id: "e-op-stop-gate"
+    from: "operator"
+    to: "stop-gate"
+    kind: stop-preview-and-request-target-only
+  - id: "e-stop-gate-runtime"
+    from: "stop-gate"
+    to: "runtime"
+    kind: fence-admission-then-drain-target-only
+  - id: "e-runtime-power"
+    from: "runtime"
+    to: "power"
+    kind: hold-or-release-assertion-target-only
 transactions:
   - id: "tx-runtime-lifecycle"
     owner: Runtime
@@ -79,6 +97,14 @@ transactions:
     owner: Observability UsageIngestor
     atomic_records: ["usage_leaf", "dedupe_identity", "price_snapshot_reference", "quota_snapshot_if_observed"]
     external_calls_inside: false
+  - id: "tx-runtime-stop-request"
+    owner: Runtime
+    atomic_records: ["runtime_incarnation", "drain_state", "idempotency_receipt", "audit_record"]
+    external_calls_inside: false
+  - id: "tx-workspace-rename"
+    owner: Workspace owner service
+    atomic_records: ["workspace", "event", "idempotency_receipt", "audit_record"]
+    external_calls_inside: false
 external_boundaries:
   - id: "os-actions"
     owner: native desktop OS bridge
@@ -94,3 +120,8 @@ recovery:
   owner: Runtime lifecycle and canonical domain owners
   source_of_truth: committed-owner-records-plus-fresh-native-os-observations
   restart_action: reload target persisted preferences when that store is implemented (current SettingsView values reset with component state); re-probe-runtime-and-os-assertions; clear-stale-ephemeral-assertion; reconcile-domain-mutations; usage-read-from-durable-leaves-without-double-counting
+
+# Owner-accepted 2026-11-09: status ACCEPTED/LOCKED authorizes implementation only.
+# Stop-gate, power and rename edges are revision 1.0 targets; none is served. The
+# authenticated stop route stays unmounted until Task/Attempt, Effect, lease and local
+# service-reference settlement is proven (apps/litecoworkd/src/runtime.rs).

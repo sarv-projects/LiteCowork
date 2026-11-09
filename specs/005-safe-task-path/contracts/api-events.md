@@ -1,5 +1,7 @@
 # API and events - Safe Task Path
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Currently served Task operations
 
 - `POST /v1/tasks` (`createTask`): creates the durable Task envelope and initial TaskSpecRevision with an idempotency receipt. It does not start planning, an AgentSession, an Attempt or an Environment.
@@ -23,4 +25,4 @@ Target ordering is: authenticate Task/Workspace/producer scope; compare Task and
 
 ## Error contract
 
-Reuse canonical errors from `docs/SCHEMAS.md` and `docs/schemas/error-codes.schema.json`, including `AGENT_UNAVAILABLE`, `STALE_TASK_VERSION`, `STALE_SPEC_REVISION`, `FORBIDDEN`, `CONFLICT`, `DEPENDENCY_UNAVAILABLE`, `STALE_FENCE` and `INTEGRITY_FAILURE` where their owner conditions apply. This DRAFT declares no new ErrorCode or API operation.
+Reuse canonical errors from `docs/SCHEMAS.md` and `docs/schemas/error-codes.schema.json`, including `AGENT_UNAVAILABLE`, `STALE_TASK_VERSION`, `STALE_SPEC_REVISION`, `FORBIDDEN`, `CONFLICT`, `DEPENDENCY_UNAVAILABLE`, `STALE_FENCE` and `INTEGRITY_FAILURE` where their owner conditions apply. This package declares no new operation outside the OpenAPI target set; task T01 promotes the accepted error codes and request bodies (accepted target interfaces, not yet in source). Conversation promotion reuses `createTask` with `conversation_id` and `source_message_refs`.

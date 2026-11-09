@@ -1,0 +1,206 @@
+feature_id: "017"
+name: "Data Portability, Backup and Restore"
+status: "IN_REVIEW"
+spec_revision: "0.1"
+note: "All links are target design pending owner acceptance of B-41. Only the CLI path (main.rs to backup_operator to LocalBackupService) exists as CODE; nothing here is served."
+nodes:
+  - id: "settings-storage-backup-ui"
+    owner: "Desktop UI (Settings Storage and Backup)"
+    kind: "component"
+    responsibility: "Preview, passphrase entry, create/verify/import/offline restore flows, progress, deletion status"
+    implementation_status: "TARGET_ONLY: SettingsCategory has general, workspaces, agents, runtime only"
+    inputs: ["owner intent", "operation and manifest projections"]
+    outputs: ["typed Tauri commands"]
+  - id: "tauri-backup-bridge"
+    owner: "Desktop Tauri bridge"
+    kind: "desktop transport"
+    responsibility: "Typed commands, native dialogs, zeroizing passphrase hand-off, offline restore orchestration"
+    implementation_status: "TARGET_ONLY: backup_bridge.rs does not exist"
+    inputs: ["typed UI command"]
+    outputs: ["authenticated IPC request", "sidecar restore invocation"]
+  - id: "operator-backup-routes"
+    owner: "litecoworkd Operator"
+    kind: "authenticated boundary"
+    responsibility: "Principal from IPC peer, Workspace ownership, idempotency, If-Match, typed errors, no-store"
+    implementation_status: "TARGET_ONLY: four OpenAPI operations are target_only in served-route-inventory.json"
+    inputs: ["IPC request"]
+    outputs: ["service command", "operation and manifest views"]
+  - id: "backup-service"
+    owner: "Daemon BackupService"
+    kind: "domain service"
+    responsibility: "Operation admission and single-flight, spawn_blocking work, progress, cancellation, settlement"
+    inputs: ["validated command"]
+    outputs: ["storage calls", "operation state"]
+  - id: "local-backup-service"
+    owner: "Storage (storage-sqlite LocalBackupService)"
+    kind: "storage library"
+    responsibility: "Workspace-scoped snapshot, container seal and verify, staging, import, restore"
+    implementation_status: "CODE: create_backup, verify_backup, restore_backup, check_upgrade_compatibility; scope and portability gaps per SPEC section 4"
+    inputs: ["snapshot request", "archive path", "passphrase"]
+    outputs: ["outcome records"]
+  - id: "sqlite-store"
+    owner: "Storage"
+    kind: "transaction boundary"
+    responsibility: "backup_operations, workspace_backup_manifests, events, receipts, imported rows"
+    inputs: ["typed storage command"]
+    outputs: ["committed result"]
+  - id: "blob-store"
+    owner: "Storage (FileBlobStore)"
+    kind: "file store"
+    responsibility: "Encrypted blob envelopes read for backup and written for import"
+    inputs: ["blob ref"]
+    outputs: ["envelope bytes"]
+  - id: "os-keystore"
+    owner: "Operating system keystore"
+    kind: "external"
+    responsibility: "Workspace blob keys; never exported"
+    inputs: ["key lookup"]
+    outputs: ["key for in-process decryption"]
+  - id: "archive-file"
+    owner: "Owner file system"
+    kind: "external file"
+    responsibility: "LCBK1 container; untrusted on read"
+    inputs: ["sealed chunks"]
+    outputs: ["container bytes"]
+  - id: "runtime-lifecycle-gate"
+    owner: "Feature 011 Runtime lifecycle"
+    kind: "lifecycle gate"
+    responsibility: "Authenticated stop, observed quiescence, lock release and restart for offline restore"
+    implementation_status: "TARGET_ONLY: no authenticated Operator stop exists"
+    inputs: ["stop request"]
+    outputs: ["quiescence observation"]
+  - id: "offline-restore-cli"
+    owner: "litecoworkd backup CLI"
+    kind: "sidecar process"
+    responsibility: "Restore into an empty directory while the Runtime is stopped"
+    implementation_status: "CODE: backup_operator::restore"
+    inputs: ["archive", "destination", "passphrase file"]
+    outputs: ["restore receipt JSON"]
+  - id: "deletion-status-projection"
+    owner: "Storage read model"
+    kind: "projection"
+    responsibility: "Workspace-level pending, failed and acknowledged purge targets"
+    inputs: ["purge plans", "purge receipts", "Feature 014 tombstones when present"]
+    outputs: ["deletion status rows"]
+  - id: "context-document-deletion-owner"
+    owner: "Feature 003 ContextDocument deletion"
+    kind: "owner route"
+    responsibility: "Purge request and reconciliation; retry semantics"
+    implementation_status: "SERVED: GET/POST /v1/resources/{resource_id}/context-document/deletion"
+    inputs: ["retry with stable idempotency key"]
+    outputs: ["purge state"]
+edges:
+  - id: "e01"
+    from: "settings-storage-backup-ui"
+    to: "tauri-backup-bridge"
+    kind: "typed command"
+    contract: "contracts/ui-behavior.md commands"
+  - id: "e02"
+    from: "tauri-backup-bridge"
+    to: "operator-backup-routes"
+    kind: "authenticated-request"
+    contract: "SPEC 7.2 route table over LOCAL-OPERATOR-IPC"
+  - id: "e03"
+    from: "operator-backup-routes"
+    to: "backup-service"
+    kind: "command"
+    contract: "owner-scoped admission, read and cancel"
+  - id: "e04"
+    from: "backup-service"
+    to: "sqlite-store"
+    kind: "transaction"
+    contract: "tx-backup-operation-admission and tx-backup-manifest-publish"
+  - id: "e05"
+    from: "backup-service"
+    to: "local-backup-service"
+    kind: "blocking call outside transactions"
+    contract: "create_backup_with, verify_backup, import_workspace with BackupProgress"
+  - id: "e06"
+    from: "local-backup-service"
+    to: "sqlite-store"
+    kind: "read snapshot"
+    contract: "VACUUM INTO then Workspace row filter on the copy"
+  - id: "e07"
+    from: "local-backup-service"
+    to: "blob-store"
+    kind: "read and write envelopes"
+    contract: "verbatim copy or portable re-encryption"
+  - id: "e08"
+    from: "local-backup-service"
+    to: "os-keystore"
+    kind: "key lookup"
+    contract: "OsWorkspaceBlobKeyProvider; key never serialized"
+  - id: "e09"
+    from: "local-backup-service"
+    to: "archive-file"
+    kind: "file io"
+    contract: "LCBK1 container write and read-back"
+  - id: "e10"
+    from: "tauri-backup-bridge"
+    to: "runtime-lifecycle-gate"
+    kind: "lifecycle request"
+    contract: "stop and observe quiescence before offline restore"
+  - id: "e11"
+    from: "tauri-backup-bridge"
+    to: "offline-restore-cli"
+    kind: "sidecar spawn"
+    contract: "litecoworkd backup restore into an empty directory"
+  - id: "e12"
+    from: "offline-restore-cli"
+    to: "archive-file"
+    kind: "file read"
+    contract: "verify then stage then swap"
+  - id: "e13"
+    from: "operator-backup-routes"
+    to: "deletion-status-projection"
+    kind: "read"
+    contract: "listWorkspaceDeletionStatus"
+  - id: "e14"
+    from: "tauri-backup-bridge"
+    to: "context-document-deletion-owner"
+    kind: "authenticated-request"
+    contract: "owner retry route with stable idempotency key"
+transactions:
+  - id: "tx-backup-operation-admission"
+    owner: "BackupService via Storage"
+    atomic_records: ["backup_operations row QUEUED", "request receipt"]
+    external_calls_inside: false
+    known_gap: "Target only; no operation table exists"
+  - id: "tx-backup-manifest-publish"
+    owner: "BackupService via Storage"
+    atomic_records: ["workspace_backup_manifests row", "backup_operations SUCCEEDED", "workspace.backup.created.v1", "request receipt"]
+    external_calls_inside: false
+    known_gap: "Today the CLI inserts the manifest row directly after read-back verification"
+  - id: "tx-backup-operation-failure"
+    owner: "BackupService via Storage"
+    atomic_records: ["backup_operations FAILED or CANCELLED with error_code", "request receipt"]
+    external_calls_inside: false
+  - id: "tx-workspace-import-commit"
+    owner: "LocalBackupService import via Storage"
+    atomic_records: ["imported Workspace rows", "capability_grants REVOKED", "Connections reauthentication required", "backup_operations SUCCEEDED", "workspace.imported.v1", "request receipt"]
+    external_calls_inside: false
+  - id: "tx-restore-staging-revoke"
+    owner: "LocalBackupService restore on the staged database"
+    atomic_records: ["capability_grants REVOKED", "runtime_incarnations STOPPED", "restore marker"]
+    external_calls_inside: false
+external_boundaries:
+  - id: "archive-read"
+    owner: "LocalBackupService"
+    input_trust: "untrusted file"
+    timeout: "bounded by size caps and chunk count"
+    retry: "none automatic; owner selects archive again"
+  - id: "os-keystore-access"
+    owner: "OsWorkspaceBlobKeyProvider"
+    input_trust: "os-service"
+    timeout: "finite OS call"
+    retry: "fail operation with typed error; no fallback key"
+  - id: "runtime-stop"
+    owner: "Feature 011 Runtime lifecycle"
+    input_trust: "local-process"
+    timeout: "finite quiescence deadline; first-row value set by 011"
+    retry: "abort restore and restart original installation"
+  - id: "sidecar-restore"
+    owner: "Tauri backup bridge"
+    input_trust: "local-process JSON output"
+    timeout: "finite; progress by file size"
+    retry: "inspect destination; never swap a partial directory"

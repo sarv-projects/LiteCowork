@@ -1,5 +1,7 @@
 # UI behavior - Golden Connection and One Capability Write
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs/V1-UI-SCREEN-CONTRACT.md). Control classes: [V1-SETTINGS-CONTRACT-LEDGER.md](../../../docs/V1-SETTINGS-CONTRACT-LEDGER.md) and [SEMANTIC-SERVED-UI-MAP.md](../../../docs/SEMANTIC-SERVED-UI-MAP.md). Action states: [V1-UI-ACTION-STATE-LEDGER.md](../../../docs/V1-UI-ACTION-STATE-LEDGER.md).
 
 ## Target flow and state distinctions
@@ -20,6 +22,13 @@ Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs
 - The backend connect-or-install route returns 503; its test route returns UNKNOWN without contacting a provider. UI does not simulate a successful connection or grant.
 - Needs You ApprovalDetail is real: it loads an owner-scoped Approval, shows exact action/target/risk/expiry, requires exact digest on APPROVE, preserves the same idempotent decision request after uncertain response and refreshes state. Its copy correctly says approval does not execute the action or create a reusable grant.
 - No connected account list/detail, OAuth start/callback, scope review, connection revoke, provider read/write picker, CapabilityGrant authoring for a connector, or actual Invocation dispatch/reconciliation UI exists.
+
+## Accepted V1 additions (revision 1.0)
+
+- Discover Connections tab: list plus "Connect GitHub", disabled with a stated reason when the keystore probe fails or the OAuth recipe decision (TASKS T02) is not recorded.
+- Connection detail: status, provider scopes in plain words (GitHub scopes are broad; the LiteCowork grant is the narrow control), grants, recent Invocations, Disconnect with confirmation and remote-revoke state (CONFIRMED or OWNER_ACTION_REQUIRED with the GitHub settings link).
+- Golden read and golden write are separate actions; the write shows the exact target and body and routes to Needs You for approval.
+- Managed and Installed tabs stay owned by package 013.
 
 ## Required rendered regression cases after implementation
 

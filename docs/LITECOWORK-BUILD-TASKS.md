@@ -54,7 +54,9 @@ This is the working delivery checklist for the active source tree. It is not a G
 | BT-04.5 | Execute one bounded file edit with CapabilityInvocation/Effect receipt | Timeout-after-effect and idempotent reconciliation |
 | BT-04.6 | Verify independently and present actual evidence | Model self-report is not accepted as verification |
 
-## BT-05 — LiteSPM and Connections (Feature 006)
+## BT-05 — LiteSPM and Connections (Features 013/006)
+
+BT-05.1..BT-05.3 are owned by Feature 013 (LiteSPM package lifecycle bridge); BT-05.4 and BT-05.5 stay with Feature 006.
 
 | ID | Task | Exit evidence |
 |---|---|---|
@@ -64,7 +66,9 @@ This is the working delivery checklist for the active source tree. It is not a G
 | BT-05.4 | Keep install, auth, assignment, grant and invocation separate | UI and service state matrix |
 | BT-05.5 | Qualify one first-party Connection read then one write | Secret custody, scopes, approval, idempotency, revoke |
 
-## BT-06 — Artifacts and intelligent presentation (Feature 007)
+## BT-06 — Artifacts and intelligent presentation (Features 007/016)
+
+BT-06.1 and BT-06.2 are owned by Feature 007; BT-06.3..BT-06.5 are owned by Feature 016 (rich presentation and Intelligent UI).
 
 | ID | Task | Exit evidence |
 |---|---|---|
@@ -114,6 +118,118 @@ This is the working delivery checklist for the active source tree. It is not a G
 | BT-10.3 | Verify Runtime vs Operator vs Task readiness copy | No false “execution ready” indication |
 | BT-10.4 | Complete shell keyboard/focus/reduced-motion tests | Packaged desktop acceptance |
 | BT-10.5 | Run full declared OS/provider release matrix | CODE/SYSTEM/USER and owner sign-off |
+
+## BT-11: Conversation history management (Feature 014)
+
+| ID | Task | Exit evidence |
+|---|---|---|
+| BT-11.1 | Rename, archive and unarchive with CAS and idempotency | 014-T03, 014-T07, 014-T12 |
+| BT-11.2 | Conversation search with in-transaction index maintenance | 014-T04, 014-T08, 014-T11 |
+| BT-11.3 | Delete as tombstone, fenced purge and startup resume (B-38) | 014-T05, 014-T06, 014-T09, 014-T13 |
+| BT-11.4 | Qualify on both release rows | 014-T17 and proposed E2E-14 |
+
+## BT-12: Task control and delegation (Feature 015)
+
+| ID | Task | Exit evidence |
+|---|---|---|
+| BT-12.1 | Typed TaskStatus transitions, pause/resume with quiescence | 015-T03, 015-T04 |
+| BT-12.2 | Steering, cancel fan-out and handoff with late-result fencing | 015-T05..015-T07 |
+| BT-12.3 | Child-Attempt admission, budgets and escalation (B-39, A-37) | 015-T08..015-T10 |
+| BT-12.4 | Linux-row qualification of the delegation pair; Windows after B-35 | 015-T17, 015-T18 and proposed E2E-15 |
+
+## BT-13: Backup, usage and diagnostics (Features 017/018)
+
+| ID | Task | Exit evidence |
+|---|---|---|
+| BT-13.1 | Workspace-scoped snapshot that cannot leak other Workspaces | 017-T03 with canary scan |
+| BT-13.2 | Portable export/import and restore correctness fixes | 017-T04, 017-T05, 017-T08, 017-T09 |
+| BT-13.3 | Usage ledger, projections and export without fabricated zeros | 018-T03..018-T06 |
+| BT-13.4 | Structured redacted log, crash records and support bundle (B-42) | 018-T07..018-T10 |
+| BT-13.5 | Qualify E2E-12 and proposed E2E-16 on both rows | 017-T16, 018-T16 |
+
+## BT-14: Proactivity and quiet learning (Feature 020)
+
+| ID | Task | Exit evidence |
+|---|---|---|
+| BT-14.1 | Fix the deterministic learning gate before first use | 020-T03 |
+| BT-14.2 | Deterministic Suggestion producers with budgets (D-01) | 020-T04..020-T07 |
+| BT-14.3 | Learning storage, service and review UI (B-45) | 020-T08..020-T11 |
+| BT-14.4 | Qualify proposed E2E-17 on both rows | 020-T15 |
+
+## BT-15: Release engineering and V1 go/no-go (Feature 019)
+
+| ID | Task | Exit evidence |
+|---|---|---|
+| BT-15.1 | Native Linux and Windows CI runners; secret scan and dependency audit | 019-T03..019-T05 |
+| BT-15.2 | Signed Windows installers and Linux deb with checksums (B-43) | 019-T08..019-T10 |
+| BT-15.3 | Updater gated on Feature 011 quiescence | 019-T11, 019-T12, 019-T19 |
+| BT-15.4 | Licensing ADR and third-party notices (B-44) | 019-T13 |
+| BT-15.5 | Row-aware qualification matrix, accessibility, performance, resilience | 019-T14..019-T18 |
+| BT-15.6 | V1 go/no-go over every package VERIFIED task | 019-T23 |
+
+## V1 release waves (2026-11-09)
+
+The owner accepted packages 001-012 on 2026-11-09. Packages 013-020 are IN_REVIEW and each wave item for them starts only after that package's T01 records acceptance. A wave starts when its inputs below are met, not on a date.
+
+| Wave | Packages | Inputs | Exit |
+|---|---|---|---|
+| W0 | 011, 019 skeleton (019-T03..019-T05) | Acceptance recorded | Native CI runs `check.sh` plus the `src-tauri` workspace on Linux and Windows; IPC profiles qualified (011-T02, 011-T03) |
+| W1 | 001, 002, 003, 014; then 012 after 001-T07 | W0 CI green | OpenCode v2.0.32 bindable (002-T01) and dispatching through a durable, single-flight, recoverable turn; E2E-01 and E2E-03 on the Windows row |
+| W2 | 005 (Linux), 007, 009, 013 observe (013-T02..013-T06), 016 | 001 commit and recovery tasks done | E2E-04 on Linux, E2E-07, E2E-09, E2E-11 |
+| W3 | 006, 013 plan/apply (013-T07..013-T18), 008 | 005 Environment and Trust wiring on Linux | E2E-05, E2E-06, E2E-08 |
+| W4 | 004, 015, 020 | 002-T12 Claude Code module; 005 Attempt admission; 009 Coworker chat | E2E-02, proposed E2E-15 and E2E-17 |
+| W5 | 010 | 005 execution handoff | E2E-10 |
+| W6 | 017, 018, 019 qualification (019-T06..019-T23) | All earlier waves VERIFIED or explicitly descoped by the owner | E2E-12, proposed E2E-16, signed packages, V1 go/no-go |
+
+Windows Task execution, the daemon terminal and Windows delegation stay UNAVAILABLE until B-35 is accepted and 005-T17/005-T18 qualify. That path runs in parallel with W3 to W5 and does not block the Linux row.
+
+## Migration allocation (provisional)
+
+The wired schema is v27 and `docs/schemas/sqlite-v28.sql` exists but is unwired (register A-40). Many packages wrote "sqlite-v29.sql or the next free number" and Feature 012 named v30, so the numbers collide. This table assigns numbers in wave merge order. Rules: the first package to bump `SCHEMA_VERSION` also wires v28, because migrations apply in order; a package that merges out of order takes the next free number and updates this table in the same change; a merged migration is never renumbered or edited.
+
+| Migration | Package and task | Content (from the package DATA-MODEL) |
+|---|---|---|
+| v28 (existing) | first migration-bearing merge, planned 001 | Workspace delegation settings revisions (A-40) |
+| v29 | 001 (W1) | Dispatch outbox, single-flight index, commit identity fields, usage records |
+| v30, v31 | 002-T04, 002-T07 (W1) | Runtime-local descriptor store; auth observations |
+| v32 | 003-T09 (W1) | `context_attachments`, `retrieval_receipts` |
+| v33 | 014 (W1) | Conversation status columns, search index, deletion tombstone and purge manifest |
+| v34 | 012-T05 (W1, replaces the v30 named in 012) | Control events and side notes |
+| v35 | 005-T01 (W2) | Plan acceptance, Attempt admission and Effect records |
+| v36 | 007-T01 (W2) | `artifact_export_receipts`, source Conversation columns |
+| v37 | 009 (W2) | Conversation Coworker origin and memory fields |
+| v38 | 013 (W2/W3) | Package approvals and operation receipts |
+| v39 | 006-T01 (W3) | `connections` rebuild and Connection records |
+| v40 | 008-T01 (W3) | Browser session/lease/receipt and terminal session/receipt |
+| v41 | 015 (W4) | `task_control_requests`, `task_resume_packets` |
+| v42 | 020-T02 (W4) | `learning_candidates`, `coworker_learning_policies`, `memory_records` |
+| v43 | 010-T01 (W5) | Delivery lease and status transitions, SUPPRESSED rows |
+| v44 | 017 (W6) | `backup_operations` |
+| v45 (if needed) | 018 (W6) | Optional diagnostics table; the usage table comes from 001 |
+
+Packages 004, 011, 016 and 019 plan no migration.
+
+## Cross-package dependency graph
+
+Each edge "A -> B" means B needs A's named outcome. Edges are taken from each package's PLAN.md and TASKS.md "Depends on" lines.
+
+```text
+011 (IPC, shell)           -> every package with UI or Operator routes
+019 skeleton (CI)         -> every package qualification task
+002-T01 (bindable OpenCode) -> 001-T04, 001-T09
+001 (turn commit, Stop)   -> 012, 014, 016-T08, 018-T03, 004
+001-T15 (usage records)   -> 018-T05
+002-T12 (Claude Code)     -> 004-T05, 015-T08
+003 (retrieval)           -> 009-T07, 014-T13
+005 (Environment, Attempt) -> 006-T07, 008-T09, 010-T08, 015
+005-T17 (Windows, B-35)   -> 008-T12, 015-T18, 005-T18
+013-T14 (bridge handoff)  -> 006 package-backed capabilities
+007 (Artifact create)     -> 016-T10
+009 (Coworker chat)       -> 020-T09
+010 quiet hours           -> 020-T06
+011-T13/T14 (quiescence)  -> 019-T11, 019-T19
+all package VERIFIED tasks -> 019-T23 (V1 go/no-go)
+```
 
 ## Parallel documentation and validation
 

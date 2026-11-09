@@ -1,6 +1,8 @@
 # Data model - Native Agent Install, Auth and Binding
 
-**Feature:** 002 | **Status:** DRAFT | **Updated:** 2026-11-06
+**Feature:** 002 | **Updated:** 2026-11-09
+
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 Identities and lifecycles stay in the canonical owner documents. This file lists records this slice reads or commits. It does not authorize new tables by itself.
 
@@ -35,4 +37,8 @@ Use existing event names in [docs/EVENTS.md](../../docs/EVENTS.md). A new event 
 
 ## Retention and migration
 
-Follow owner retention rules. Purge removes future visibility of payload bytes; receipts may remain. No migration is authorized in this revision. Any new table/column requires canonical model owner, schema migration, event/schema and tests in the same reviewed change.
+Follow owner retention rules. Purge removes future visibility of payload bytes; receipts may remain. Revision 1.0 authorizes two Runtime-local stores, created only by their tasks: the AgentControlDescriptor record (digest, module version, issued/expires time, probe-budget counter; 002-T04) and the redacted auth observation (002-T07). Neither carries a Workspace id or secret bytes. Each uses the next unused immutable `docs/schemas/sqlite-vNN.sql` with its canonical model owner, event/schema and tests in the same reviewed change. No migration exists yet.
+
+## Provider identity (002-T01)
+
+`agent_profiles.provider_key` is stored upper case (`CODEX`, `OPENCODE`, validated in `probe_local_agent_profile`). The supervisor must parse it into a closed `NativeProviderKey` before dispatch instead of matching a lowercase literal. Existing rows need no migration if the parser is the only consumer; a test fixture that seeds lowercase `codex` (`apps/litecoworkd/src/conversation_operator_tests.rs`) is aligned in the same task.

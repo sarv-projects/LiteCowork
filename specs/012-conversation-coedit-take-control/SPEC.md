@@ -1,10 +1,12 @@
 # 012 - Conversation co-edit and take-control
 
 **ID:** 012
-**Status:** DRAFT
+**Status:** ACCEPTED/LOCKED
 **Owners:** Conversation, Agent Runtime, Product
-**Updated:** 2026-11-08
-**Revision:** 0.1
+**Updated:** 2026-11-09
+**Revision:** 1.0
+**Owner acceptance:** accepted 2026-11-09 by the repository owner (sarv-projects) via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md) (PR #1), B-34 "ACCEPT (scoped)". Binding condition: 012 implementation waits on the Feature 001 effective Stop with observed quiescence (register A-25). Acceptance approves the design and authorizes implementation; it is not evidence that anything is implemented, SERVED, INTEGRATED or QUALIFIED.
+**Change control:** this is a locked contract. Any change to it from now on requires a new revision and renewed owner approval (SPECIFICATION-STANDARD section 7).
 **Target release:** V1 local desktop
 **Dependencies:** root ARCHITECTURE.md, docs/V1-PRODUCT-RELEASE-CONTRACT.md, docs/IMPLEMENTATION-MASTER-PLAN.md, and the owner documents named in RESEARCH.md. Feature 001 remains the Conversation send/turn authority; Feature 004 owns agent relay. Research gate RV-14 is owned by docs/VIABILITY-VS-COMPETITORS.md.
 
@@ -42,7 +44,7 @@ The active checkout has a Conversation turn lifecycle and a cancel route, but no
 | Co-edit / take-control as an owner concept | NOT DOCUMENTED | Tracked only as research RV-14; the Duet first-party URL is unresolved (2026-11-08). No owner doc asserts the capability; this is the one gap-matrix row with "Doc claims it? = no". |
 | Driver / presence projection | NOT PRESENT | The transcript does not distinguish "agent turn running" from "owner in control"; there is no truthful driver indicator. |
 
-Code or a passing helper test alone does not qualify a co-edit / take-control journey. This package remains DRAFT until B-34 is owner-accepted, RV-14 has a dated first-party reference or an explicit no-vendor-claim resolution, and the Feature 001 Stop/quiescence defects (A-25) are closed.
+Code or a passing helper test alone does not qualify a co-edit / take-control journey. B-34 is owner-accepted (2026-11-09) with the no-vendor-claim constraint for RV-14; implementation of every take-control and side-chat task waits until the Feature 001 Stop/quiescence defects (A-25) are closed.
 
 ## 5. LOCKED and FLEXIBLE decisions
 
@@ -59,15 +61,15 @@ Code or a passing helper test alone does not qualify a co-edit / take-control jo
 - Side-chat presentation copy and placement, provided state distinctions (agent running / owner in control / side-chat) remain visible.
 - Internal module/helper names, provided the transactions and secret boundaries stay intact.
 
-### DECLARED DECISIONS AND ARCHITECTURAL CONTRACTS (OWNER ACCEPTANCE NOT YET EVIDENCED)
+### ACCEPTED DECISIONS AND ARCHITECTURAL CONTRACTS (owner-accepted 2026-11-09)
 
-This PROPOSED resolution mirrors the specs/001 §5 style. It is a RECOMMENDED position authored for owner review under SPECIFICATION-STANDARD §7; no author may self-approve. The blocker is open and pending owner in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md); the research gate is owned by [docs/VIABILITY-VS-COMPETITORS.md](../../docs/VIABILITY-VS-COMPETITORS.md) (RV-14).
+This resolution mirrors the specs/001 section 5 style. The owner accepted it on 2026-11-09 under SPECIFICATION-STANDARD section 7 as "ACCEPT (scoped)"; the scope caveat (implementation waits on Feature 001 Stop/quiescence) is a binding condition. The register row is tracked in [docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md); the research gate is owned by [docs/VIABILITY-VS-COMPETITORS.md](../../docs/VIABILITY-VS-COMPETITORS.md) (RV-14).
 
-| ID | Topic | PROPOSED resolution and architectural contract | Canonical authority and consequence |
+| ID | Topic | Accepted resolution and architectural contract | Canonical authority and consequence |
 |---|---|---|---|
-| B-34 | Co-edit / take-control owner model on a Conversation | **PROPOSED: Model synchronous co-edit as two bounded Conversation UX affordances over the Feature 001 turn authority, with no new durable work type.** (1) **Take-control** is an authenticated owner command on a non-terminal turn: it issues the Feature 001 cancel path, waits for observed native stop/quiescence, settles that turn `CANCELLED` (a racing completion/failure wins and remains authoritative), records an immutable `ConversationControlEvent{kind: OWNER_TOOK_CONTROL}` and moves the Conversation to an ordinary owner-authored state in which the stopped turn's committed content is preserved as editable context. No Task/Attempt/Coworker/lease is created. (2) **Side-chat** is a bounded owner message, kind `OWNER_SIDE_NOTE`, correlated to the running turn id for display only; it is excluded from the running turn's `ConversationContextPackage` and never reroutes or steers that turn. Both affordances are available only while a turn is non-terminal; both preserve single-flight (no second active turn). The driver indicator is derived from committed turn status plus the latest control event. | [STATE-MACHINES.md](../../docs/STATE-MACHINES.md), [EXPERIENCE.md](../../docs/EXPERIENCE.md), [API.md](../../docs/API.md), [EVENTS.md](../../docs/EVENTS.md). Any new message kind / event / control-event type is promotable only when its canonical owner document and `docs/schemas/` change together. RV-14 is cited as RESEARCH; do not assert Claude Duet as a shipped fact. |
+| B-34 | Co-edit / take-control owner model on a Conversation | **ACCEPTED (2026-11-09), scoped:** implementation waits on Feature 001 effective Stop with observed quiescence (A-25). **Model synchronous co-edit as two bounded Conversation UX affordances over the Feature 001 turn authority, with no new durable work type.** (1) **Take-control** is an authenticated owner command on a non-terminal turn: it issues the Feature 001 cancel path, waits for observed native stop/quiescence, settles that turn `CANCELLED` (a racing completion/failure wins and remains authoritative), records an immutable `ConversationControlEvent{kind: OWNER_TOOK_CONTROL}` and moves the Conversation to an ordinary owner-authored state in which the stopped turn's committed content is preserved as editable context. No Task/Attempt/Coworker/lease is created. (2) **Side-chat** is a bounded owner message, kind `OWNER_SIDE_NOTE`, correlated to the running turn id for display only; it is excluded from the running turn's `ConversationContextPackage` and never reroutes or steers that turn. Both affordances are available only while a turn is non-terminal; both preserve single-flight (no second active turn). The driver indicator is derived from committed turn status plus the latest control event. | [STATE-MACHINES.md](../../docs/STATE-MACHINES.md), [EXPERIENCE.md](../../docs/EXPERIENCE.md), [API.md](../../docs/API.md), [EVENTS.md](../../docs/EVENTS.md). Any new message kind / event / control-event type is promotable only when its canonical owner document and `docs/schemas/` change together. RV-14 is cited as RESEARCH; do not assert Claude Duet as a shipped fact. |
 
-This row is a declared design position only. This package stays DRAFT; owner acceptance, the dated RV-14 reference and the Feature 001 Stop/quiescence fixes are not complete. Do not infer owner sign-off from the presence of a decision row.
+B-34 is owner-accepted and this package is ACCEPTED/LOCKED. RV-14 stays RESEARCH only (no Claude Duet capability is asserted). Implementation and qualification status are unchanged: nothing in section 4 is implemented, and progress is tracked in [TASKS.md](TASKS.md) and [docs/IMPLEMENTATION-STATUS.md](../../docs/IMPLEMENTATION-STATUS.md).
 
 ## 6. High-level design
 
@@ -125,12 +127,12 @@ Observed in the active source; existence is CODE evidence, not qualification.
 - `transition_conversation_turn(...)` enforces turn state transitions; generic OPEN->RUNNING remains forbidden outside readiness activation.
 - `ConversationContextPackage` builder in `crates/storage-core/src/conversation.rs` orders committed messages by aggregate revision and excludes `SYSTEM_NOTICE`.
 
-### 7.2 PROPOSED signatures (not yet in source)
+### 7.2 Accepted target signatures (not yet in source)
 
-Every signature below is PROPOSED and is not promotable until its canonical owner document and the OpenAPI/schema change together.
+Every signature below is an accepted target interface (not yet in source). It is promoted into its canonical owner document and the OpenAPI/schema together by TASKS T01 before implementation uses it.
 
 ```rust
-// PROPOSED: owner take-control over a non-terminal turn.
+// Accepted target interface (not yet in source): owner take-control over a non-terminal turn.
 pub struct TakeControlCommand {
     pub principal_id: String,
     pub workspace_id: String,
@@ -140,7 +142,7 @@ pub struct TakeControlCommand {
     pub idempotency_key: String,
 }
 
-// PROPOSED: immutable control-event appended atomically with turn settlement.
+// Accepted target interface (not yet in source): immutable control-event appended atomically with turn settlement.
 pub enum ConversationControlEventKind { OwnerTookControl, OwnerReleasedControl }
 
 pub struct ConversationControlEvent {
@@ -150,7 +152,7 @@ pub struct ConversationControlEvent {
     pub occurred_at: String,
 }
 
-// PROPOSED: bounded side-chat note correlated to a running turn, excluded from its prompt.
+// Accepted target interface (not yet in source): bounded side-chat note correlated to a running turn, excluded from its prompt.
 pub struct OwnerSideNote {
     pub conversation_id: String,
     pub correlated_turn_id: String,   // must be a non-terminal turn at commit time
@@ -158,7 +160,7 @@ pub struct OwnerSideNote {
 }
 ```
 
-Typed errors (PROPOSED): `TakeControlError::{TurnAlreadyTerminal, StaleTurnVersion, QuiescenceTimeout, RacedCompletionWins}`; `SideNoteError::{TurnTerminal, OverBudget, CrossWorkspace}`.
+Typed errors (accepted target interface, not yet in source): `TakeControlError::{TurnAlreadyTerminal, StaleTurnVersion, QuiescenceTimeout, RacedCompletionWins}`; `SideNoteError::{TurnTerminal, OverBudget, CrossWorkspace}`.
 
 Ordering: authenticate, compare the expected turn version, issue the Feature 001 cancel path, observe quiescence outside any SQLite transaction, then commit settlement + control-event atomically. Side-note commit verifies the correlated turn is non-terminal at commit time.
 
@@ -223,7 +225,7 @@ Performance:
 python3 .specify/scripts/validate_feature_package.py specs/012-conversation-coedit-take-control
 ```
 
-Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. They are not evidence until run on a recovered source tree and the Feature 001 Stop/quiescence fixes (A-25) are in place.
+This is the structural gate only. The feature gates are the cargo and pnpm commands named in TASKS.md (canonical end-to-end target `cargo test -p litecoworkd --test conversation_coedit_take_control --locked`, created by TASKS T09). They are not evidence until the Feature 001 Stop/quiescence fixes (A-25) are in place and they pass on the release-matrix row.
 
 ## 14. Out-of-bounds
 
@@ -236,7 +238,7 @@ Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. The
 | ID | Question | Evidence/limitation | Owner | Gate |
 |---|---|---|---|---|
 | O-01 | Exact take-control quiescence contract and deadline. | Feature 001 cancel does not yet observe native interrupt/quiescence (A-25); take-control cannot be qualified until that lands. | Agent Runtime / Conversation | B-34 / A-25 |
-| O-02 | Side-note message kind and correlation schema. | `OWNER_SIDE_NOTE` and the control-event type are PROPOSED; promotable only with the owner doc and `docs/schemas/` together. | Conversation / Storage | B-34 |
+| O-02 | Side-note message kind and correlation schema. | `OWNER_SIDE_NOTE` and the control-event type are accepted target interfaces (not yet in source); promoted with the owner doc and `docs/schemas/` together by T01. | Conversation / Storage | B-34 / T01 |
 | O-03 | Whether RV-14 Claude Duet is ever cited as fact. | The Duet first-party URL is unresolved (2026-11-08); the matrix maps co-edit onto Conversation UX without asserting Duet. | Product | RV-14 |
 | O-04 | Driver-indicator presentation and accessibility copy. | No current driver projection exists; this is a UI-contract target. | Desktop UI | B-34 |
 
@@ -244,6 +246,8 @@ Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. The
 
 | Requirement | Canonical owner | Task | Acceptance | Verification method |
 |---|---|---|---|---|
+| Accepted contract promotion | STATE-MACHINES, EVENTS, API, SCHEMAS | 012-T01 | AC-002 / AC-003 | Schema validation |
+| Storage records and migration | STORAGE | 012-T05 | AC-002 / AC-003 / AC-009 | Storage atomicity and CAS tests |
 | Take-control settles only after quiescence | STATE-MACHINES, AGENT-CONTROL | 012-T02 | AC-001 | Quiescence integration test |
 | Atomic control-event + owner-in-control state | STATE-MACHINES, STORAGE, EVENTS | 012-T02 | AC-002 / AC-011 | Storage atomicity + restart test |
 | Side-chat correlated, non-steering | EXPERIENCE, API | 012-T03 | AC-003 | Side-note commit/projection test |
@@ -254,6 +258,9 @@ Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. The
 | Single-flight preserved | STATE-MACHINES, API | 012-T03 | AC-009 | Concurrency test |
 | Racing completion wins | STATE-MACHINES | 012-T02 | AC-010 | Race recovery test |
 | Truthful driver indicator | PRESENTATION-RUNTIME, API | 012-T04 | AC-012 | Projection + a11y render test |
+| Tauri commands and composer affordances | NATIVE-COMPOSER-LLD, V1-UI-SCREEN-CONTRACT | 012-T06 | AC-001 / AC-003 / AC-005 / AC-012 | UI tests |
+| Crash, restart, replay and timeout recovery | FAILURE-RECOVERY | 012-T07 | AC-010 / AC-011 / AC-013 | Fault-injection and restart tests |
+| Cross-layer trace, qualification, docs sync, VERIFIED | AGENTS.md section 4, ACCEPTANCE-AND-E2E-PLAN | 012-T08 / 012-T09 / 012-T10 / 012-T11 | AC-001 to AC-013 (AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013) | Packaged desktop E2E |
 | Bounded quiescence deadline | RUNTIME-LIFECYCLE, FAILURE-RECOVERY | 012-T02 | AC-013 | Bounded quiescence timing test |
 
-Implementation tasks: 012-T01, 012-T02, 012-T03, 012-T04.
+Implementation tasks: T01 to T11 in [TASKS.md](TASKS.md).

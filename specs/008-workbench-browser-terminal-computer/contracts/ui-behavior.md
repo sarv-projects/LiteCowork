@@ -1,5 +1,7 @@
 # UI behavior - Workbench Browser Terminal and Computer
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs/V1-UI-SCREEN-CONTRACT.md), [DESKTOP-SHELL-LLD.md](../../../docs/DESKTOP-SHELL-LLD.md), [CHROME-BROWSER-LLD.md](../../../docs/CHROME-BROWSER-LLD.md), and [V1-INTEGRATED-TERMINAL-LLD.md](../../../docs/V1-INTEGRATED-TERMINAL-LLD.md).
 
 ## Target surface
@@ -13,15 +15,26 @@ Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs
 - Diffs show actual content/revision or VCS comparison, exact source IDs/digests and true added/removed counts. Activity shows committed event/Attempt/Effect/process observations only, or is deferred to Work/Task detail by the screen contract.
 - Computer use is only shown when a real provider and OS permission exists. Otherwise the UI states unavailable/unsupported with a reason; it never animates a phantom cursor or claims screen capture/input injection.
 
-## Current implementation crosswalk
+## Current implementation crosswalk (re-checked 2026-11-09)
 
-- `WorkbenchPanel` is a React right pane with launcher, Files, Terminal, Browser and Diffs paths. `WorkbenchTab` declares `activity` but no navigation or Activity render branch exists.
+- `WorkbenchPanel` is a React right pane with launcher, Files, Terminal, Browser and Review (`diffs`) paths. `WorkbenchTab` declares `activity` but no navigation or Activity render branch exists; the final `else` renders `ReviewPane`.
 - Files is a list/filter of the Workspace Resource catalog; preview is fetched for an exact ResourceRevision. It is not a native filesystem tree or Environment browser.
-- Browser is a generic URL input and iframe preview; default URL is the local `127.0.0.1:4242/v1/health` health endpoint. It is not a Chrome process/provider, managed profile, persistent session, browser agent or CDP/Playwright controller. Tab change unmounts its iframe; panel close and Workspace change reset state.
-- Terminal has local React scrollback/input/command history only. No process spawn, shell executable, PTY/ConPTY, Tauri IPC bridge, stdin/stdout transport or daemon session exists. `help/status/dir/whoami/version` return fixed illustrative text; `dir` lists Resource records; generic commands print fabricated exit code 0. The `pwsh 7 · Windows ConPTY` and `KILL_ON_CLOSE` badges are not backed by a process or containment attestation.
-- Diffs is not a VCS or exact revision diff. It marks preview lines as additions/deletions using a fixed modulo pattern; without a preview it renders a fixed sample patch and hard-coded +4/-1 stats.
-- There is no Activity tab despite the `activity` union type. Environment take/return-control operations are target-only and not called by the Workbench.
-- Computer-use source has policy/consent helpers only; no capture/input provider. The provider probe reports unsupported/unavailable on current platforms.
+- Browser is a URL input and iframe preview labelled "Embedded page preview". `browserUrl` starts empty (register A-51); there is no default endpoint and no containment claim. It is not a Chrome process/provider, managed profile, persistent session, browser agent or CDP/Playwright controller.
+- Terminal (`TerminalPane`) renders "Terminal execution is unavailable" with the missing prerequisites. It has no input, executes nothing and shows no exit code, ConPTY, Job Object or KILL_ON_CLOSE label (register A-51; `tests/workbench-truthfulness.test.mjs`).
+- Review (`ReviewPane`) renders "Nothing to review yet" and states that changes are never inferred from document text. No diff producer exists.
+- Computer-use source has policy/consent helpers only; there is no Computer status surface in the Workbench.
+
+## Accepted V1 state table (2026-11-09)
+
+| View | Windows x64 row | Linux x64 row | Loading / empty / error / denied / offline / stale |
+|---|---|---|---|
+| Browser | MANAGED_CHROMIUM when provider READY; otherwise NEEDS_SETUP/UNAVAILABLE with reason | Same | Starting spinner with cancel; empty tab list; provider error with repair; consent denied; OFFLINE when Runtime down; stale epoch shown as "control changed, refresh" |
+| Terminal | UNAVAILABLE: "needs a qualified Windows Environment provider (Feature 005 B-35)" | Real PTY under admitted bubblewrap Environment | Discovering profiles; no profiles; spawn failed; Environment not admitted; LOST/RECONNECTING after restart; never a guessed exit status |
+| Activity | Committed records for the bound Conversation/Task | Same | Loading; "No recorded activity yet"; read error with retry; stale cursor reload |
+| Diffs | Exact ResourceRevision or VCS pair | Same | Computing; "No changes"; TOO_LARGE / BINARY / SOURCE_MISSING typed states |
+| Computer | UNAVAILABLE (B-32 deferred), status text only, no control | Same | Not applicable |
+
+Every unavailable state is a focusable status region with an accessible name and the concrete prerequisite; keyboard users reach each view through the launcher and tool pills.
 
 ## Required rendered regression cases after implementation
 

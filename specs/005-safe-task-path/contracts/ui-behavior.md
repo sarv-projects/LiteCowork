@@ -1,5 +1,7 @@
 # UI behavior - Safe Task Path
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs/V1-UI-SCREEN-CONTRACT.md). Control classes: [V1-SETTINGS-CONTRACT-LEDGER.md](../../../docs/V1-SETTINGS-CONTRACT-LEDGER.md) and [SEMANTIC-SERVED-UI-MAP.md](../../../docs/SEMANTIC-SERVED-UI-MAP.md). Action states: [V1-UI-ACTION-STATE-LEDGER.md](../../../docs/V1-UI-ACTION-STATE-LEDGER.md).
 
 ## Target user journey
@@ -19,6 +21,12 @@ Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs
 - Planning readiness UI explicitly says it is read-only and does not start planning or an agent. It reports blockers and says planning dispatch is unavailable; it must not be styled as a Start/Run action.
 - Task presentation reads saved projections and a stream. “Latest saved progress” is not a live process guarantee, invented percentage or ETA. A Task with status READY is a saved Task state, not an executing worker.
 - Plan acceptance, Attempt start, Effect approval, Task cancel/recover, Environment selection/provisioning and isolation detail controls are not present in the current Work UI because their execution routes are target-only.
+
+## Accepted V1 additions (revision 1.0)
+
+- Conversation page: a "Create Task from this reply" action on each committed AGENT message (not on streaming, failed, cancelled or uncommitted turns). It opens an editable Task draft showing Workspace, lead and pinned inputs and saves through `create_task` with the origin `conversation_id` and `source_message_refs`. Keyboard reachable, accessible name, focus returns to the message on cancel.
+- Work execution panel (`TaskExecutionPanel`): plan Accept, Attempt, Environment with the four enforcement statuses, grant and Approval link, Effect, Evidence, verification, Cancel and Recover. States: loading, empty, error, denied, offline, stale, UNAVAILABLE, recovery.
+- Windows row until B-35 qualifies: execution controls are replaced by "Task execution is not available on Windows yet: no qualified Windows Environment provider." No Job Object isolation badge.
 
 ## Required rendered regression cases after implementation
 

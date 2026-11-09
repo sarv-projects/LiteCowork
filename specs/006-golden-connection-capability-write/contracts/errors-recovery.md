@@ -1,5 +1,7 @@
 # Errors and recovery - Golden Connection and One Capability Write
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Target recovery rules
 
 - OAuth cancellation or callback/state mismatch leaves no usable Connection. The first valid terminal callback wins; replayed `state` is refused. Token custody is write-only and the provider token never enters an event, log, agent prompt or ordinary UI response.
@@ -19,6 +21,13 @@
 - Approval list/get/resolve works and is exact-digest-bound, but approval is not connected to provider Invocation dispatch.
 - CapabilityInvocation Operator is read-only. SQLite refuses DISPATCHED admission; Trust is compiled but not wired; no combined Trust/Effect/ApprovalUse transaction or live provider reconciler exists.
 - The served grant endpoint is a narrow Task-planning Resource-read grant, not connector authority.
+
+## Accepted V1 additions (revision 1.0)
+
+- Keystore unavailable: Connect fails closed; no plaintext fallback.
+- Revoke: REVOKED and grant revocation commit first, then keystore delete; a delete failure is reported and does not reopen the Connection. Remote revocation is CONFIRMED or OWNER_ACTION_REQUIRED, never assumed.
+- Restart: pending AuthAttempts become EXPIRED; keystore entries with no committed Connection are removed; DISPATCHED or AMBIGUOUS Invocations go to reconciliation, never to a second POST.
+- `connect-or-install` keeps its 503 `LITESPM_PACKAGE_SERVICE_NOT_QUALIFIED` until package 013 qualifies.
 
 ## Canonical error contract
 

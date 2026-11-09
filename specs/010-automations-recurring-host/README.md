@@ -1,8 +1,8 @@
 # 010 - Automations and Recurring Host
 
-**Status:** DRAFT - review required; does not authorize implementation.
-**Revision:** 0.2 | **Updated:** 2026-11-06
-**Owners to approve:** Automation, Task Runtime, Runtime lifecycle, Desktop UI.
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Revision:** 1.0 | **Updated:** 2026-11-09 | **Owner acceptance:** B-26, B-27 and the A-35 quiet-hours ownership accepted 2026-11-09 by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
+**Owners:** Automation, Task Runtime, Runtime lifecycle, Desktop UI.
 
 ## User outcome
 
@@ -10,7 +10,7 @@ A saved schedule or event creates exactly one Task per occurrence, including acr
 
 ## Current truth
 
-The active checkout contains the Rust daemon, Tauri desktop application and shared crates. This package remains DRAFT and does not authorize implementation until owner decisions and supporting contracts are accepted. Its current implementation boundary is mapped in docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
+The active checkout contains the Rust daemon, Tauri desktop application and shared crates. This package is ACCEPTED/LOCKED (owner-accepted 2026-11-09). That authorizes implementation in the order given by [TASKS.md](TASKS.md); it is not a claim that delivery, event triggers or Task execution exist. Its current implementation boundary is mapped in docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
 
 ## Package
 

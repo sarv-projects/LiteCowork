@@ -1,6 +1,7 @@
 # Research - Automations and Recurring Host
 
 **Feature:** 010 | **Checked:** 2026-11-06
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
 ## Canonical authorities
 

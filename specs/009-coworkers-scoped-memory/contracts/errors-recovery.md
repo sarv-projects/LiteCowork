@@ -1,6 +1,6 @@
 # Errors and recovery - Coworkers and Scoped Memory
 
-**Feature:** 009 | **Status:** DRAFT | **Source cross-check:** 2026-11-06
+**Feature:** 009 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification. | **Source cross-check:** 2026-11-06
 
 ## Currently served Coworker configuration operations
 

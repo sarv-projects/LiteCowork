@@ -1,0 +1,168 @@
+feature_id: "013"
+name: "LiteSPM Package Lifecycle Bridge"
+status: "IN_REVIEW"
+spec_revision: "0.1"
+notes: "All edges are proposed target wiring, not served. Only the Discover search/describe routes and the fail-closed connect-or-install route exist today."
+nodes:
+  - id: "discover-ui"
+    owner: "Desktop UI (Discover)"
+    kind: "component"
+    responsibility: "Installed / native and Managed tabs, plan review dialog, approval control, progress and accessible states"
+    inputs: ["owner input", "inventory page", "plan", "receipt state"]
+    outputs: ["typed package lifecycle commands"]
+  - id: "tauri-bridge"
+    owner: "Desktop Tauri bridge"
+    kind: "desktop transport"
+    responsibility: "Bounded typed commands; one idempotency key per user intent"
+    implementation_status: "TARGET_ONLY: discover_bridge.rs supports search and item only"
+    inputs: ["UI command"]
+    outputs: ["authenticated Operator request"]
+  - id: "operator"
+    owner: "litecoworkd Operator"
+    kind: "authenticated boundary"
+    responsibility: "Owner and Workspace scope, Runtime match, idempotency, typed errors"
+    inputs: ["desktop IPC request"]
+    outputs: ["validated package command", "projection"]
+  - id: "package-service"
+    owner: "PackageLifecycleService"
+    kind: "domain service"
+    responsibility: "Host profile check, plan/approve/apply orchestration, reconciliation, Discover projection, capability identity producer"
+    implementation_status: "TARGET_ONLY"
+    inputs: ["validated command", "LiteSPM responses"]
+    outputs: ["storage commands", "LiteSPM calls", "projection rows"]
+  - id: "sqlite-store"
+    owner: "Storage"
+    kind: "transaction boundary"
+    responsibility: "Approvals, operation receipts, service observation, idempotency receipts, events"
+    inputs: ["typed storage command"]
+    outputs: ["committed result"]
+  - id: "litespm-client"
+    owner: "LiteSpmClient (Capability Fabric)"
+    kind: "protocol client"
+    responsibility: "Handshake, pinned version negotiation, endpoint owner check, bounded framed calls, deadlines"
+    implementation_status: "TARGET_ONLY: no LiteSPM client exists in apps/ or crates/"
+    inputs: ["semantic operation request"]
+    outputs: ["untrusted bounded LiteSPM responses"]
+  - id: "litespm-daemon"
+    owner: "Upstream LiteSPM"
+    kind: "external process"
+    responsibility: "Inventory, plan, apply, receipts, read-back, rollback, host config writes"
+    inputs: ["pinned protocol request"]
+    outputs: ["inventory", "plan", "operation receipt"]
+  - id: "native-host-config"
+    owner: "Native agent host (OpenCode v2.0.32)"
+    kind: "external filesystem"
+    responsibility: "Host-owned skills directory and config; written only by LiteSPM"
+    inputs: ["LiteSPM owned mutation"]
+    outputs: ["observed state"]
+  - id: "capability-classifier"
+    owner: "domain-invocations"
+    kind: "pure policy"
+    responsibility: "classify_agent_capability_route over LiteSPM-verified identity"
+    inputs: ["AgentCapabilityBridgeInput"]
+    outputs: ["route and decision (grants no authority)"]
+  - id: "feature-006-grants"
+    owner: "Feature 006 Connection and grant owner"
+    kind: "downstream service"
+    responsibility: "Assignment, grant, invocation, grant invalidation on fingerprint change"
+    inputs: ["installed-not-granted fact", "fingerprint change notification"]
+    outputs: ["grant decisions"]
+edges:
+  - id: "e01"
+    from: "discover-ui"
+    to: "tauri-bridge"
+    kind: "typed-command"
+    contract: "package_inventory_request, package_plan_request, package_approval_request, package_apply_request, package_operation_get"
+  - id: "e02"
+    from: "tauri-bridge"
+    to: "operator"
+    kind: "authenticated-request"
+    contract: "proposed /v1/package-service, /v1/package-inventory, /v1/package-operations routes (SPEC 7.2)"
+  - id: "e03"
+    from: "operator"
+    to: "package-service"
+    kind: "command"
+    contract: "owner-scoped validated command"
+  - id: "e04"
+    from: "package-service"
+    to: "litespm-client"
+    kind: "external-call"
+    contract: "outside any SQLite transaction; deadline and byte caps"
+  - id: "e05"
+    from: "litespm-client"
+    to: "litespm-daemon"
+    kind: "os-local-ipc"
+    contract: "pinned LiteSPM daemon protocol (B-36); never HTTP, CLI output or stdio bridge"
+  - id: "e06"
+    from: "litespm-daemon"
+    to: "native-host-config"
+    kind: "owned-mutation"
+    contract: "LiteSPM authority only"
+  - id: "e07"
+    from: "litespm-daemon"
+    to: "litespm-client"
+    kind: "untrusted-observation"
+    contract: "size, schema and correlation validated before use"
+  - id: "e08"
+    from: "package-service"
+    to: "sqlite-store"
+    kind: "transaction"
+    contract: "approval record; begin_apply; settle_apply; reconcile"
+  - id: "e09"
+    from: "package-service"
+    to: "capability-classifier"
+    kind: "pure-call"
+    contract: "identity fields only from settled receipts"
+  - id: "e10"
+    from: "package-service"
+    to: "feature-006-grants"
+    kind: "notification"
+    contract: "installed-not-granted; fingerprint change invalidates dependent grants"
+  - id: "e11"
+    from: "operator"
+    to: "discover-ui"
+    kind: "projection"
+    contract: "inventory page, plan, receipt state; authoritative=false"
+transactions:
+  - id: "tx-record-approval"
+    owner: "Storage via PackageLifecycleService"
+    atomic_records: ["PackageOperationApproval GRANTED", "package.operation.approved.v1", "request receipt"]
+    external_calls_inside: false
+  - id: "tx-begin-apply"
+    owner: "Storage via PackageLifecycleService"
+    atomic_records: ["PackageOperationApproval CONSUMED", "PackageOperationReceipt DISPATCHING", "package.operation.dispatched.v1", "request receipt"]
+    external_calls_inside: false
+  - id: "tx-settle-apply"
+    owner: "Storage via PackageLifecycleService"
+    atomic_records: ["PackageOperationReceipt terminal or UNKNOWN", "package.operation.settled.v1"]
+    external_calls_inside: false
+  - id: "tx-reconcile"
+    owner: "Storage via PackageLifecycleService"
+    atomic_records: ["PackageOperationReceipt RECONCILED_*", "package.operation.reconciled.v1"]
+    external_calls_inside: false
+  - id: "tx-service-observation"
+    owner: "Storage via PackageLifecycleService"
+    atomic_records: ["LiteSpmServiceObservation for this Runtime incarnation"]
+    external_calls_inside: false
+external_boundaries:
+  - id: "litespm-handshake"
+    owner: "LiteSpmClient"
+    input_trust: "external-process"
+    timeout: "finite; proposed 5 s, confirmed in 013-T04"
+    retry: "reconnect with backoff; never downgrade protocol"
+  - id: "litespm-inventory"
+    owner: "LiteSpmClient"
+    input_trust: "untrusted"
+    timeout: "finite; proposed 30 s"
+    retry: "safe read retry; failure is PACKAGE_INVENTORY_UNAVAILABLE"
+  - id: "litespm-apply"
+    owner: "PackageLifecycleService"
+    input_trust: "external-mutation"
+    timeout: "finite; timeout after write is UNKNOWN"
+    retry: "never re-send; reconcile by original operation identity"
+recovery:
+  owner: "PackageLifecycleService"
+  source_of_truth: ["LiteSPM operation receipt", "PackageOperationReceipt", "PackageOperationApproval"]
+  implementation_status: "TARGET_ONLY"
+  restart_action: "list_unsettled_package_operations; operation_get for DISPATCHING and UNKNOWN; settle or keep UNKNOWN; block new mutation per target"
+  ui_action: "show UNKNOWN with Reconcile; refresh inventory after settlement"

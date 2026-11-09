@@ -1,5 +1,7 @@
 # Errors and recovery - Safe Task Path
 
+**Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+
 ## Target recovery rules
 
 - A Task-create retry with the exact same idempotency identity/payload returns the original Task receipt. Reusing the same request identity with a different payload is a conflict.
@@ -19,6 +21,11 @@
 - IsolationAttestation and QuiescenceObservation types/checks are not wired into a production Task Attempt path; the process-scope journal is staged/dead code.
 - Capability grants are presently limited to Task-planning Resource reads. There is no admitted write grant, Effect dispatcher/reconciler or independent write-verification pipeline connected to an Attempt.
 - UI only exposes Task creation, spec editing, read-only readiness, Task/Step/progress/Artifact read views. No plan/Attempt/Environment/cancel/recover actions are live.
+
+## Platform availability
+
+- On a platform with no qualified Environment provider (the Windows row until B-35 qualifies), planning dispatch and Attempt start return `DEPENDENCY_UNAVAILABLE` with a provider-unavailable reason and create no session, plan, Attempt or Environment. Task create and read views keep working.
+- Crash between temp write and rename leaves the Effect AMBIGUOUS; restart reconciles the target digest and removes the orphaned temp file; it never rewrites automatically.
 
 ## Canonical errors
 

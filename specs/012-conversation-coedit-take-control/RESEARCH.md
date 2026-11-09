@@ -1,6 +1,7 @@
 # Research - Conversation co-edit and take-control
 
-**Feature:** 012 | **Checked:** 2026-11-08
+**Feature:** 012 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
+**Checked:** 2026-11-08
 
 ## Sources
 
@@ -50,10 +51,10 @@ No OpenLoomi, OpenDot or vendor code is imported; all are read at the pinned SHA
 
 - The composed Conversation route in `apps/litecoworkd/src/conversation_operator.rs` exposes submit/cancel/retry; the cancel route commits `CANCEL_REQUESTED` then `CANCELLED` without observing native interrupt/quiescence, and the desktop Stop handler searches transient turns the OpenCode path never emits (register A-25). There is no take-control continuation or side-chat message kind.
 - `AgentSessionSupervisor` dispatches only `provider_key == "opencode"`; take-control reuses its cancel/quiescence authority rather than adding a provider path.
-- The `ConversationContextPackage` builder orders committed messages by aggregate revision and excludes `SYSTEM_NOTICE`; it has no side-note concept because no side-note exists yet. The proposed exclusion of `OWNER_SIDE_NOTE` from the running turn's prompt is a new requirement, not current behavior.
+- The `ConversationContextPackage` builder orders committed messages by aggregate revision and excludes `SYSTEM_NOTICE`; it has no side-note concept because no side-note exists yet. The accepted (not yet implemented) exclusion of `OWNER_SIDE_NOTE` from the running turn's prompt is a new requirement, not current behavior.
 - Changing co-edit state must not create a Task, Attempt, DelegationProfile, Environment, lease or grant; this matches the Conversation/Task separation enforced elsewhere in the source.
 
-These are source/route/UI findings. No co-edit, take-control or side-chat journey was executed. Feature 012 remains DRAFT.
+These are source/route/UI findings. No co-edit, take-control or side-chat journey was executed. Feature 012 is ACCEPTED/LOCKED (design only) since 2026-11-09.
 
 ## Alternatives
 

@@ -1,8 +1,10 @@
 # API and events - Automations and Recurring Host
 
-Automation and Routine routes in docs/API.md and AUTOMATION.md. No new webhook ingress in this DRAFT.
+**Feature:** 010 | **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 
-Event names must already exist in [docs/EVENTS.md](../../../docs/EVENTS.md) or be added there with the schema in the same reviewed change. This DRAFT does not declare new event types.
+Automation and Routine routes in docs/API.md and AUTOMATION.md. No new public webhook ingress in this package (V1 non-goal).
+
+Event names must already exist in [docs/EVENTS.md](../../../docs/EVENTS.md) or be added there with the schema in the same reviewed change. No new event type is served by this package yet; accepted target additions (delivery status transitions on `notification.delivery.changed.v1`, event-trigger observation fields) are promoted by TASKS.md T01.
 
 Error codes must already exist in [docs/SCHEMAS.md](../../../docs/SCHEMAS.md) or be added with `docs/schemas/error-codes.schema.json`.
 

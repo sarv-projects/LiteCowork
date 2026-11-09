@@ -101,8 +101,8 @@ def main() -> int:
         for rel in owner_files:
             if not (ROOT / rel).is_file():
                 errors.append(f"{area}: missing owner document {rel}")
-    if package_count != 12:
-        errors.append(f"Expected 12 feature packages, found {package_count}")
+    if package_count != 20:
+        errors.append(f"Expected 20 feature packages, found {package_count}")
     if openapi_count != served_count + target_count:
         errors.append(
             f"OpenAPI/served inventory mismatch: {openapi_count} != {served_count}+{target_count}"

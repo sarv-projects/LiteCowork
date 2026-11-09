@@ -1,0 +1,32 @@
+# 016 - Rich Presentation, Intelligent UI and Generated Media
+
+- **Status:** IN_REVIEW - authored complete for owner review; does not authorize implementation until the owner accepts the SPEC and blocker B-40.
+- **Revision:** 0.1 | **Updated:** 2026-11-09 | **Blocker:** B-40 (first Intelligent UI component and Interactive Artifact Runtime V1 posture), PROPOSED, pending owner.
+- **Owners:** Presentation Runtime, Conversation, Artifacts, Storage, Operator/API, Desktop UI, Security, Accessibility and Product.
+- **Release rows:** Windows x64 with OpenCode v2.0.32 first, Linux x64 second. No Environment provider is needed.
+
+## User outcome
+
+Answers can show tables, a chart with an equivalent data table, and one accessible "what-if" calculator built from the answer's own numbers. Turning rich presentation off, or any validation failure, shows the full original text. Generated images become Library Artifacts with their source Conversation and turn. Interactive app Artifacts open as an inert preview; nothing runs in the chat WebView.
+
+## Current truth
+
+The desktop validator (`apps/litecowork-ui/src/presentation/rich-presentation.ts`, 512 KiB, 200 blocks, depth 8) accepts five block kinds; the Rust storage validator (`crates/storage-sqlite/src/rich_presentations.rs`, 1 MiB cap) accepts two. Nothing in production publishes a RichPresentation. There is no chart, image or Intelligent UI renderer, no media ingestion, no disable preference and no Interactive Artifact Runtime code. The read route and the semantic fallback view exist.
+
+## Package
+
+- [SPEC.md](SPEC.md) - problem, decisions (B-40), HLD/LLD, security, EARS acceptance.
+- [PLAN.md](PLAN.md) - phases, dependency graph, gates, risks.
+- [TASKS.md](TASKS.md) - ordered tasks to VERIFIED for V1.
+- [DATA-MODEL.md](DATA-MODEL.md) - records, lifecycles, bounds.
+- [RESEARCH.md](RESEARCH.md) - pinned references (OpenIntelligentUI) and decisions.
+- [WIRING.yaml](WIRING.yaml) - components, edges, transactions, boundaries.
+- [contracts/](contracts/README.md) - API/events, errors/recovery, UI behavior.
+
+## Dependencies
+
+Feature 001 (committed semantic message), Feature 007 (Artifact create and Conversation association), Feature 011 (CSP, display preferences, IPC), Feature 019 (CSP audit, release rows).
+
+## Canonical owners
+
+[Architecture](../../ARCHITECTURE.md), [V1 release](../../docs/V1-PRODUCT-RELEASE-CONTRACT.md), [Rich Response](../../docs/RICH-RESPONSE.md), [Presentation Runtime](../../docs/PRESENTATION-RUNTIME.md), [Intelligent UI and image content](../../docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md), [Interactive Artifact Runtime](../../docs/INTERACTIVE-ARTIFACT-RUNTIME.md), [Rendering conformance](../../docs/RENDERING-CONFORMANCE-LLD.md), [Artifacts and evidence](../../docs/ARTIFACTS-EVIDENCE.md), [Schemas](../../docs/SCHEMAS.md).
