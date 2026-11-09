@@ -317,7 +317,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T18 - Resilience matrix on both rows against shipped storage code
 
-- **Status:** PARTIAL - `scripts/v1_resilience_matrix.py` implements five cases on Python `sqlite3` and imports `fcntl` (POSIX only).
+- **Status:** PARTIAL (CODE): `crates/storage-sqlite/tests/resilience.rs` (3 native tests over the shipped store: committed write survives restart with `integrity_check` ok, uncommitted foreign transaction rolled back at restart, page-capped write refused with a storage-full error and the store stays consistent; no `cfg` skip) pass on Linux; `scripts/v1_resilience_matrix.py` no longer imports `fcntl` or `signal` at top level and reports BLOCKED (never PASSED) when the stale-lock case cannot run (`tests/test_resilience_matrix.py`). NOT done: `apps/litecoworkd/tests/startup_recovery_release.rs` (new-binary-on-old-database and failed-migration DEGRADED cases), corrupt-blob and daemon lock cases as Rust tests, any Windows run (needs native Windows, T04).
 - **Depends on:** T01, T04, T14
 - **Cross-package prerequisites:** Feature 017 restore path for the failed-migration recovery case.
 - **Owner:** QA, Storage.
