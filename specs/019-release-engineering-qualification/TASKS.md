@@ -402,7 +402,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 - **Status:** NOT STARTED.
 - **Depends on:** T22
-- **Cross-package prerequisites:** every package's "Package VERIFIED for V1" task: 001-T23, 002-T17, 003-T17, 004-T12, 005-T20, 006-T17, 007-T17, 008-T19, 009-T18, 010-T17, 011-T19, 012-T11, 013-T20, 014-T19, 015-T20, 016-T18, 017-T18, 018-T18, this package's T22, and 020-T17 (IDs read from each package's TASKS.md on 2026-11-09; re-check at execution time).
+- **Cross-package prerequisites:** every package's "Package VERIFIED for V1" task: 001-T28, 002-T19, 003-T18, 004-T12, 005-T20, 006-T17, 007-T17, 008-T21, 009-T18, 010-T17, 011-T23, 012-T11, 013-T21, 014-T19, 015-T21, 016-T19, 017-T18, 018-T19, this package's T22, and 020-T17 (IDs re-synced on 2026-11-09 after folding the owner-approved tasks P-00 to P-19; re-check at execution time).
 - **Owner:** Product (repository owner, final decision), Release Engineering, Security, QA.
 - **Allowed paths:** `scripts/v1_release_gate.py` (new), `tests/test_release_gate.py` (new), `docs/release/V1-GO-NO-GO.md` (new), `docs/IMPLEMENTATION-STATUS.md`.
 - **Contract:** V1 release contract sections 3 and 7 (gate G); BT-10.5; SPEC section 15; AC-020, AC-014.

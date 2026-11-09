@@ -297,6 +297,7 @@ Record correlation ids for Task, Step, Attempt, parent Attempt, lease epoch, Del
 - AC-019 IF a delegate request comes from a session that is not the current parent Attempt's session, carries grant refs beyond the parent's grants, names a foreign Workspace or asks for a shared writable Environment, THEN THE SYSTEM SHALL deny it (`ParentSessionNotCurrent`, `AuthorityPrerequisitesUnproven`, 404, `DELEGATION_ENVIRONMENT_SHARING_DENIED`) and log only ids and the denial class. Verify: security negative tests and log redaction check.
 - AC-020 WHEN the Work screen loads a page of 200 Activity entries, THE SYSTEM SHALL return the page within 300 ms at p95 and render it without a main-thread task over 100 ms on the reference release-row machine, and a control command SHALL return its receipt within 500 ms at p95 excluding the quiescence wait. Verify: performance harness on the release row.
 - AC-021 WHEN the B-39 pair runs on the Linux release row, THE SYSTEM SHALL complete the journey "OpenCode lead delegates one Step to Claude Code, independent verifier checks it, owner pauses, resumes and hands off the lead" with CODE, SYSTEM and owner USER evidence including denial and recovery cases. Verify: packaged desktop E2E on the exact row.
+- AC-022 WHEN the Mission Control canvas renders and a Compare Agents fan-out is explicitly requested (task P-14), THE SYSTEM SHALL bind the delegation tree, step status, live tool activity, approvals and evidence to real runtime records only, SHALL show the canvas only after the first bounded workflow is proven, and SHALL run Compare Agents as a read-only fan-out that never mutates a Task or creates authority; an absent runtime record SHALL render as unavailable, never fabricated. Verify: Mission Control canvas and read-only Compare Agents test.
 
 ## 15. Executable acceptance command
 
@@ -345,4 +346,5 @@ This package is IN_REVIEW and authorizes nothing yet. After acceptance, each tas
 | Linux-row qualification | ACCEPTANCE-AND-E2E-PLAN | 015-T17 | AC-020 / AC-021 |
 | Windows-row qualification after B-35 | ACCEPTANCE-AND-E2E-PLAN | 015-T18 | AC-017 / AC-021 |
 | Documentation sync | IMPLEMENTATION-STATUS | 015-T19 | AC-015 / AC-016 |
-| VERIFIED transition | SPECIFICATION-STANDARD | 015-T20 | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014, AC-015, AC-016, AC-017, AC-018, AC-019, AC-020, AC-021 |
+| Mission Control canvas and read-only Compare Agents (P-14) | V1-UI-SCREEN-CONTRACT, PRESENTATION-RUNTIME | 015-T20 | AC-022 |
+| VERIFIED transition | SPECIFICATION-STANDARD | 015-T21 | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014, AC-015, AC-016, AC-017, AC-018, AC-019, AC-020, AC-021, AC-022 |

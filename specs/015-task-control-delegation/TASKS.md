@@ -339,14 +339,31 @@ Gaps to V1: no owner acceptance (B-39), no typed Task status, no pause/resume/st
 - **Evidence:** PR diff.
 - **Stop:** a status upgrade lacks an evidence reference.
 
-## 015-T20 - Package VERIFIED for V1
+## 015-T20 - Mission Control canvas and read-only Compare Agents fan-out (P-14)
+
+- **Status:** NOT STARTED - added under this package's IN_REVIEW status. Folds proposed task P-14 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this package.
+- **Depends on:** T13, T16
+- **Cross-package prerequisites:** Feature 001 turn activity records and Feature 005 Attempt records as the runtime read sources.
+- **Owner:** Task Control, Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/src/`, `apps/litecoworkd/src/`, `specs/015-task-control-delegation/contracts/ui-behavior.md`, adjacent tests.
+- **Contract:** SPEC §12; AC-015, AC-022; V1-UI-SCREEN-CONTRACT; PRESENTATION-RUNTIME.
+- **Change intent:** add a Mission Control canvas that shows the delegation tree, step status, live tool activity, approvals and evidence, bound to real runtime records and shown only after the first bounded workflow is proven; and an explicitly-requested read-only Compare Agents fan-out that runs the same prompt across chosen agents for comparison without mutating a Task or creating authority. An absent runtime record renders unavailable, never fabricated. The list itself defers agent swarms past V1; this task does not add swarm orchestration.
+- **Acceptance:**
+  - [ ] The canvas renders the delegation tree, step status, live tool activity, approvals and evidence from real runtime records only (AC-022).
+  - [ ] Compare Agents is read-only, explicitly requested, and never mutates a Task or creates authority (AC-022).
+  - [ ] The canvas is shown only after a bounded workflow is proven; an absent record renders unavailable (AC-015, AC-022).
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** canvas and Compare Agents test output in Completion evidence.
+- **Stop:** the canvas would show a value with no runtime record; render it unavailable rather than infer.
+
+## 015-T21 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED
-- **Depends on:** T01-T19
+- **Depends on:** T01-T20
 - **Cross-package prerequisites:** Feature 019 release evidence bundle accepted.
 - **Owner:** Product, repository owner.
 - **Allowed paths:** `specs/015-task-control-delegation/`.
-- **Contract:** SPECIFICATION-STANDARD lifecycle; AC-001 to AC-021.
+- **Contract:** SPECIFICATION-STANDARD lifecycle; AC-001 to AC-022.
 - **Change intent:** assemble the evidence bundle (per-task revision, command, result, OS, harness, reviewer); move status ACCEPTED/LOCKED to IMPLEMENTING when T02 starts and to VERIFIED when every task closes and the owner signs off.
 - **Acceptance:**
   - [ ] Every AC has a passing test reference on the Linux row; Windows row is either qualified or recorded UNAVAILABLE with B-35 open.
@@ -357,7 +374,7 @@ Gaps to V1: no owner acceptance (B-39), no typed Task status, no pause/resume/st
 
 ## Dependency order
 
-T01 -> T02 -> T03 -> (T04, T05 in parallel) -> T06 and T07 (both after T04) -> T08 (after T02, T03) -> T09 and T10 (after T08) -> T11 (after T04-T10) -> (T12, T13, T14 in parallel) -> T15 (after T04-T10) -> T16 (after T11-T15) -> T17 -> T18 (blocked on B-35) and T19 -> T20.
+T01 -> T02 -> T03 -> (T04, T05 in parallel) -> T06 and T07 (both after T04) -> T08 (after T02, T03) -> T09 and T10 (after T08) -> T11 (after T04-T10) -> (T12, T13, T14 in parallel) -> T15 (after T04-T10) -> T16 (after T11-T15) -> T17 -> T18 (blocked on B-35) and T19. (T13, T16) -> T20 (Mission Control canvas, P-14). (T18, T19, T20) -> T21 (VERIFIED).
 
 ## Cross-package dependencies
 

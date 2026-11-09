@@ -13,6 +13,8 @@ On the Work screen the owner can pause, resume, steer, cancel and hand off a run
 
 Child-admission decisions, lead-failover policy, lead-handoff packets and escalation policy exist as Rust domain code in `crates/domain-task` with no production caller. The only served pieces are the lead-binding change route (`POST /v1/tasks/{task_id}/lead-agent`, no new Attempt) and the read-only verification-runs list. Pause, resume, steer, Task-level cancel fan-out, worker dispatch, independent verification and the Work-screen timeline are absent. Every execution path depends on Feature 005, which qualifies on Linux first.
 
+Under this package's IN_REVIEW status, proposed task P-14 is folded in as 015-T20: a Mission Control canvas (delegation tree, step status, live tool activity, approvals, evidence) bound to real runtime records after the first bounded workflow is proven, plus an explicitly-requested read-only Compare Agents fan-out. Source: [docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](../../docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md) section 8.
+
 ## Package
 
 - [SPEC.md](SPEC.md) - problem, decisions (B-39), HLD/LLD, security, EARS acceptance.

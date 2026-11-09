@@ -1,0 +1,84 @@
+# V1 product feature coverage
+
+**Consolidated:** 2026-11-09. This document is the single answer to "are all the capabilities in the LiteCowork Final Product Feature List covered or not, and if not, why". It maps every capability in that list (the 17 capabilities, Parts I-IV, consolidated 9 Nov 2026) to its owning package(s), the covering tasks (including the owner-approved folded P-tasks), and a COVERED / PARTIAL / DEFERRED verdict with a one-line reason.
+
+This is a normative-linking document. It does not restate any owner's normative definition; it links to the owner that holds it. The product promise is owned by [PRODUCT.md](PRODUCT.md) and [V1-PRODUCT-RELEASE-CONTRACT.md](V1-PRODUCT-RELEASE-CONTRACT.md); the ACP native-agent transport direction is owned by register [A-54](CONTRADICTION-AND-ALIGNMENT-REGISTER.md) and the 2026-11-09 fold approval by register [A-55](CONTRADICTION-AND-ALIGNMENT-REGISTER.md). Package status is in [V1-FEATURE-SDD-REGISTER.md](V1-FEATURE-SDD-REGISTER.md); the capability-to-task crosswalk is in [SPEC-TASK-TRACEABILITY.md](SPEC-TASK-TRACEABILITY.md); current implementation evidence is in [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).
+
+## Headline verdict
+
+All 17 capabilities are OWNED by an accepted or in-review package. None is unowned. The remaining gaps are depth, not scope: the design exists and the owner-approved tasks are planned; what is not yet done is the exact OS/build/provider/auth qualification and a handful of deliberately deferred surfaces. Qualification before claim is enforced throughout: a capability is reported as working only when CODE, SYSTEM and owner USER evidence exist for the exact build, OS, agent/provider version and authentication route; Unknown is not success (see [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) and the evidence vocabulary in [AGENTS.md](../AGENTS.md)).
+
+The one direction that makes this bounded is the Agent Client Protocol (ACP) spine: the native-agent adapter is defined as an ACP client with a per-provider launch catalog (Feature 002 task 002-T17, consumed by Feature 001), keeping OpenCode v2 HTTP as one non-ACP adapter until its ACP route qualifies. ACP agents stay native subprocesses that own their reasoning and authentication; LiteCowork stays the Client that owns permission, files, terminals and evidence. This single qualified path delivers capabilities 1, 2, 3 and 15 at once (register [A-54](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)).
+
+## Part I: the 17 capabilities
+
+| # | Capability | Owning package(s) | Covering tasks | Verdict | One-line reason |
+|---|---|---|---|---|---|
+| 1 | Universal Chat and Agent Relay | [001](../specs/001-conversation-session-supervisor/README.md), [004](../specs/004-agent-relay/README.md), [012](../specs/012-conversation-coedit-take-control/README.md), [014](../specs/014-conversation-history-management/README.md) | ACP client 002-T17; rendering 001-T24 (P-01), 001-T25 (P-02), 016-T18 (P-03), 001-T26 (P-04); relay 004-T03..T10 | COVERED | Chat and relay are owned; rendering and streaming are fixed by the ACP spine plus the per-block Markdown and activity-card tasks. |
+| 2 | Bring Your Own Agent, Registry, Matchmaker, Upgrade Shield | [002](../specs/002-native-agent-install-auth-binding/README.md) | ACP launch catalog 002-T17 (P-11); Matchmaker 002-T18 (P-12) | COVERED | Registry becomes the ACP launch catalog and the Matchmaker ranks eligible bound agents for a job; the user still chooses. |
+| 3 | Coding cockpit, interactive terminal, Git and worktree | [008](../specs/008-workbench-browser-terminal-computer/README.md), [005](../specs/005-safe-task-path/README.md) | Terminal 008 B-23; worktrees 005; Git UI, diff and PR 008-T20 (P-13) | COVERED | Daemon-owned PTY/ConPTY terminal and worktrees are owned; the Git worktree UI and user-invoked PR ops are the folded P-13 task. |
+| 4 | Durable Tasks, multi-agent delegation, Compare Agents, Mission Control | [005](../specs/005-safe-task-path/README.md), [015](../specs/015-task-control-delegation/README.md) | Durable Task path 005; Mission Control canvas and read-only Compare Agents fan-out 015-T20 (P-14) | COVERED | Durable Tasks and delegation are owned; Compare and the Mission Control canvas are folded as P-14 after the first bounded workflow. Swarms are deferred (Part III). |
+| 5 | Persistent Coworkers | [009](../specs/009-coworkers-scoped-memory/README.md), [020](../specs/020-proactivity-quiet-learning/README.md) | Coworker CRUD/revisions/status 009; proactivity 020 | COVERED | Persistent Coworker identity, scoped context and responsibilities are owned by 009 with proactivity in 020. |
+| 6 | Computer interaction and Workbench | [008](../specs/008-workbench-browser-terminal-computer/README.md) | Activity view 008-T02/T14; Computer use deferred B-32 | COVERED | Workbench is owned; the Activity pane is 008-T02/T14. Computer use is deferred (B-32) and shown explicitly unavailable, not faked. |
+| 7 | LiteSPM and native Marketplace | [013](../specs/013-litespm-package-lifecycle-bridge/README.md) | LiteSPM bridge pin and safety contract 013-T20 (P-17) | COVERED | LiteSPM is the package lifecycle authority; the pin reconciles the three SHAs and mirrors the preview/backup/transaction/byte-exact-restore safety contract. |
+| 8 | Connections and app integrations | [006](../specs/006-golden-connection-capability-write/README.md) | First read and reviewed write B-19/B-20 | COVERED (write path blocked on B-19) | Connections are owned (first GitHub read plus one reviewed write), but the first reviewed-write task 006-T02 is BLOCKED on the open B-19 owner decision: the GitHub `client_secret` web-flow finding is an external GitHub constraint still listed Open in the owner packet (Part 4), not a resolved recipe or a missing owner. |
+| 9 | Local Knowledge, Resources, RAG, Context Debugger | [003](../specs/003-workspace-roots-context-ingestion/README.md) | Context Debugger 003-T17 (P-15) | COVERED | Roots, resources and lexical retrieval are owned; the Context Debugger (exactly what entered model context: attachments, retrieved passages with source revisions, skills, limits) is folded as P-15. |
+| 10 | Routines and Automations | [010](../specs/010-automations-recurring-host/README.md) | TriggerHost and Routine-to-Task 010 | COVERED | Routines, Automations and the local recurring host are owned by 010. |
+| 11 | Memory and Knowledge Learning | [009](../specs/009-coworkers-scoped-memory/README.md), [020](../specs/020-proactivity-quiet-learning/README.md) | Owner-authored Coworker memory 009 B-24; learning gate 020 | COVERED | Memory and learning are owned. Automatic memory stays review-gated by design, matching the accepted single learning vocabulary ([A-20](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)/[A-34](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)). |
+| 12 | Library and Artifacts | [007](../specs/007-professional-artifacts/README.md) | Artifact create/export B-21/B-30/B-31 | COVERED | Artifacts are owned, Markdown-first with a byte-stable round-trip. DOCX/XLSX and full Office parity are deferred (Part III), matching the list. |
+| 13 | Intelligent UI, 5 presentation layers, Interactive Artifacts | [016](../specs/016-rich-presentation-intelligent-ui/README.md) | Validator drift and missing publisher 016-T03/T04/T08; per-block Markdown 016-T18 (P-03) | COVERED | Rich presentation is owned; the Rust/TypeScript validator drift and the missing publisher are fixed by 016-T03/T04/T08 plus the per-block Markdown task. Interactive Artifacts stay preview-only with no arbitrary model HTML/JS. |
+| 14 | Mission Control and persistent Workspace Dashboard | [015](../specs/015-task-control-delegation/README.md), [011](../specs/011-desktop-shell-ipc-settings-runtime/README.md) | Mission Control canvas 015-T20 (P-14); Workspace Dashboard 011-T22 (P-16) | COVERED | Mission Control is owned by 015. The pinnable Workspace Dashboard was previously unowned (PARTIAL); the folded P-16 task gives it an owner, so the capability is now COVERED. |
+| 15 | Needs You inbox | fed by [005](../specs/005-safe-task-path/README.md), [006](../specs/006-golden-connection-capability-write/README.md), [009](../specs/009-coworkers-scoped-memory/README.md), [020](../specs/020-proactivity-quiet-learning/README.md); shell [011](../specs/011-desktop-shell-ipc-settings-runtime/README.md) | Shell reachability 011-T19 (P-05) | COVERED | The inbox is fed by the Task/Connection/Coworker/proactivity packages; the page was unreachable from the sidebar, which the folded P-05 shell task fixes. |
+| 16 | Media, voice, multimodal | [003](../specs/003-workspace-roots-context-ingestion/README.md) (image), later | Image where the ACP provider supports it 003 | PARTIAL BY DESIGN | Image upload and understanding are supported where the ACP provider negotiates it. Audio and transcription are V1.x and live voice is V1.1; video is V1.x. This is scope, not a V1 gate. |
+| 17 | Desktop Runtime, Settings, security, portability, evidence, commercial | [011](../specs/011-desktop-shell-ipc-settings-runtime/README.md), [017](../specs/017-data-portability-backup-restore/README.md), [018](../specs/018-usage-diagnostics-observability/README.md), [019](../specs/019-release-engineering-qualification/README.md) | Settings honesty 011-T06; decomposition 011-T20 (P-07+P-19); portability 017; codegen drift gate 018-T18 (P-18); commercial ADR 019-T13 | COVERED | Desktop runtime, honest Settings, portability, usage/diagnostics and release qualification are owned. REPORTED/OBSERVED/VERIFIED evidence states are used throughout, and the commercial model is local-first with no mandatory subscription and no token markup (B-44). |
+
+### How to read the verdicts
+
+- **COVERED** means the capability has a normative owner and the owner-approved tasks exist to deliver it. It does not assert that the exact OS/build/provider/auth route is already QUALIFIED; qualification evidence is tracked per package in [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).
+- **PARTIAL BY DESIGN** means part of the capability is in V1 and the rest is a dated later milestone (Part III), not an accidental gap.
+- **DEFERRED** (used in Part III) means the surface is intentionally out of locked V1; where a UI exists it is shown explicitly unavailable, never faked.
+
+## Part II: UI shell
+
+The shell is owned by Feature [011](../specs/011-desktop-shell-ipc-settings-runtime/README.md); the normative screen and interaction contract is [V1-UI-SCREEN-CONTRACT.md](V1-UI-SCREEN-CONTRACT.md) and the live flow IDs are in [FLOWS.md](FLOWS.md).
+
+- Every mounted page must have a navigation path and every null API must resolve to an honest unavailable-versus-empty state; the shell-reachability task 011-T19 (folded P-05) adds nav entries for Goals, Notifications and Ideas (or removes them with owner agreement), fixes Back/Forward, and corrects Recent Chats loading and error states and the Needs You count.
+- App.tsx and the Rust god files are decomposed into owned modules behind the existing boundaries with one shared Operator-unavailable panel and no behavior change (011-T20, folded P-07 and P-19).
+- Settings is a single authority: the unmounted SettingsPage is merged into the mounted SettingsView and deleted, with precedence notes where a setting has a Coworker or Automation override (011-T21, folded P-08). The V1 Settings acceptance surface is the honestly-mapped served controls within the mounted categories (B-33); the 16-category IA is authored target, not an assertion of served controls.
+- The persistent Workspace Dashboard with pinnable widgets (Task status, automation status, Coworker activity, recent artifacts) is 011-T22 (folded P-16).
+
+## Part III: deferred boundaries
+
+These are intentionally out of locked V1. They are recorded as scope, and any present UI is shown explicitly unavailable rather than faked.
+
+- **V1.1:** extension creator, third-party plugins, a large connector catalog, skill authoring, a public CLI/SDK, live voice, advanced Compare and concurrency, PPTX/PDF parity, and rewind/fork.
+- **V1.x:** video.
+- **V2:** mobile and remote dispatch, hosted runtime, laptop-off continuation, multi-device replication, multi-user collaboration, organization RBAC, and swarms.
+
+Two discussion ideas are recorded as future direction only and are not in locked V1:
+
+- LiteCowork-MCP as an external-control surface (letting another client drive LiteCowork), to be revisited after the ACP spine qualifies.
+- A direct-API fallback adapter for providers without a native harness, to be revisited only if an owner decision adds it; the ACP client remains the V1 spine.
+
+Computer use (B-32), the Windows Environment provider for safe Task execution (B-35) and the DOCX/XLSX/Office format engine (beyond Markdown, B-21) are deferred from the first V1 milestone and tracked at their owners.
+
+## Part IV: the 12 qualification journeys
+
+Each capability is proven by a user journey, not by a route registration or a UI tile. The golden journeys are owned by [ACCEPTANCE-AND-E2E-PLAN.md](ACCEPTANCE-AND-E2E-PLAN.md); full cross-layer tracing is required per [AGENTS.md](../AGENTS.md) section 4 (user outcome, screen and control, typed UI command, authenticated route, authorization, service owner, transaction, event/receipt, projection, recovery, acceptance evidence).
+
+| # | Qualification journey | Primary package | Golden E2E |
+|---|---|---|---|
+| 1 | Send one chat turn to a qualified native agent and render it | [001](../specs/001-conversation-session-supervisor/README.md) | E2E-01 |
+| 2 | Install, authenticate and bind one native agent | [002](../specs/002-native-agent-install-auth-binding/README.md) | E2E-02 |
+| 3 | Ingest workspace roots and cite grounded context | [003](../specs/003-workspace-roots-context-ingestion/README.md) | E2E-03 |
+| 4 | Run one safe Task edit under an admitted Environment | [005](../specs/005-safe-task-path/README.md) | E2E-04 |
+| 5 | Complete one reviewed Connection write | [006](../specs/006-golden-connection-capability-write/README.md) | E2E-05 |
+| 6 | Discover and install one package through the LiteSPM bridge | [013](../specs/013-litespm-package-lifecycle-bridge/README.md) | E2E-06 |
+| 7 | Produce one professional Artifact with a byte-stable round-trip | [007](../specs/007-professional-artifacts/README.md) | E2E-07 |
+| 8 | Use the Workbench browser preview and a real terminal | [008](../specs/008-workbench-browser-terminal-computer/README.md) | E2E-08 |
+| 9 | Create an optional Coworker chat and one memory record | [009](../specs/009-coworkers-scoped-memory/README.md) | E2E-09 |
+| 10 | Schedule an Automation that materializes a Task exactly once | [010](../specs/010-automations-recurring-host/README.md) | E2E-10 |
+| 11 | Render a rich answer with an honest fallback | [016](../specs/016-rich-presentation-intelligent-ui/README.md) | E2E-11 |
+| 12 | Back up and restore a Workspace | [017](../specs/017-data-portability-backup-restore/README.md) | E2E-12 |
+
+The relay (E2E-02 extension), history (E2E-14), Task steer and delegate (E2E-15), usage and support bundle (E2E-16), quiet learning (E2E-17) and the V1 go/no-go (019-T23, all rows) journeys extend this set; the proposed E2E-14..E2E-17 ids are tracked in [ACCEPTANCE-AND-E2E-PLAN.md](ACCEPTANCE-AND-E2E-PLAN.md).

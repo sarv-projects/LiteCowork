@@ -1,6 +1,7 @@
 # Reference synthesis, LiteSPM-as-a-service, ACP, and V1 feature alignment (2026-11-09)
 
-**Status:** research and planning synthesis. Not an owner contract. Authority stays with ARCHITECTURE.md, the owner docs and the accepted feature packages. Everything new here is a proposed task against an existing package (Section 8) for owner review; no accepted package (001-012) TASKS file is edited by this document.
+**Status:** research and planning synthesis. Not an owner contract. Authority stays with ARCHITECTURE.md, the owner docs and the accepted feature packages. Everything new here was a proposed task against an existing package (Section 8) for owner review.
+**Outcome (2026-11-09):** the owner accepted the ACP direction (register [A-54](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)) and approved folding the proposed tasks P-11..P-19 into their owning packages, including the LOCKED packages (register [A-55](CONTRADICTION-AND-ALIGNMENT-REGISTER.md), recorded in [OWNER-ACCEPTANCE-REVIEW-PACKET.md](OWNER-ACCEPTANCE-REVIEW-PACKET.md) Part 5). The Section 8 items below are therefore accepted package tasks now, not open proposals; their final task ids and the capability-by-capability verdict are in [V1-PRODUCT-FEATURE-COVERAGE.md](V1-PRODUCT-FEATURE-COVERAGE.md) and [SPEC-TASK-TRACEABILITY.md](SPEC-TASK-TRACEABILITY.md). The "proposed P-NN" wording below is preserved as the original proposal record.
 **Revision:** branch `docs/audit-competitor-superset` at 06620c7.
 **Inputs:** the consolidated LiteCowork Final Product Feature List (9 Nov 2026, 17 capabilities), the [LiteSPM product site](https://lite-spm-nine.vercel.app/), the [Agent Client Protocol overview](https://agentclientprotocol.com/protocol/overview), and nine reference repositories cloned read-only into `repo_take/` (research only, never imported as source per AGENTS.md section 7): [getpaseo/paseo](https://github.com/getpaseo/paseo), [elie222/rakazo](https://github.com/elie222/rakazo), [prasenjeet-symon/ogcode](https://github.com/prasenjeet-symon/ogcode), [0xsline/awesome-deepseek-harness](https://github.com/0xsline/awesome-deepseek-harness), [hotovo/aider-desk](https://github.com/hotovo/aider-desk), [zhayujie/CowAgent](https://github.com/zhayujie/CowAgent), [CherryHQ/cherry-studio](https://github.com/CherryHQ/cherry-studio), [ValueCell-ai/ClawX](https://github.com/ValueCell-ai/ClawX), [LePro10/NeuralAgent](https://github.com/LePro10/NeuralAgent).
 
@@ -108,7 +109,7 @@ Consistent with the per-package optimization notes added on 2026-11-09 and confi
 - **Rust (daemon):** the ACP client and event normalization; terminal/PTY ownership; the single rich-presentation validator; diffs; permission and policy gates; secrets; the wire-type source of truth with generated TS.
 - **TypeScript (UI):** pure reducers and registered renderer components only; the ACP provider launch catalog as data; no second validator authority (generate the parity check from schemas).
 
-## 8. Proposed tasks for owner review
+## 8. Proposed tasks for owner review (accepted 2026-11-09, register A-55)
 
 Packages 001, 002, 003, 004, 005, 008, 011 and 015 are ACCEPTED/LOCKED, so these need an owner-approved TASKS revision; nothing here edits a locked file. Packages 013-020 are IN_REVIEW and can take additions now.
 

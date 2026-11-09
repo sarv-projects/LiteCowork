@@ -20,7 +20,7 @@ Do not create a second schema authority. Promote machine contracts in schemas/ a
 
 | Work | Canonical starting point |
 |---|---|
-| Product promise and scope | PRODUCT.md, V1-PRODUCT-RELEASE-CONTRACT.md |
+| Product promise and scope | PRODUCT.md, V1-PRODUCT-RELEASE-CONTRACT.md, V1-PRODUCT-FEATURE-COVERAGE.md |
 | Current implementation and release status | IMPLEMENTATION-STATUS.md |
 | Architecture and identity ownership | ../ARCHITECTURE.md, DATA-MODEL.md, STATE-MACHINES.md |
 | Native agents and agent controls | AGENT-FABRIC.md, AGENT-CONTROL.md, AGENT-ACCOUNT-ROUTE-MATRIX.md |
@@ -28,7 +28,7 @@ Do not create a second schema authority. Promote machine contracts in schemas/ a
 | Durable Tasks and execution | TASK-RUNTIME.md, ENVIRONMENTS.md, TRUST.md, DELEGATION.md |
 | Security and provider trust boundaries | SECURITY.md, TRUST.md, NETWORK-SECURITY.md, CONNECTORS-WORKFLOWS.md |
 | UI and Workbench | V1-UI-SCREEN-CONTRACT.md, V1-UI-ACTION-STATE-LEDGER.md, SEMANTIC-SERVED-UI-MAP.md, SETTINGS-AND-SHELL-SURFACE-AUDIT.md, UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md, DESKTOP-SHELL-LLD.md, DESIGN-SYSTEM.md |
-| LiteSPM | LITESPM-LITECOWORK-INTEROP-LLD.md, LITESPM-INTEGRATION-PLAN.md |
+| LiteSPM | LITESPM-LITECOWORK-INTEROP-LLD.md, LITESPM-INTEGRATION-PLAN.md, LITESPM-INTEGRATION-STUDY-2026-11.md |
 | Connectors and workflow adapters | CONNECTORS-WORKFLOWS.md, CONNECTOR-FACTORY-DESIGN.md, OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md |
 | Automations and routines | AUTOMATION.md, ROUTINES.md, RESPONSIBILITIES.md |
 | Artifacts and presentation | ARTIFACTS-EVIDENCE.md, PRESENTATION-RUNTIME.md, INTELLIGENT-UI-AND-IMAGE-CONTENT.md, INTERACTIVE-ARTIFACT-RUNTIME.md |
@@ -43,11 +43,13 @@ Do not create a second schema authority. Promote machine contracts in schemas/ a
 - adr/README.md: decision records and status.
 - SCHEMAS.md and schemas/: machine-readable contract index and definitions.
 - V1-FEATURE-SDD-REGISTER.md and ../specs/README.md: feature-package lifecycle.
+- [V1-PRODUCT-FEATURE-COVERAGE.md](V1-PRODUCT-FEATURE-COVERAGE.md): the capability-by-capability COVERED/PARTIAL/DEFERRED verdict for all 17 Final Product Feature List capabilities, the UI shell, the deferred V1.1/V1.x/V2 boundaries and the 12 qualification journeys.
 - FEATURE-AND-UI-CONTRACT-COVERAGE.md: screen, API, owner, test and SDD coverage.
 - SEMANTIC-SERVED-UI-MAP.md: user-visible controls mapped to their actual owner operations and evidence state.
 - SETTINGS-AND-SHELL-SURFACE-AUDIT.md: source-level inventory of mounted Settings controls, unused props, unmounted alternate page and shell-surface boundaries.
 - [UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md](UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md): 2026-11-09 audit of agent-output rendering, Intelligent UI, every screen, every Settings control and architecture, with cowork-style recommendations and proposed tasks.
-- [REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md): 2026-11-09 synthesis of nine reference repos, the LiteSPM service model, ACP, and alignment of all 17 Final Product Feature List capabilities to the 20 packages, with proposed tasks P-11..P-19.
+- [REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md): 2026-11-09 synthesis of nine reference repos, the LiteSPM service model, ACP, and alignment of all 17 Final Product Feature List capabilities to the 20 packages. Its proposed tasks P-11..P-19 (with the UI audit's P-00..P-09) were owner-accepted on 2026-11-09 (register A-55) and folded into their packages; the capability verdict is in [V1-PRODUCT-FEATURE-COVERAGE.md](V1-PRODUCT-FEATURE-COVERAGE.md).
+- [LITESPM-INTEGRATION-STUDY-2026-11.md](LITESPM-INTEGRATION-STUDY-2026-11.md): source-cited study of the real LiteSPM repository (HEAD 84d5fab, v0.6.0) - its daemon IPC transport, 19 methods, 12 bridge tools, protocol 2026-07-28, install-plan/approval hash, effect taxonomy and security model - grounding the Feature 013 pin.
 - V1-FUNCTION-CONTRACT-LEDGER.md: user-facing function contracts.
 - V1-SETTINGS-CONTRACT-LEDGER.md: individual settings behavior and persistence.
 - V1-UI-ACTION-STATE-LEDGER.md: UI actions, eligibility, loading, empty, failure and recovery states.

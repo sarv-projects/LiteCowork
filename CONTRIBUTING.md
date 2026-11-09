@@ -1,5 +1,26 @@
 # Contributing to LiteCowork
 
+## Repository layout
+
+- Rust workspace and local daemon: apps/litecoworkd
+- Tauri v2 / React desktop application: apps/litecowork-ui
+- Domain, storage, runtime and IPC crates: crates/
+- Normative product and domain contracts: docs/
+- Feature SDD packages: specs/
+- Specification templates and validators: .specify/
+
+The desktop Operator is not the Runtime. The daemon owns durable operations and lifecycle; the native agent owns its own reasoning and private state; LiteSPM owns package lifecycle. A route, package listing, probe or UI affordance is not proof of a qualified product flow.
+
+## Building and running
+
+The Rust workspace is rooted at Cargo.toml. The desktop package uses pnpm and is under apps/litecowork-ui. Use the package scripts and the Rust workspace configuration in the repository; do not infer the supported build matrix from a developer machine alone.
+
+Before claiming a feature works, trace its screen and control to the typed Tauri command, the authenticated Operator route, the service owner, the storage or effect transaction, the provider integration, the stream or projection and the recovery behavior. Record CODE, SERVED, INTEGRATED and QUALIFIED separately.
+
+## Current delivery truth
+
+Conversation CRUD and an OpenCode-only code-level dispatch path exist. The Send control now enforces the disabled-until-qualified gate and the empty state is truthful LiteCowork-branded copy (register A-24/A-26), but Stop is ineffective for OpenCode, failed-turn Retry has no UI affordance, and no packaged provider USER journey is qualified. The local 30-second Automation TriggerHost settles supported schedules and materializes READY Tasks but does not execute them. Notification outcomes can create PENDING delivery records, but no outbound sender advances them to delivered states. Task planning/Attempt admission, a qualified mediated Effect path, LiteSPM lifecycle integration, a real process-backed terminal, a controlled browser, Computer use and the full Coworker/memory experience are not release-qualified. The precise evidence and the ordered blockers are maintained in [docs/IMPLEMENTATION-STATUS.md](docs/IMPLEMENTATION-STATUS.md); the capability-level coverage verdict is in [docs/V1-PRODUCT-FEATURE-COVERAGE.md](docs/V1-PRODUCT-FEATURE-COVERAGE.md).
+
 ## Architecture first
 
 Read [`ARCHITECTURE.md`](ARCHITECTURE.md) and the focused contracts listed in

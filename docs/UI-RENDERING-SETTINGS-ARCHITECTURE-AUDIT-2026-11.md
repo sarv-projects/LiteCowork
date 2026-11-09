@@ -1,6 +1,7 @@
 # UI, agent-output rendering, Intelligent UI, Settings and architecture audit (2026-11-09)
 
-**Status:** evidence audit. This is not an owner contract. Normative behavior stays with ARCHITECTURE.md, the owner docs and the accepted feature packages. Findings that need new work are mapped to an existing package task or listed as a proposed task addition for the owner (Section 9). Accepted packages 001-012 are LOCKED, so this audit does not edit their TASKS.md.
+**Status:** evidence audit. This is not an owner contract. Normative behavior stays with ARCHITECTURE.md, the owner docs and the accepted feature packages. Findings that need new work were mapped to an existing package task or listed as a proposed task addition for the owner (Section 9).
+**Outcome (2026-11-09):** the owner approved folding the Section 9 proposed tasks P-00..P-09 into their owning packages, including the LOCKED packages, under the ACP direction (register [A-55](CONTRADICTION-AND-ALIGNMENT-REGISTER.md) and [A-54](CONTRADICTION-AND-ALIGNMENT-REGISTER.md), recorded in [OWNER-ACCEPTANCE-REVIEW-PACKET.md](OWNER-ACCEPTANCE-REVIEW-PACKET.md) Part 5). Those items are accepted package tasks now, not open proposals; the destination task ids are in [OWNER-ACCEPTANCE-REVIEW-PACKET.md](OWNER-ACCEPTANCE-REVIEW-PACKET.md) Part 5 and [V1-PRODUCT-FEATURE-COVERAGE.md](V1-PRODUCT-FEATURE-COVERAGE.md). The "proposed P-NN" wording below is preserved as the original proposal record.
 **Revision audited:** branch `docs/audit-competitor-superset` at e678a91. Read-only source review. No build or test was run for this audit.
 **Related owners:** [V1-UI-SCREEN-CONTRACT.md](V1-UI-SCREEN-CONTRACT.md), [V1-UI-ACTION-STATE-LEDGER.md](V1-UI-ACTION-STATE-LEDGER.md), [SETTINGS-AND-SHELL-SURFACE-AUDIT.md](SETTINGS-AND-SHELL-SURFACE-AUDIT.md), [V1-SETTINGS-CONTRACT-LEDGER.md](V1-SETTINGS-CONTRACT-LEDGER.md), [PRESENTATION-RUNTIME.md](PRESENTATION-RUNTIME.md), [INTELLIGENT-UI-AND-IMAGE-CONTENT.md](INTELLIGENT-UI-AND-IMAGE-CONTENT.md), [NATIVE-COMPOSER-LLD.md](NATIVE-COMPOSER-LLD.md), [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).
 
@@ -170,7 +171,7 @@ LiteCowork already owns the right model. The gap is that the working state is in
 | C-9 | Split view: two Conversations or a Conversation plus a Library item side by side. | Parallel work, as later Claude desktop builds do. | Pure UI layout; no new authority. | Proposed P-10 (011 shell, post-V1 if needed) |
 | C-10 | Live artifacts that refresh from a Connection. | Strong rival feature. | Needs 006 Connections and 016 runtime; defer past V1. | Record only |
 
-## 9. Finding to task map and proposed task additions
+## 9. Finding to task map and proposed task additions (accepted 2026-11-09, register A-55)
 
 Existing tasks already cover: R-02 (001-T04), R-03 (001-T13, 001-T16), R-07 typed failure (001-T04), R-09 (001-T14), U-03 (001-T14, 001-T18), U-06 (011-T07), U-07 (011-T11), U-08 search (014-T11), S-01..S-04 (011-T05, 011-T06, 011-T07, 011-T11), rich drift (016-T03, 016-T04), Activity tab (008-T02, 008-T14), Artifact create (007-T02, 007-T12).
 

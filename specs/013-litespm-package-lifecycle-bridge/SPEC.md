@@ -270,6 +270,7 @@ Record correlation ID, LiteSPM operation ref, plan digest prefix, host profile, 
 - AC-018 WHEN `classify_agent_capability_route` is called for a package, THE SYSTEM SHALL set `lite_spm_managed` and `package_digest_verified` only from a settled LiteSPM receipt matched to current inventory by LiteSPM identity and digest. Verify: producer unit tests.
 - AC-019 WHILE B-36 and B-37 are not accepted or the release-row route is not qualified, THE SYSTEM SHALL keep connect-or-install returning `LITESPM_PACKAGE_SERVICE_NOT_QUALIFIED` and every new verb disabled with that reason. Verify: route and UI negative tests.
 - AC-020 WHEN Discover reports `checked_at` or uses a current time, THE SYSTEM SHALL use an RFC 3339 clock value, not a correlation identifier. Verify: route test parsing `checked_at`.
+- AC-021 WHEN the LiteSPM bridge is pinned (task P-17), THE SYSTEM SHALL take its wire names, version and authentication only from the published pinned bridge contract (reconciling the three SHAs 9f42b25d, 111fd9b8 and f77a3a3), SHALL mirror the LiteSPM preview, backup, transaction and byte-exact-restore safety contract so a failed mutation restores byte-for-byte, and SHALL use single-flight plus backoff for Discover read-through; while the published bridge is unreachable the pin SHALL be recorded as TARGET-pending-published-bridge and no wire name SHALL be inferred from CLI output or a listing. Verify: RESEARCH pin record and single-flight read-through test.
 
 ## 15. Executable acceptance command
 
@@ -318,4 +319,5 @@ While IN_REVIEW, no implementation path is in bounds. After acceptance, each tas
 | Failure and recovery matrix | FAILURE-RECOVERY, TESTING | 013-T16 | AC-008 / AC-009 / AC-012 |
 | Cross-layer trace | AGENTS.md section 4 | 013-T17 | AC-004 / AC-010 / AC-014 |
 | Qualification (E2E-06, LSI rows) | ACCEPTANCE-AND-E2E-PLAN, LITESPM-INTEGRATION-PLAN section 8 | 013-T18 | AC-002 / AC-011 / AC-016 |
-| Docs sync and VERIFIED transition | IMPLEMENTATION-STATUS | 013-T19 / 013-T20 | AC-001 to AC-020 (AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014, AC-015, AC-016, AC-017, AC-018, AC-019, AC-020) |
+| LiteSPM bridge pin and safety-contract mirror (P-17) | RESEARCH, AGENTS.md section 6 | 013-T20 | AC-021 |
+| Docs sync and VERIFIED transition | IMPLEMENTATION-STATUS | 013-T19 / 013-T21 | AC-001 to AC-021 (AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014, AC-015, AC-016, AC-017, AC-018, AC-019, AC-020, AC-021) |

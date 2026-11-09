@@ -303,10 +303,45 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 - **Evidence:** regenerated inventory diff; IMPLEMENTATION-STATUS diff.
 - **Stop:** stop if any doc would claim a level higher than recorded evidence.
 
-## 002-T17 - Package VERIFIED for V1
+## 002-T17 - Define the native-agent adapter as an ACP client (P-11)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-11 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package. This is the register A-54 ACP direction (see docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md); rationale and the borrowable mapping stay in that register row and the synthesis doc, not restated here.
+- **Depends on:** T03
+- **Cross-package prerequisites:** Feature 001 adapter-trait task (Feature 001 T04) is the Conversation-side integration point; this package's Adapter 1.0 registry task T03 is the local integration point.
+- **Owner:** Agent Runtime.
+- **Allowed paths:** `apps/litecoworkd/src/agents/acp/` (new), `apps/litecoworkd/src/agents/module_registry.rs`, `apps/litecoworkd/src/agents/modules/`, `specs/002-native-agent-install-auth-binding/RESEARCH.md`, adjacent tests.
+- **Contract:** SPEC §5, §7.1; AC-013, AC-018; AGENT-CONTROL; register A-54.
+- **Change intent:** define the native-agent adapter as an ACP client covering `initialize`, `session/new`, `session/prompt`, `session/update`, `session/cancel`, and the client-side `request_permission`, filesystem read/write and terminal `create`/`output`/`kill`/`release` surfaces, with a per-provider launch catalog. Keep the OpenCode v2 HTTP path (Feature 001 T04 adapter) as one non-ACP adapter until OpenCode's own ACP route qualifies. Pin the ACP SDK version in RESEARCH.md. ACP agents stay native subprocesses that own reasoning and auth; LiteCowork stays the Client that owns permission, files, terminals and evidence (no invariant is weakened).
+- **Acceptance:**
+  - [ ] The ACP client completes `initialize`/`session/new`/`session/prompt`/`session/update`/`session/cancel` against a fixture agent and routes `request_permission`, fs and terminal calls to the Client owner (AC-018).
+  - [ ] The per-provider launch catalog selects a provider by exact identity, never a brand match; OpenCode v2 HTTP remains a distinct non-ACP adapter (AC-013).
+  - [ ] The pinned ACP SDK version is recorded in RESEARCH.md with its source.
+  - [ ] Negative: an uncorrelated or foreign session update cannot mutate another session's state.
+- **Command:** `cargo test -p litecoworkd --locked acp_client_adapter` (filter to be added by this task)
+- **Evidence:** fixture test output; pinned SDK version in RESEARCH.md recorded in Completion evidence.
+- **Stop:** stop if an ACP surface would let a native tool action be recorded as a LiteCowork Effect.
+
+## 002-T18 - Agent Matchmaker ranking for a job (P-12)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-12 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package.
+- **Depends on:** T05, T17
+- **Cross-package prerequisites:** NONE
+- **Owner:** Agent Runtime, UI.
+- **Allowed paths:** `apps/litecoworkd/src/agents/matchmaker.rs` (new), `apps/litecoworkd/src/operator.rs` (route wiring only), `apps/litecowork-ui/src/`, adjacent tests.
+- **Contract:** SPEC §5, §7.1; AC-019; AGENT-CONTROL.
+- **Change intent:** given a job description, rank the eligible bound agents by declared capability from their fresh descriptors, each with a stated plain-language reason. The ranking is advisory: the user still chooses the agent. No ranking is produced from a stale descriptor.
+- **Acceptance:**
+  - [ ] Ranking uses only fresh descriptor-declared capabilities and lists a reason per candidate (AC-019).
+  - [ ] The user selection is never overridden by the ranking; the chosen agent is the bound one (AC-019).
+  - [ ] Negative: an ineligible or disabled binding is excluded; a stale descriptor yields no rank.
+- **Command:** `cargo test -p litecoworkd --locked agent_matchmaker` (filter to be added by this task)
+- **Evidence:** test output in Completion evidence.
+- **Stop:** stop if the ranking would auto-dispatch a job without the user choosing.
+
+## 002-T19 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED
-- **Depends on:** T01-T16
+- **Depends on:** T01-T18
 - **Cross-package prerequisites:** Feature 001 and Feature 004 qualification records for the shared E2E rows.
 - **Owner:** Product (owner sign-off), Agent Runtime.
 - **Allowed paths:** this package (status lines), `CURRENT-RUN.md`.
@@ -321,7 +356,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## Dependency order
 
-T01 and T02 start in parallel (T01 is the first code change). T02 -> T03 -> T04. T01 + T04 -> T05. T05 -> T06, T07, T08. T05 + T06 -> T09. T05 + T07 -> T10. T03 -> T11. T03 + T05 + T07 -> T12. T05-T08 -> T13. T09 + T10 + T13 -> T14. T12 + T14 -> T15 -> T16 -> T17.
+T01 and T02 start in parallel (T01 is the first code change). T02 -> T03 -> T04. T01 + T04 -> T05. T05 -> T06, T07, T08. T05 + T06 -> T09. T05 + T07 -> T10. T03 -> T11. T03 + T05 + T07 -> T12. T05-T08 -> T13. T09 + T10 + T13 -> T14. T12 + T14 -> T15 -> T16. T03 -> T17 (ACP client, P-11); T05 + T17 -> T18 (Matchmaker, P-12). T16 + T18 -> T19 (VERIFIED).
 
 ## Cross-package dependencies
 

@@ -273,6 +273,10 @@ Gap coverage (revision 1.0):
 Performance:
 - **AC-012:** WHEN terminal output is high-volume, THE SYSTEM SHALL apply bounded scrollback/backpressure and SHALL NOT block the Operator or other tabs. Verify: backpressure/throughput test.
 
+Owner-approved additions (2026-11-09):
+- **AC-018:** WHEN the Browser preview iframe renders (task P-06), THE SYSTEM SHALL NOT combine `allow-scripts` with `allow-same-origin` in its sandbox attribute, and a guard test SHALL fail if any iframe in the source carries that attribute pair. Verify: iframe sandbox guard test.
+- **AC-019:** WHEN the Workbench shows a Git worktree and diff or runs a GitHub pull-request operation (task P-13), THE SYSTEM SHALL compute the diff from the real VCS with true added/removed counts and SHALL run PR operations only through a Feature 006 brokered Connection on explicit user action, never auto-opened or self-approved by an agent and never exposing tokens or arbitrary URLs. Verify: worktree/VCS diff and user-invoked PR-op test.
+
 ## 16. Executable acceptance command
 
 ```bash
@@ -293,7 +297,7 @@ Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. The
 - The current diff pane is illustrative, not VCS/evidence. Activity is not a rendered Workbench tab. Whether Activity belongs in Workbench or Work/Task detail follows the canonical V1 screen contract; do not make it a fabricated fifth work surface.
 - Archive UI is not served evidence.
 
-Each blocker has the owners named above. The owner decisions are recorded (ACCEPTED 2026-11-09). Implementation tasks: 008-T01 through 008-T19 in TASKS.md.
+Each blocker has the owners named above. The owner decisions are recorded (ACCEPTED 2026-11-09). Implementation tasks: 008-T01 through 008-T21 in TASKS.md.
 
 ## 7a. Owner facts and implementation crosswalk checked 2026-11-06
 
@@ -341,3 +345,5 @@ Read from CHROME-BROWSER-LLD, V1-INTEGRATED-TERMINAL-LLD, and STATE-MACHINES.
 | Terminal per-row availability (B-17/B-35 rider) | ENVIRONMENTS, V1-INTEGRATED-TERMINAL-LLD | 008-T11, 008-T12 | AC-015 | Per-row terminal availability test |
 | Computer explicitly UNAVAILABLE (B-32) | ENVIRONMENTS, TRUST | 008-T02 | AC-016 | Computer unavailable render and route-inventory test |
 | Prior-incarnation handles fenced | RUNTIME-LIFECYCLE, CHROME-BROWSER-LLD | 008-T07, 008-T13 | AC-017 | Incarnation-fencing restart test |
+| Browser iframe sandbox guard (P-06, owner approval 2026-11-09) | CHROME-BROWSER-LLD, register A-51 | 008-T19 | AC-018 | Iframe sandbox guard test |
+| Git worktree, VCS diff and user-invoked GitHub PR ops (P-13, owner approval 2026-11-09) | ENVIRONMENTS, Feature 006 Connection broker | 008-T20 | AC-019 | Worktree/VCS diff and PR-op test |

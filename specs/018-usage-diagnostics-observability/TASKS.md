@@ -312,14 +312,31 @@ Gaps to V1: normalization contract, OpenCode counter extraction, reader, routes,
 - **Evidence:** diff of status documents.
 - **Stop:** evidence and claim disagree; downgrade the claim.
 
-## 018-T18 - Package VERIFIED for V1
+## 018-T18 - Generate operator-api.ts and TS validators from the Rust wire types with a drift gate (P-18)
+
+- **Status:** NOT STARTED - added under this package's IN_REVIEW status. Folds proposed task P-18 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 (and audit finding X-04) into this package.
+- **Depends on:** T05
+- **Cross-package prerequisites:** NONE
+- **Owner:** API, Desktop UI, Observability.
+- **Allowed paths:** `apps/litecowork-ui/src/generated/`, `apps/litecoworkd/src/`, `scripts/`, `.specify/scripts/` (new drift gate only), adjacent tests.
+- **Contract:** SPEC §7; AC-022; ARCHITECTURE boundaries; audit finding X-04.
+- **Change intent:** generate `operator-api.ts` and its TypeScript validators from the Rust wire types following the NeuralAgent pattern, so there is one source of truth for the wire contract, and add a drift gate that fails when the generated file diverges from the Rust types. The generated file is build output, never hand-edited; regenerate it with the project generator and verify with the drift gate.
+- **Acceptance:**
+  - [ ] `operator-api.ts` and the TS validators are generated from the Rust wire types and match them (AC-022).
+  - [ ] A drift gate fails if the generated file diverges from the Rust types (AC-022).
+  - [ ] The generated file carries a do-not-edit header and is produced only by the generator.
+- **Command:** `pnpm --dir apps/litecowork-ui run api:generate && pnpm --dir apps/litecowork-ui run api:check` and `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** generation and drift-gate output in Completion evidence.
+- **Stop:** the generator cannot reproduce a hand-written type; reconcile the Rust type first rather than hand-edit the output.
+
+## 018-T19 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED.
-- **Depends on:** T01-T17
+- **Depends on:** T01-T18
 - **Cross-package prerequisites:** Feature 019 evidence bundle process and release qualification matrix.
 - **Owner:** Product (sign-off), Observability, Security.
 - **Allowed paths:** this package; `docs/IMPLEMENTATION-STATUS.md`.
-- **Contract:** SPEC sections 14-15; AC-001 to AC-021; SPECIFICATION-STANDARD lifecycle.
+- **Contract:** SPEC sections 14-15; AC-001 to AC-022; SPECIFICATION-STANDARD lifecycle.
 - **Change intent:** assemble the evidence bundle; move ACCEPTED/LOCKED -> IMPLEMENTING at the first implementation merge and IMPLEMENTING -> VERIFIED after owner sign-off on both rows.
 - **Acceptance:**
   - [ ] Canonical command passes on both rows.
@@ -343,7 +360,7 @@ Findings from reading the source, folded into the tasks above. They add no scope
 
 ## Dependency order
 
-T01 -> T02 -> T03 -> (T04, T05 in parallel) -> T06 (after T05). T02 -> T07 -> T08. T02 -> T09. T10 after T07, T08, T09. T11 after T06, T09, T10 -> T12. T13 after T05-T10 -> T14. T15 after T06, T09-T12. T16 after T01-T15 -> T17 -> T18. Every task depends on T01.
+T01 -> T02 -> T03 -> (T04, T05 in parallel) -> T06 (after T05). T02 -> T07 -> T08. T02 -> T09. T10 after T07, T08, T09. T11 after T06, T09, T10 -> T12. T13 after T05-T10 -> T14. T15 after T06, T09-T12. T16 after T01-T15 -> T17. T05 -> T18 (operator-api.ts generation and drift gate, P-18). (T17, T18) -> T19 (VERIFIED). Every task depends on T01.
 
 ## Cross-package dependencies
 
