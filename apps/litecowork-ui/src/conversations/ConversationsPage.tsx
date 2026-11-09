@@ -704,9 +704,30 @@ export function ConversationsPage({
 
   const isTurnRunning = transientTurns.some(t => t.state === "STREAMING" || t.state === "RECONNECTING") || activeStatus === "RUNNING";
 
+  // A-24 disabled-until-qualified gate (docs/V1-UI-SCREEN-CONTRACT.md "Conversation screen" steps 1/3):
+  // Send requires a qualified (selectable) AgentBinding, not merely a non-empty draft. A binding is
+  // qualified only when buildConversationAgentChoices admits it (current workspace, enabled, lead-eligible).
+  // When no Conversation is selected yet, the composer creates one via `create()`; eligibility is
+  // re-checked against the resulting Conversation's binding, so a draft with no qualified binding
+  // cannot submit a turn.
+  const selectedAgentBindingId = selected?.active_agent_binding_id ?? null;
+  const selectedBindingQualified = selectedAgentBindingId !== null
+    && agentChoices.some(choice => choice.agentBindingId === selectedAgentBindingId && choice.selectable);
+  // For an unstarted Conversation (no selectedId) a qualified binding still must exist to submit; the
+  // workspace default (when selectable) or any selectable choice makes Send eligible after creation.
+  const hasQualifiedBindingForNewConversation = agentChoices.some(choice => choice.selectable);
+  const bindingEligibleForSend = selectedId ? selectedBindingQualified : hasQualifiedBindingForNewConversation;
+  const sendEligible = Boolean(composerDraft.trim())
+    && Boolean(workspaceId)
+    && operatorReady
+    && !sendingTurn
+    && !isTurnRunning
+    && bindingEligibleForSend;
+
   const sendTurn = async () => {
     const text = composerDraft.trim();
     if (!text || !workspaceId || !operatorReady || sendingTurn || isTurnRunning) return;
+    if (!bindingEligibleForSend) return;
     if (!selectedId) {
       void create(text.slice(0, 36));
       return;
@@ -886,25 +907,23 @@ export function ConversationsPage({
             </>
           ) : (
             <div className="message-assistant-wrap">
-              <div className="message-assistant-body">
+              {/*
+                A-26 empty-state contract (docs/V1-UI-SCREEN-CONTRACT.md "Conversation screen"):
+                the empty canvas must be truthful and LiteCowork-branded. It must NOT carry
+                third-party "Antigravity" branding and must NOT advertise any capability the
+                current build cannot perform. Ordinary chat routes through the selected native
+                agent harness; nothing here claims terminal execution, verification or other
+                unqualified behavior.
+              */}
+              <div className="message-assistant-body conversation-empty-state">
                 <p>
-                  I am <strong>Antigravity</strong>, an advanced agentic AI coding and engineering assistant. I can help
-                  you with software engineering, codebase exploration, automation, system design, debugging, and project
-                  management tasks.
+                  Start a conversation in this Workspace. Messages are sent to the native agent you select,
+                  which owns its own reasoning, models and tools.
                 </p>
-                <p>Here is a summary of what I can do:</p>
-                <h3>1. Codebase Exploration &amp; Analysis</h3>
-                <ul>
-                  <li>Search, read, and understand existing codebases across languages and architectures.</li>
-                  <li>Trace bugs, performance bottlenecks, and architectural seams.</li>
-                  <li>Review pull requests, commits, and diffs for code standards and functional specifications.</li>
-                </ul>
-                <h3>2. Full-Cycle Software Development</h3>
-                <ul>
-                  <li>Design, author, and refactor features with clean typing, error handling, and tests.</li>
-                  <li>Execute verifiable commands, run test suites, and inspect terminal output.</li>
-                  <li>Orchestrate multi-step plans with strict verification and zero hallucinations.</li>
-                </ul>
+                <p>
+                  Choose a qualified agent in the composer below, then type your message. Ordinary chat does
+                  not create a Task or require a Coworker.
+                </p>
               </div>
             </div>
           )}
@@ -997,9 +1016,19 @@ export function ConversationsPage({
               <button
                 className="composer-submit-btn"
                 type="button"
-                disabled={!composerDraft.trim() || !operatorReady || sendingTurn}
+                disabled={!sendEligible}
+                title={
+                  !composerDraft.trim()
+                    ? "Enter a message"
+                    : !operatorReady
+                      ? "Operator is not ready"
+                      : !bindingEligibleForSend
+                        ? "Select a qualified agent to send"
+                        : sendingTurn
+                          ? "Sending…"
+                          : "Send message"
+                }
                 onClick={() => void sendTurn()}
-                title="Send message"
               >
                 ✦
               </button>
@@ -1009,4 +1038,4 @@ export function ConversationsPage({
       </div>
     </div>
   );
-};
+};

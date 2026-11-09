@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 270
-- Included lines: 57517
-- Included bytes: 4606661
+- Included lines: 57519
+- Included bytes: 4609845
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,7 +25,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 130 | 46932 |
+| docs/ | 130 | 46934 |
 | repository root | 6 | 1549 |
 | scripts/ | 1 | 14 |
 | specs/ | 121 | 8242 |
@@ -70,7 +70,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
 | docs/CONTEXT.md | 272 | 19955 | f80c31cda1a4c7aa |
-| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 128 | 59077 | 40b54a3963a9ce27 |
+| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 128 | 60194 | de5cf00369ab09a1 |
 | docs/COVERAGE-MATRIX.md | 174 | 25367 | 64c4380d1987ee75 |
 | docs/COWORKER-FLOWS.md | 166 | 20076 | 309015aa4fe4a14a |
 | docs/COWORKERS-TARGET.md | 456 | 58061 | 3afdfb6005644afe |
@@ -79,16 +79,16 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13326 | 404bb17ada4c842c |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13592 | ee72608328aca956 |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 927 | 69198 | f6753a21cfcfe5eb |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
 | docs/FAILURE-RECOVERY.md | 213 | 17867 | 71418bc2b863c859 |
-| docs/FEATURE-AND-UI-CONTRACT-COVERAGE.md | 137 | 20891 | f2bfba6d93a4a9d8 |
+| docs/FEATURE-AND-UI-CONTRACT-COVERAGE.md | 137 | 21002 | 16294042e9895d9c |
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 297 | 58127 | f739370f8116bf6b |
+| docs/IMPLEMENTATION-STATUS.md | 297 | 58573 | 19135097bfba6229 |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -120,7 +120,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/RUNTIME-MESH.md | 744 | 36915 | 5df0580b7369d59d |
 | docs/SCHEMAS.md | 1630 | 73873 | f58d2dc4f000f6f0 |
 | docs/SECURITY.md | 290 | 16118 | 47552e601ce4142c |
-| docs/SEMANTIC-SERVED-UI-MAP.md | 184 | 30756 | 22bf00dde8fdf8c3 |
+| docs/SEMANTIC-SERVED-UI-MAP.md | 184 | 30911 | e27195b0ddccb208 |
 | docs/SERVICES.md | 1582 | 101551 | 43c93b0fb23f464f |
 | docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md | 111 | 18984 | e5d28f0061fcff69 |
 | docs/SOURCE-RECONCILIATION.md | 179 | 16220 | 5567fad3a3b603ea |
@@ -136,9 +136,9 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/USER-EXPERIENCE-RESEARCH-AND-MAGNETIC-USE-CASES.md | 243 | 22769 | a52bb38efaeeb7d2 |
 | docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md | 150 | 18757 | a0a8dc909d4e831c |
 | docs/V1-AGENT-MEMORY-FAST-PATH-LLD.md | 104 | 10314 | 095643b94c54af62 |
-| docs/V1-DESIGN-INDEX.md | 75 | 11642 | 64849373958a9fb9 |
+| docs/V1-DESIGN-INDEX.md | 75 | 11771 | f83bbdc47991da5f |
 | docs/V1-END-TO-END-FLOW-AND-RACE-CONTRACTS.md | 72 | 16127 | 84dc86b1be98969c |
-| docs/V1-FEATURE-SDD-REGISTER.md | 51 | 10206 | 58f6cc0edcb589b3 |
+| docs/V1-FEATURE-SDD-REGISTER.md | 51 | 10313 | 570fbc64f84bc077 |
 | docs/V1-FUNCTION-CONTRACT-LEDGER.md | 273 | 115936 | cf4e1f6171faaa5c |
 | docs/V1-FUNCTION-FILE-CATALOG.md | 505 | 41402 | b3ed7a3eeb974279 |
 | docs/V1-INTEGRATED-TERMINAL-LLD.md | 131 | 13592 | 61264382a39f84e8 |
@@ -147,7 +147,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/V1-SETTINGS-CONTRACT-LEDGER.md | 215 | 56260 | d22b0c11c1258b85 |
 | docs/V1-TELEMETRY-USAGE-RESILIENCE-LLD.md | 351 | 37853 | 375da7f1482fe2da |
 | docs/V1-UI-ACTION-STATE-LEDGER.md | 62 | 12248 | d80a0bb4134daaea |
-| docs/V1-UI-SCREEN-CONTRACT.md | 366 | 49614 | b0836a6813303e34 |
+| docs/V1-UI-SCREEN-CONTRACT.md | 368 | 49901 | e77bc3e76f430090 |
 | docs/V1-WORKFLOW-EVENT-LLD.md | 139 | 14813 | aa20f0e960080e6e |
 | docs/VIABILITY-VS-COMPETITORS.md | 239 | 24161 | 74be14df4bd7e54b |
 | docs/WORLD-RESOURCES.md | 529 | 38043 | bef06f6e6dd86d16 |
@@ -187,12 +187,12 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/001-conversation-session-supervisor/PLAN.md | 106 | 9515 | 312aa8ec0658ed4c |
 | specs/001-conversation-session-supervisor/README.md | 28 | 2862 | b427b179551f0e43 |
 | specs/001-conversation-session-supervisor/RESEARCH.md | 101 | 14699 | bdcba727cf4bc42f |
-| specs/001-conversation-session-supervisor/SPEC.md | 354 | 44791 | ad089afbc15498df |
+| specs/001-conversation-session-supervisor/SPEC.md | 354 | 45113 | 4088baadd182f220 |
 | specs/001-conversation-session-supervisor/TASKS.md | 161 | 12492 | f7ea27be2996d84e |
 | specs/001-conversation-session-supervisor/contracts/README.md | 10 | 706 | 92b53ba5c0e7fc1a |
 | specs/001-conversation-session-supervisor/contracts/api-events.md | 63 | 6120 | 3044763035671d27 |
 | specs/001-conversation-session-supervisor/contracts/errors-recovery.md | 78 | 8976 | 906ff2568696fd58 |
-| specs/001-conversation-session-supervisor/contracts/ui-behavior.md | 93 | 8007 | eaf8450542d80142 |
+| specs/001-conversation-session-supervisor/contracts/ui-behavior.md | 93 | 8251 | 31281b11e9c2130c |
 | specs/002-native-agent-install-auth-binding/DATA-MODEL.md | 38 | 4534 | 594170f47c6d8bb4 |
 | specs/002-native-agent-install-auth-binding/PLAN.md | 37 | 1681 | e151bd3fdd9f73a0 |
 | specs/002-native-agent-install-auth-binding/README.md | 31 | 2279 | 6ef6d06cb9fe66e0 |
