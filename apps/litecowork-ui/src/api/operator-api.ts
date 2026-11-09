@@ -1334,6 +1334,7 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
+        /** @description Served (read-only). Lists durable owner records that block a safe stop (admitted turns, non-terminal Attempts, unresolved Effects, held leases, pending cleanup). The verdict is UNKNOWN, never QUIESCENT, while no live-work observer exists for agent sessions, child processes and terminal or browser sessions; provider_reference_ids stays empty until that observer exists. */
         get: operations["previewLocalRuntimeStop"];
         put?: never;
         post?: never;

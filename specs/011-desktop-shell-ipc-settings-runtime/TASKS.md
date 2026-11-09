@@ -243,7 +243,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T14 - Desktop stop and update UI with quiescence gate
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL (CODE; Tauri bridge not compiled here). DONE: `src/runtime/runtime-stop-state.ts` (pure summary: Stop safely disabled with reasons for BLOCKED/UNKNOWN and always while the stop command is unmounted, update gate allowed only on QUIESCENT for the exact incarnation, `runtimeStoppedLabel` shows "Runtime stopped" only from an observed STOPPED state so window close never does), `RuntimeStopPreviewPanel.tsx`, a mapped `runtime-stop-preview` control in Settings > Runtime wired in `App.tsx` to `get_runtime_stop_preview`, `tests/runtime-stop-update.test.mjs` (7 tests). Rust bridge `get_runtime_stop_preview` and `check_update_quiescence` in `runtime_lifecycle_bridge.rs` with a fail-closed decoder (contradictory QUIESCENT, foreign identity, unknown fields and unknown blocker codes rejected); the decoder and its 7 unit tests were compiled and run in an isolated scratch crate (7 pass), but `src-tauri` itself cannot build here (gdk-3.0), so the `#[tauri::command]` wrappers and handler registration in `lib.rs` are UNVERIFIED. NOT done: the actual Stop request flow (needs T13 request half), the install-update refusal inside `install_update` (Feature 019 T11, B-43), cargo test of `runtime_stop` on a host that can build src-tauri.
 - **Depends on:** T13
 - **Cross-package prerequisites:** Feature 019 updater (calls the gate).
 - **Owner:** Desktop UI, Runtime
@@ -251,9 +251,9 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC Advanced tab, §7.2 `UpdateQuiescenceGate`; AC-014, AC-015
 - **Change intent:** Tauri commands for preview and request stop and for `check_update_quiescence`. UI: Preview stop lists running and unknown items; Stop safely enabled only on QUIESCENT; update/install flow refuses without positive quiescence and offers Retry.
 - **Acceptance:**
-  - [ ] Stop button disabled with reasons while preview is BLOCKED or UNKNOWN (AC-014).
-  - [ ] Update refused without positive quiescence; message lists what is running (AC-015).
-  - [ ] Window close never shows "Runtime stopped".
+  - [x] Stop button disabled with reasons while preview is BLOCKED or UNKNOWN (AC-014).
+  - [x] Update refused without positive quiescence; message lists what is running (AC-015). (UI gate and bridge decoder only; no installer path exists yet.)
+  - [x] Window close never shows "Runtime stopped".
 - **Command:** `cargo test -p litecowork-ui --locked runtime_stop` (filter to be added by this task) and `pnpm --dir apps/litecowork-ui test`
 - **Evidence:** test output; ledger rows.
 - **Stop:** stop if any path installs an update without the gate.

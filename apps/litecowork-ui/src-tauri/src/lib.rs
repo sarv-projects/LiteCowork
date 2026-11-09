@@ -5430,6 +5430,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_runtime_status,
             runtime_lifecycle_bridge::get_runtime_lifecycle,
+            runtime_lifecycle_bridge::get_runtime_stop_preview,
+            runtime_lifecycle_bridge::check_update_quiescence,
             list_agent_installations,
             agent_control_bridge::get_agent_control_descriptor,
             agent_control_bridge::refresh_agent_control_descriptor,

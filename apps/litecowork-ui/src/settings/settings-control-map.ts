@@ -35,4 +35,5 @@ export const SETTINGS_CONTROL_MAP: Readonly<Record<string, SettingsControlEntry>
   "workspaces-rename-submit": { class: "OperatorServed", effect: "renameWorkspace" },
   "runtime-start": { class: "Native", effect: "start_local_runtime desktop bridge" },
   "runtime-refresh": { class: "OperatorServed", effect: "getLocalRuntimeLifecycle" },
+  "runtime-stop-preview": { class: "OperatorServed", effect: "previewLocalRuntimeStop (read-only; Stop safely renders as text until requestLocalRuntimeStop is mounted)" },
 };

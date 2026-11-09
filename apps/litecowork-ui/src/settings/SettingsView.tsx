@@ -16,6 +16,8 @@ import type {
 import type { WorkspaceListState } from "../workspaces/WorkspaceFirstRun";
 import type { RuntimeInventoryStreamStatus } from "../runtime/runtime-inventory-stream";
 import { deriveRuntimeHealthRows } from "../runtime/runtime-health";
+import { RuntimeStopPreviewPanel } from "../runtime/RuntimeStopPreviewPanel";
+import type { StopPreviewState } from "../runtime/runtime-stop-state";
 import type { LocalPreferences } from "./local-preferences";
 import { agentSettingsDescription } from "./agents-heading";
 import "./settings-view.css";
@@ -38,6 +40,9 @@ export type SettingsViewProps = {
   runtimeBusy: boolean;
   startRuntime: () => Promise<void>;
   refreshRuntime: () => Promise<void>;
+  /** Stop preview (previewLocalRuntimeStop). Optional so hosts without the bridge render it disabled. */
+  stopPreview?: StopPreviewState;
+  onPreviewStop?: () => Promise<void>;
   agents: AgentInstallationView[];
   agentError: string | null;
   refreshAgents: () => Promise<void>;
@@ -696,6 +701,23 @@ export function SettingsView(props: SettingsViewProps) {
                     Runtime error: {props.runtimeError}
                   </p>
                 )}
+
+                <div style={{ marginTop: "12px" }}>
+                  <h3 className="settings-card-title">Stop and update safety</h3>
+                  <p className="settings-card-subtitle">
+                    Preview what is running before the Runtime is stopped or LiteCowork is updated. Closing the window does not stop the Runtime.
+                  </p>
+                  <button data-control-id="runtime-stop-preview" className="settings-btn" type="button"
+                    disabled={!props.onPreviewStop || !props.runtime?.operatorReady || props.stopPreview?.status === "LOADING"}
+                    onClick={() => void props.onPreviewStop?.()}>
+                    {props.stopPreview?.status === "LOADING" ? "Checking…" : "Preview stop"}
+                  </button>
+                  <RuntimeStopPreviewPanel
+                    state={props.stopPreview ?? { status: "IDLE" }}
+                    runtimeId={props.runtime?.runtimeId ?? null}
+                    incarnationId={props.runtime?.localIncarnationId ?? null}
+                  />
+                </div>
 
                 {props.runtimeLifecycle?.blockers && props.runtimeLifecycle.blockers.length > 0 && (
                   <div style={{ marginTop: "12px" }}>
