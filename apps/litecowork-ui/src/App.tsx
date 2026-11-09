@@ -133,6 +133,7 @@ import {
   saveLocalPreferences,
   type LocalPreferences,
 } from "./settings/local-preferences.ts";
+import { matchShortcut, shortcutKeys, type ShortcutId } from "./shell/shortcut-registry.ts";
 import {
   classifyRenameFailure,
   nextRenameRequest,
@@ -1675,6 +1676,29 @@ function App() {
     }
   };
 
+  const shortcutHandlers: Record<ShortcutId, () => void> = {
+    "new-chat": () => {
+      if (taskSaving) return;
+      setSelectedConversationId(null);
+      requestPageNavigation("Conversations");
+    },
+    "open-library": () => {
+      requestPageNavigation("Library");
+    },
+  };
+  const shortcutHandlersRef = useRef(shortcutHandlers);
+  shortcutHandlersRef.current = shortcutHandlers;
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      const id = matchShortcut(event);
+      if (!id) return;
+      event.preventDefault();
+      shortcutHandlersRef.current[id]();
+    };
+    document.addEventListener("keydown", onShortcut);
+    return () => document.removeEventListener("keydown", onShortcut);
+  }, []);
+
   /** Resolves true when the rename committed; false keeps the caller's draft. */
   const renameWorkspace = async (draftName: string): Promise<boolean> => {
     const workspace = workspaces.find((item) => item.workspaceId === selectedWorkspaceId);
@@ -2331,28 +2355,6 @@ function App() {
                 <path d="M9 3v18" />
               </svg>
             </button>
-            <button
-              className="sidebar-icon-btn"
-              type="button"
-              aria-label="Back"
-              title="Back"
-              onClick={() => window.history.back()}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              className="sidebar-icon-btn"
-              type="button"
-              aria-label="Forward"
-              title="Forward"
-              onClick={() => window.history.forward()}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </button>
           </div>
         </div>
 
@@ -2393,7 +2395,7 @@ function App() {
           >
             <span className="sidebar-plus-glyph" aria-hidden="true">+</span>
             <span>New Chat</span>
-            <span className="sidebar-chat-shortcut">Ctrl N</span>
+            <span className="sidebar-chat-shortcut">{shortcutKeys("new-chat")}</span>
           </button>
         </div>
 

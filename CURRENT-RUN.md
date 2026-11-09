@@ -244,6 +244,11 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 - Added the Notifications Settings category (link plus unavailable reason naming Feature 010) and agents-heading.ts. `pnpm test` plus `pnpm run build` results recorded in the commit; same 5 pre-existing failures.
 - 011-T09 stays PARTIAL: AgentCatalogSettings controls are not in the control map.
 
+### Wave 0 slice 7: 011-T11 shortcut registry (partial), 011-T19 reachability (partial) (2026-11, CODE)
+
+- Added src/shell/shortcut-registry.ts, tests/keyboard-focus-baseline.test.mjs (3), tests/shell-reachability.test.mjs (3); removed Back/Forward buttons that called window.history without any pushState.
+- Not done: focus-return/skip-link/browser keyboard path (T11); Recent Chats states and Needs You count (T19).
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.

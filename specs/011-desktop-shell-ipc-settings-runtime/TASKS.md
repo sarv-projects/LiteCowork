@@ -190,7 +190,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T11 - App-wide keyboard and focus baseline
 
-- **Status:** PARTIAL (`App.tsx` traps focus and handles Escape for the narrow navigation drawer and narrow Workbench; `tests/settings-accessibility.test.mjs` covers Settings details; shortcut labels Ctrl + N / W / K have no handlers)
+- **Status:** PARTIAL (CODE): `src/shell/shortcut-registry.ts` registers Ctrl N (New Chat) and Ctrl K (Library); App binds a typed handler map and the sidebar label comes from the registry; `tests/keyboard-focus-baseline.test.mjs` (3 tests) fails on a label without a handler. Ctrl W is intentionally unregistered (WebView/OS reserved; documented in the registry). NOT done: visible-focus audit, focus return after drawers/dialogs, skip link, Tab-order browser test, and the Settings shortcut list generated from the registry
 - **Depends on:** T06
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI
@@ -198,7 +198,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §13 accessibility; V1-UI-SCREEN-CONTRACT; AC-011, AC-018
 - **Change intent:** One shortcut registry that registers handlers and generates the Settings shortcut list and the sidebar label ("Ctrl N" in `App.tsx`). Visible focus style on all interactive elements; focus return after dialogs/drawers; skip link to main content; Tab order through navigation, composer, Workbench and Settings.
 - **Acceptance:**
-  - [ ] Every listed shortcut has a registered handler; test fails on a label without a handler (AC-018).
+  - [x] Every listed shortcut has a registered handler; test fails on a label without a handler (AC-018).
   - [ ] Keyboard-only path: open New Chat, send focus to composer, open Workbench, open Settings, change category, close drawer, focus returns (AC-018).
   - [ ] Settings categories reachable and announced (AC-011).
 - **Command:** `pnpm --dir apps/litecowork-ui test` and `pnpm --dir apps/litecowork-ui run test:browser`
@@ -327,7 +327,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T19 - Shell reachability and truthfulness (P-05)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-05 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 (findings U-01, U-04, U-05, U-08, and the C-6 Needs You count) into this LOCKED package.
+- **Status:** PARTIAL (CODE): all 13 Page values already have navigation entries and `tests/shell-reachability.test.mjs` (3 tests) now guards that; non-functional Back/Forward buttons removed. NOT done: unavailable-vs-empty fallback audit, Recent Chats loading/error states, real Needs You count (depends on Feature 010 and 014 prerequisites)
 - **Depends on:** T06
 - **Cross-package prerequisites:** Feature 010 local-poll notification delivery for the Needs You count source; Feature 014 Recent Chats read path.
 - **Owner:** Desktop UI.
@@ -335,7 +335,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §12, §14; AC-021; V1-UI-SCREEN-CONTRACT; register A-35.
 - **Change intent:** make the shell reachable and truthful: add navigation entries for Goals, Notifications and Ideas or remove them from V1 with owner agreement; remove or actually implement Back/Forward (today they call `window.history` while navigation never pushes history); distinguish unavailable from empty in the placeholder fallback; give Recent Chats explicit loading and error states; and show a real Needs You count. Add a test that fails if a mounted page has no navigation path or a null API renders as an empty state.
 - **Acceptance:**
-  - [ ] Every mounted page has a navigation path, or is removed from V1 with a recorded owner decision (AC-021).
+  - [x] Every mounted page has a navigation path, or is removed from V1 with a recorded owner decision (AC-021).
   - [ ] Back/Forward either work against real history or are removed; a null API renders unavailable, not empty (AC-021).
   - [ ] Recent Chats shows distinct loading and error states; the Needs You count reflects a real count (AC-021).
 - **Command:** `pnpm --dir apps/litecowork-ui test`
