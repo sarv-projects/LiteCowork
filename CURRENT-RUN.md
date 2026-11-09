@@ -230,7 +230,7 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 
 - Added src/settings/local-preferences.ts, tests/local-preferences.test.mjs (7 tests), root application in App.tsx, dark theme, density, text scale and reduced-motion CSS. Removed the inert shortcut card from Settings.
 - Commands: `npx tsc --noEmit`, `pnpm run api:check`, `pnpm run build` pass; `pnpm test` 508 pass / 5 pre-existing failures.
-- 011-T06 remains PARTIAL: no control map, inert-control audit test or category modules yet.
+- 011-T06 follow-up (same day): settings-control-map.ts plus tests/settings-inert-control-audit.test.mjs landed (pnpm test 513 pass / 5 pre-existing failures). Still PARTIAL: AgentCatalogSettings controls and the category module split.
 
 ### Preservation and delivery rules
 

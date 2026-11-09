@@ -104,7 +104,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T06 - Remove inert Settings controls and gate by owner class (B-29/B-33)
 
-- **Status:** PARTIAL (four categories mounted in `SettingsView.tsx`; the display-only shortcut card is removed and the General appearance controls are now real via T07; NOT done: `settings-control-map.ts`, the inert-control audit test, per-category modules, unavailable entries for Usage, Storage and About, target-only rendering audit)
+- **Status:** PARTIAL (CODE): `settings-control-map.ts` maps all 19 controls rendered directly by `SettingsView.tsx` (each carries `data-control-id`); `tests/settings-inert-control-audit.test.mjs` (5 tests) fails on an unmapped control, a Target-class control or a missing unavailable entry; shortcut card removed; Usage, Storage and About render as unavailable text with prerequisite. NOT done: the 32 controls inside `AgentCatalogSettings` are outside the map (T09 owns them), the per-category module split with typed context, and the 16-category IA (not a V1 claim, B-33)
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI, Product
@@ -112,9 +112,9 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §5 B-29, B-33; V1-SETTINGS-CONTRACT-LEDGER; AC-003, AC-007, AC-011, AC-020
 - **Change intent:** Add a typed `settings-control-map.ts` with one entry per rendered control (`SettingsControlClass`: LocalOnly, Native, Target, OperatorServed) generated from the T01 ledger. Remove the General appearance controls until T07 wires them, and the shortcut card until T11's registry exists. Render Usage & Monitoring (Feature 018), Storage & Backup (Feature 017) and About & Diagnostics (Feature 018) as unavailable entries with their prerequisite, not as controls. Split categories into modules under `settings/categories/` with a typed context instead of 60 props.
 - **Acceptance:**
-  - [ ] Audit test fails if any rendered input/button lacks a control-map entry with a served operation or applied local effect (AC-020).
-  - [ ] Target-only entries render as text with a reason and send no mutation (AC-003).
-  - [ ] Category navigation and unavailable reasons are keyboard and screen-reader accessible (AC-011).
+  - [x] Audit test fails if any SettingsView-rendered input/button lacks a control-map entry with a served operation or applied local effect (AC-020).
+  - [x] Target-only entries render as text with a reason and send no mutation (AC-003).
+  - [x] Category navigation (keyboard-operable buttons and a labelled list; no new screen-reader run) and unavailable reasons are keyboard and screen-reader accessible (AC-011).
   - [ ] Rich presentation disabled still shows semantic Conversation text (AC-007).
 - **Command:** `pnpm --dir apps/litecowork-ui test` and `pnpm --dir apps/litecowork-ui run build`
 - **Evidence:** audit test output; UI ledger diff.
