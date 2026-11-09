@@ -164,7 +164,7 @@ function WorkspaceDefaultLeadControls({
         : selectedDefaultLeadBindingId ? "Saved lead selection is unavailable in the current binding list" : "No Workspace default lead selected"}</span>
       <small>An explicit lead choice takes priority. Work started for a Coworker uses that Coworker’s lead setting before this Workspace fallback. LiteCowork uses this Workspace choice only after those higher-priority lead choices. LiteCowork rechecks a compatible Runtime offer and session-specific authorization before starting work. A saved default may remain selected while those checks fail.</small>
     </div>
-    {selectedDefaultLeadBindingId && !confirming && <button
+    {selectedDefaultLeadBindingId && !confirming && <button data-control-id="agent-default-clear-begin"
       type="button"
       className="agent-catalog__secondary"
       disabled={!canChangeWorkspaceAgentPolicy || defaultAgentBusy}
@@ -172,8 +172,8 @@ function WorkspaceDefaultLeadControls({
     >Clear Workspace default…</button>}
     {confirming && selectedDefaultLeadBindingId && <div className="agent-catalog__clear-default-confirm" role="group" aria-label="Confirm clearing Workspace default lead">
       <span>Clear this Workspace fallback? Explicit choices and Coworker lead settings stay in place; other work will need an eligible lead selected.</span>
-      <button type="button" className="agent-catalog__secondary" disabled={defaultAgentBusy} onClick={() => setConfirming(false)}>Keep default</button>
-      <button type="button" className="agent-catalog__primary" disabled={!canChangeWorkspaceAgentPolicy || defaultAgentBusy} onClick={() => { setConfirming(false); onSetDefaultLead(null); }}>{defaultAgentBusy ? "Clearing…" : "Confirm clear"}</button>
+      <button data-control-id="agent-default-clear-cancel" type="button" className="agent-catalog__secondary" disabled={defaultAgentBusy} onClick={() => setConfirming(false)}>Keep default</button>
+      <button data-control-id="agent-default-clear-confirm" type="button" className="agent-catalog__primary" disabled={!canChangeWorkspaceAgentPolicy || defaultAgentBusy} onClick={() => { setConfirming(false); onSetDefaultLead(null); }}>{defaultAgentBusy ? "Clearing…" : "Confirm clear"}</button>
     </div>}
   </div>;
 }
@@ -641,7 +641,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
           <h2 id="agent-catalog-title">Coding agents</h2>
           <p>Check what is installed, what the adapter has observed, and which agents this Workspace is configured to use.</p>
         </div>
-        <button type="button" className="agent-catalog__secondary" onClick={onRefresh} disabled={!runtimeReady || loading}>
+        <button data-control-id="agent-catalog-refresh" type="button" className="agent-catalog__secondary" onClick={onRefresh} disabled={!runtimeReady || loading}>
           {loading ? "Refreshing…" : "Refresh catalog"}
         </button>
       </header>
@@ -666,7 +666,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
         <div className="agent-catalog__registry-state" role="note">
           <strong>{registryLoading ? "Loading ACP Registry…" : registryStale ? "Showing a cached ACP Registry snapshot" : registryObservedAt ? "ACP Registry snapshot loaded" : registryApiUnavailable(props.registryApi)}</strong>
           <span>{registryObservedAt ? `Observed ${formatTime(registryObservedAt)}${registryStale ? " · stale" : " · current"}. Registry presence does not mean the agent is installed, signed in, configured, or supported.` : "Curated candidates remain available independently of the remote Registry."}</span>
-          <button type="button" className="agent-catalog__secondary" onClick={refreshRegistry} disabled={!props.registryApi || registryLoading}>
+          <button data-control-id="agent-registry-refresh" type="button" className="agent-catalog__secondary" onClick={refreshRegistry} disabled={!props.registryApi || registryLoading}>
             {registryLoading ? "Refreshing…" : "Refresh ACP Registry"}
           </button>
         </div>
@@ -709,8 +709,8 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
           </div>
           <form className="agent-catalog__registry-search" onSubmit={(event) => { event.preventDefault(); const query = registrySearchDraft.trim(); setRegistryQuery(query); setRegistryEntries([]); requestRegistryPage(query, null, false); }}>
             <label htmlFor="agent-registry-search">Search remote entries</label>
-            <input id="agent-registry-search" type="search" maxLength={128} value={registrySearchDraft} onChange={(event) => setRegistrySearchDraft(event.currentTarget.value)} placeholder="Name or agent ID" />
-            <button type="submit" className="agent-catalog__secondary" disabled={!props.registryApi || registryLoading}>Search</button>
+            <input data-control-id="agent-registry-search" id="agent-registry-search" type="search" maxLength={128} value={registrySearchDraft} onChange={(event) => setRegistrySearchDraft(event.currentTarget.value)} placeholder="Name or agent ID" />
+            <button data-control-id="agent-registry-search-submit" type="submit" className="agent-catalog__secondary" disabled={!props.registryApi || registryLoading}>Search</button>
           </form>
           {registryEntries.length === 0 && !registryLoading && <p className="agent-catalog__empty">{registryError ? "Remote Registry entries are unavailable." : "No ACP Registry entries match this search."}</p>}
           {registryEntries.length > 0 && <ul className="agent-catalog__registry-list">
@@ -724,7 +724,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
               </dl>
             </li>)}
           </ul>}
-          {registryCursor && <button type="button" className="agent-catalog__secondary" onClick={() => requestRegistryPage(registryQuery, registryCursor, true)} disabled={registryLoading}>{registryLoading ? "Loading…" : "Load more Registry entries"}</button>}
+          {registryCursor && <button data-control-id="agent-registry-load-more" type="button" className="agent-catalog__secondary" onClick={() => requestRegistryPage(registryQuery, registryCursor, true)} disabled={registryLoading}>{registryLoading ? "Loading…" : "Load more Registry entries"}</button>}
         </section>
       </section>
 
@@ -770,7 +770,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
             <strong>Codex App Server profile</strong>
             <span>{codexInstallation?.installation === "INSTALLED" ? `CLI detected${codexInstallation.version ? ` · ${codexInstallation.version}` : ""}` : codexInstallation ? humanize(codexInstallation.installation) : "No Codex executable detected"}</span>
           </div>
-          <button type="button" className="agent-catalog__primary" onClick={onProbeCodex} disabled={!canProbeCodex}>
+          <button data-control-id="agent-probe-codex" type="button" className="agent-catalog__primary" onClick={onProbeCodex} disabled={!canProbeCodex}>
             {busyAction === "probe" ? "Probing…" : "Probe Codex profile"}
           </button>
         </div>
@@ -781,7 +781,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
             <strong>OpenCode profile</strong>
             <span>{openCodeInstallation?.installation === "INSTALLED" ? `CLI detected${openCodeInstallation.version ? ` · ${openCodeInstallation.version}` : ""}` : openCodeInstallation ? humanize(openCodeInstallation.installation) : "No OpenCode executable detected"}</span>
           </div>
-          <button type="button" className="agent-catalog__primary" onClick={onProbeOpenCode} disabled={!canProbeOpenCode}>
+          <button data-control-id="agent-probe-opencode" type="button" className="agent-catalog__primary" onClick={onProbeOpenCode} disabled={!canProbeOpenCode}>
             {busyAction === "probe:OPENCODE" ? "Probing…" : "Probe OpenCode profile"}
           </button>
         </div>
@@ -899,7 +899,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
                   <p>Provider catalog IDs are display-only; they do not establish connection, authentication, entitlement, or inference. No Task or AgentSession is started, and this profile is incompatible with Task execution.</p>
                 </details>}
                 {workspaceId && controlKey && <div className="agent-catalog__control-inspection">
-                  <button
+                  <button data-control-id="agent-control-inspect"
                     type="button"
                     className="agent-catalog__secondary"
                     aria-expanded={controlsExpanded}
@@ -915,9 +915,9 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
                 {isBound ? <p className="agent-catalog__bound">A Workspace binding exists below. A detected profile alone does not make it a lead or a worker.</p> : (
                   <div className="agent-catalog__configure">
                     {offerReady
-                      ? <label><input type="checkbox" checked={leadEligibleByProfile[profile.agentProfileId] ?? true} onChange={(event) => setLeadEligibleByProfile((current) => ({ ...current, [profile.agentProfileId]: event.target.checked }))} /> Allow this binding to be selected as a lead</label>
+                      ? <label><input data-control-id="agent-binding-lead-eligible" type="checkbox" checked={leadEligibleByProfile[profile.agentProfileId] ?? true} onChange={(event) => setLeadEligibleByProfile((current) => ({ ...current, [profile.agentProfileId]: event.target.checked }))} /> Allow this binding to be selected as a lead</label>
                       : <p className="agent-catalog__hint" role="status">{currentOfferIsIncompatible ? "Lead selection is unavailable because this profile is not compatible for Workspace binding." : "Lead selection requires a fresh compatible Runtime offer with usable readiness."}</p>}
-                    <button type="button" className="agent-catalog__secondary" disabled={!canConfigureBinding || !offerReady} onClick={() => onCreateBinding(profile, leadEligibleByProfile[profile.agentProfileId] ?? true)}>
+                    <button data-control-id="agent-binding-create" type="button" className="agent-catalog__secondary" disabled={!canConfigureBinding || !offerReady} onClick={() => onCreateBinding(profile, leadEligibleByProfile[profile.agentProfileId] ?? true)}>
                       {bindingActionLabel}
                     </button>
                     <small>Adding creates a disabled binding. It does not select a default lead, create a DelegationProfile, start an agent, or run a Task.</small>
@@ -948,10 +948,10 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
               </div>
               <div className="agent-catalog__binding-action">
                 <span className={`agent-catalog__badge ${binding.enabled ? "is-good" : "is-muted"}`}>{binding.enabled ? "Enabled" : "Disabled"}</span>
-                {!binding.enabled && <button type="button" className="agent-catalog__secondary" disabled={!canConfigureBinding || busyAction != null} onClick={() => onEnableBinding(binding)}>{busyAction === `enable:${binding.agentBindingId}` ? "Enabling…" : "Enable"}</button>}
-                {binding.enabled && !isDefaultLead && <button type="button" className="agent-catalog__secondary" disabled={!canChangeWorkspaceAgentPolicy || busyAction != null} onClick={() => onDisableBinding(binding)}>{busyAction === `disable:${binding.agentBindingId}` ? "Disabling…" : "Disable"}</button>}
+                {!binding.enabled && <button data-control-id="agent-binding-enable" type="button" className="agent-catalog__secondary" disabled={!canConfigureBinding || busyAction != null} onClick={() => onEnableBinding(binding)}>{busyAction === `enable:${binding.agentBindingId}` ? "Enabling…" : "Enable"}</button>}
+                {binding.enabled && !isDefaultLead && <button data-control-id="agent-binding-disable" type="button" className="agent-catalog__secondary" disabled={!canChangeWorkspaceAgentPolicy || busyAction != null} onClick={() => onDisableBinding(binding)}>{busyAction === `disable:${binding.agentBindingId}` ? "Disabling…" : "Disable"}</button>}
                 {binding.enabled && isDefaultLead && <span className="agent-catalog__hint">Choose another default agent or clear this one before disabling it.</span>}
-                {eligibleLead && !isDefaultLead && <button type="button" className="agent-catalog__secondary" disabled={!canChangeWorkspaceAgentPolicy || defaultAgentBusy} onClick={() => onSetDefaultLead(binding.agentBindingId)}>{defaultAgentBusy ? "Saving lead…" : "Set as default lead"}</button>}
+                {eligibleLead && !isDefaultLead && <button data-control-id="agent-binding-set-default" type="button" className="agent-catalog__secondary" disabled={!canChangeWorkspaceAgentPolicy || defaultAgentBusy} onClick={() => onSetDefaultLead(binding.agentBindingId)}>{defaultAgentBusy ? "Saving lead…" : "Set as default lead"}</button>}
                 {binding.enabled && !binding.leadEligible && <span className="agent-catalog__hint">Cannot be selected as a lead</span>}
               </div>
               {workspaceId && quotaApi && <AgentQuotaObservation
@@ -976,7 +976,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
       {hasWorkspace && <section className="agent-catalog__section" aria-labelledby="worker-profiles-title">
         <div className="agent-catalog__section-heading">
           <div><h3 id="worker-profiles-title">Subagent profiles</h3><p>One installed agent can have several profiles. Creating or revising a profile never starts an agent. Profiles remain disabled until adapter option validation and Trust/Environment admission are available.</p></div>
-          <button type="button" className="agent-catalog__secondary" onClick={refreshWorkerProfiles} disabled={workerProfilesLoading || !runtimeReady}>{workerProfilesLoading ? "Refreshing…" : "Refresh profiles"}</button>
+          <button data-control-id="worker-profiles-refresh" type="button" className="agent-catalog__secondary" onClick={refreshWorkerProfiles} disabled={workerProfilesLoading || !runtimeReady}>{workerProfilesLoading ? "Refreshing…" : "Refresh profiles"}</button>
         </div>
         {!runtimeReady && <p className="agent-catalog__notice">Start the local Operator to manage worker profiles.</p>}
         {workerProfilesLoading && workerProfiles.length === 0 ? <p className="agent-catalog__empty">Loading saved worker profiles…</p> : workerProfiles.length === 0 ? <p className="agent-catalog__empty">No worker profiles have been created for this Workspace.</p> : <ul className="agent-catalog__worker-profiles">
@@ -1000,7 +1000,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
                 {profile.status === "ENABLED" && <small>Execution is unavailable in this Runtime; this status does not mean a worker can run.</small>}
               </div>
               <div className="agent-catalog__worker-profile-actions">
-                <button type="button" className="agent-catalog__secondary" disabled={workerProfileBusy || workerProfileLifecycleBusy !== null || !!workerProfileForm || archived || profile.status !== "DISABLED" || !profile.editable || !binding?.enabled || !workspaceActive || !runtimeEnrolled || !runtimeReady} onClick={() => setWorkerProfileForm({
+                <button data-control-id="worker-profile-edit" type="button" className="agent-catalog__secondary" disabled={workerProfileBusy || workerProfileLifecycleBusy !== null || !!workerProfileForm || archived || profile.status !== "DISABLED" || !profile.editable || !binding?.enabled || !workspaceActive || !runtimeEnrolled || !runtimeReady} onClick={() => setWorkerProfileForm({
                   bindingId: profile.agent_binding_id,
                   profileId: profile.delegation_profile_id,
                   baseVersion: profile.version,
@@ -1008,9 +1008,9 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
                   routing: profile.revision.routing_description,
                   instructions: profile.revision.instructions ?? "",
                 })}>{!profile.editable ? "Settings need adapter review" : profile.status !== "DISABLED" ? "Disable before editing" : "Edit future revision"}</button>
-                {!archived && !duplicateForm && <button type="button" className="agent-catalog__secondary" disabled={!workspaceActive || !runtimeReady || !runtimeEnrolled || workerProfileLifecycleBusy !== null || !!workerProfileForm} onClick={() => setWorkerProfileDuplicateForm({ profileId: profile.delegation_profile_id, baseVersion: profile.version, name: `${profile.name} Copy` })}>Duplicate</button>}
-                {profile.status === "ENABLED" && <button type="button" className="agent-catalog__secondary" disabled={!workspaceActive || !runtimeReady || !runtimeEnrolled || workerProfileLifecycleBusy !== null} onClick={() => changeProfileStatus(profile, "DISABLED")}>{workerProfileLifecycleBusy === profile.delegation_profile_id ? "Disabling…" : "Disable"}</button>}
-                {!archived && !archiveConfirmation && <button type="button" className="agent-catalog__secondary" disabled={!workspaceActive || !runtimeReady || !runtimeEnrolled || workerProfileLifecycleBusy !== null} onClick={() => setWorkerProfileArchiveConfirmation({ profileId: profile.delegation_profile_id, baseVersion: profile.version })}>Archive…</button>}
+                {!archived && !duplicateForm && <button data-control-id="worker-profile-duplicate-begin" type="button" className="agent-catalog__secondary" disabled={!workspaceActive || !runtimeReady || !runtimeEnrolled || workerProfileLifecycleBusy !== null || !!workerProfileForm} onClick={() => setWorkerProfileDuplicateForm({ profileId: profile.delegation_profile_id, baseVersion: profile.version, name: `${profile.name} Copy` })}>Duplicate</button>}
+                {profile.status === "ENABLED" && <button data-control-id="worker-profile-disable" type="button" className="agent-catalog__secondary" disabled={!workspaceActive || !runtimeReady || !runtimeEnrolled || workerProfileLifecycleBusy !== null} onClick={() => changeProfileStatus(profile, "DISABLED")}>{workerProfileLifecycleBusy === profile.delegation_profile_id ? "Disabling…" : "Disable"}</button>}
+                {!archived && !archiveConfirmation && <button data-control-id="worker-profile-archive-begin" type="button" className="agent-catalog__secondary" disabled={!workspaceActive || !runtimeReady || !runtimeEnrolled || workerProfileLifecycleBusy !== null} onClick={() => setWorkerProfileArchiveConfirmation({ profileId: profile.delegation_profile_id, baseVersion: profile.version })}>Archive…</button>}
                 {!profile.editable && profile.edit_block_reason && <small>{profile.edit_block_reason}</small>}
               </div>
               {profileApi && profile.status !== "ARCHIVED" && <DelegationProfilePerformance
@@ -1027,15 +1027,15 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
               {duplicateForm && <form className="agent-catalog__lifecycle-form" onSubmit={event => { event.preventDefault(); if (!changedSinceDuplicateForm && duplicateForm.name.trim()) duplicateProfile(duplicateForm); }}>
                 <strong>Duplicate as a disabled profile</strong>
                 <span>Copies the current non-secret settings into revision 1. Attempts, credentials, grants, and environments are never copied.</span>
-                {sourceArchived ? <div className="agent-catalog__conflict" role="alert"><strong>The source profile is archived.</strong><span>Choose another active profile to duplicate.</span></div> : changedSinceDuplicateForm && <div className="agent-catalog__conflict" role="alert"><strong>The source profile changed.</strong><span>Review its latest routing description: {profile.revision.routing_description}</span><button type="button" className="agent-catalog__secondary" onClick={() => setWorkerProfileDuplicateForm({ ...duplicateForm, baseVersion: profile.version })}>Use this latest source revision</button></div>}
-                <label>New profile name<input maxLength={120} value={duplicateForm.name} onChange={event => setWorkerProfileDuplicateForm({ ...duplicateForm, name: event.target.value })} /></label>
+                {sourceArchived ? <div className="agent-catalog__conflict" role="alert"><strong>The source profile is archived.</strong><span>Choose another active profile to duplicate.</span></div> : changedSinceDuplicateForm && <div className="agent-catalog__conflict" role="alert"><strong>The source profile changed.</strong><span>Review its latest routing description: {profile.revision.routing_description}</span><button data-control-id="worker-profile-duplicate-use-latest" type="button" className="agent-catalog__secondary" onClick={() => setWorkerProfileDuplicateForm({ ...duplicateForm, baseVersion: profile.version })}>Use this latest source revision</button></div>}
+                <label>New profile name<input data-control-id="worker-profile-duplicate-name" maxLength={120} value={duplicateForm.name} onChange={event => setWorkerProfileDuplicateForm({ ...duplicateForm, name: event.target.value })} /></label>
                 {workerProfilesError && <p className="agent-catalog__error" role="alert">{workerProfilesError}</p>}
-                <div className="agent-catalog__worker-editor-actions"><button type="button" className="agent-catalog__secondary" disabled={workerProfileLifecycleBusy === profile.delegation_profile_id} onClick={() => setWorkerProfileDuplicateForm(null)}>Cancel</button><button type="submit" className="agent-catalog__primary" disabled={!duplicateForm.name.trim() || duplicateForm.name.length > 120 || changedSinceDuplicateForm || sourceArchived || workerProfileLifecycleBusy !== null}>{workerProfileLifecycleBusy === profile.delegation_profile_id ? "Duplicating…" : "Create disabled copy"}</button></div>
+                <div className="agent-catalog__worker-editor-actions"><button data-control-id="worker-profile-duplicate-cancel" type="button" className="agent-catalog__secondary" disabled={workerProfileLifecycleBusy === profile.delegation_profile_id} onClick={() => setWorkerProfileDuplicateForm(null)}>Cancel</button><button data-control-id="worker-profile-duplicate-submit" type="submit" className="agent-catalog__primary" disabled={!duplicateForm.name.trim() || duplicateForm.name.length > 120 || changedSinceDuplicateForm || sourceArchived || workerProfileLifecycleBusy !== null}>{workerProfileLifecycleBusy === profile.delegation_profile_id ? "Duplicating…" : "Create disabled copy"}</button></div>
               </form>}
               {archiveConfirmation && <div className="agent-catalog__lifecycle-form" role="group" aria-label={`Archive ${profile.name}`}>
                 <strong>Archive this profile?</strong><span>It will stop being available for future selection. Existing Attempts retain their pinned history. The profile can no longer be revised; a duplicate can be created before archiving if you need a new working copy.</span>
-                {changedSinceArchivePrompt && <div className="agent-catalog__conflict" role="alert"><strong>The profile changed since this confirmation opened.</strong><span>Current revision {profile.current_revision}: {profile.revision.routing_description}</span><button type="button" className="agent-catalog__secondary" onClick={() => setWorkerProfileArchiveConfirmation({ profileId: profile.delegation_profile_id, baseVersion: profile.version })}>Review and confirm latest revision</button></div>}
-                <div className="agent-catalog__worker-editor-actions"><button type="button" className="agent-catalog__secondary" disabled={workerProfileLifecycleBusy === profile.delegation_profile_id} onClick={() => setWorkerProfileArchiveConfirmation(null)}>Cancel</button><button type="button" className="agent-catalog__primary" disabled={changedSinceArchivePrompt || workerProfileLifecycleBusy !== null} onClick={() => changeProfileStatus(profile, "ARCHIVED")}>{workerProfileLifecycleBusy === profile.delegation_profile_id ? "Archiving…" : "Confirm archive"}</button></div>
+                {changedSinceArchivePrompt && <div className="agent-catalog__conflict" role="alert"><strong>The profile changed since this confirmation opened.</strong><span>Current revision {profile.current_revision}: {profile.revision.routing_description}</span><button data-control-id="worker-profile-archive-review-latest" type="button" className="agent-catalog__secondary" onClick={() => setWorkerProfileArchiveConfirmation({ profileId: profile.delegation_profile_id, baseVersion: profile.version })}>Review and confirm latest revision</button></div>}
+                <div className="agent-catalog__worker-editor-actions"><button data-control-id="worker-profile-archive-cancel" type="button" className="agent-catalog__secondary" disabled={workerProfileLifecycleBusy === profile.delegation_profile_id} onClick={() => setWorkerProfileArchiveConfirmation(null)}>Cancel</button><button data-control-id="worker-profile-archive-confirm" type="button" className="agent-catalog__primary" disabled={changedSinceArchivePrompt || workerProfileLifecycleBusy !== null} onClick={() => changeProfileStatus(profile, "ARCHIVED")}>{workerProfileLifecycleBusy === profile.delegation_profile_id ? "Archiving…" : "Confirm archive"}</button></div>
               </div>}
             </li>;
           })}
@@ -1045,7 +1045,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
           const hasForm = workerProfileForm?.bindingId === binding.agentBindingId;
           return <div className="agent-catalog__worker-create" key={binding.agentBindingId}>
             <div><strong>{agent?.displayName ?? "Configured agent"}</strong><span>Enabled Workspace binding</span></div>
-            {!hasForm && !workerProfileForm && <button type="button" className="agent-catalog__secondary" disabled={workerProfileBusy || !workspaceActive || !runtimeReady || !runtimeEnrolled} onClick={() => setWorkerProfileForm({ bindingId: binding.agentBindingId, profileId: null, baseVersion: null, name: `${agent?.displayName ?? "Agent"} Worker`, routing: "Bounded coding work for this agent.", instructions: "" })}>Create disabled worker profile</button>}
+            {!hasForm && !workerProfileForm && <button data-control-id="worker-profile-create-begin" type="button" className="agent-catalog__secondary" disabled={workerProfileBusy || !workspaceActive || !runtimeReady || !runtimeEnrolled} onClick={() => setWorkerProfileForm({ bindingId: binding.agentBindingId, profileId: null, baseVersion: null, name: `${agent?.displayName ?? "Agent"} Worker`, routing: "Bounded coding work for this agent.", instructions: "" })}>Create disabled worker profile</button>}
             {hasForm && <WorkerProfileEditor
               value={workerProfileForm}
               busy={workerProfileBusy}
@@ -1135,12 +1135,12 @@ function WorkerProfileEditor({ value, busy, error, conflict, onChange, onCancel,
     && value.instructions.length <= 12000;
   return <form className="agent-catalog__worker-editor" onSubmit={event => { event.preventDefault(); if (canSave && !busy) onSave(); }}>
     <h4>{value.profileId ? "Create an immutable revision" : "New worker profile"}</h4>
-    <label>Profile name<input maxLength={120} value={value.name} disabled={busy} onChange={event => onChange({ ...value, name: event.target.value })} required /></label>
-    <label>When to use<textarea maxLength={240} rows={2} value={value.routing} disabled={busy} onChange={event => onChange({ ...value, routing: event.target.value })} required /></label>
-    <label>Worker instructions <span>(guidance, not a security control)</span><textarea maxLength={12000} rows={4} value={value.instructions} disabled={busy} onChange={event => onChange({ ...value, instructions: event.target.value })} /></label>
+    <label>Profile name<input data-control-id="worker-profile-form-name" maxLength={120} value={value.name} disabled={busy} onChange={event => onChange({ ...value, name: event.target.value })} required /></label>
+    <label>When to use<textarea data-control-id="worker-profile-form-routing" maxLength={240} rows={2} value={value.routing} disabled={busy} onChange={event => onChange({ ...value, routing: event.target.value })} required /></label>
+    <label>Worker instructions <span>(guidance, not a security control)</span><textarea data-control-id="worker-profile-form-instructions" maxLength={12000} rows={4} value={value.instructions} disabled={busy} onChange={event => onChange({ ...value, instructions: event.target.value })} /></label>
     <div className="agent-catalog__worker-editor-note"><strong>Fixed safety defaults</strong><span>No session/model overrides; one concurrent child; no recursive delegation; isolated Attempt environment and worktree writes; no external effects or secret access.</span></div>
-    {conflict && <div className="agent-catalog__conflict" role="alert"><strong>A newer revision exists.</strong><span>Your current draft is preserved. Review the latest revision before you continue.</span><button type="button" className="agent-catalog__secondary" onClick={onLoadLatest} disabled={busy}>Discard draft and load latest revision</button></div>}
+    {conflict && <div className="agent-catalog__conflict" role="alert"><strong>A newer revision exists.</strong><span>Your current draft is preserved. Review the latest revision before you continue.</span><button data-control-id="worker-profile-form-load-latest" type="button" className="agent-catalog__secondary" onClick={onLoadLatest} disabled={busy}>Discard draft and load latest revision</button></div>}
     {error && <p className="agent-catalog__error" role="alert">{error}</p>}
-    <div className="agent-catalog__worker-editor-actions"><button type="button" className="agent-catalog__secondary" onClick={onCancel} disabled={busy}>Cancel</button><button type="submit" className="agent-catalog__primary" disabled={!canSave || busy || conflict}>{busy ? "Saving…" : value.profileId ? "Save new revision" : "Create disabled profile"}</button></div>
+    <div className="agent-catalog__worker-editor-actions"><button data-control-id="worker-profile-form-cancel" type="button" className="agent-catalog__secondary" onClick={onCancel} disabled={busy}>Cancel</button><button data-control-id="worker-profile-form-save" type="submit" className="agent-catalog__primary" disabled={!canSave || busy || conflict}>{busy ? "Saving…" : value.profileId ? "Save new revision" : "Create disabled profile"}</button></div>
   </form>;
 }

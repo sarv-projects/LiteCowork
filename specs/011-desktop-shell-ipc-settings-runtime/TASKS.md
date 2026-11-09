@@ -157,7 +157,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T09 - Settings -> Agents screen over served Feature 002 operations (A-35)
 
-- **Status:** PARTIAL (CODE): Agents heading now derives from probed profiles (`src/settings/agents-heading.ts`) and `tests/settings-agents-heading.test.mjs` (4 tests) pins it; descriptor 503 renders UNAVAILABLE via the existing `AgentControlDescriptorPanel` (existing tests). NOT done: mapping the 32 controls inside `AgentCatalogSettings` into `settings-control-map.ts`, and new pending/receipt/error tests for probe and binding actions (existing props `agentActionBusy/Message/Error` were not re-verified here)
+- **Status:** DONE (CODE). Agents heading derives from probed profiles (`src/settings/agents-heading.ts`, 4 tests); descriptor 503 renders UNAVAILABLE via `AgentControlDescriptorPanel`; all 35 interactive elements in `AgentCatalogSettings.tsx` carry `data-control-id` and are classified in `AGENT_CATALOG_CONTROL_MAP` (`settings-control-map.ts`), audited by `tests/agent-catalog-control-map.test.mjs` (4 tests: unique ids, map and render agree, no Target-class control, no sign-in/install/update control); pending (Probing…, disabled probes), receipt (role=status) and error (role=alert) states are pinned by `tests/agent-catalog-action-states.test.mjs` (3 tests). Sign-in and install/update are not rendered as controls (Feature 002 does not serve them).
 - **Depends on:** T06
 - **Cross-package prerequisites:** Feature 002 OpenCode binding probe fix and AgentControlDescriptor producer tasks.
 - **Owner:** Desktop UI (screen), Feature 002 owners (operations)
@@ -166,7 +166,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Change intent:** Map every Agents control to its Feature 002 operation and served state. Unserved operations (descriptor, sign-in, install/update) render unavailable with the reason; the screen layout and categories stay owned here and Feature 002 links to it. Remove the heading text that lists agents with no probe.
 - **Acceptance:**
   - [x] With descriptor routes returning 503, model/effort controls are shown unavailable, not hidden as ready (AC-019).
-  - [ ] Probe and binding actions show pending, receipt and error states.
+  - [x] Probe and binding actions show pending, receipt and error states.
   - [x] Heading names only harnesses with active probes.
 - **Command:** `pnpm --dir apps/litecowork-ui test`
 - **Evidence:** test names; ledger rows.
