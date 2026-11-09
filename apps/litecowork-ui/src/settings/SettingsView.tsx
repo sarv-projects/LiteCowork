@@ -17,12 +17,14 @@ import type { WorkspaceListState } from "../workspaces/WorkspaceFirstRun";
 import type { RuntimeInventoryStreamStatus } from "../runtime/runtime-inventory-stream";
 import { deriveRuntimeHealthRows } from "../runtime/runtime-health";
 import type { LocalPreferences } from "./local-preferences";
+import { agentSettingsDescription } from "./agents-heading";
 import "./settings-view.css";
 
 export type SettingsCategory =
   | "general"
   | "workspaces"
   | "agents"
+  | "notifications"
   | "runtime";
 
 export type SettingsViewProps = {
@@ -82,6 +84,7 @@ export type SettingsViewProps = {
   renameBusy: boolean;
   renameError: string | null;
   onClearRenameError: () => void;
+  onOpenNotifications: () => void;
   onSetDefaultAgentBinding: (agentBindingId: string | null) => Promise<void>;
   defaultAgentBusy: boolean;
   instructions: string;
@@ -150,6 +153,14 @@ export function SettingsView(props: SettingsViewProps) {
         >
           <span className="settings-nav-icon">🤖</span>
           <span>Agents</span>
+        </button>
+        <button data-control-id="nav-notifications"
+          className={`settings-nav-item ${activeCategory === "notifications" ? "active" : ""}`}
+          type="button"
+          onClick={() => setActiveCategory("notifications")}
+        >
+          <span className="settings-nav-icon">🔔</span>
+          <span>Notifications</span>
         </button>
         <div className="settings-sidebar-heading">System &amp; Trust</div>
         <button data-control-id="nav-runtime"
@@ -510,6 +521,39 @@ export function SettingsView(props: SettingsViewProps) {
           )}
 
           {/* ================================================================= */}
+          {/* NOTIFICATIONS: link only. Quiet hours semantics belong to Feature 010. */}
+          {/* ================================================================= */}
+          {activeCategory === "notifications" && (
+            <>
+              <header className="settings-header">
+                <h1 className="settings-title">Notifications</h1>
+                <p className="settings-description">
+                  Delivery history and notification policies are owned by the Notifications page.
+                </p>
+              </header>
+              <section className="settings-card">
+                <div className="settings-row">
+                  <div className="settings-row-info">
+                    <span className="settings-row-label">Quiet hours</span>
+                    <span className="settings-row-desc" data-testid="quiet-hours-unavailable">
+                      Quiet-hours editing is unavailable until Feature 010 serves its control surface. The saved policy is shown read-only on the Notifications page.
+                    </span>
+                  </div>
+                  <div className="settings-row-action">
+                    <button data-control-id="notifications-open"
+                      className="settings-btn"
+                      type="button"
+                      onClick={() => props.onOpenNotifications()}
+                    >
+                      Open Notifications
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* ================================================================= */}
           {/* 3. AGENT HARNESSES & MODELS                                       */}
           {/* ================================================================= */}
           {activeCategory === "agents" && (
@@ -517,7 +561,7 @@ export function SettingsView(props: SettingsViewProps) {
               <header className="settings-header">
                 <h1 className="settings-title">Agent Harnesses &amp; Models</h1>
                 <p className="settings-description">
-                  Configure detected native agent harnesses (OpenCode, Codex, Claude Code, Gemini). LiteCowork coordinates native harnesses without imposing an external reasoning loop.
+                  {agentSettingsDescription(props.agentProfiles)}
                 </p>
               </header>
 

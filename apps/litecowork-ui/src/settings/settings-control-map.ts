@@ -15,6 +15,8 @@ export const SETTINGS_CONTROL_MAP: Readonly<Record<string, SettingsControlEntry>
   "nav-general": { class: "LocalOnly", effect: "category navigation" },
   "nav-workspaces": { class: "LocalOnly", effect: "category navigation" },
   "nav-agents": { class: "LocalOnly", effect: "category navigation" },
+  "nav-notifications": { class: "LocalOnly", effect: "category navigation" },
+  "notifications-open": { class: "LocalOnly", effect: "navigate to the Notifications page (Feature 010 owns quiet hours)" },
   "nav-runtime": { class: "LocalOnly", effect: "category navigation" },
   "pref-theme": { class: "LocalOnly", effect: "LocalPreferenceStore theme applied at document root" },
   "pref-density": { class: "LocalOnly", effect: "LocalPreferenceStore density applied at document root" },

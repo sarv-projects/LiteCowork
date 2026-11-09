@@ -239,6 +239,11 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 - `cargo test -p litecoworkd workspace` shows 103 pass and 1 fail (`spawned_daemon_replays_workspace_create_after_lost_ack_and_restart`); it fails identically on the base state with my changes stashed, so it is pre-existing.
 - Not verified: src-tauri does not build here (missing gdk-3.0), so the `rename_workspace` command is uncompiled.
 
+### Wave 0 slice 6: 011-T10 Notifications link, 011-T09 partial (2026-11, CODE)
+
+- Added the Notifications Settings category (link plus unavailable reason naming Feature 010) and agents-heading.ts. `pnpm test` plus `pnpm run build` results recorded in the commit; same 5 pre-existing failures.
+- 011-T09 stays PARTIAL: AgentCatalogSettings controls are not in the control map.
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.

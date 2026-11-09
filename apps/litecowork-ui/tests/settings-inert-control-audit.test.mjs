@@ -46,3 +46,11 @@ test("Usage, Storage and About render as unavailable text with a prerequisite, n
     assert.doesNotMatch(item, /<button|<input|<select/);
   }
 });
+
+test("Notifications entry links to Feature 010 and defines no quiet-hours control (AC-020)", () => {
+  assert.match(source, /Feature 010/);
+  assert.doesNotMatch(source, /quiet_hours|startLocalTime|start_local_time|weekdays/i);
+  const entry = SETTINGS_CONTROL_MAP["notifications-open"];
+  assert.equal(entry.class, "LocalOnly");
+  assert.doesNotMatch(Object.keys(SETTINGS_CONTROL_MAP).join(" "), /quiet/);
+});

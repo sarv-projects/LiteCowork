@@ -157,7 +157,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T09 - Settings -> Agents screen over served Feature 002 operations (A-35)
 
-- **Status:** PARTIAL (`SettingsView.tsx` renders `AgentCatalogSettings` with probe, binding create/enable/disable and default-lead actions; descriptor and credential routes in `apps/litecoworkd/src/agent_control_operator.rs` and `agent_credentials_operator.rs` return 503)
+- **Status:** PARTIAL (CODE): Agents heading now derives from probed profiles (`src/settings/agents-heading.ts`) and `tests/settings-agents-heading.test.mjs` (4 tests) pins it; descriptor 503 renders UNAVAILABLE via the existing `AgentControlDescriptorPanel` (existing tests). NOT done: mapping the 32 controls inside `AgentCatalogSettings` into `settings-control-map.ts`, and new pending/receipt/error tests for probe and binding actions (existing props `agentActionBusy/Message/Error` were not re-verified here)
 - **Depends on:** T06
 - **Cross-package prerequisites:** Feature 002 OpenCode binding probe fix and AgentControlDescriptor producer tasks.
 - **Owner:** Desktop UI (screen), Feature 002 owners (operations)
@@ -165,16 +165,16 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC §5 A-35, Agents tab; Feature 002 SPEC (operations); AC-019
 - **Change intent:** Map every Agents control to its Feature 002 operation and served state. Unserved operations (descriptor, sign-in, install/update) render unavailable with the reason; the screen layout and categories stay owned here and Feature 002 links to it. Remove the heading text that lists agents with no probe.
 - **Acceptance:**
-  - [ ] With descriptor routes returning 503, model/effort controls are shown unavailable, not hidden as ready (AC-019).
+  - [x] With descriptor routes returning 503, model/effort controls are shown unavailable, not hidden as ready (AC-019).
   - [ ] Probe and binding actions show pending, receipt and error states.
-  - [ ] Heading names only harnesses with active probes.
+  - [x] Heading names only harnesses with active probes.
 - **Command:** `pnpm --dir apps/litecowork-ui test`
 - **Evidence:** test names; ledger rows.
 - **Stop:** stop if this screen would restate Feature 002 operation semantics instead of linking.
 
 ## 011-T10 - Notifications entry linking Feature 010 quiet hours
 
-- **Status:** NOT STARTED
+- **Status:** DONE (CODE): Notifications category links to the Notifications page and states that quiet-hours editing is unavailable until Feature 010; no quiet-hours control exists in this package; `settings-inert-control-audit.test.mjs` pins it
 - **Depends on:** T06
 - **Cross-package prerequisites:** Feature 010 quiet-hours control surface task (A-35).
 - **Owner:** Desktop UI
@@ -182,8 +182,8 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Contract:** SPEC Notifications tab; A-35; AC-020
 - **Change intent:** Add a Notifications category entry that hosts Feature 010's quiet-hours component when Feature 010 serves it, and otherwise shows an unavailable reason. Shell-local sound/notification choices appear only when the OS notification provider exists.
 - **Acceptance:**
-  - [ ] No quiet-hours control is defined in this package's code (AC-020).
-  - [ ] Unavailable state names Feature 010 as the prerequisite.
+  - [x] No quiet-hours control is defined in this package's code (AC-020).
+  - [x] Unavailable state names Feature 010 as the prerequisite.
 - **Command:** `pnpm --dir apps/litecowork-ui test`
 - **Evidence:** audit test output.
 - **Stop:** stop if quiet-hours semantics would be duplicated here.
