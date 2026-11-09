@@ -19,7 +19,7 @@ This is the working delivery checklist for the active source tree. It is not a G
 |---|---|---|
 | BT-01.1 | Make submit admission and dispatch intent recoverable across daemon crash | Durable state/outbox; restart finds committed undispatched turns |
 | BT-01.2 | Make idempotent replay resolve original dispatch state | Same key returns receipt; no duplicate provider prompt |
-| BT-01.3 | Qualify OpenCode v2.0.32 adapter on packaged Windows | Send/stream/cancel/retry/restart USER flow |
+| BT-01.3 | Qualify the native-agent adapter as an ACP client (Feature 002 002-T17, consumed by Feature 001), keeping OpenCode v2.0.32 HTTP as one non-ACP adapter until its ACP route qualifies | Send/stream/cancel/retry/restart USER flow through the ACP client; OpenCode event mapping confirmed against the 001-T23 fixture |
 | BT-01.4 | Ensure unsupported agent bindings cannot appear Send-eligible | Exact descriptor + adapter/auth/OS eligibility matrix |
 | BT-01.5 | Verify semantic message, rich presentation and stream resync | Saved transcript authoritative after gap/restart |
 | BT-01.6 | Complete Feature 001 API/UI/error/recovery contract review | Supporting contracts accepted by owners |
@@ -182,6 +182,8 @@ The owner accepted packages 001-012 on 2026-11-09. Packages 013-020 are IN_REVIE
 | W6 | 017, 018, 019 qualification (019-T06..019-T23) | All earlier waves VERIFIED or explicitly descoped by the owner | E2E-12, proposed E2E-16, signed packages, V1 go/no-go |
 
 Windows Task execution, the daemon terminal and Windows delegation stay UNAVAILABLE until B-35 is accepted and 005-T17/005-T18 qualify. That path runs in parallel with W3 to W5 and does not block the Linux row.
+
+Folded tasks (owner-accepted 2026-11-09, register A-55) land in the wave of their owning package. The ACP native-agent client (002-T17, consumed by Feature 001) is the W1 adapter spine and carries the OpenCode fixture and normalizer (001-T23, 001-T24) plus the activity/plan cards, autoscroll and native permission prompts (001-T25, 001-T26, 001-T27); the Agent Matchmaker (002-T18) is W1. Per-block Markdown (016-T18) and the Context Debugger (003-T17) are W2. The LiteSPM pin (013-T20) is W3; the iframe sandbox guard and Git worktree/diff/PR (008-T19, 008-T20) are W3. Mission Control and read-only Compare (015-T20) is W4. The shell reachability, decomposition, SettingsPage merge and Workspace Dashboard tasks (011-T19..011-T22) ride the W0 shell package, with the Dashboard deliverable landing once its inputs exist. The operator-api.ts codegen and drift gate (018-T18) is W6. The V1 go/no-go (019-T23) re-synced its VERIFIED-id list to the new final task ids.
 
 ## Migration allocation (provisional)
 

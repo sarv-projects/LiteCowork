@@ -12,6 +12,8 @@ The owner opens Settings > Usage & Monitoring and sees honest, source-labelled u
 
 No usage record exists in any Rust source; the OpenCode adapter parses no token field; usage routes are target-only. The quota observation route is served and always returns `null`. Daemon diagnostics are 12 `eprintln!` calls; there is no structured log, crash record or support bundle. Settings has four categories and neither Usage nor About. See [SPEC.md](SPEC.md) section 4.
 
+Under this package's IN_REVIEW status, proposed task P-18 is folded in as 018-T18: generate `operator-api.ts` and the TypeScript validators from the Rust wire types (NeuralAgent pattern) and add a drift gate, so the wire contract has one source of truth (audit finding X-04). Source: [docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](../../docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md) section 8.
+
 ## Package
 
 - [SPEC.md](SPEC.md) - problem, goals, HLD/LLD, vocabulary mapping, B-42, security, EARS acceptance.

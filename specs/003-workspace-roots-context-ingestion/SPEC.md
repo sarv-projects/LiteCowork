@@ -271,6 +271,7 @@ V1 gap coverage (revision 1.0):
 - **AC-017:** WHEN the owner types @ in the composer, THE SYSTEM SHALL offer only Resources of the current Workspace that are under an ACTIVE root or otherwise admitted, pin each choice to an exact revision, and expose the picker as a keyboard-operable labelled listbox. Verify: @-reference picker render and keyboard test.
 - **AC-018:** WHEN a turn with explicit ResourceRefs is admitted, THE SYSTEM SHALL persist one ContextAttachment per pinned ref with the turn, and after restart Context Used SHALL show the same attachments. Verify: ContextAttachment persistence and restart test.
 - **AC-019:** IF a root is paused or revoked after a ResourceRef was selected but before the turn dispatches, THEN THE SYSTEM SHALL refuse the attachment with a typed root-not-active error and SHALL NOT materialize its bytes to the agent. Verify: revoke-during-send race test.
+- **AC-020:** WHEN the owner opens the Context Debugger for a committed turn (task P-15, owner approval 2026-11-09), THE SYSTEM SHALL show exactly what entered the model context - attachments, retrieved passages with their source revisions, in-scope skills and the applied limits - read from the durable retrieval receipt and ContextAttachment records, and SHALL NOT reconstruct or fabricate context; a turn with no retrieval SHALL show an explicit no-retrieval state. Verify: Context Debugger render and restart test.
 
 ## 16. Executable acceptance command
 
@@ -294,7 +295,7 @@ Implementation gates are the cargo and pnpm commands named in TASKS.md. They are
 - The first GA OS (Windows x64, B-02/B-28 rider) and ingestion formats (B-13) are accepted; the current Windows desktop still cannot complete the root-add/scan journey until the Windows tasks land.
 - Open question for implementation: whether Windows 8.3 short names and case variants are normalized before overlap comparison or rejected; `windows_absolute_paths_overlap` currently compares components ordinal case-insensitively and fails closed on noncanonical components.
 
-All section 5 decisions are owner-accepted. Implementation tasks run from 003-T01 through 003-T17 in TASKS.md.
+All section 5 decisions are owner-accepted. Implementation tasks run from 003-T01 through 003-T18 in TASKS.md.
 
 ## 7a. Owner facts incorporated 2026-11-01
 
@@ -335,3 +336,4 @@ Read from WORLD-RESOURCES, CONTEXT, and STATE-MACHINES.
 | @-reference ResourceRef picker | CONTEXT, NATIVE-COMPOSER-LLD | 003-T11 | AC-017 | Picker render and keyboard test |
 | Persisted ContextAttachment | CONTEXT, STORAGE | 003-T09 | AC-018 | Persistence and restart test |
 | Revoke-during-send fence | CONTEXT, WORLD-RESOURCES, FAILURE-RECOVERY | 003-T13 | AC-019 | Revoke-during-send race test |
+| Context Debugger surface (P-15, owner approval 2026-11-09) | CONTEXT, PRESENTATION-RUNTIME | 003-T17 | AC-020 | Context Debugger render and restart test |

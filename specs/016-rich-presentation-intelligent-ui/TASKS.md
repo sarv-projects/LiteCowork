@@ -297,14 +297,31 @@ Gaps to V1: owner acceptance (B-40), validator drift, no producer, no chart or I
 - **Evidence:** PR diff.
 - **Stop:** a status upgrade lacks evidence.
 
-## 016-T18 - Package VERIFIED for V1
+## 016-T18 - Per-block Markdown degradation with code and TEXT_SLICE rendering (P-03)
+
+- **Status:** NOT STARTED - added under this package's IN_REVIEW status. Folds proposed task P-03 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 (findings R-05, R-06) into this package.
+- **Depends on:** T06
+- **Cross-package prerequisites:** Feature 001 committed AGENT message text is the input the renderer consumes.
+- **Owner:** Presentation, Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/src/conversations/StructuredTextPreview.tsx`, `apps/litecowork-ui/src/conversations/RichResponseView.tsx`, `apps/litecowork-ui/tests/`, adjacent tests.
+- **Contract:** SPEC §12; AC-019; INTELLIGENT-UI-AND-IMAGE-CONTENT; AGENTS.md section 8.
+- **Change intent:** replace the all-or-nothing Markdown parse with per-block degradation so GFM tables, horizontal rules and nested lists render without a whole-message raw fallback; give each code block a language label, a copy button and lazy highlighting that returns React nodes (never HTML strings); render TEXT_SLICE through the same Markdown renderer; and keep the no-executable-content posture (no `dangerouslySetInnerHTML`, https-only links). Add a golden corpus of real agent answers.
+- **Acceptance:**
+  - [ ] The golden corpus of real agent answers renders with no whole-message raw fallback and no HTML strings (AC-019).
+  - [ ] Code blocks show a language label, a copy button and lazy highlighting returning React nodes (AC-019).
+  - [ ] TEXT_SLICE renders through the same Markdown renderer; links stay https-only and no executable content is emitted (AC-019).
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** golden-corpus render test output in Completion evidence.
+- **Stop:** a block cannot degrade safely; render that block as plain text, never the whole message raw.
+
+## 016-T19 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED
-- **Depends on:** T01-T17
+- **Depends on:** T01-T18
 - **Cross-package prerequisites:** Feature 019 release evidence bundle accepted.
 - **Owner:** Product, repository owner.
 - **Allowed paths:** `specs/016-rich-presentation-intelligent-ui/`.
-- **Contract:** SPECIFICATION-STANDARD lifecycle; AC-001 to AC-018.
+- **Contract:** SPECIFICATION-STANDARD lifecycle; AC-001 to AC-019.
 - **Change intent:** assemble the evidence bundle; move ACCEPTED/LOCKED to IMPLEMENTING when T02 starts and to VERIFIED when all tasks close and the owner signs off.
 - **Acceptance:**
   - [ ] Every AC has a passing test reference on both rows.
@@ -315,7 +332,7 @@ Gaps to V1: owner acceptance (B-40), validator drift, no producer, no chart or I
 
 ## Dependency order
 
-T01 -> T02 -> T03 -> (T04, T05 in parallel). T04 -> T06; T05 + T06 -> T07; T03 + T05 -> T08; T04 -> T09; T02 -> T10; T01 -> T11 (independent of the validator work). T06 + T07 -> T12; T08 + T10 -> T13; T03 + T04 + T06 + T07 -> T14. T06-T13 -> T15 -> T16 -> T17 -> T18.
+T01 -> T02 -> T03 -> (T04, T05 in parallel). T04 -> T06; T05 + T06 -> T07; T03 + T05 -> T08; T04 -> T09; T02 -> T10; T01 -> T11 (independent of the validator work). T06 + T07 -> T12; T08 + T10 -> T13; T03 + T04 + T06 + T07 -> T14. T06-T13 -> T15 -> T16 -> T17. T06 -> T18 (per-block Markdown, P-03). (T17, T18) -> T19 (VERIFIED).
 
 ## Cross-package dependencies
 

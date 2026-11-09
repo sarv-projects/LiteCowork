@@ -342,17 +342,51 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 - **Evidence:** documentation diff.
 - **Stop:** stop if a status claim exceeds recorded evidence.
 
-## 008-T19 - Package VERIFIED for V1
+## 008-T19 - Remove allow-same-origin from the Browser preview iframe and add a guard test (P-06)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-06 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 (finding U-02) into this LOCKED package.
+- **Depends on:** T06
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop shell, Security.
+- **Allowed paths:** `apps/litecowork-ui/src/workbench/WorkbenchPanel.tsx`, `apps/litecowork-ui/tests/workbench-truthfulness.test.mjs` (or new guard test), adjacent tests.
+- **Contract:** SPEC §12, §8; AC-018; CHROME-BROWSER-LLD; register A-51.
+- **Change intent:** remove `allow-same-origin` from the Browser preview iframe `sandbox` attribute (or remove the embedded preview entirely), so `allow-scripts` can never combine with `allow-same-origin` and defeat the iframe sandbox, and add a guard test that fails if any iframe in the source carries both `allow-scripts` and `allow-same-origin`. No remote frame renders in a packaged build (the CSP blocks it); this closes the exposure before any future CSP change.
+- **Acceptance:**
+  - [ ] No iframe in the source combines `allow-scripts` with `allow-same-origin` (AC-018).
+  - [ ] A guard test in the workbench-truthfulness suite fails if that attribute pair reappears (AC-018).
+  - [ ] The Browser preview still renders an allowed URL or shows its honest unavailable notice; no model markup executes.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** guard test output in Completion evidence; register A-51 doc-sync note.
+- **Stop:** removing the attribute breaks the only working preview; remove the preview instead and record the decision.
+
+## 008-T20 - Git worktree view, VCS diff and user-invoked GitHub PR ops (P-13)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-13 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package.
+- **Depends on:** T15
+- **Cross-package prerequisites:** Feature 006 Golden Connection capability so GitHub PR operations run behind a brokered Connection (user-invoked only).
+- **Owner:** Desktop shell, Environments, Connections.
+- **Allowed paths:** `apps/litecoworkd/src/`, `apps/litecowork-ui/src/workbench/`, `specs/008-workbench-browser-terminal-computer/contracts/ui-behavior.md`, adjacent tests.
+- **Contract:** SPEC §12; AC-014, AC-019; register A-51; Feature 006 Connection broker.
+- **Change intent:** add a Git worktree view and a changed-file and aggregate diff computed from the real VCS (reusing the exact-revision diff path from task T15), plus user-invoked GitHub pull-request operations that run only behind a Feature 006 brokered Connection. PR operations are always an explicit user action; no agent self-approves or auto-opens a PR, and tokens or arbitrary URLs never reach an agent.
+- **Acceptance:**
+  - [ ] The worktree view lists changed files and shows a changed-file and aggregate diff from the real VCS with true added/removed counts (AC-019).
+  - [ ] GitHub PR operations run only through a Feature 006 brokered Connection and only on explicit user action (AC-019).
+  - [ ] Negative: a missing, binary or over-bound source shows a typed unavailable state, not an inferred diff (AC-014).
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** diff and PR-op test output; contracts/ui-behavior.md rows in Completion evidence.
+- **Stop:** an agent could open or approve a PR without the user; keep PR ops user-invoked only.
+
+## 008-T21 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED
-- **Depends on:** T01-T18
+- **Depends on:** T01-T20
 - **Cross-package prerequisites:** Feature 005 B-35 resolution for the Windows terminal, or an owner-recorded V1 release decision that ships Windows with Terminal UNAVAILABLE.
 - **Owner:** Product (repository owner), Desktop shell, Environments
 - **Allowed paths:** this package
 - **Contract:** docs/SPECIFICATION-STANDARD.md lifecycle; SPEC §15 all AC IDs
 - **Change intent:** Assemble the evidence bundle, move SPEC and WIRING status ACCEPTED/LOCKED -> IMPLEMENTING (when T03 starts) -> VERIFIED, and obtain owner sign-off.
 - **Acceptance:**
-  - [ ] Every AC from AC-001 to AC-017 has recorded CODE/SYSTEM/USER evidence on its declared row.
+  - [ ] Every AC from AC-001 to AC-019 has recorded CODE/SYSTEM/USER evidence on its declared row.
   - [ ] Owner sign-off recorded with date and revision.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Evidence:** evidence bundle index in CURRENT-RUN.md; IMPLEMENTATION-STATUS.md row.
@@ -369,7 +403,7 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 
 ## Dependency order
 
-T01 and T02 start first (T02 needs nothing). Browser lane: T01 -> T03, T04 -> T05 -> T06 (also after T02), T07. Terminal lane: T01 -> T08 -> T09 (blocked on Feature 005 Linux Environment) -> T10 -> T11 (also after T02), T13; T10 -> T12 (blocked on Feature 005 B-35). Activity: T01, T02 -> T14. Diffs: T01, T02 -> T15. Close-out: T06, T11, T13, T14, T15 -> T16 -> T17 -> T18 -> T19 (T19 depends on all).
+T01 and T02 start first (T02 needs nothing). Browser lane: T01 -> T03, T04 -> T05 -> T06 (also after T02), T07. Terminal lane: T01 -> T08 -> T09 (blocked on Feature 005 Linux Environment) -> T10 -> T11 (also after T02), T13; T10 -> T12 (blocked on Feature 005 B-35). Activity: T01, T02 -> T14. Diffs: T01, T02 -> T15. Close-out: T06, T11, T13, T14, T15 -> T16 -> T17 -> T18. Owner-approved additions: T06 -> T19 (iframe guard, P-06); T15 -> T20 (worktree/VCS diff and GitHub PR ops, P-13). T18, T19, T20 -> T21 (VERIFIED depends on all).
 
 ## Cross-package dependencies
 

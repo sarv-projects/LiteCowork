@@ -66,7 +66,7 @@ machine protocol are separate concerns.
 
 The upstream repository [sarv-projects/LiteSPM](https://github.com/sarv-projects/LiteSPM)
 was checked at main commit
-`111fd9b8e84573f8fce76b6374b4ff9639502539` (2026-11-05). Its STATUS.md describes
+`111fd9b8e84573f8fce76b6374b4ff9639502539` (2026-11-05). **Pin resolved (2026-11-09):** the LiteSPM repository was read read-only at HEAD `84d5faba75bc621a651e0cec0f831e936bb2082d` (`git describe` `v0.6.0-143-g84d5fab`, npm `0.6.0`, Apache-2.0) and its published contract transcribed in [LITESPM-INTEGRATION-STUDY-2026-11.md](LITESPM-INTEGRATION-STUDY-2026-11.md). This HEAD supersedes the earlier `9f42b25d` / `111fd9b8` / `f77a3a3` pins; the historical study notes below are kept for provenance. Confirmed: JSON-RPC line-delimited local IPC, `daemon.handshake` plus 19 methods, protocol `2026-07-28`, `planHash` over RFC 8785 canonical JSON, a 17-action effect taxonomy and a central egress/secret model. The pin is re-read at implementation time (013-T02 / 013-T20); wire names come from the published contract, never inferred (AGENTS.md section 6). Its STATUS.md describes
 the 13-tool local MCP stdio bridge as **WIRED**. The documented launch surface is
 `litespm bridge stdio --host <host-id>`; the bridge is a thin local client of the
 LiteSPM daemon, not a public HTTP API. The upstream status claims that read/capability/

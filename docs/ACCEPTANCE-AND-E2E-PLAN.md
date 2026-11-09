@@ -60,6 +60,8 @@ Never translate a unit pass, mocked UI, schema, catalog row, successful process 
 
 E2E-14..E2E-17 were proposed on 2026-11-09 with packages 014, 015, 018 and 020. They stay proposed until those packages are accepted.
 
+The send/stream/stop adapter exercised by E2E-01 (and the relay in E2E-02) is the owner-accepted Agent Client Protocol (ACP) client with a per-provider launch catalog (Feature 002 task 002-T17, consumed by Feature 001; register [A-54](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)/[A-55](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)), with OpenCode v2 HTTP kept as one non-ACP adapter until its ACP route qualifies. E2E-01 must also confirm the OpenCode event mapping against the captured v2.0.32 fixture (Feature 001 task 001-T23) rather than top-level key guessing, and render the activity, plan and inline-FAILED cards and autoscroll from the folded rendering tasks (001-T24..T26). Deterministic provider fixtures remain acceptable only for provider output control, never as a replacement for the daemon, IPC, session lifecycle, persistence or UI.
+
 ### Optional future extension — external WorkflowBackend adapter (not a current V1 release gate)
 
 Do not run or report this journey as available until an owner has promoted Feature 010 T18,

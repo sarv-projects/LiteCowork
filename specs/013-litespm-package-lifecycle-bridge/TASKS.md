@@ -14,7 +14,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` on 2026
 - **Tauri:** `apps/litecowork-ui/src-tauri/src/discover_bridge.rs` `discover_request` supports operations `search` and `item` only (registered in `apps/litecowork-ui/src-tauri/src/lib.rs`).
 - **UI:** `apps/litecowork-ui/src/discover/DiscoverPage.tsx` (tabs Explore, "Installed / native", Managed, Connections; Managed and Connections render "Not available"), `discover-state.ts` (`connectActionOutcome()` disables every row action), `discover-api.ts`, `desktop-discover-api.ts`; test `apps/litecowork-ui/tests/discover-catalog-state.test.ts`.
 - **Reusable:** `crates/operator-ipc` (`BudgetedBody`, `InFlightBodyBudget`, framed `read_response`), `crates/windows-local-security` (`current_logon_sid`, `connect_operator_pipe`).
-- **LiteSPM client:** absent. Upstream pins disagree (`9f42b25d`, `111fd9b8`, `f77a3a3`); upstream lacks a published descriptor, approval-recording method and package `operation.get` per interop LLD Appendix A.
+- **LiteSPM client:** absent. Earlier pins disagreed (`9f42b25d`, `111fd9b8`, `f77a3a3`); resolved 2026-11-09 to HEAD `84d5fab` (v0.6.0) in [LITESPM-INTEGRATION-STUDY-2026-11.md](../../docs/LITESPM-INTEGRATION-STUDY-2026-11.md); upstream lacks a published descriptor, approval-recording method and package `operation.get` per interop LLD Appendix A.
 
 Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/receipt, reconcile, adopt/unmanage, rollback/remove/update/repair, UI) plus CODE/SYSTEM/USER qualification on both rows.
 
@@ -346,14 +346,31 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 - **Evidence:** diff and command output.
 - **Stop:** a status claim lacks evidence.
 
-## 013-T20 - Package VERIFIED for V1
+## 013-T20 - Pin the LiteSPM bridge and mirror its safety contract (P-17)
+
+- **Status:** NOT STARTED - added under this package's IN_REVIEW status. Folds proposed task P-17 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 (and Section 2) into this package.
+- **Depends on:** T04
+- **Cross-package prerequisites:** NONE
+- **Owner:** Package Lifecycle, Connections, Storage.
+- **Allowed paths:** `specs/013-litespm-package-lifecycle-bridge/RESEARCH.md`, `apps/litecoworkd/src/`, adjacent tests.
+- **Contract:** SPEC sections 5-7; AC-018, AC-021; AGENTS.md section 6; RESEARCH pinned sources.
+- **Change intent:** pin the LiteSPM bridge from its published package and protocol, reconciling the three observed SHAs 9f42b25d, 111fd9b8 and f77a3a3; mirror the LiteSPM preview, backup, transaction and byte-exact-restore safety contract so a package mutation is previewed, backed up and either committed atomically or restored byte-for-byte; and adopt single-flight plus backoff for Discover read-through. Wire names, version and authentication come only from the published pinned bridge contract (LiteSPM publishes it at `ARCH/06-API-CONTRACTS.md` and `ARCH/11-LOCAL-RUNTIME-IPC.md`), never inferred from CLI output or a marketplace listing (AGENTS.md section 6). RESEARCH.md records the pin as TARGET-pending-published-bridge because the pin source is LiteSPM's own published package or protocol release, which must be confirmed against that published contract at implementation time; reading a reference clone during research does not make its checkout the authoritative pin.
+- **Acceptance:**
+  - [ ] RESEARCH.md records the pin with the three reconciled SHAs and the TARGET-pending-published-bridge status, and the exact wire names come only from the published bridge contract (AC-021).
+  - [ ] The preview, backup, transaction and byte-exact-restore safety contract is mirrored; a failed mutation restores byte-for-byte (AC-021).
+  - [ ] Discover read-through uses single-flight plus backoff; the receipt-to-inventory match stays digest-bound (AC-018).
+- **Command:** `python3 .specify/scripts/validate_feature_package.py`
+- **Evidence:** RESEARCH.md pin note and single-flight test output in Completion evidence.
+- **Stop:** the published bridge contract cannot be fetched; keep the pin TARGET-pending-published-bridge and do not infer wire names.
+
+## 013-T21 - Package VERIFIED for V1
 
 - **Status:** BLOCKED (owner acceptance, T01).
-- **Depends on:** T01-T19
+- **Depends on:** T01-T20
 - **Cross-package prerequisites:** Feature 019 release sign-off process.
 - **Owner:** Product (repository owner).
 - **Allowed paths:** this package; `docs/IMPLEMENTATION-STATUS.md`.
-- **Contract:** SPEC sections 14-15; AC-001 to AC-020; SPECIFICATION-STANDARD lifecycle.
+- **Contract:** SPEC sections 14-15; AC-001 to AC-021; SPECIFICATION-STANDARD lifecycle.
 - **Change intent:** assemble the evidence bundle; move IN_REVIEW -> ACCEPTED/LOCKED (T01) -> IMPLEMENTING (first implementation merge) -> VERIFIED after owner sign-off on both rows.
 - **Acceptance:**
   - [ ] Canonical command passes on both rows against the pinned LiteSPM build.
@@ -376,7 +393,7 @@ Findings from reading the source. They are folded into the tasks above and add n
 
 ## Dependency order
 
-T01 -> T02 -> T03 -> T04 -> T05 -> T06. T03 -> T07. (T05, T06, T07) -> T08 -> T09 -> T10 -> T11. T09 -> T14. (T06, T08, T09) -> T12 -> T13. T01 -> T15. (T09-T11, T14) -> T16. (T13, T16) -> T17. (T13-T17) -> T18 -> T19 -> T20.
+T01 -> T02 -> T03 -> T04 -> T05 -> T06. T03 -> T07. (T05, T06, T07) -> T08 -> T09 -> T10 -> T11. T09 -> T14. (T06, T08, T09) -> T12 -> T13. T01 -> T15. (T09-T11, T14) -> T16. (T13, T16) -> T17. (T13-T17) -> T18 -> T19. T04 -> T20 (LiteSPM bridge pin, P-17). (T19, T20) -> T21 (VERIFIED).
 
 ## Cross-package dependencies
 

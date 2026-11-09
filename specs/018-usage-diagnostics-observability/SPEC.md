@@ -286,6 +286,7 @@ This package is the observability owner for the desktop. Its own health: dropped
 - AC-019 WHEN the usage summary is computed over the reference fixture, THE SYSTEM SHALL use the covering index (query plan check) and record the measured latency as the baseline before any numeric threshold is set. Verify: query plan test and performance harness.
 - AC-020 WHILE no qualified provider diagnostic exists for an AgentBinding, THE SYSTEM SHALL show Run provider diagnostic as unavailable with the reason and SHALL NOT report a passing provider test. Verify: UI test.
 - AC-021 WHEN `getConversationUsage` is called for a Conversation whose turns used several AgentBindings, THE SYSTEM SHALL sum each distinct record once across bindings, keep per-binding drill-down, and return `inference_count` as null unless response identities are verified. Verify: route test with two bindings.
+- AC-022 WHEN the operator API client types are built (task P-18), THE SYSTEM SHALL generate `operator-api.ts` and its TypeScript validators from the Rust wire types following the NeuralAgent pattern, keeping one source of truth, and a drift gate SHALL fail if the generated file diverges from the Rust types; the generated file SHALL NOT be hand-edited. Verify: generation and drift-gate test.
 
 ## 15. Executable acceptance command
 
@@ -337,4 +338,5 @@ Do not read the owner's real native session files or credentials during design v
 | Cross-layer trace | AGENTS.md section 4 | 018-T15 | AC-002 / AC-012 |
 | Qualification on both rows | ACCEPTANCE-AND-E2E-PLAN | 018-T16 | AC-001 / AC-002 / AC-012 / AC-013 |
 | Documentation sync | IMPLEMENTATION-STATUS | 018-T17 | AC-008 |
-| Package VERIFIED | SPECIFICATION-STANDARD | 018-T18 | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014, AC-015, AC-016, AC-017, AC-018, AC-019, AC-020, AC-021 |
+| Generated operator-api.ts and TS validators with drift gate (P-18) | ARCHITECTURE boundaries, audit X-04 | 018-T18 | AC-022 |
+| Package VERIFIED | SPECIFICATION-STANDARD | 018-T19 | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014, AC-015, AC-016, AC-017, AC-018, AC-019, AC-020, AC-021, AC-022 |

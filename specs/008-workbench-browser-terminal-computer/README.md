@@ -14,6 +14,8 @@ The active Workbench Files pane is a Resource projection/preview, not a live fil
 
 Accepted decisions (2026-11-09): B-22 `MANAGED_CHROMIUM` with an isolated profile, ambient-CDP discovery and default-profile copy disabled; B-23 one daemon-owned PTY/ConPTY per tab under an admitted Environment with ordered receipts and timeout-as-receipt, qualifying on the Linux x64 row first and visibly UNAVAILABLE on Windows until Feature 005 B-35; B-32 Computer use deferred and explicitly UNAVAILABLE. Revision 1.0 adds the Workbench Activity view and exact-revision/VCS Diffs to scope. The V1 plan is in [TASKS.md](TASKS.md).
 
+By owner approval on 2026-11-09 (see [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)), this package folds proposed tasks P-06 (008-T19, remove `allow-same-origin` from the Browser preview iframe and add a guard test; audit finding U-02) and P-13 (008-T20, Git worktree view, VCS diff and user-invoked GitHub PR ops behind [Feature 006](../006-golden-connection-capability-write/SPEC.md)). Sources: [docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md](../../docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md) section 9 and [docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](../../docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md) section 8.
+
 ## Package
 
 - [SPEC.md](SPEC.md)

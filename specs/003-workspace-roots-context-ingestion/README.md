@@ -14,6 +14,8 @@ The owner attaches a folder as a persistent WorkspaceRoot, asks a grounded quest
 
 The active checkout contains the Rust daemon, Tauri desktop application and shared crates. Owner acceptance authorizes implementation of this package; it does not change what the code does. Today Windows root add returns 503 (`create_workspace_root_from_native_selection` fallback in `apps/litecoworkd/src/operator.rs`), scan returns 501 `SCAN_UNSUPPORTED_PLATFORM` on every non-Linux target (`apps/litecoworkd/src/workspace_root_scan_operator.rs`), grounded retrieval (`apps/litecoworkd/src/rag_retrieval_operator.rs`) is not called by Send and writes no receipt, there is no persisted ContextAttachment, and the composer sends `resourceRefs: []`. The implementation boundary is mapped in SPEC.md §4 and docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
 
+By owner approval on 2026-11-09 (see [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)), this package folds proposed task P-15 (003-T17, Context Debugger surface showing exactly what entered model context). Source: [docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](../../docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md) section 8.
+
 ## Package
 
 - [SPEC.md](SPEC.md)

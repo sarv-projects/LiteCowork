@@ -246,6 +246,12 @@ Gap coverage (revision 1.0):
 - **AC-019:** WHEN Settings -> Agents renders, THE SYSTEM SHALL invoke only Feature 002 operations that are served and SHALL render each unserved operation (for example the AgentControlDescriptor and credential routes that return 503) as unavailable with its reason. Verify: Agents screen served-operation map test.
 - **AC-020:** WHEN a Settings control has no served owner operation or applied local effect, THE SYSTEM SHALL not render it as an interactive control; the Notifications entry SHALL link to Feature 010's quiet-hours contract and SHALL NOT render its own quiet-hours controls. Verify: inert-control audit test.
 
+Owner-approved additions (2026-11-09):
+- **AC-021:** WHEN the shell renders (task P-05), THE SYSTEM SHALL give every mounted page a navigation path or remove it from V1 with a recorded owner decision, SHALL make Back/Forward either work against real history or be absent, SHALL render a null API as unavailable rather than empty, SHALL give Recent Chats distinct loading and error states, and SHALL show a real Needs You count; a test SHALL fail if a mounted page has no navigation path or a null API renders as empty. Verify: shell reachability guard test.
+- **AC-022:** WHEN App.tsx and the Rust god files are decomposed (tasks P-07 and P-19), THE SYSTEM SHALL preserve behavior exactly - one shared Operator-unavailable panel, one module per page, and owned modules behind the existing boundaries - with no new authority, route or record, and existing UI and cargo tests SHALL pass unchanged. Verify: unchanged-behavior test suite.
+- **AC-023:** WHEN Settings renders (task P-08), THE SYSTEM SHALL present one Settings authority with the former SettingsPage features merged in, SHALL delete SettingsPage and the unused navigation array, and SHALL show a precedence note on each setting that has a Coworker or Automation override (register A-35). Verify: merged-settings and precedence-note test.
+- **AC-024:** WHEN the Workspace Dashboard renders (task P-16), THE SYSTEM SHALL show pinnable Task-status, automation-status, Coworker-activity and recent-artifacts widgets from served owner projections, SHALL render an unavailable source as unavailable with its reason rather than a fabricated value, and SHALL persist pin state across restart per Workspace. Verify: dashboard render and persistence test.
+
 ## 16. Executable acceptance command
 
 ```bash
@@ -264,7 +270,7 @@ Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. The
 - Historical IPC CODE in the archive is not current served evidence for this checkout.
 - Semantic map rows start as TARGET or LOCAL_ONLY until source returns.
 
-Each blocker has the owners named above. The owner decisions are recorded (ACCEPTED 2026-11-09). Implementation tasks: 011-T01 through 011-T19 in TASKS.md.
+Each blocker has the owners named above. The owner decisions are recorded (ACCEPTED 2026-11-09). Implementation tasks: 011-T01 through 011-T23 in TASKS.md.
 
 ## 7a. Owner facts incorporated 2026-11-01
 
@@ -304,6 +310,10 @@ Read from LOCAL-OPERATOR-IPC and RUNTIME-LIFECYCLE.
 | App-wide keyboard/focus baseline (gap) | V1-UI-SCREEN-CONTRACT; DESKTOP-SHELL-LLD | 011-T11 | AC-018 | App-wide keyboard/focus test |
 | Settings -> Agents screen owner (A-35) | V1-SETTINGS-CONTRACT-LEDGER; Feature 002 operations | 011-T09 | AC-019 | Agents screen served-operation map test |
 | Inert controls removed; quiet hours linked (B-29/B-33, A-35) | V1-SETTINGS-CONTRACT-LEDGER; Feature 010 | 011-T06, 011-T10 | AC-020 | Inert-control audit test |
+| Shell reachability and truthfulness (P-05, owner approval 2026-11-09) | V1-UI-SCREEN-CONTRACT | 011-T19 | AC-021 | Shell reachability guard test |
+| App.tsx and god-file decomposition (P-07, P-19, owner approval 2026-11-09) | ARCHITECTURE boundaries | 011-T20 | AC-022 | Unchanged-behavior test suite |
+| SettingsPage merged into SettingsView with precedence notes (P-08, owner approval 2026-11-09, A-35) | V1-SETTINGS-CONTRACT-LEDGER | 011-T21 | AC-023 | Merged-settings and precedence-note test |
+| Persistent Workspace Dashboard (P-16, owner approval 2026-11-09) | V1-UI-SCREEN-CONTRACT | 011-T22 | AC-024 | Dashboard render and persistence test |
 
 
 ## V1 Settings screen map and control behavior — 2026-11-06

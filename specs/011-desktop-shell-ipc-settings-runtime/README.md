@@ -22,6 +22,8 @@ Accepted decisions (2026-11-09): B-28 Windows 11/10 x64 named-pipe DACL profile 
 
 Usage projections and historical usage UI are not served. The telemetry LLD is normative target only. The new Settings specification does not authorize fake values or placeholder controls.
 
+By owner approval on 2026-11-09 (see [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)), this package folds proposed tasks P-05 (011-T19, shell reachability and truthfulness), P-07 with P-19 (011-T20, decompose App.tsx and the Rust god files behind existing boundaries, no behavior change), P-08 (011-T21, merge SettingsPage into SettingsView with precedence notes) and P-16 (011-T22, persistent Workspace Dashboard with pinnable widgets). Sources: [docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md](../../docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md) section 9 and [docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](../../docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md) section 8.
+
 ## Package
 
 - [SPEC.md](SPEC.md)

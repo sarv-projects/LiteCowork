@@ -303,16 +303,33 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
   - [ ] No document claims a level above the recorded evidence.
 - **Command:** `python3 scripts/audit_served_routes.py` and `python3 .specify/scripts/validate_feature_package.py`
 - **Evidence:** diff of the regenerated inventory; validator PASS line
-- **Stop:** an inventory mismatch blocks T17.
+- **Stop:** an inventory mismatch blocks T18.
 
-## 003-T17 - Package VERIFIED for V1
+## 003-T17 - Context Debugger surface (P-15)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-15 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package.
+- **Depends on:** T16
+- **Cross-package prerequisites:** Feature 001 turn settlement so a committed turn exists to inspect.
+- **Owner:** Resource, Conversation, Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/src/`, `apps/litecoworkd/src/`, `specs/003-workspace-roots-context-ingestion/contracts/ui-behavior.md`, adjacent tests.
+- **Contract:** SPEC §15 AC-018, AC-020; CONTEXT; PRESENTATION-RUNTIME.
+- **Change intent:** add a Context Debugger surface that shows exactly what entered the model context for a turn: the attachments, the retrieved passages with their source revisions, the skills in scope, and the applied limits (budget, truncation notice). It reads the durable retrieval receipt and ContextAttachment records (AC-016, AC-018); it reports only what was actually sent, never a reconstruction, and it never materializes bytes outside an admitted root.
+- **Acceptance:**
+  - [ ] The surface lists attachments, retrieved passages with exact source revisions, in-scope skills and the applied limits for a committed turn (AC-020).
+  - [ ] Values come from the stored retrieval receipt and ContextAttachment records and match after restart (AC-018, AC-020).
+  - [ ] Negative: a turn with no retrieval shows an explicit "no retrieval" state, not an empty or fabricated list.
+- **Command:** `python3 .specify/scripts/validate_feature_package.py` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** UI test output and contracts/ui-behavior.md row in Completion evidence.
+- **Stop:** the surface cannot read a durable receipt; show unavailable rather than reconstruct context.
+
+## 003-T18 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED
-- **Depends on:** T01-T16
+- **Depends on:** T01-T17
 - **Cross-package prerequisites:** Feature 019 release qualification sign-off process.
 - **Owner:** Resource, Conversation, Storage, Security/Trust, Desktop UI; repository owner sign-off
 - **Allowed paths:** this package (status fields), `docs/IMPLEMENTATION-STATUS.md`
-- **Contract:** SPECIFICATION-STANDARD lifecycle; SPEC §15 AC-001 to AC-019
+- **Contract:** SPECIFICATION-STANDARD lifecycle; SPEC §15 AC-001 to AC-020
 - **Change intent:** Assemble the evidence bundle (per-task revision, command, result, OS, harness, reviewer); move status ACCEPTED/LOCKED to IMPLEMENTING when T02 starts and to VERIFIED only after owner sign-off on both rows.
 - **Acceptance:**
   - [ ] Every AC ID has passing evidence on each declared row or a recorded owner exception.
@@ -323,7 +340,7 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## Dependency order
 
-T01 -> T02 -> T03 -> (T04, T05) -> T06; T05 -> T07; (T01, T03, T05) -> T08; (T01, T02) -> T09 -> (T10, T11); T10 -> T12; (T04, T05, T10, T11) -> T13; (T08, T11, T12) -> T14; (T06, T07, T13, T14) -> T15 -> T16 -> T17. The Windows track (T03-T06) and the Send track (T09-T12) run in parallel after T02.
+T01 -> T02 -> T03 -> (T04, T05) -> T06; T05 -> T07; (T01, T03, T05) -> T08; (T01, T02) -> T09 -> (T10, T11); T10 -> T12; (T04, T05, T10, T11) -> T13; (T08, T11, T12) -> T14; (T06, T07, T13, T14) -> T15 -> T16 -> T17 (Context Debugger, P-15) -> T18 (VERIFIED). The Windows track (T03-T06) and the Send track (T09-T12) run in parallel after T02.
 
 ## Cross-package dependencies
 

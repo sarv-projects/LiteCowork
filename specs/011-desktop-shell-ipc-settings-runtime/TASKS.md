@@ -325,17 +325,85 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 - **Evidence:** documentation diff.
 - **Stop:** stop if a status claim exceeds recorded evidence.
 
-## 011-T19 - Package VERIFIED for V1
+## 011-T19 - Shell reachability and truthfulness (P-05)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-05 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 (findings U-01, U-04, U-05, U-08, and the C-6 Needs You count) into this LOCKED package.
+- **Depends on:** T06
+- **Cross-package prerequisites:** Feature 010 local-poll notification delivery for the Needs You count source; Feature 014 Recent Chats read path.
+- **Owner:** Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/src/App.tsx`, `apps/litecowork-ui/src/`, `apps/litecowork-ui/tests/`, adjacent tests.
+- **Contract:** SPEC §12, §14; AC-021; V1-UI-SCREEN-CONTRACT; register A-35.
+- **Change intent:** make the shell reachable and truthful: add navigation entries for Goals, Notifications and Ideas or remove them from V1 with owner agreement; remove or actually implement Back/Forward (today they call `window.history` while navigation never pushes history); distinguish unavailable from empty in the placeholder fallback; give Recent Chats explicit loading and error states; and show a real Needs You count. Add a test that fails if a mounted page has no navigation path or a null API renders as an empty state.
+- **Acceptance:**
+  - [ ] Every mounted page has a navigation path, or is removed from V1 with a recorded owner decision (AC-021).
+  - [ ] Back/Forward either work against real history or are removed; a null API renders unavailable, not empty (AC-021).
+  - [ ] Recent Chats shows distinct loading and error states; the Needs You count reflects a real count (AC-021).
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** reachability guard test output in Completion evidence.
+- **Stop:** a page cannot be given a real navigation path; remove it from V1 rather than leave it unreachable.
+
+## 011-T20 - Decompose App.tsx and the Rust god files behind existing boundaries (P-07 and P-19)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed tasks P-07 and P-19 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 (findings U-09, X-02) and docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package. No behavior change.
+- **Depends on:** T06
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop UI, Agent Runtime, Storage.
+- **Allowed paths:** `apps/litecowork-ui/src/shell/` (new), `apps/litecowork-ui/src/`, `apps/litecoworkd/src/operator.rs`, `crates/storage-sqlite/src/lib.rs`, `apps/litecowork-ui/src-tauri/src/lib.rs`, adjacent tests.
+- **Contract:** SPEC §12; AC-022; ARCHITECTURE boundaries; audit section 6.
+- **Change intent:** split `App.tsx` into a `shell/` plus one module per page (LibraryPage, HomePage, WorkPage first) with one shared "Operator unavailable" panel replacing the six duplicated copies; and decompose the god files `operator.rs`, `crates/storage-sqlite/src/lib.rs` and `apps/litecowork-ui/src-tauri/src/lib.rs` into owned modules behind the existing boundaries (for example an `ipc_server.rs` plus a router module, and the existing `*_bridge.rs` pattern). No behavior change; existing tests pass unchanged.
+- **Acceptance:**
+  - [ ] App.tsx is split into a shell plus per-page modules with one shared Operator-unavailable panel; existing UI tests pass unchanged (AC-022).
+  - [ ] operator.rs, storage-sqlite/src/lib.rs and src-tauri/src/lib.rs are decomposed behind existing boundaries with no behavior change and existing cargo tests pass (AC-022).
+  - [ ] No new authority, route or record is introduced by the split.
+- **Command:** `pnpm --dir apps/litecowork-ui test` and `cargo test -p litecoworkd --locked` and `cargo test -p storage-sqlite --locked`
+- **Evidence:** before/after module listing and green test output in Completion evidence.
+- **Stop:** a split would change behavior or move authority; keep the boundary and record the limit.
+
+## 011-T21 - Merge SettingsPage into SettingsView with precedence notes (P-08)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-08 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 (findings S-05, S-06) into this LOCKED package.
+- **Depends on:** T06, T20
+- **Cross-package prerequisites:** NONE
+- **Owner:** Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/src/settings/`, `apps/litecowork-ui/src/App.tsx`, adjacent tests.
+- **Contract:** SPEC §12; AC-023; register A-35; V1-SETTINGS-CONTRACT-LEDGER.
+- **Change intent:** merge the unmounted `SettingsPage` features (instruction-conflict recovery "Use this version", revision history, the Runtime enrollment card, the archive checklist) into the mounted `SettingsView`, delete `SettingsPage` and the unused `navigation` array, and add a precedence note on each surface where a setting has a Coworker or Automation override. Cross-reference register A-35 for screen ownership; do not restate the ownership rule here.
+- **Acceptance:**
+  - [ ] One Settings authority remains; conflict recovery and Runtime enrollment are reachable; `SettingsPage` and the unused `navigation` array are deleted (AC-023).
+  - [ ] Each setting with a Coworker or Automation override shows a precedence note (AC-023).
+  - [ ] Negative: no second settings surface or duplicate navigation array remains in the source.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** merged-view test output in Completion evidence.
+- **Stop:** a merged feature has no served owner operation; render it unavailable rather than inert.
+
+## 011-T22 - Persistent Workspace Dashboard with pinnable widgets (P-16)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-16 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package.
+- **Depends on:** T06, T19
+- **Cross-package prerequisites:** Feature 005 Task status, Feature 010 automation status, Feature 009 Coworker activity and Feature 007 recent artifacts as the widget read sources.
+- **Owner:** Desktop UI.
+- **Allowed paths:** `apps/litecowork-ui/src/`, `specs/011-desktop-shell-ipc-settings-runtime/contracts/ui-behavior.md`, adjacent tests.
+- **Contract:** SPEC §12; AC-024; V1-UI-SCREEN-CONTRACT.
+- **Change intent:** add a persistent Workspace Dashboard with pinnable widgets for Task status, automation status, Coworker activity and recent artifacts. Each widget reads a served owner projection; an unavailable source renders the widget as unavailable with its reason, never a fabricated value. Pin state persists locally per Workspace.
+- **Acceptance:**
+  - [ ] The dashboard shows pinnable Task-status, automation-status, Coworker-activity and recent-artifacts widgets from served projections (AC-024).
+  - [ ] An unavailable widget source renders unavailable with its reason, not empty or fabricated (AC-024).
+  - [ ] Pin state persists across restart per Workspace.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** dashboard render and persistence test output in Completion evidence.
+- **Stop:** a widget would show a value with no served owner source; render it unavailable.
+
+## 011-T23 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED
-- **Depends on:** T01-T18
+- **Depends on:** T01-T22
 - **Cross-package prerequisites:** NONE beyond those of T13 and T17.
 - **Owner:** Product (repository owner), Runtime, Desktop UI
 - **Allowed paths:** this package
 - **Contract:** docs/SPECIFICATION-STANDARD.md lifecycle; SPEC §15 all AC IDs
 - **Change intent:** Assemble the evidence bundle, move SPEC and WIRING status ACCEPTED/LOCKED -> IMPLEMENTING (when T02 resumes code work) -> VERIFIED, and obtain owner sign-off.
 - **Acceptance:**
-  - [ ] Every AC from AC-001 to AC-020 has recorded CODE/SYSTEM/USER evidence on both rows.
+  - [ ] Every AC from AC-001 to AC-024 has recorded CODE/SYSTEM/USER evidence on both rows.
   - [ ] Owner sign-off recorded with date and revision.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`
 - **Evidence:** evidence bundle index in CURRENT-RUN.md; IMPLEMENTATION-STATUS.md row.
@@ -351,7 +419,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## Dependency order
 
-T02, T03, T04, T05 start immediately (hardening existing code). T01 -> T06 -> T07, T09, T10, T11; T01, T06 -> T08; T01 -> T12; T01, T04 -> T13 (blocked on Features 001 and 005) -> T14; T05, T14 -> T15; T07-T12, T14 -> T16; T02, T03, T15, T16 -> T17 -> T18 -> T19 (T19 depends on all).
+T02, T03, T04, T05 start immediately (hardening existing code). T01 -> T06 -> T07, T09, T10, T11; T01, T06 -> T08; T01 -> T12; T01, T04 -> T13 (blocked on Features 001 and 005) -> T14; T05, T14 -> T15; T07-T12, T14 -> T16; T02, T03, T15, T16 -> T17 -> T18. Owner-approved additions: T06 -> T19 (shell reachability, P-05), T06 -> T20 (decomposition, P-07+P-19), T06 + T20 -> T21 (Settings merge, P-08), T06 + T19 -> T22 (Workspace Dashboard, P-16). T18, T19, T20, T21, T22 -> T23 (VERIFIED depends on all).
 
 ## Cross-package dependencies
 

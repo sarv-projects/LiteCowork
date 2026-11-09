@@ -412,10 +412,96 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Evidence:** diff of the status documents.
 - **Stop:** evidence and claim disagree; downgrade the claim.
 
-## 001-T23 - Package VERIFIED for V1
+## 001-T23 - Capture a redacted OpenCode v2.0.32 turn fixture (P-00)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-00 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 into this LOCKED package.
+- **Depends on:** T04
+- **Cross-package prerequisites:** Feature 002 OpenCode probe fix so a live binding is creatable for the capture.
+- **Owner:** Agent Runtime.
+- **Allowed paths:** `apps/litecoworkd/src/agents/fixtures/` (new), `specs/001-conversation-session-supervisor/RESEARCH.md`, adjacent tests.
+- **Contract:** SPEC 7.4, 10; AC-008, AC-027; AGENT-FABRIC; RESEARCH pinned sources.
+- **Change intent:** capture one real OpenCode v2.0.32 turn (event stream for a text answer, a tool call, a file edit, a permission ask and an error) as a committed redacted fixture, and record the exact event envelope shape in RESEARCH.md so finding R-01 (top-level `delta`/`content`/`done` versus the v2 `session.text.delta`/`session.text.ended`/`session.idle` names) is confirmed or refuted with evidence before any normalizer change.
+- **Acceptance:**
+  - [ ] The fixture replays through the parser deterministically with handles, tokens and prompt text redacted.
+  - [ ] R-01 is confirmed or refuted in RESEARCH.md with the exact captured envelope keys (AC-027).
+  - [ ] No credential, native handle or raw prompt body survives in the committed fixture (AC-008).
+- **Command:** `cargo test -p litecoworkd --locked opencode_turn_fixture` (filter to be added by this task)
+- **Evidence:** fixture path and RESEARCH.md envelope note in Completion evidence.
+- **Stop:** the pinned OpenCode v2.0.32 server cannot be reached to capture a real turn; record the blocker rather than fabricate an envelope.
+
+## 001-T24 - OpenCodeEventNormalizer with correlated internal events (P-01)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-01 (audit section 7 and 9; findings R-01, R-04, X-01) into this LOCKED package.
+- **Depends on:** T04, T23
+- **Cross-package prerequisites:** NONE
+- **Owner:** Agent Runtime.
+- **Allowed paths:** `apps/litecoworkd/src/agents/opencode_server.rs`, `apps/litecoworkd/src/agents/normalizer.rs` (new), `apps/litecoworkd/src/agents/supervisor.rs`, adjacent tests.
+- **Contract:** SPEC 7.4, 8; AC-008, AC-028; AGENT-CONTROL; AGENT-FABRIC.
+- **Change intent:** add an `OpenCodeEventNormalizer` beside `opencode_server.rs` that maps v2.0.32 events to the internal enum in audit section 7 (`TextDelta`, `TextEnded`, `ReasoningStarted`/`ReasoningEnded` kept separate and never stored or shown unless the harness marks it user-visible, `ToolCalled`/`Progress`/`Succeeded`/`Failed`, `PermissionAsked`, `FileChanged`, `TodoUpdated`, `StepStarted`/`StepEnded`, `UsageRecorded`, `ExecutionSucceeded`/`Failed`, `Idle`). Correlate on the session id carried in the envelope `data` or `location`, never on a top-level guess. Replace the hard 60 s read cap with an idle or heartbeat timeout. Count and drop unknown events.
+- **Acceptance:**
+  - [ ] Fixture tests cover each event kind from T23; unknown events are counted and dropped, never projected (AC-008).
+  - [ ] Reasoning content never appears in the committed AGENT message (AC-028).
+  - [ ] Correlation uses the envelope session id; an uncorrelated or foreign-session frame cannot mutate state (AC-008).
+  - [ ] An idle or heartbeat timeout, not a fixed 60 s cap, bounds a quiet stream.
+- **Command:** `cargo test -p litecoworkd --locked opencode_event_normalizer` (filter to be added by this task)
+- **Evidence:** test output in Completion evidence.
+- **Stop:** an event cannot be correlated to a session; drop it rather than guess.
+
+## 001-T25 - Transient turn.activity frames and REPORTED activity records with UI cards (P-02)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-02 (audit C-1, C-2; findings R-04, R-07) into this LOCKED package.
+- **Depends on:** T13, T24
+- **Cross-package prerequisites:** NONE
+- **Owner:** Agent Runtime, Conversation, UI.
+- **Allowed paths:** `apps/litecoworkd/src/agents/supervisor.rs`, `crates/storage-core/src/conversation.rs`, `crates/storage-sqlite/src/conversations.rs`, `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/src/conversations/presentation-stream.ts`, adjacent tests.
+- **Contract:** SPEC 7.2, 7.3, 11; AC-029; PRESENTATION-RUNTIME; STATE-MACHINES.
+- **Change intent:** emit a transient `turn.activity` frame for tool, file, permission and todo events from the normalizer (T24) using the frame shape the UI reducer already accepts, and persist them as REPORTED activity observation records linked to the turn, never as LiteCowork Effects. Render activity cards (collapsed by default), a plan checklist from `TodoUpdated`, and an inline FAILED card with the safe reason. Copy says "reported by the agent".
+- **Acceptance:**
+  - [ ] Activity is visible during a turn and reconstructable after restart from the stored REPORTED records (AC-029).
+  - [ ] Tool and file activity are stored as REPORTED observations, never as Effect receipts; no fabricated success (AC-029).
+  - [ ] A failed turn shows an inline FAILED card with a safe reason; UI copy says "reported by the agent".
+- **Command:** `cargo test -p litecoworkd --locked turn_activity_records` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output; screenshot or DOM assertion of an activity card in Completion evidence.
+- **Stop:** an activity record would read as a LiteCowork Effect; keep it REPORTED.
+
+## 001-T26 - Stick-to-bottom autoscroll and new-messages indicator (P-04)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-04 (audit finding R-08) into this LOCKED package.
+- **Depends on:** T13
+- **Cross-package prerequisites:** NONE
+- **Owner:** UI.
+- **Allowed paths:** `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/src/conversations/conversation-turn-state.ts` (new per the optimization notes), adjacent tests.
+- **Contract:** SPEC 11; AC-030; NATIVE-COMPOSER-LLD; V1-UI-SCREEN-CONTRACT.
+- **Change intent:** add stick-to-bottom autoscroll that follows new frames only when the view is already at the bottom, and a "new messages" indicator when the user has scrolled up while new content arrives; keep scroll position stable while the user reads history.
+- **Acceptance:**
+  - [ ] Scroll stays put when the user is reading history and a new frame arrives (AC-030).
+  - [ ] The view follows new content when the user is at the bottom (AC-030).
+  - [ ] The "new messages" indicator appears only while scrolled up and clears on return to the bottom.
+- **Command:** `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** UI test output in Completion evidence.
+- **Stop:** autoscroll would steal focus from a text selection; prefer the indicator.
+
+## 001-T27 - Surface native permission prompts inline and in Needs You (P-09)
+
+- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-09 (audit C-3), owned jointly with Feature 002 (ACP `request_permission`, see Feature 002 T17), into this LOCKED package.
+- **Depends on:** T24, T25
+- **Cross-package prerequisites:** Feature 002 ACP client `request_permission` path (Feature 002 T17) delivers the harness answer channel.
+- **Owner:** Agent Runtime, Conversation, UI.
+- **Allowed paths:** `apps/litecoworkd/src/agents/supervisor.rs`, `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`, `apps/litecowork-ui/src/needs-you/`, adjacent tests.
+- **Contract:** SPEC 7.2, 8; AC-031; TRUST; AGENT-CONTROL.
+- **Change intent:** when the harness emits `PermissionAsked`, surface the prompt inline in the transcript and in Needs You, and send the owner answer back through the harness permission API; this is a native permission answered through the harness, never a LiteCowork grant or an Effect. Copy must state that the agent, not LiteCowork, is asking.
+- **Acceptance:**
+  - [ ] A denied prompt reaches the harness and no LiteCowork grant is created (AC-031).
+  - [ ] The prompt appears both inline and in Needs You with copy that says the agent is asking.
+  - [ ] An unanswered prompt times out to the harness default without fabricating an answer (AC-031).
+- **Command:** `cargo test -p litecoworkd --locked native_permission_prompt` and `pnpm --dir apps/litecowork-ui test`
+- **Evidence:** test output in Completion evidence.
+- **Stop:** the answer channel is not the harness; do not convert the prompt into a LiteCowork grant.
+
+## 001-T28 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED.
-- **Depends on:** T01-T22
+- **Depends on:** T01-T27
 - **Cross-package prerequisites:** Feature 019 evidence bundle process and release qualification matrix.
 - **Owner:** Product (sign-off), Conversation, Agent Runtime, Security.
 - **Allowed paths:** this package; `docs/IMPLEMENTATION-STATUS.md`.

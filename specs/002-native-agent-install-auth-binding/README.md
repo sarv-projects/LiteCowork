@@ -22,6 +22,7 @@ The catalogue, Agent profile sections, action preconditions and status projectio
 - Release target: V1 release matrix row 1 (Windows x64 + OpenCode v2.0.32), row 2 (Linux x64). Claude Code CLI is the second AgentModule (B-11).
 - Screen ownership (A-35): the Settings -> Agents screen is owned by [Feature 011](../011-desktop-shell-ipc-settings-runtime/SPEC.md). Feature 002 owns only the install/auth/descriptor/binding operations that screen invokes.
 - Consumers: [Feature 001](../001-conversation-session-supervisor/SPEC.md) needs a creatable OpenCode binding (P1 prerequisite); [Feature 004](../004-agent-relay/SPEC.md) needs the second module.
+- By owner approval on 2026-11-09 (see [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)), this package folds proposed tasks P-11 (002-T17, define the native-agent adapter as an ACP client, register [A-54](../../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md)) and P-12 (002-T18, Agent Matchmaker). Source: [docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](../../docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md) section 8. The ACP SDK pin is recorded in [RESEARCH.md](RESEARCH.md).
 
 ## Package
 
@@ -35,4 +36,4 @@ The catalogue, Agent profile sections, action preconditions and status projectio
 
 ## Canonical owners
 
-[Architecture](../../ARCHITECTURE.md), [Product](../../docs/PRODUCT.md), [V1 release](../../docs/V1-PRODUCT-RELEASE-CONTRACT.md), [Master plan](../../docs/IMPLEMENTATION-MASTER-PLAN.md), [Agent Discovery LLD](../../docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md), [Telemetry LLD](../../docs/V1-TELEMETRY-USAGE-RESILIENCE-LLD.md), [Settings control ledger](../../docs/V1-SETTINGS-CONTRACT-LEDGER.md).
+[Architecture](../../ARCHITECTURE.md), [Product](../../docs/PRODUCT.md), [V1 release](../../docs/V1-PRODUCT-RELEASE-CONTRACT.md), [Master plan](../../docs/IMPLEMENTATION-MASTER-PLAN.md), [Agent Discovery LLD](../../docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md), [Telemetry LLD](../../docs/V1-TELEMETRY-USAGE-RESILIENCE-LLD.md), [Settings control ledger](../../docs/V1-SETTINGS-CONTRACT-LEDGER.md).

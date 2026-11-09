@@ -100,8 +100,37 @@ These came out of the V1 task planning on 2026-11-09. None is accepted. The new 
 
 Accepting 013-020 also needs the owner to accept each package SPEC as a whole (each package's T01).
 
+## Part 5: 2026-11-09 approval to fold the proposed P-tasks into their owning packages
+
+On 2026-11-09 the owner (sarv-projects) directed "update all docs end to end" and approved folding the proposed tasks P-05 and P-11..P-19 (with the P-00..P-09 rendering and shell set) into their owning packages, including the LOCKED packages, under the Agent Client Protocol (ACP) native-agent transport direction. The ACP direction is authored once at register [A-54](CONTRADICTION-AND-ALIGNMENT-REGISTER.md); this approval is recorded as register [A-55](CONTRADICTION-AND-ALIGNMENT-REGISTER.md). The proposed-task sources are [UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md](UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md) (P-00..P-09) and [REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md](REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md) (P-11..P-19).
+
+This approval does not re-open any LOCKED B-decision. It adds the owner-approved depth tasks inside each package's TASKS.md, renumbers each affected package's "Package VERIFIED for V1" task, and keeps one normative owner per entity. The single answer to "are all 17 capabilities covered" is [V1-PRODUCT-FEATURE-COVERAGE.md](V1-PRODUCT-FEATURE-COVERAGE.md): all 17 are owned; the remaining gaps are depth, not scope.
+
+| Proposed task | Capability / defect | Destination package | Final task id and name |
+|---|---|---|---|
+| P-00 | Capture a redacted OpenCode v2.0.32 turn fixture | 001 | 001-T23 Capture a redacted OpenCode v2.0.32 turn fixture |
+| P-01 | OpenCodeEventNormalizer with correlated internal events | 001 | 001-T24 OpenCodeEventNormalizer with correlated internal events |
+| P-02 | Transient turn.activity frames, REPORTED activity records and UI cards | 001 | 001-T25 Transient turn.activity frames and REPORTED activity records with UI cards |
+| P-04 | Stick-to-bottom autoscroll and new-messages indicator | 001 | 001-T26 Stick-to-bottom autoscroll and new-messages indicator |
+| P-09 | Native permission prompts inline and in Needs You | 001 (with 002) | 001-T27 Surface native permission prompts inline and in Needs You |
+| P-11 | Native-agent adapter as an ACP client (per-provider launch catalog) | 002 (consumed by 001) | 002-T17 Define the native-agent adapter as an ACP client |
+| P-12 | Agent Matchmaker ranking for a job | 002 | 002-T18 Agent Matchmaker ranking for a job |
+| P-15 | Context Debugger (what entered model context) | 003 | 003-T17 Context Debugger surface |
+| P-06 | Remove allow-same-origin from the Browser preview iframe and add a guard test | 008 | 008-T19 Remove allow-same-origin from the Browser preview iframe and add a guard test |
+| P-13 | Git worktree view, VCS diff and user-invoked GitHub PR ops | 008 | 008-T20 Git worktree view, VCS diff and user-invoked GitHub PR ops |
+| P-05 | Shell reachability and truthfulness | 011 | 011-T19 Shell reachability and truthfulness |
+| P-07 + P-19 | Decompose App.tsx and the Rust god files behind existing boundaries | 011 | 011-T20 Decompose App.tsx and the Rust god files behind existing boundaries |
+| P-08 | Merge SettingsPage into SettingsView with precedence notes | 011 | 011-T21 Merge SettingsPage into SettingsView with precedence notes |
+| P-16 | Persistent Workspace Dashboard with pinnable widgets | 011 | 011-T22 Persistent Workspace Dashboard with pinnable widgets |
+| P-17 | Pin the LiteSPM bridge and mirror its safety contract | 013 | 013-T20 Pin the LiteSPM bridge and mirror its safety contract |
+| P-14 | Mission Control canvas and read-only Compare Agents fan-out | 015 | 015-T20 Mission Control canvas and read-only Compare Agents fan-out |
+| P-03 | Per-block Markdown degradation with code and TEXT_SLICE rendering | 016 | 016-T18 Per-block Markdown degradation with code and TEXT_SLICE rendering |
+| P-18 | Generate operator-api.ts and TS validators from the Rust wire types with a drift gate | 018 | 018-T18 Generate operator-api.ts and TS validators from the Rust wire types with a drift gate |
+
+The renumbered "Package VERIFIED for V1" tasks are 001-T28, 002-T19, 003-T18, 008-T21, 011-T23, 013-T21, 015-T21, 016-T19 and 018-T19; 019-T23 (the V1 go/no-go) re-synced its VERIFIED-id list to those ids. Packages not in this table keep their prior final task id.
+
 ## Summary
 
-- Accepted 2026-11-09: Parts 1-3 in full, with the riders in the Decision cells.
+- Accepted 2026-11-09: Parts 1-3 in full, with the riders in the Decision cells; and Part 5 (fold the proposed P-tasks P-00..P-09 and P-11..P-19 into their owning packages under the ACP direction, register A-55).
 - Open: Part 4. The highest-impact items are B-35 (Windows Task execution), the B-19 OAuth recipe (blocks 006-T02) and B-36 (blocks all of 013).
 - The delivery order is in [LITECOWORK-BUILD-TASKS.md](LITECOWORK-BUILD-TASKS.md) "V1 release waves".

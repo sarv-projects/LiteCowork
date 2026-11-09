@@ -287,6 +287,10 @@ V1 gap coverage (revision 1.0):
 - **AC-016:** WHEN the owner begins native sign-in, THE SYSTEM SHALL launch only a descriptor-declared native auth method and record a redacted, time-bounded auth observation in the closed AgentAuthState set (UNKNOWN, NEEDS_AUTH, AUTHENTICATING, AUTHENTICATED, EXPIRED, DEGRADED, ERROR), independent of installation and binding state. Verify: auth observation and cancellation test.
 - **AC-017:** WHEN Claude Code CLI is added as the second AgentModule, THE SYSTEM SHALL require its own installation, auth, descriptor, binding and session-readiness evidence on each release-matrix row and SHALL NOT inherit qualification from OpenCode. Verify: module independence test and second-row qualification record.
 
+Owner-approved additions (2026-11-09; register A-54):
+- **AC-018:** WHEN the native-agent adapter is defined as an ACP client (task P-11), THE SYSTEM SHALL complete `initialize`, `session/new`, `session/prompt`, `session/update` and `session/cancel`, route client-side `request_permission`, filesystem and terminal calls to the LiteCowork Client owner, select providers from a per-provider launch catalog by exact identity, and keep the OpenCode v2 HTTP path as one non-ACP adapter until its ACP route qualifies; the pinned ACP SDK version SHALL be recorded in RESEARCH.md. Verify: ACP client fixture tests and SDK pin record.
+- **AC-019:** WHEN a job is given to the Agent Matchmaker (task P-12), THE SYSTEM SHALL rank only eligible bound agents by their fresh descriptor-declared capability with a stated reason per candidate and SHALL NOT override the user's final choice or rank from a stale descriptor. Verify: matchmaker ranking tests.
+
 ## 16. Executable acceptance command
 
 ```bash
@@ -307,7 +311,7 @@ Implementation gates are the cargo and pnpm commands named per task in TASKS.md.
 - The exact Claude Code CLI version, transport flags and auth method are pinned in its conformance fixture by 002-T12; they are not inferred from the inventory candidate in `native_cli.rs`.
 - The active checkout has partial served registry/inventory/profile/binding handlers. Install/update, native auth-begin and native-config open remain target-only; descriptor refresh and credential submission routes are mounted but fail closed with 503. See §4 and docs/IMPLEMENTATION-STATUS.md.
 
-Each blocker was resolved by owner acceptance on 2026-11-09. Implementation is ordered in TASKS.md, starting with the OpenCode binding fix in 002-T01 and ending with 002-T17 (package VERIFIED).
+Each blocker was resolved by owner acceptance on 2026-11-09. Implementation is ordered in TASKS.md, starting with the OpenCode binding fix in 002-T01 and ending with 002-T19 (package VERIFIED).
 
 ## 7a. Owner facts incorporated 2026-11-01
 
@@ -363,6 +367,8 @@ Read from AGENT-CONTROL, AGENT-FABRIC, AGENT-ACCOUNT-ROUTE-MATRIX, V1-AGENT-DISC
 | Composer shows only descriptor-declared options and commands | AGENT-CONTROL §14.4, NATIVE-COMPOSER-LLD | 002-T09 | AC-015 | Composer render + a11y test |
 | Native sign-in observation | AGENT-CONTROL, AGENT-ACCOUNT-ROUTE-MATRIX | 002-T07 | AC-016 | Auth observation test |
 | Claude Code CLI independent second module (B-11) | AGENT-CONTROL, AGENT-ACCOUNT-ROUTE-MATRIX | 002-T12 | AC-017 | Module independence test |
+| Native-agent adapter as an ACP client (P-11, owner approval 2026-11-09, register A-54) | AGENT-CONTROL, register A-54 | 002-T17 | AC-018 | ACP client fixture tests |
+| Agent Matchmaker ranking (P-12, owner approval 2026-11-09) | AGENT-CONTROL | 002-T18 | AC-019 | Matchmaker ranking tests |
 
 ## V1 model and effort picker details — 2026-11-06
 

@@ -9,6 +9,8 @@ DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package
 
 Owner acceptance was recorded on 2026-11-09 in [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Packages 001-012 are ACCEPTED/LOCKED; 013-020 were added from the V1 gap analysis and are IN_REVIEW until their own blockers are accepted. Every package carries a V1 TASKS.md that ends in a "Package VERIFIED for V1" task; the release go/no-go is 019-T23. Delivery waves are in [LITECOWORK-BUILD-TASKS.md](../docs/LITECOWORK-BUILD-TASKS.md).
 
+On the same 2026-11-09 review the owner also approved folding the proposed tasks P-05 and P-11..P-19 (with the P-00..P-09 rendering and shell set) into their owning packages, including the LOCKED ones, under the ACP native-agent transport direction (register [A-54](../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md)). The native-agent adapter (Feature 002 002-T17, consumed by Feature 001) is now defined as an Agent Client Protocol (ACP) client with a per-provider launch catalog, keeping the OpenCode v2 HTTP path as one non-ACP adapter until its ACP route qualifies. The folded tasks pushed several packages to new final ids (001 to T28, 002 to T19, 003 to T18, 008 to T21, 011 to T23, 013 to T21, 015 to T21, 016 to T19, 018 to T19); always read the current TASKS.md for the exact ids. The capability-to-task coverage map is [V1-PRODUCT-FEATURE-COVERAGE.md](../docs/V1-PRODUCT-FEATURE-COVERAGE.md).
+
 | ID | Feature | Status | Package |
 |---|---|---|---|
 | 001 | Conversation Session Supervisor and Native Turn Execution | ACCEPTED/LOCKED 2026-11-09 (B-01..B-10; B-02 rider: OpenCode v2.0.32 first, Windows x64 first row) | [001-conversation-session-supervisor](001-conversation-session-supervisor/README.md) |
