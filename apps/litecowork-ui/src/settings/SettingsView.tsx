@@ -20,6 +20,7 @@ import { RuntimeStopPreviewPanel } from "../runtime/RuntimeStopPreviewPanel";
 import type { StopPreviewState } from "../runtime/runtime-stop-state";
 import type { LocalPreferences } from "./local-preferences";
 import { agentSettingsDescription } from "./agents-heading";
+import { ShortcutList } from "../shell/ShortcutList";
 import "./settings-view.css";
 
 export type SettingsCategory =
@@ -207,6 +208,8 @@ export function SettingsView(props: SettingsViewProps) {
                   Customize the visual appearance, density, motion, and display scaling of your LiteCowork desktop workspace.
                 </p>
               </header>
+
+              <ShortcutList />
 
               <section className="settings-card">
                 <div className="settings-card-header">

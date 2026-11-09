@@ -190,7 +190,7 @@ Gaps: B-28 native-row qualification, inert-control removal, applied local prefer
 
 ## 011-T11 - App-wide keyboard and focus baseline
 
-- **Status:** PARTIAL (CODE): `src/shell/shortcut-registry.ts` registers Ctrl N (New Chat) and Ctrl K (Library); App binds a typed handler map and the sidebar label comes from the registry; `tests/keyboard-focus-baseline.test.mjs` (3 tests) fails on a label without a handler. Ctrl W is intentionally unregistered (WebView/OS reserved; documented in the registry). NOT done: visible-focus audit, focus return after drawers/dialogs, skip link, Tab-order browser test, and the Settings shortcut list generated from the registry
+- **Status:** PARTIAL (CODE): `src/shell/shortcut-registry.ts` registers Ctrl N and Ctrl K with typed handlers; skip link (`Skip to main content`) targets `<main id="main-content" tabIndex={-1}>`; one global `:focus-visible` outline now covers button, a, textarea, input, select, summary and `[tabindex]`; the Settings General category lists shortcuts generated from the registry (`ShortcutList.tsx`); navigation drawer and Workbench already return focus to their triggers (pinned by source assertions); `tests/keyboard-focus-baseline.test.mjs` (7 tests). Ctrl W stays unregistered (WebView/OS reserved). NOT done: the keyboard-only browser path (New Chat, composer, Workbench, Settings, close drawer) and a real Tab-order run need Chrome (`pnpm run test:browser`); none is installed in this container, so AC-018 keyboard path and AC-011 announcement checks remain unmeasured.
 - **Depends on:** T06
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI

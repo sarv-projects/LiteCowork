@@ -2345,6 +2345,14 @@ function App() {
 
   return (
     <div className={`app-shell ${navigationOpen ? "navigation-open" : ""}`}>
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >Skip to main content</a>
       {navigationOpen && <button className="sidebar-backdrop" type="button" tabIndex={-1} aria-label="Close main navigation" onClick={() => closeNavigation()} />}
       <aside
         id="main-navigation"
@@ -2574,7 +2582,7 @@ function App() {
         </div>
       </aside>
 
-      <main className="main-area" inert={mainAreaInert} aria-hidden={mainAreaInert || undefined}>
+      <main id="main-content" tabIndex={-1} className="main-area" inert={mainAreaInert} aria-hidden={mainAreaInert || undefined}>
         {page !== "Conversations" && (
           <header className="topbar">
           <button
