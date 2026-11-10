@@ -3435,6 +3435,7 @@ mod tests {
                 items: Vec::new(),
                 next_cursor: None,
                 active_turn: Some(json!({"turn_id": "turn-1", "status": "RUNNING"})),
+                retryable_turn: None,
             },
             ConversationPresentationSnapshot {
                 workspace_id: "workspace-1".to_owned(),
@@ -3446,6 +3447,7 @@ mod tests {
                 items: Vec::new(),
                 next_cursor: None,
                 active_turn: None,
+                retryable_turn: None,
             },
         ];
         let filter_digest = "a".repeat(64);
@@ -3501,6 +3503,7 @@ mod tests {
                 items: vec![json!({"message":{"message_id":"message-1"}})],
                 next_cursor: Some("message-1".to_owned()),
                 active_turn: None,
+                retryable_turn: None,
             },
             ConversationPresentationSnapshot {
                 workspace_id: "workspace-1".to_owned(),
@@ -3512,6 +3515,7 @@ mod tests {
                 items: vec![json!({"message":{"message_id":"message-b"}})],
                 next_cursor: None,
                 active_turn: None,
+                retryable_turn: None,
             },
         ];
 

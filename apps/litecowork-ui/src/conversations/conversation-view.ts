@@ -37,6 +37,8 @@ export type RichPresentationRefView = {
   availability: "AVAILABLE" | "FETCHING" | "UNAVAILABLE" | "POLICY_OMITTED" | "UNSUPPORTED_VERSION" | "INTEGRITY_FAILED";
 };
 
+import type { ActiveTurnView, RetryableTurnView } from "./conversation-turn-state.ts";
+
 export type ConversationSnapshotView = {
   workspace_id: string;
   conversation_id: string;
@@ -46,7 +48,10 @@ export type ConversationSnapshotView = {
   origin_sequence?: string;
   messages: ConversationMessageView[];
   next_cursor: string | null;
-  active_turn: { status: string } | null;
+  /** Identity and aggregate version of the in-flight turn; Stop sends them as If-Match. */
+  active_turn: ActiveTurnView | null;
+  /** The latest turn when it FAILED, with the version Retry sends and its typed reason. Omitted only for the local empty state. */
+  retryable_turn?: RetryableTurnView | null;
 };
 
 export type ConversationWorkspaceSelection = {
@@ -326,7 +331,8 @@ export function parseConversationList(value: unknown, workspaceId: string): Conv
 export function parseConversationSnapshot(value: unknown, workspaceId: string, conversationId: string): ConversationSnapshotView {
   if (!record(value) || value.workspace_id !== workspaceId || value.conversation_id !== conversationId
     || !Array.isArray(value.items) || value.items.length > 100
-    || !(value.active_turn === null || record(value.active_turn))
+    || !(value.active_turn === null || parseActiveTurn(value.active_turn) !== null)
+    || !(value.retryable_turn === undefined || value.retryable_turn === null || parseRetryableTurn(value.retryable_turn) !== null)
     || !Number.isSafeInteger(value.projection_revision) || (value.projection_revision as number) < 1
     || !boundedText(value.stream_cursor, 2048)
     || typeof value.origin_sequence !== "string" || !/^(0|[1-9][0-9]{0,18})$/.test(value.origin_sequence)) {
@@ -367,6 +373,29 @@ export function parseConversationSnapshot(value: unknown, workspaceId: string, c
     origin_sequence: value.origin_sequence,
     messages,
     next_cursor: (value.next_cursor as string | null | undefined) ?? null,
-    active_turn: value.active_turn as { status: string } | null,
+    active_turn: value.active_turn === null ? null : parseActiveTurn(value.active_turn),
+    retryable_turn: value.retryable_turn === undefined || value.retryable_turn === null ? null : parseRetryableTurn(value.retryable_turn),
   };
+}
+
+const NONTERMINAL = ["OPEN", "RUNNING", "WAITING_USER", "WAITING_DEPENDENCY", "CANCEL_REQUESTED"];
+
+function parseActiveTurn(value: unknown): ActiveTurnView | null {
+  if (!record(value) || !boundedText(value.turn_id) || !Number.isSafeInteger(value.version) || (value.version as number) < 1
+    || !NONTERMINAL.includes(String(value.status))
+    || !Number.isSafeInteger(value.retry_ordinal) || (value.retry_ordinal as number) < 0) return null;
+  return {
+    turn_id: value.turn_id,
+    version: value.version as number,
+    status: value.status as string,
+    retry_ordinal: value.retry_ordinal as number,
+    ...(typeof value.presentation_preference === "string" ? { presentation_preference: value.presentation_preference } : {}),
+  };
+}
+
+function parseRetryableTurn(value: unknown): RetryableTurnView | null {
+  if (!record(value) || !boundedText(value.turn_id) || !Number.isSafeInteger(value.version) || (value.version as number) < 1
+    || !Number.isSafeInteger(value.retry_ordinal) || (value.retry_ordinal as number) < 0
+    || !(value.reason_code === null || boundedText(value.reason_code, 128))) return null;
+  return { turn_id: value.turn_id, version: value.version as number, retry_ordinal: value.retry_ordinal as number, reason_code: value.reason_code as string | null };
 }

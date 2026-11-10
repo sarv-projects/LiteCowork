@@ -161,7 +161,7 @@ export function reducePresentationFrame(
     const payload = object(f.payload);
     if (!payload || f.projection_type !== "conversation_presentation") return state;
     if (hasOnlyKeys(payload,
-      ["conversation_id", "stream_cursor", "origin_sequence", "items", "next_cursor", "active_turn"],
+      ["conversation_id", "stream_cursor", "origin_sequence", "items", "next_cursor", "active_turn", "retryable_turn"],
       ["conversation_id", "stream_cursor", "origin_sequence", "items", "next_cursor", "active_turn"]) && Array.isArray(payload.items)) {
       const rawSnapshot = {
         workspace_id: f.workspace_id,
@@ -172,6 +172,7 @@ export function reducePresentationFrame(
         items: payload.items,
         next_cursor: payload.next_cursor,
         active_turn: payload.active_turn,
+        retryable_turn: payload.retryable_turn ?? null,
       };
       let conversationSnapshot: ConversationSnapshotView;
       try {
@@ -212,6 +213,7 @@ export function reducePresentationFrame(
         items: [payload.item],
         next_cursor: state.conversationSnapshot.next_cursor,
         active_turn: state.conversationSnapshot.active_turn,
+        retryable_turn: state.conversationSnapshot.retryable_turn ?? null,
       };
       let upsert: ConversationSnapshotView;
       try {

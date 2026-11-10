@@ -79,3 +79,24 @@ test("the Send control is gated on a qualified binding, not merely a non-empty d
     "send eligibility must incorporate a binding-qualification predicate",
   );
 });
+
+test("no fabricated model, title or composer hint copy remains in the Conversation page", () => {
+  for (const fabricated of ["Gemini 3.8 Flash Low", "AI Capabilities Overview", "@ to mention, / for actions", "Turbo"]) {
+    assert.equal(source.includes(fabricated), false, `fabricated copy must not return: ${fabricated}`);
+  }
+});
+
+test("composer controls without an owner route are disabled and named unavailable (AC-025)", () => {
+  for (const name of ["Add context or file (unavailable)", "Voice input (unavailable)", "More options (unavailable)"]) {
+    const at = source.indexOf(`aria-label="${name}"`);
+    assert.notEqual(at, -1, `${name} must exist as an unavailable control`);
+    assert.match(source.slice(at, at + 60), /disabled/, `${name} must be disabled`);
+  }
+});
+
+test("Stop and Retry send the projected turn version, never a hard-coded one (AC-024, AC-025)", () => {
+  assert.equal(/expectedVersion:\s*1\b/.test(source), false, "expectedVersion must not be hard-coded");
+  assert.match(source, /expectedVersion: stopping\.expectedVersion/);
+  assert.match(source, /expectedVersion: retrying\.version/);
+  assert.match(source, /invoke<unknown>\("retry_conversation_turn"/);
+});

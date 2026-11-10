@@ -291,7 +291,8 @@
         "origin_sequence",
         "items",
         "next_cursor",
-        "active_turn"
+        "active_turn",
+        "retryable_turn"
       ],
       "properties": {
         "conversation_id": {"type": "string", "minLength": 1, "maxLength": 256},
@@ -306,6 +307,12 @@
         "active_turn": {
           "oneOf": [
             {"$ref": "#/$defs/conversation_turn"},
+            {"type": "null"}
+          ]
+        },
+        "retryable_turn": {
+          "oneOf": [
+            {"$ref": "#/$defs/conversation_retryable_turn"},
             {"type": "null"}
           ]
         }
@@ -421,12 +428,24 @@
     },
     "conversation_turn": {
       "type": "object",
-      "required": ["turn_id", "status", "retry_ordinal", "presentation_preference"],
+      "required": ["turn_id", "version", "status", "retry_ordinal", "presentation_preference"],
       "properties": {
         "turn_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "version": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
         "status": {"enum": ["OPEN", "RUNNING", "WAITING_USER", "WAITING_DEPENDENCY", "CANCEL_REQUESTED"]},
         "retry_ordinal": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
         "presentation_preference": {"enum": ["AUTO", "SIMPLE", "RICH"]}
+      },
+      "additionalProperties": false
+    },
+    "conversation_retryable_turn": {
+      "type": "object",
+      "required": ["turn_id", "version", "retry_ordinal", "reason_code"],
+      "properties": {
+        "turn_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "version": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "retry_ordinal": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "reason_code": {"type": ["string", "null"], "maxLength": 128}
       },
       "additionalProperties": false
     },

@@ -5178,9 +5178,19 @@ export type components = {
             /** @description Conversation message pagination cursor. */
             next_cursor?: string | null;
             active_turn: components["schemas"]["ConversationTurnPresentation"] | null;
+            /** @description The latest turn when it is FAILED; carries the aggregate version Retry must send as If-Match and the typed settlement reason. */
+            retryable_turn: components["schemas"]["ConversationRetryableTurn"] | null;
+        };
+        ConversationRetryableTurn: {
+            turn_id: string;
+            version: number;
+            retry_ordinal: number;
+            reason_code: string | null;
         };
         ConversationTurnPresentation: {
             turn_id: string;
+            /** @description ConversationTurn aggregate version; Stop sends it as If-Match. */
+            version: number;
             /** @enum {string} */
             status: "OPEN" | "RUNNING" | "WAITING_USER" | "WAITING_DEPENDENCY" | "CANCEL_REQUESTED";
             retry_ordinal: number;

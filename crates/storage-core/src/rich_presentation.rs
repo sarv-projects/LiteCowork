@@ -69,6 +69,10 @@ pub struct ConversationPresentationSnapshot {
     pub items: Vec<Value>,
     pub next_cursor: Option<String>,
     pub active_turn: Option<Value>,
+    /// The Conversation's latest turn when (and only when) it is FAILED: its identity,
+    /// aggregate version for Retry's If-Match and the typed settlement reason code.
+    #[serde(default)]
+    pub retryable_turn: Option<Value>,
 }
 
 pub const MAX_CONVERSATION_PRESENTATION_MESSAGES: usize = 100;

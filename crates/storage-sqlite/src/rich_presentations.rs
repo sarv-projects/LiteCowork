@@ -639,7 +639,7 @@ fn read_conversation_presentation_in_transaction(
     }
     let active_turn: Option<Value> = tx
         .query_row(
-            "SELECT json_object('turn_id',turn_id,'status',status,'retry_ordinal',retry_ordinal,'presentation_preference',presentation_preference) FROM conversation_turns WHERE conversation_id=?1 AND status IN ('OPEN','RUNNING','WAITING_USER','WAITING_DEPENDENCY','CANCEL_REQUESTED') ORDER BY created_at DESC,turn_id DESC LIMIT 1",
+            "SELECT json_object('turn_id',turn_id,'status',status,'version',version,'retry_ordinal',retry_ordinal,'presentation_preference',presentation_preference) FROM conversation_turns WHERE conversation_id=?1 AND status IN ('OPEN','RUNNING','WAITING_USER','WAITING_DEPENDENCY','CANCEL_REQUESTED') ORDER BY created_at DESC,turn_id DESC LIMIT 1",
             params![conversation],
             |row| row.get::<_, String>(0),
         )
@@ -648,6 +648,17 @@ fn read_conversation_presentation_in_transaction(
         .map(|json| serde_json::from_str(&json))
         .transpose()
         .map_err(|_| StoreError::Integrity("invalid active Conversation turn".into()))?;
+    let retryable_turn: Option<Value> = tx
+        .query_row(
+            "SELECT json_object('turn_id',t.turn_id,'version',t.version,'retry_ordinal',t.retry_ordinal,'reason_code',(SELECT json_extract(e.payload_json,'$.reason_code') FROM domain_events e WHERE e.entity_type='ConversationTurn' AND e.entity_id=t.turn_id AND e.type='conversation.turn.settled.v1' ORDER BY e.entity_revision DESC LIMIT 1)) FROM conversation_turns t WHERE t.conversation_id=?1 AND t.status='FAILED' AND t.turn_id=(SELECT turn_id FROM conversation_turns WHERE conversation_id=?1 ORDER BY created_at DESC,turn_id DESC LIMIT 1)",
+            params![conversation],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(map_database_error)?
+        .map(|json| serde_json::from_str(&json))
+        .transpose()
+        .map_err(|_| StoreError::Integrity("invalid retryable Conversation turn".into()))?;
     Ok(ConversationPresentationSnapshot {
         workspace_id: workspace.to_owned(),
         conversation_id: conversation.to_owned(),
@@ -658,5 +669,6 @@ fn read_conversation_presentation_in_transaction(
         items,
         next_cursor,
         active_turn,
+        retryable_turn,
     })
 }

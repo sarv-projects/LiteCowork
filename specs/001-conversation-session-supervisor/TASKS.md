@@ -296,7 +296,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T16 - Bind Stop to the projected active turn and real aggregate version
 
-- **Status:** NOT STARTED - `cancelTurn` searches `transientTurns` (not emitted on the OpenCode path) and sends `expectedVersion: 1`; `active_turn` carries only `{ status }` in `conversation-view.ts`.
+- **Status:** DONE (prerequisite of T17/T18, done with them; rendered DOM not exercised) - the projected `active_turn` now carries `version` and the snapshot gains `retryable_turn` (OpenAPI `ConversationTurnPresentation` and `ConversationRetryableTurn`, stream schema, generated `operator-api.ts`). `conversation-turn-state.ts` `stopTarget` binds Stop to the projected turn id and version; `cancelTurn` sends them to `cancel_conversation_turn`, shows `Stopping` for CANCEL_REQUESTED (button disabled, named `Stopping the response`), and on any failure refreshes the snapshot and shows a recoverable message. Focus returns to the composer when the fence lifts. Evidence: `conversation-turn-state.test.ts` (10 tests), storage `conversation_presentation_snapshot_is_bounded_paged_and_keeps_semantic_truth` (version, retryable reason). The Tauri command path cannot be compiled here (gdk-3.0 missing); no React render test exists for the page.
 - **Depends on:** T01, T07
 - **Cross-package prerequisites:** NONE
 - **Owner:** UI, Presentation Operator.
@@ -313,7 +313,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T17 - Add the failed-turn Retry UI
 
-- **Status:** NOT STARTED - `retry_conversation_turn` exists in `conversation_bridge.rs` but has no call site in `apps/litecowork-ui/src`.
+- **Status:** DONE (logic and source-level guards; no rendered test) - the latest FAILED turn renders an inline card with a fixed safe reason (`retryReasonLabel`; unknown codes never leak raw text), says the message was kept, and a Retry button whose accessible name includes the reason. It invokes `retry_conversation_turn` with the projected `retryable_turn.version` and a fresh request id, is disabled while pending (double click sends one request), and a failure refreshes the snapshot. Retry is hidden once any turn is in flight. Evidence: `conversation-turn-state.test.ts`, `conversation-empty-state-truthfulness.test.mjs` (source guards: no hard-coded `expectedVersion: 1`, retry command present).
 - **Depends on:** T07, T16
 - **Cross-package prerequisites:** NONE
 - **Owner:** UI.
@@ -330,7 +330,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T18 - Fence the composer for every nonterminal state and remove inert or fabricated composer controls
 
-- **Status:** PARTIAL - `sendEligible` gate and truthful empty state landed at 8129420; `isTurnRunning` ignores OPEN, WAITING_USER, WAITING_DEPENDENCY and CANCEL_REQUESTED; Voice Input, More options and Turbo are inert; "@ to mention, / for actions" placeholder, the "Gemini 3.8 Flash Low" fallback option label and the "AI Capabilities Overview" title fallback are fabricated copy.
+- **Status:** DONE (logic and source-level guards; no rendered test) - `isSendEligible` and `isTurnOccupyingComposer` in `conversation-turn-state.ts` fence OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY and CANCEL_REQUESTED plus a visible streamed turn and the in-flight submit (so the gap after the 202 is covered). Attachments, Voice input and the header More options are disabled with `(unavailable)` accessible names; the Turbo pill and the `@`/`/` placeholder hint were removed; the fabricated `Gemini 3.8 Flash Low` and `AI Capabilities Overview` fallbacks became `No agent selected` and `Untitled conversation`. The A-24 `disabled={!sendEligible}` guard still passes. Evidence: `conversation-turn-state.test.ts`, extended `conversation-empty-state-truthfulness.test.mjs`. `pnpm run build` was not run (api:check, tsc and tests were).
 - **Depends on:** T16
 - **Cross-package prerequisites:** Feature 002 descriptor-declared commands and model/effort (render only when declared); Feature 003 @-reference picker; Feature 011 app-wide keyboard and focus baseline.
 - **Owner:** UI.
@@ -466,7 +466,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T26 - Stick-to-bottom autoscroll and new-messages indicator (P-04)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-04 (audit finding R-08) into this LOCKED package.
+- **Status:** DONE (logic and source wiring; no rendered scroll test) - `isAtBottom` (48 px threshold), `scrollFollowDecision` and `contentSignature` are pure and tested. The page follows new messages and streamed text only while the reader is at the bottom and not selecting text; otherwise it keeps the scroll position and shows a `New messages` indicator that clears on return to the bottom or on the scroll-to-bottom button. A different Conversation starts at the bottom. Evidence: `conversation-turn-state.test.ts` autoscroll tests. jsdom scroll behavior is not tested.
 - **Depends on:** T13
 - **Cross-package prerequisites:** NONE
 - **Owner:** UI.

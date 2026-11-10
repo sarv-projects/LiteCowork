@@ -6977,7 +6977,7 @@ components:
     ConversationPresentationSnapshot:
       type: object
       additionalProperties: false
-      required: [workspace_id, conversation_id, projection_revision, stream_cursor, origin_sequence, items, active_turn]
+      required: [workspace_id, conversation_id, projection_revision, stream_cursor, origin_sequence, items, active_turn, retryable_turn]
       properties:
         workspace_id: {type: string, minLength: 1}
         conversation_id: {type: string, minLength: 1}
@@ -6990,12 +6990,23 @@ components:
           items: {$ref: '#/components/schemas/ConversationPresentationMessage'}
         next_cursor: {type: [string, 'null'], description: 'Conversation message pagination cursor.'}
         active_turn: {oneOf: [{$ref: '#/components/schemas/ConversationTurnPresentation'}, {type: 'null'}]}
+        retryable_turn: {oneOf: [{$ref: '#/components/schemas/ConversationRetryableTurn'}, {type: 'null'}], description: 'The latest turn when it is FAILED; carries the aggregate version Retry must send as If-Match and the typed settlement reason.'}
+    ConversationRetryableTurn:
+      type: object
+      additionalProperties: false
+      required: [turn_id, version, retry_ordinal, reason_code]
+      properties:
+        turn_id: {type: string, minLength: 1}
+        version: {type: integer, minimum: 1, maximum: 9007199254740991}
+        retry_ordinal: {type: integer, minimum: 0}
+        reason_code: {type: [string, 'null'], maxLength: 128}
     ConversationTurnPresentation:
       type: object
       additionalProperties: false
-      required: [turn_id, status, retry_ordinal, presentation_preference]
+      required: [turn_id, version, status, retry_ordinal, presentation_preference]
       properties:
         turn_id: {type: string, minLength: 1}
+        version: {type: integer, minimum: 1, maximum: 9007199254740991, description: 'ConversationTurn aggregate version; Stop sends it as If-Match.'}
         status: {type: string, enum: [OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY, CANCEL_REQUESTED]}
         retry_ordinal: {type: integer, minimum: 0}
         presentation_preference: {type: string, enum: [AUTO, SIMPLE, RICH]}
