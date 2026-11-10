@@ -344,6 +344,9 @@ pub struct SettleConversationTurn {
     pub command: TurnCommand,
     pub turn_event: EventDraft,
     pub session: Option<SettleConversationSession>,
+    /// Whatever usage was observed for this attempt (B-10); `None` records UNKNOWN. A
+    /// missing or rejected usage row never blocks the settlement.
+    pub usage: Option<ConversationTurnUsage>,
 }
 
 #[derive(Clone, Debug)]

@@ -83,8 +83,12 @@ pub(crate) enum NormalizedAgentEvent {
     StepStarted,
     /// A native step ended.
     StepEnded,
-    /// Native usage was reported. Values are not billing authority.
-    UsageRecorded,
+    /// Native usage was reported. Values are not billing authority. Token counts are
+    /// present only when the native frame carried them as non-negative integers.
+    UsageRecorded {
+        input_tokens: Option<u64>,
+        output_tokens: Option<u64>,
+    },
     /// The whole native execution reached a terminal outcome.
     ExecutionSettled { outcome: ToolOutcome },
     /// The native session went idle: the turn's native work is complete.
@@ -269,7 +273,11 @@ impl OpenCodeEventNormalizer {
                 // Usage values are never billing authority.
                 let has_usage = part.get("tokens").is_some() || part.get("cost").is_some();
                 if has_usage {
-                    Some(NormalizedAgentEvent::UsageRecorded)
+                    let tokens = part.get("tokens");
+                    Some(NormalizedAgentEvent::UsageRecorded {
+                        input_tokens: tokens.and_then(|t| t.get("input")).and_then(Value::as_u64),
+                        output_tokens: tokens.and_then(|t| t.get("output")).and_then(Value::as_u64),
+                    })
                 } else {
                     Some(NormalizedAgentEvent::StepEnded)
                 }
@@ -531,7 +539,10 @@ mod opencode_event_normalizer_tests {
         });
         assert_eq!(
             norm.normalize(None, &finish_usage),
-            Some(NormalizedAgentEvent::UsageRecorded)
+            Some(NormalizedAgentEvent::UsageRecorded {
+                input_tokens: Some(10),
+                output_tokens: Some(20)
+            })
         );
 
         let finish_bare = json!({

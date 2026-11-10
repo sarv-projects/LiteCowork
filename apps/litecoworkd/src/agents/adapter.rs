@@ -72,6 +72,59 @@ pub(crate) trait TurnObserver: Send {
     fn finish(&mut self);
 }
 
+/// Fans each event out to several observers in order.
+pub(crate) struct ObserverSet(pub(crate) Vec<Box<dyn TurnObserver>>);
+
+impl TurnObserver for ObserverSet {
+    fn on_event(&mut self, event: &NormalizedAgentEvent) {
+        for observer in &mut self.0 {
+            observer.on_event(event);
+        }
+    }
+
+    fn finish(&mut self) {
+        for observer in &mut self.0 {
+            observer.finish();
+        }
+    }
+}
+
+/// Provider-reported token totals accumulated across a turn's usage observations.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ReportedUsage {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    /// True once at least one usage observation carried a token count.
+    pub observed: bool,
+}
+
+/// Shared handle the supervisor reads after the drive loop ends.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct UsageCollector(Arc<std::sync::Mutex<ReportedUsage>>);
+
+impl UsageCollector {
+    pub(crate) fn snapshot(&self) -> ReportedUsage {
+        self.0.lock().map(|usage| *usage).unwrap_or_default()
+    }
+}
+
+impl TurnObserver for UsageCollector {
+    fn on_event(&mut self, event: &NormalizedAgentEvent) {
+        if let NormalizedAgentEvent::UsageRecorded { input_tokens, output_tokens } = event {
+            if input_tokens.is_none() && output_tokens.is_none() {
+                return;
+            }
+            if let Ok(mut usage) = self.0.lock() {
+                usage.observed = true;
+                usage.input_tokens = usage.input_tokens.saturating_add(input_tokens.unwrap_or(0));
+                usage.output_tokens = usage.output_tokens.saturating_add(output_tokens.unwrap_or(0));
+            }
+        }
+    }
+
+    fn finish(&mut self) {}
+}
+
 /// Cooperative per-turn Stop signal shared between the Operator-facing supervisor
 /// handle and the blocking drive loop (001-T07). Setting it is a request, not a
 /// settlement: only observed quiescence settles a cancelled turn.

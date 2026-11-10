@@ -74,6 +74,7 @@ pub(crate) fn recover_conversation_sessions(
                     None,
                     RECOVERY_REASON_CODE,
                     &correlation_id,
+                    None,
                 ) {
                     Ok(()) => {
                         report.intents_settled += 1;
@@ -125,6 +126,7 @@ pub(crate) fn recover_conversation_sessions(
                         Some(&session.agent_session_id),
                         RECOVERY_REASON_CODE,
                         &correlation_id,
+                        None,
                     ) {
                         Ok(()) => report.starting_sessions_released += 1,
                         Err(_) => report.failures += 1,

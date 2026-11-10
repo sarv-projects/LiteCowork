@@ -740,6 +740,32 @@ impl ConversationTurnStore for SqliteConversationStore {
                 "UPDATE conversation_dispatch_intents SET state='SETTLED', settled_at=?1, version=version+1 WHERE turn_id=?2 AND retry_ordinal=?3 AND state<>'SETTLED'",
                 params![next.settled_at, settlement.turn_id, i64::from(current.retry_ordinal)],
             ).map_err(map_database_error)?;
+            // B-10: one usage row per attempt. INSERT OR IGNORE keeps a replay or an
+            // earlier row from failing the settlement.
+            let (attribution, input_tokens, output_tokens) = match settlement.usage {
+                Some(usage) => (
+                    match usage.attribution_source {
+                        storage_core::conversation::UsageAttributionSource::ProviderReported => "PROVIDER_REPORTED",
+                        storage_core::conversation::UsageAttributionSource::EstimatedLocal => "ESTIMATED_LOCAL",
+                    },
+                    Some(to_sql_i64(usage.input_tokens, "input tokens")?),
+                    Some(to_sql_i64(usage.output_tokens, "output tokens")?),
+                ),
+                None => ("UNKNOWN", None, None),
+            };
+            tx.execute(
+                "INSERT OR IGNORE INTO conversation_turn_usage_records(usage_id,turn_id,retry_ordinal,conversation_id,attribution_source,input_tokens,output_tokens,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+                params![
+                    format!("usage-{}-{}", settlement.turn_id, current.retry_ordinal),
+                    settlement.turn_id,
+                    i64::from(current.retry_ordinal),
+                    settlement.conversation_id,
+                    attribution,
+                    input_tokens,
+                    output_tokens,
+                    next.settled_at,
+                ],
+            ).map_err(map_database_error)?;
             insert_domain_event(&tx, &settlement.turn_event, &state_ref)?;
             if let (Some(end), Some(session)) = (settlement.session.as_ref(), ended_session.as_ref()) {
                 let session_bytes = canonical_json(session)?;

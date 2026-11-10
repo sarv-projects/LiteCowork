@@ -279,7 +279,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T15 - Write usage records at turn settlement (B-10)
 
-- **Status:** NOT STARTED - no usage record table or writer exists in any Rust source.
+- **Status:** DONE (OpenCode path; table was v29) - every attempt settlement writes exactly one `conversation_turn_usage_records` row inside its own transaction: the final commit (T02) and now `settle_conversation_turn` (FAILED and CANCELLED, `INSERT OR IGNORE`, `SettleConversationTurn.usage`). The supervisor attributes PROVIDER_REPORTED when the native `step-finish` frames carried non-zero `tokens.input` or `tokens.output` (summed by `UsageCollector`), else ESTIMATED_LOCAL `max(1, bytes / 4)` per direction from the encoded prompt and the answer, else UNKNOWN. A zero-token report is treated as not-provider-reported (the captured fixture reports 0/0). No cost is stored. Restart-recovery settlements record UNKNOWN. Evidence: `conversation_usage_attribution_prefers_reported_then_estimate_then_unknown`, `conversation_usage_collector_sums_reported_tokens_across_steps`, `conversation_usage_record_written_at_settlement_keeps_the_reported_attribution_once`, the UNKNOWN assertion in `conversation_turn_settlement_fails_turn_*`, existing commit tests. Whether real OpenCode v2.0.32 reports tokens in this shape is unconfirmed (fixture only).
 - **Depends on:** T01, T06
 - **Cross-package prerequisites:** Feature 018 owns the reader and dashboard.
 - **Owner:** Conversation, Observability.

@@ -363,6 +363,18 @@ impl Activated {
         session_end: ConversationSessionEnd,
         session_version: u64,
     ) -> Result<storage_core::conversation::SettledConversationTurn, StoreError> {
+        self.settle_with_usage(turn_version, command, to, session_end, session_version, None)
+    }
+
+    fn settle_with_usage(
+        &self,
+        turn_version: u64,
+        command: TurnCommand,
+        to: &str,
+        session_end: ConversationSessionEnd,
+        session_version: u64,
+        usage: Option<storage_core::conversation::ConversationTurnUsage>,
+    ) -> Result<storage_core::conversation::SettledConversationTurn, StoreError> {
         let (session_event_type, session_to) = match session_end {
             ConversationSessionEnd::Closed => ("agent.session.closed.v1", "CLOSED"),
             ConversationSessionEnd::Lost => ("agent.session.lost.v1", "LOST"),
@@ -399,6 +411,7 @@ impl Activated {
                     serde_json::json!({"agent_session_id": self.session_id, "to": session_to}),
                 ),
             }),
+            usage,
         })
     }
 
@@ -430,6 +443,34 @@ fn conversation_turn_settlement_fails_turn_ends_session_and_settles_intent_witho
         "0"
     );
     assert_eq!(a.counts().0, 0, "a failed turn leaves no AGENT message");
+    assert_eq!(
+        a.row("SELECT attribution_source FROM conversation_turn_usage_records WHERE turn_id=?1", &a.turn_id),
+        "UNKNOWN",
+        "a failure with nothing observed records UNKNOWN usage"
+    );
+}
+
+#[test]
+fn conversation_usage_record_written_at_settlement_keeps_the_reported_attribution_once() {
+    use storage_core::conversation::{ConversationTurnUsage, UsageAttributionSource};
+    let a = activated();
+    let usage = ConversationTurnUsage {
+        attribution_source: UsageAttributionSource::EstimatedLocal,
+        input_tokens: 120,
+        output_tokens: 7,
+    };
+    a.settle_with_usage(2, TurnCommand::Fail { settled_at: NOW.to_owned() }, "FAILED", ConversationSessionEnd::Lost, 2, Some(usage))
+        .expect("failure settlement with observed usage");
+    let (source, input, output): (String, i64, i64) = a
+        .connection()
+        .query_row(
+            "SELECT attribution_source,input_tokens,output_tokens FROM conversation_turn_usage_records WHERE turn_id=?1",
+            params![a.turn_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("usage record");
+    assert_eq!((source.as_str(), input, output), ("ESTIMATED_LOCAL", 120, 7));
+    assert_eq!(a.counts().2, 1, "exactly one usage row for the attempt");
 }
 
 #[test]

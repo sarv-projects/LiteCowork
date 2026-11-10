@@ -18,8 +18,8 @@ use std::time::Duration;
 use serde_json::json;
 use storage_core::conversation::{
     CommitConversationAgentResponse, ConversationMessageRecord, ConversationSessionEnd,
-    ConversationTurn, ConversationTurnStatus, ConversationTurnStore, SettleConversationSession,
-    SettleConversationTurn, TurnCommand,
+    ConversationTurn, ConversationTurnStatus, ConversationTurnStore, ConversationTurnUsage,
+    SettleConversationSession, SettleConversationTurn, TurnCommand, UsageAttributionSource,
 };
 use storage_core::{
     ActivateConversationAgentSession, AgentCatalogStore, AgentHostInstanceRecord, AgentHostStore,
@@ -28,7 +28,10 @@ use storage_core::{
 };
 use storage_sqlite::{SqliteConversationStore, SqliteWorkspaceStore};
 
-use super::adapter::{AgentAdapter, CancelSignal, OpenCodeAdapter, StreamBudget, TurnObservation};
+use super::adapter::{
+    AgentAdapter, CancelSignal, ObserverSet, OpenCodeAdapter, StreamBudget, TurnObservation,
+    UsageCollector,
+};
 use super::native_provider::NativeProviderKey;
 use super::opencode_server::{
     OpenCodeEnvironment, OpenCodeServer, OpenCodeServerConfig, OpenCodeServerProtocol,
@@ -209,6 +212,7 @@ impl AgentSessionSupervisor {
                     None,
                     "AGENT_UNAVAILABLE",
                     &correlation,
+                    None,
                 );
                 return Ok(());
             };
@@ -393,6 +397,7 @@ impl AgentSessionSupervisor {
                         Some(&session_id),
                         "CONVERSATION_SESSION_ADMISSION_UNAVAILABLE",
                         &correlation,
+                        None,
                     );
                     return Err(err);
                 }
@@ -504,6 +509,7 @@ pub(crate) fn settle_attempt_failed(
     session_id: Option<&str>,
     reason_code: &str,
     correlation_id: &str,
+    usage: Option<ConversationTurnUsage>,
 ) -> Result<(), String> {
     let conv_store = SqliteConversationStore::new(store.clone());
     let turn = conv_store
@@ -593,6 +599,7 @@ pub(crate) fn settle_attempt_failed(
             },
             turn_event,
             session: ended,
+            usage,
         })
         .map(|_| ())
         .map_err(|e| format!("Settle failed turn error: {e:?}"))
@@ -611,6 +618,7 @@ fn settle_attempt_cancelled(
     turn_id: &str,
     session_id: &str,
     correlation_id: &str,
+    usage: Option<ConversationTurnUsage>,
 ) -> Result<(), String> {
     let conv_store = SqliteConversationStore::new(store.clone());
     let turn = conv_store
@@ -678,9 +686,43 @@ fn settle_attempt_cancelled(
                 ),
                 agent_session_id: session.agent_session_id,
             }),
+            usage,
         })
         .map(|_| ())
         .map_err(|e| format!("Settle cancelled turn error: {e:?}"))
+}
+
+/// B-10 usage attribution: provider-reported tokens when the native stream carried
+/// non-zero counts, else a local estimate of `max(1, bytes / 4)` per direction from the
+/// bytes actually exchanged, else UNKNOWN (`None`). A zero-token report is not treated
+/// as provider-reported usage. No cost is inferred.
+fn turn_usage(
+    reported: super::adapter::ReportedUsage,
+    prompt_bytes: usize,
+    output_bytes: usize,
+) -> Option<ConversationTurnUsage> {
+    if reported.observed && (reported.input_tokens > 0 || reported.output_tokens > 0) {
+        return Some(ConversationTurnUsage {
+            attribution_source: UsageAttributionSource::ProviderReported,
+            input_tokens: reported.input_tokens,
+            output_tokens: reported.output_tokens,
+        });
+    }
+    if prompt_bytes == 0 && output_bytes == 0 {
+        return None;
+    }
+    let estimate = |bytes: usize| {
+        if bytes == 0 {
+            0
+        } else {
+            (bytes as u64 / 4).max(1)
+        }
+    };
+    Some(ConversationTurnUsage {
+        attribution_source: UsageAttributionSource::EstimatedLocal,
+        input_tokens: estimate(prompt_bytes),
+        output_tokens: estimate(output_bytes),
+    })
 }
 
 /// Runs one store commit and retries only transient storage failures. Every retry
@@ -796,15 +838,19 @@ fn execute_agent_turn(
             // Drive the native boundary through the provider-neutral AgentAdapter
             // (001-T04) rather than hand-parsing SSE. The OpenCode v2 HTTP path is
             // the one non-ACP adapter; it owns the server for the life of the turn.
+            let usage_collector = UsageCollector::default();
             let mut adapter = OpenCodeAdapter::new(server)
                 .with_cancel(cancel.clone())
-                .with_observer(Box::new(crate::transient_frames::TurnFramePublisher::new(
-                    crate::transient_frames::transient_bus().clone(),
-                    workspace_id,
-                    conversation_id,
-                    turn_id,
-                    retry_ordinal,
-                )));
+                .with_observer(Box::new(ObserverSet(vec![
+                    Box::new(crate::transient_frames::TurnFramePublisher::new(
+                        crate::transient_frames::transient_bus().clone(),
+                        workspace_id,
+                        conversation_id,
+                        turn_id,
+                        retry_ordinal,
+                    )),
+                    Box::new(usage_collector.clone()),
+                ])));
 
             // Phase 1: version/capability probe (B-03). A failed probe is a typed
             // FAILED turn with the USER message kept and no fallback (AC-015).
@@ -898,6 +944,9 @@ fn execute_agent_turn(
                 super::conversation_prompt::MAX_NATIVE_CONVERSATION_INPUT_BYTES,
             )
             .map_err(|e| format!("Context window error: {e:?}"))?;
+            let prompt_bytes = super::conversation_prompt::encode_conversation_context_prompt(&context)
+                .map(|prompt| prompt.len())
+                .unwrap_or(0);
 
             // Phase 3: dispatch the bounded committed context only after the
             // activation commit above. The native message id correlates native
@@ -931,6 +980,7 @@ fn execute_agent_turn(
                         turn_id,
                         session_id,
                         correlation_id,
+                        turn_usage(usage_collector.snapshot(), prompt_bytes, 0),
                     )?;
                     return Ok(TurnOutcome::Cancelled);
                 }
@@ -940,6 +990,20 @@ fn execute_agent_turn(
                     return Ok(TurnOutcome::StopUnconfirmed);
                 }
                 Ok(TurnObservation::Failed { reason_code }) | Err(reason_code) => {
+                    // Settle FAILED here so whatever usage was observed is recorded;
+                    // the dispatcher's later settle of an already-settled turn is a no-op.
+                    let _ = settle_attempt_failed(
+                        store,
+                        runtime_id,
+                        principal_id,
+                        workspace_id,
+                        conversation_id,
+                        turn_id,
+                        Some(session_id),
+                        reason_code.reason_code(),
+                        correlation_id,
+                        turn_usage(usage_collector.snapshot(), prompt_bytes, 0),
+                    );
                     return Err(format!(
                         "OpenCode turn failed closed: {}",
                         reason_code.reason_code()
@@ -972,7 +1036,11 @@ fn execute_agent_turn(
                 expected_session_version: activated.session.version,
                 retry_ordinal,
                 provider_response_id,
-                usage: None,
+                usage: turn_usage(
+                    usage_collector.snapshot(),
+                    prompt_bytes,
+                    accumulated_text.len(),
+                ),
                 turn_status: ConversationTurnStatus::Completed,
                 message: ConversationMessageRecord {
                     message_id: final_message_id.clone(),
@@ -1065,6 +1133,39 @@ fn execute_agent_turn(
 mod tests {
     use super::*;
     use storage_core::StoreError;
+
+    #[test]
+    fn conversation_usage_attribution_prefers_reported_then_estimate_then_unknown() {
+        use super::super::adapter::ReportedUsage;
+        let reported = ReportedUsage { input_tokens: 10, output_tokens: 20, observed: true };
+        let usage = turn_usage(reported, 4_000, 400).expect("reported usage");
+        assert_eq!(usage.attribution_source, UsageAttributionSource::ProviderReported);
+        assert_eq!((usage.input_tokens, usage.output_tokens), (10, 20));
+
+        // A zero-token report (fixture-style) is not provider usage: estimate instead.
+        let zero = ReportedUsage { input_tokens: 0, output_tokens: 0, observed: true };
+        let usage = turn_usage(zero, 4_000, 3).expect("estimated usage");
+        assert_eq!(usage.attribution_source, UsageAttributionSource::EstimatedLocal);
+        assert_eq!((usage.input_tokens, usage.output_tokens), (1_000, 1), "max(1, bytes / 4)");
+
+        // Nothing exchanged and nothing reported is UNKNOWN (None).
+        assert!(turn_usage(ReportedUsage::default(), 0, 0).is_none());
+        // A failed attempt with only the prompt sent estimates input and no output.
+        let usage = turn_usage(ReportedUsage::default(), 40, 0).expect("input only");
+        assert_eq!((usage.input_tokens, usage.output_tokens), (10, 0));
+    }
+
+    #[test]
+    fn conversation_usage_collector_sums_reported_tokens_across_steps() {
+        use super::super::adapter::{TurnObserver, UsageCollector};
+        use super::super::normalizer::NormalizedAgentEvent;
+        let mut collector = UsageCollector::default();
+        collector.on_event(&NormalizedAgentEvent::UsageRecorded { input_tokens: Some(5), output_tokens: None });
+        collector.on_event(&NormalizedAgentEvent::UsageRecorded { input_tokens: None, output_tokens: None });
+        collector.on_event(&NormalizedAgentEvent::UsageRecorded { input_tokens: Some(7), output_tokens: Some(9) });
+        let total = collector.snapshot();
+        assert_eq!((total.input_tokens, total.output_tokens, total.observed), (12, 9, true));
+    }
 
     #[test]
     fn conversation_final_settlement_retries_only_transient_store_failures() {
