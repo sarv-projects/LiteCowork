@@ -440,6 +440,7 @@ async fn submit_conversation_turn(
         load_authorized_conversation(&state, &workspace_id, &conversation_id).await?;
     let presentation_preference =
         parse_presentation_preference(body.presentation_preference.as_deref())?;
+    check_turn_resources(&state, &workspace_id, &body).await?;
     let content = serde_json::to_value(&body.content).map_err(|_| invalid_turn_request())?;
     let resource_refs =
         serde_json::to_value(&body.resource_refs).map_err(|_| invalid_turn_request())?;
@@ -1130,6 +1131,44 @@ async fn load_authorized_conversation(
     .map_err(|_| internal())?
     .map_err(map_store_error)?;
     conversation.ok_or_else(not_found)
+}
+
+/// Refuses a bad attachment while the draft and chips are still on screen (001-T14, B-08).
+/// The same rules run again at dispatch; this only moves the refusal earlier.
+async fn check_turn_resources(
+    state: &ConversationApiState,
+    workspace_id: &str,
+    body: &SubmitConversationTurnBody,
+) -> Result<(), Response> {
+    use crate::agents::resource_materializer::{MaterializeError, check_resource_refs};
+    let mut refs: Vec<Value> = Vec::new();
+    for resource_ref in &body.resource_refs {
+        refs.push(serde_json::to_value(resource_ref).map_err(|_| invalid_turn_request())?);
+    }
+    for block in &body.content {
+        if let ConversationTurnContentBlock::Resource { resource_ref, .. } = block {
+            refs.push(serde_json::to_value(resource_ref).map_err(|_| invalid_turn_request())?);
+        }
+    }
+    if refs.is_empty() {
+        return Ok(());
+    }
+    let store = state.store.clone();
+    let workspace_id = workspace_id.to_owned();
+    let outcome = tokio::task::spawn_blocking(move || check_resource_refs(&store, &workspace_id, &refs))
+        .await
+        .map_err(|_| internal())?;
+    outcome.map_err(|refusal| match refusal {
+        MaterializeError::NotFound => error(StatusCode::NOT_FOUND, "NOT_FOUND", "An attached Resource was not found in this Workspace"),
+        MaterializeError::StaleRevision => error(StatusCode::CONFLICT, "RESOURCE_STALE", "An attached Resource changed; reattach its current revision"),
+        MaterializeError::StoreUnavailable => error(StatusCode::SERVICE_UNAVAILABLE, "RESOURCE_UNAVAILABLE", "Attached Resources could not be read"),
+        MaterializeError::BinaryUnavailable => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "Only text Resources can be attached to a Conversation turn"),
+        MaterializeError::TooLarge => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "An attached Resource is too large"),
+        MaterializeError::NotText => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "An attached Resource is not valid text"),
+        MaterializeError::Restricted => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "A restricted Resource cannot be attached to a Conversation turn"),
+        MaterializeError::TooMany => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "Too many Resources are attached"),
+        MaterializeError::NotAuthorized => error(StatusCode::BAD_REQUEST, "INVALID_RESOURCE_REF", "An attached Resource reference is not valid for this Workspace"),
+    })
 }
 
 fn validate_turn_request(

@@ -948,6 +948,14 @@ fn execute_agent_turn(
                     turn_id,
                 )
                 .map_err(|e| format!("Load context error: {e:?}"))?;
+            // B-08: reauthorize every attached Resource and inline its text before the
+            // window runs; any refusal fails the turn before dispatch with a typed reason.
+            let context = super::resource_materializer::materialize_conversation_resources(
+                store,
+                workspace_id,
+                context,
+            )
+            .map_err(|e| format!("Resource materialization failed: {}", e.reason_code()))?;
             // B-07: reduce an over-budget prefix with the explicit notice, or refuse
             // the turn with a typed error. Never a silent truncation.
             let (context, _context_reduction) = super::conversation_prompt::window_conversation_context(

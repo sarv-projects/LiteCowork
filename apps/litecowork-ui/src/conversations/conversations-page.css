@@ -448,3 +448,7 @@
 .turn-activity-card { padding: 0.15em 0; }
 .turn-activity-card.failed strong { color: var(--danger, #b3261e); }
 .turn-activity-plan { margin: 0.25em 0; }
+
+.composer-attachment-picker { position: absolute; bottom: 100%; background: var(--surface, #fff); border: 1px solid var(--border, #ccc); border-radius: 8px; padding: 0.5em; max-height: 14em; overflow: auto; }
+.composer-attachment-picker ul { list-style: none; margin: 0; padding: 0; }
+.composer-attachment-chip { display: inline-flex; align-items: center; gap: 0.25em; padding: 0.1em 0.5em; border: 1px solid var(--border, #ccc); border-radius: 999px; font-size: 0.85em; }

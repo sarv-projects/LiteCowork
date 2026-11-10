@@ -314,6 +314,7 @@ Implementation status (source audit reconciled 2026-11-06). Message append/list 
 operations remain **target-only**: they are declared in OpenAPI but no handler is mounted.
 The mounted Conversation routes include create/list/get, AgentBinding mutation,
 presentation/rich-presentation/tasks, and the three turn routes below.
+Turn submit reauthorizes `resource_refs` and `RESOURCE` blocks: only same-Workspace, current-revision, non-RESTRICTED text Resources up to 128 KiB (16 per message) are accepted (404 `NOT_FOUND`, 409 `RESOURCE_STALE`, 422 `INVALID_RESOURCE_REF`, 503 `RESOURCE_UNAVAILABLE`), and they are inlined as digest-headed text at dispatch (001-T14).
 `GET .../turns/{turn_id}/activity` is SERVED (read-only): bounded, ordered REPORTED activity
 observations (tool, file, permission, todo, step) the native agent said it performed, so the UI can
 rebuild activity cards after restart. They are never Effects, receipts or grants (001-T25, AC-029).

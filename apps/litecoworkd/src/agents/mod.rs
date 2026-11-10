@@ -13,6 +13,7 @@ mod codex_profile_probe;
 pub(crate) mod control_descriptor;
 pub(crate) mod conversation_recovery;
 mod conversation_prompt;
+pub(crate) mod resource_materializer;
 pub(crate) mod module_registry;
 mod native_cli;
 pub(crate) mod native_provider;

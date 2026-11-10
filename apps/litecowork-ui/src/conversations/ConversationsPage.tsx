@@ -21,6 +21,7 @@ import {
   stopTarget,
   turnStatusLabel,
 } from "./conversation-turn-state";
+import { addAttachment, attachmentChipLabel, attachmentRefusalNotice, isAttachable, removeAttachment, toResourceRefs, type AttachmentCandidate, type AttachmentChip } from "./conversation-attachments";
 import { TurnActivityView } from "./TurnActivityView";
 import { mergeActivity, parseActivityPage, type ActivityEntry } from "./turn-activity";
 import "./conversations-page.css";
@@ -775,6 +776,20 @@ export function ConversationsPage({
     bindingEligible: bindingEligibleForSend,
   });
 
+  // Composer attachments (T14): chips are kept per selected Conversation and survive a refused send.
+  const [attachmentChips, setAttachmentChips] = useState<Record<string, AttachmentChip[]>>({});
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerState, setPickerState] = useState<{ status: "LOADING" | "READY" | "FAILED"; items: AttachmentCandidate[] }>({ status: "LOADING", items: [] });
+  const chips = composerDraftKey ? attachmentChips[composerDraftKey] ?? [] : [];
+  const openPicker = () => {
+    if (!workspaceId || !selectedId) return;
+    setPickerOpen(true);
+    setPickerState({ status: "LOADING", items: [] });
+    invoke<{ items: AttachmentCandidate[] }>("list_resources", { workspaceId, cursor: null })
+      .then(page => setPickerState({ status: "READY", items: page.items.filter(item => item.workspaceId === workspaceId && isAttachable(item)) }))
+      .catch(() => setPickerState({ status: "FAILED", items: [] }));
+  };
+
   const sendTurn = async () => {
     const text = composerDraft.trim();
     if (!text || !workspaceId || !operatorReady || sendingTurn || isTurnRunning) return;
@@ -811,13 +826,14 @@ export function ConversationsPage({
         conversationId: selectedId,
         requestId: reqId,
         content: [{ kind: "TEXT", text }],
-        resourceRefs: [],
+        resourceRefs: toResourceRefs(chips, workspaceId),
         agentBindingId: selected?.active_agent_binding_id || null,
         presentationPreference: "RICH",
       });
+      if (draftKey) setAttachmentChips(current => ({ ...current, [draftKey]: [] }));
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : String(cause);
-      setTurnError(msg);
+      setTurnError(attachmentRefusalNotice(msg) ?? msg);
       if (draftKey) {
         setConversationDrafts(current => ({ ...current, [draftKey]: text }));
       }
@@ -1130,9 +1146,41 @@ export function ConversationsPage({
         />
         <div className="composer-footer-toolbar">
           <div className="composer-footer-left">
-            <button className="composer-pill-btn" type="button" title="Attachments are unavailable" aria-label="Add context or file (unavailable)" disabled>
+            <button
+              className="composer-pill-btn"
+              type="button"
+              title={selectedId ? "Attach a text file from this Workspace" : "Start the conversation first to attach files"}
+              aria-label="Add context or file"
+              aria-expanded={pickerOpen}
+              disabled={!operatorReady || !selectedId || isTurnRunning}
+              onClick={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
+            >
               +
             </button>
+            {pickerOpen && (
+              <div className="composer-attachment-picker" role="dialog" aria-label="Attach a file from this Workspace" onKeyDown={event => { if (event.key === "Escape") setPickerOpen(false); }}>
+                {pickerState.status === "LOADING" && <p role="status">Loading files…</p>}
+                {pickerState.status === "FAILED" && <p role="alert">Files could not be loaded.</p>}
+                {pickerState.status === "READY" && pickerState.items.length === 0 && <p>No text files in this Workspace yet.</p>}
+                <ul>
+                  {pickerState.items.map(item => (
+                    <li key={item.resourceId}>
+                      <button type="button" onClick={() => {
+                        if (!composerDraftKey || !workspaceId) return;
+                        setAttachmentChips(current => ({ ...current, [composerDraftKey]: addAttachment(current[composerDraftKey] ?? [], item, workspaceId) }));
+                        setPickerOpen(false);
+                      }}>{item.displayName}</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {chips.map(chip => (
+              <span className="composer-attachment-chip" key={chip.resourceId}>
+                {chip.displayName}
+                <button type="button" aria-label={attachmentChipLabel(chip)} onClick={() => composerDraftKey && setAttachmentChips(current => ({ ...current, [composerDraftKey]: removeAttachment(current[composerDraftKey] ?? [], chip.resourceId) }))}>×</button>
+              </span>
+            ))}
             <div className="model-selector-pill" title="Active Model">
               <div className="agent-select-wrapper">
                 <select

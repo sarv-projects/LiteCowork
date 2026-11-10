@@ -71,6 +71,7 @@ pub use automation_host::{
 pub use backup::{
     BackupCreateRequest, BackupPassphrase, LocalBackupService, MINIMUM_SUPPORTED_SCHEMA_VERSION,
 };
+pub use resource_index::is_allowlisted_text;
 pub use blob::{FileBlobStore, WorkspaceBlobKey, WorkspaceBlobKeyProvider};
 pub use capability_dispatch::SqliteCapabilityDispatchStore;
 pub use conversations::SqliteConversationStore;

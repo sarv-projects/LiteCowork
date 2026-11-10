@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 364
-- Included lines: 72655
-- Included bytes: 6411276
+- Included lines: 72657
+- Included bytes: 6413806
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,8 +25,8 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 144 | 48388 |
-| repository root | 6 | 1680 |
+| docs/ | 144 | 48389 |
+| repository root | 6 | 1681 |
 | scripts/ | 1 | 14 |
 | specs/ | 201 | 21793 |
 
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 81 | 6032 | 2fc07511243a861e |
-| CURRENT-RUN.md | 294 | 43251 | 4eabadda92474593 |
+| CURRENT-RUN.md | 295 | 43600 | 35cb851ca3b18e54 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 92 | 7389 | 5a5a73e85c542f17 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -56,7 +56,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/AGENT-ACCOUNT-ROUTE-MATRIX.md | 105 | 13947 | 4c6732bf0ea16f6e |
 | docs/AGENT-CONTROL.md | 1347 | 55342 | 6700424469327bdb |
 | docs/AGENT-FABRIC.md | 497 | 32590 | 2a40c04496cfb4ec |
-| docs/API.md | 2420 | 171097 | 46842e7a8401193d |
+| docs/API.md | 2421 | 171438 | e20aeacb04656f70 |
 | docs/ARTIFACTS-EVIDENCE.md | 378 | 23528 | 578bcdabd6d2a17d |
 | docs/AUTOMATION.md | 705 | 41619 | 015fc6660d91eb00 |
 | docs/BENCHMARKS.md | 754 | 45114 | 42f307511fe0d5ac |
@@ -80,7 +80,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | ef346a2a2ab369f8 |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 24e98ff769f90585 |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 929 | 69386 | e4aae09464d8030b |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
@@ -89,7 +89,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 309 | 62130 | d32a9af328f3a777 |
+| docs/IMPLEMENTATION-STATUS.md | 309 | 62130 | 0be7a85044004a38 |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -202,7 +202,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/001-conversation-session-supervisor/README.md | 30 | 3880 | b6531e9ee31f6dc3 |
 | specs/001-conversation-session-supervisor/RESEARCH.md | 102 | 14808 | c384b7f5c45b8890 |
 | specs/001-conversation-session-supervisor/SPEC.md | 385 | 54748 | 93ea63a3227d1868 |
-| specs/001-conversation-session-supervisor/TASKS.md | 554 | 77792 | 8e6eacf1729aebc4 |
+| specs/001-conversation-session-supervisor/TASKS.md | 554 | 79632 | 5bc5e82a7200a9ce |
 | specs/001-conversation-session-supervisor/contracts/README.md | 12 | 841 | db996aef02f977b4 |
 | specs/001-conversation-session-supervisor/contracts/api-events.md | 63 | 6530 | 7579c4b6b3b0b386 |
 | specs/001-conversation-session-supervisor/contracts/errors-recovery.md | 78 | 9090 | 47de1c535b262d4f |

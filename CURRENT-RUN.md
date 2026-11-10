@@ -83,9 +83,9 @@ Current validation on the working tree:
 - Architecture/schema validator: passed active checks; one warning because the optional `openapi-spec-validator` package is not installed. JSON Schema, 148 event schemas, errors, OpenAPI structure, SQL, Gateway naming, concept and active Markdown checks passed.
 - Cross-owner consistency guard: **36 assertions passed, 0 issues**.
 - V1 contract/route/UI audit: **0 errors** (231 OpenAPI operations; 176 served, 1 outside OpenAPI, 55 target-only).
-- Design-depth audit: **0 findings**; 364 files, 72,655 lines, 12 domains, 254 functions, 201 Settings rows, 231 routes, 107 tables, 20 packages.
+- Design-depth audit: **0 findings**; 364 files, 72,657 lines, 12 domains, 254 functions, 201 Settings rows, 231 routes, 107 tables, 20 packages.
 - Feature SDD validator: **20/20 packages passed** (001-012 ACCEPTED/LOCKED 2026-11-09; 013-020 IN_REVIEW).
-- Markdown audit: **0 broken relative links** across 361 files / 72,673 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 364 files / 72,655 lines.
+- Markdown audit: **0 broken relative links** across 361 files / 72,675 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 364 files / 72,657 lines.
 - Sandbox note: the pinned Rust 1.98.1 toolchain is not installed and rustup/CARGO_HOME are read-only; the workspace builds clean on the newest installed toolchain (1.92.0) through a writable CARGO_HOME seeded from the read-only cache, plus a hand-built dbus pkg-config sysroot and link dir (keyring -> dbus-secret-service -> libdbus-sys needs `dbus-1.pc` and an unversioned `libdbus-1.so`, neither in the base image). The reproducible prefix is sourced from `/projects/sandbox/.work/env.sh` (sets CARGO_HOME, CARGO_TARGET_DIR, TMPDIR, RUSTUP_TOOLCHAIN=1.92.0, PKG_CONFIG_PATH, LIBRARY_PATH, RUSTFLAGS and PYTHONPATH). This does not change the pinned 1.98.1 release target.
 - Frontend production build: passed API type check, TypeScript and Vite. Main JS bundle is 1.05 MB minified (287 KB gzip), above Vite's 500 KB advisory.
 - Focused Conversation + responsive tests: **24/24 passed**, including journal retry, cursor pagination, drawer semantics and mobile canvas sizing.
@@ -168,9 +168,9 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 - Feature package validator: **12/12 passed**; structural checks only, not owner approval or runtime qualification.
 - Cross-owner consistency: **36 assertions passed, 0 issues**.
 - V1 contract audit: **0 errors**; 231 OpenAPI operations, 176 served, 1 authenticated local-only route and 55 target-only.
-- Design-depth audit: **0 findings**; 364 files, 72,655 lines, 12 domains, 254 functions, 201 Settings rows, 231 routes, served 176 / target-only 55, 107 tables and 20 packages.
-- Markdown audit: **0 broken relative links** across 361 files and 72,673 lines.
-- Active-corpus manifest: **364 files and 72,655 lines** (manifest excludes itself).
+- Design-depth audit: **0 findings**; 364 files, 72,657 lines, 12 domains, 254 functions, 201 Settings rows, 231 routes, served 176 / target-only 55, 107 tables and 20 packages.
+- Markdown audit: **0 broken relative links** across 361 files and 72,675 lines.
+- Active-corpus manifest: **364 files and 72,657 lines** (manifest excludes itself).
 - Architecture/schema validator: passed with one warning because optional openapi-spec-validator is not installed; JSON Schema, 148 typed events, errors, OpenAPI structure, SQLite, Gateway naming, canonical concepts and active Markdown checks passed.
 - Rust workspace: lint gate (`clippy --all-targets -- -D warnings`) **0 diagnostics**; `check --all-targets` **0 errors**; `fmt --all --check` clean; test counts as listed under "Current validation on the working tree".
 - Whitespace check: **passed** (`check.sh` whitespace stage, exit 0).
@@ -268,6 +268,7 @@ Done (all CODE; nothing here is QUALIFIED, and nothing was run on Windows, in a 
 - 019-T18 PARTIAL: `crates/storage-sqlite/tests/resilience.rs` (3 native tests) and a portable resilience runner (`tests/test_resilience_matrix.py`, 3).
 - 011-T13 prerequisite: read-only `GET /v1/runtime-lifecycle/stop-preview` is now SERVED (`runtime_stop_operator.rs`, `RuntimeLifecycleStore::read_runtime_stop_observation`). Its verdict is BLOCKED when durable work exists and UNKNOWN otherwise; it is never QUIESCENT because no live-session observer exists. `requestLocalRuntimeStop` stays unmounted. Route inventory is now 175 served / 1 local-only / 55 target-only (three audit scripts, five docs and `tests/test_architecture_validator.py` updated).
 - 001-T25 PARTIAL (storage + emission + served read + UI): the supervisor records and publishes REPORTED tool, file, permission, todo and step activity (`TurnActivityRecorder`), `GET /v1/conversations/{id}/turns/{turn_id}/activity` is SERVED (route inventory now 176 served / 1 local-only / 55 target-only; three audit scripts, five docs, `tests/test_architecture_validator.py` and the generated `operator-api.ts` updated), and the Conversation page shows collapsed "reported by the agent" activity cards, a plan count line and the activity inside the FAILED card. Not verified: any real OpenCode run, a rendered UI test, `src-tauri` (new `list_conversation_turn_activity` command is uncompiled here).
+- 001-T14 PARTIAL: dispatch-time and submit-time ResourceRef reauthorization with inline text materialization (`resource_materializer.rs`), composer "+" picker and chips. Binary attachments, WorkspaceRoot path files, the first-message-of-a-new-Conversation case, ContextAttachment persistence and the Windows row remain open; no real OpenCode run.
 - 011-T14 PARTIAL: stop preview panel and update gate in Settings > Runtime; Rust bridge `get_runtime_stop_preview` and `check_update_quiescence`.
 - 011-T09 DONE, 011-T11 PARTIAL (skip link, universal focus-visible, registry shortcut list), 011-T12 PARTIAL (`power_assertion.rs` state machine, not wired), 011-T16 PARTIAL (trace table), 011-T19 PARTIAL and 011-T21 DONE (SettingsPage deleted and merged), 011-T20 PARTIAL (shared Operator-unavailable panel, LibraryPage module), 011-T22 PARTIAL (Dashboard page).
 - Correction of an earlier claim: the 011-T19 reachability test passed against a dead `navigation` array while Goals, Notifications, Ideas and Home had no sidebar path. The sidebar now renders a More group from the array and the test inspects the rendered sidebar.
