@@ -2757,21 +2757,29 @@ async fn enable_agent_binding(
     agent_binding_id: String,
     expected_version: u64,
     request_id: String,
+    descriptor_revision: Option<String>,
 ) -> Result<AgentBindingView, String> {
     tauri::async_runtime::spawn_blocking(move || {
         if workspace_id.trim().is_empty()
             || agent_binding_id.trim().is_empty()
             || !valid_idempotency_key(&request_id)
+            || descriptor_revision.as_deref().is_some_and(|revision| {
+                revision.len() != 71 || !revision.starts_with("sha256:")
+            })
         {
             return Err("Agent binding enable request is invalid".to_owned());
         }
         let (client, workspace_url) = operator_client(&app)?;
         let base = workspace_url.replace("/v1/workspaces", "/v1/agent-bindings");
-        let response = client
+        let mut request = client
             .post(format!("{base}/{agent_binding_id}/enable"))
             .header("X-Workspace-ID", &workspace_id)
             .header("If-Match", expected_version.to_string())
-            .header("Idempotency-Key", request_id)
+            .header("Idempotency-Key", request_id);
+        if let Some(revision) = descriptor_revision {
+            request = request.header("X-Agent-Descriptor-Revision", revision);
+        }
+        let response = request
             .send()
             .map_err(|_| "Workspace agent binding could not be enabled".to_owned())?;
         let body = read_bounded_response(response)?;

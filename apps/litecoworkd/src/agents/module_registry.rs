@@ -1,7 +1,8 @@
 //! Registry primitives for the contracted AgentLifecycle/AgentModuleRegistry
-//! surface (V1-FUNCTION-CONTRACT-LEDGER F13 rows). No route or host wires this
-//! module yet, so nothing here is reachable from the crate roots until that
-//! integration lands.
+//! surface (V1-FUNCTION-CONTRACT-LEDGER F13 rows). The OpenCode manifest is
+//! registered through `agents::modules` and consumed by the descriptor service;
+//! the remaining F13 lookups (assessment, listing) are implemented but not yet
+//! called by a route.
 #![allow(
     dead_code,
     reason = "implemented-but-unwired module-registry surface for 14 contracted F13 functions; remove this file-scope allow when the routes and host integration land"
@@ -33,6 +34,12 @@ pub(crate) struct AgentModuleManifest {
     pub supported_os: Vec<OperatingSystem>,
     pub supported_architectures: Vec<OperatingArchitecture>,
     pub lifecycle_features: AgentModuleLifecycleFeatures,
+    /// Descriptor freshness window in seconds (B-12). The host ceiling is 900 s; a
+    /// module may only lower it.
+    pub descriptor_ttl_seconds: u32,
+    /// Descriptor probes admitted per minute (B-12). The host ceiling is 3; a module
+    /// may only lower it.
+    pub probe_budget_per_minute: u32,
 }
 
 /// Trusted module-declared lifecycle actions. Registry distribution metadata and
@@ -229,6 +236,10 @@ fn validate_manifest(manifest: &AgentModuleManifest) -> Result<(), ModuleRegistr
             .collect::<std::collections::BTreeSet<_>>()
             .len()
             != manifest.supported_os.len()
+        || manifest.descriptor_ttl_seconds == 0
+        || manifest.descriptor_ttl_seconds > 900
+        || manifest.probe_budget_per_minute == 0
+        || manifest.probe_budget_per_minute > 3
         || manifest.supported_architectures.is_empty()
         || manifest.supported_architectures.len() > 2
         || manifest
@@ -329,6 +340,8 @@ mod tests {
                 secure_credential_slots: false,
                 open_native_config: false,
             },
+            descriptor_ttl_seconds: 900,
+            probe_budget_per_minute: 3,
         }
     }
 

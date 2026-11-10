@@ -1,3 +1,4 @@
+mod agent_control_descriptors;
 mod agent_registry_cache;
 mod artifacts;
 mod automation_admission;
@@ -71,7 +72,6 @@ pub use automation_host::{
 pub use backup::{
     BackupCreateRequest, BackupPassphrase, LocalBackupService, MINIMUM_SUPPORTED_SCHEMA_VERSION,
 };
-pub use resource_index::is_allowlisted_text;
 pub use blob::{FileBlobStore, WorkspaceBlobKey, WorkspaceBlobKeyProvider};
 pub use capability_dispatch::SqliteCapabilityDispatchStore;
 pub use conversations::SqliteConversationStore;
@@ -99,6 +99,7 @@ pub use os_principal_binding::{
     OsRuntimePrincipalBindingProvider, RuntimeOsPlatform, RuntimeOsPrincipal,
     RuntimeOsPrincipalBinding, RuntimeOsPrincipalIdentity, UnixPrincipalId,
 };
+pub use resource_index::is_allowlisted_text;
 pub use routines::{
     RoutineEventContext, RoutineHealthFacts, RoutinePage, RoutineRevisionPage, RoutineTaskOutcome,
     SqliteRoutineStore,
@@ -19030,6 +19031,26 @@ fn enable_agent_binding_transaction(
                 .to_owned(),
         ));
     }
+    if let Some(gate) = &request.require_descriptor {
+        let current_revision = request
+            .descriptor_revision
+            .as_deref()
+            .is_some_and(|revision| {
+                agent_control_descriptors::descriptor_revision_is_current(
+                    connection,
+                    gate,
+                    revision,
+                    &request.now,
+                )
+                .unwrap_or(false)
+            });
+        if !current_revision {
+            return Err(StoreError::Invalid(
+                "DESCRIPTOR_STALE: the AgentControlDescriptor is missing, stale or does not match the current revision"
+                    .to_owned(),
+            ));
+        }
+    }
     let payload = agent_binding_enabled_payload(&next, &request.request.principal_id);
     validate_binding_event(
         &request.event,
@@ -21868,7 +21889,11 @@ fn migrate_with_failpoint(
         migrate_invocation_dispatch_admission(connection, failpoint)?;
     } else if !matches!(
         current_version,
-        V26_SCHEMA_VERSION | V27_SCHEMA_VERSION | V28_SCHEMA_VERSION | V29_SCHEMA_VERSION | V30_SCHEMA_VERSION
+        V26_SCHEMA_VERSION
+            | V27_SCHEMA_VERSION
+            | V28_SCHEMA_VERSION
+            | V29_SCHEMA_VERSION
+            | V30_SCHEMA_VERSION
     ) {
         return Err(StoreError::CorruptSchema(format!(
             "migration stopped at unexpected schema version {current_version}"

@@ -9,7 +9,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T01 - OpenCode v2.0.32 profile produces a bindable, dispatch-consistent offer
 
-- **Status:** NOT STARTED (probe, offer publication and storage gates exist; the offer is hard-coded incompatible, see SPEC §4a).
+- **Status:** CODE-COMPLETE 2026-11-10 (offer admission computed in `agents/native_provider.rs`, `NativeProviderKey`, shared executable resolver, OpenAPI `profile_admission_supported` boolean and generated types synced; probe, native_provider_key and opencode_profile tests pass). Open: Windows x64 and Linux x64 probe-to-binding transcripts need a live OpenCode 2.0.32 binary (not available in this sandbox), so AC-013 is not evidenced.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE. This task is the P1 prerequisite that Feature 001 (first native Conversation route, gate A) and Feature 004 consume.
 - **Owner:** Agent Runtime (probe, supervisor provider identity), Storage (gate unchanged, tests), Desktop UI (catalog copy).
@@ -36,7 +36,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T02 - Promote the accepted 002 interfaces into owner docs and machine schemas
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL (no migration was needed: the Runtime-local descriptor table already exists since migration 16, so no `sqlite-vNN.sql` was added; `EnableBindingWithDescriptor` is promoted as the optional `X-Agent-Descriptor-Revision` header on `enableAgentBinding` in the OpenAPI with `RESOURCE_STALE` for DescriptorStale; probe budget is in-process, see T04. Not done: auth-observation DDL and `beginAgentAuthentication` response, Claude Code route-matrix row, SPEC revision relabel, which belong to T07/T12).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 011 IPC/route conventions (Wave 0); coordinate the migration number with the orchestrator because other packages also add `sqlite-vNN.sql` files.
 - **Owner:** Agent Runtime, Security/Trust, API/schema owner.
@@ -54,7 +54,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T03 - Wire AgentModuleRegistry with the OpenCode v2.0.32 manifest and conformance fixture
 
-- **Status:** PARTIAL (`AgentModuleRegistry`, `AgentModuleManifest`, `ModuleSupportAssessment` and their tests exist in `apps/litecoworkd/src/agents/module_registry.rs`, marked `dead_code` with no caller).
+- **Status:** CODE-COMPLETE 2026-11-10 (OpenCode 2.0.32 manifest in `agents/modules/opencode.rs` with TTL 900 s and probe budget 3 per minute fields validated by the registry, registered through `default_module_registry()`, pinned fixture `apps/litecoworkd/tests/fixtures/agent-modules/opencode-2.0.32.json`; the registry file keeps a reduced `dead_code` allow for the F13 lookups no route calls yet).
 - **Depends on:** T02
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime.
@@ -71,7 +71,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T04 - Runtime-local descriptor store with digest, TTL and probe budget
 
-- **Status:** NOT STARTED
+- **Status:** CODE-COMPLETE with one deviation 2026-11-10 (`AgentDescriptorStore` in storage-core, implemented over the existing `agent_control_descriptors` table: append with compare-and-swap on the prior digest, latest/current reads, TTL boundary at expiry, oversize and non-object bodies refused; tests `descriptor_*` in agent_binding_tests). Deviation: the 3-per-minute probe budget is an in-process sliding window in `agents/descriptor_service.rs`, not a stored ledger, so a daemon restart resets it.
 - **Depends on:** T02, T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Storage, Agent Runtime.
@@ -90,7 +90,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T05 - AgentControlDescriptor producer and served descriptor routes
 
-- **Status:** PARTIAL (routes mounted in `agent_control_operator.rs` and returning `503`; `CurrentAgentDescriptorSource` trait and `NoAgentDescriptorSource` stub in `agent_credentials_routes.rs`; Tauri `agent_control_bridge.rs`, `AgentControlDescriptorPanel.tsx`, `desktop-agent-control-api.ts` already call the read).
+- **Status:** PARTIAL (descriptor routes `getAgentControlDescriptor` and `refreshAgentProfileControl` now served for a profile whose provider selects the OpenCode module: bounded probe outside any transaction, budget `429 RATE_LIMITED`, `Cache-Control: no-store`, Codex/unknown profiles still `503`; route tests added. Not done: `getAgentSessionOptions` and `getAgentHarnessCapabilities` projections (still target-only; serving them changes the 176/1/55 route counts), `StoredAgentDescriptorSource` for the credential route, panel stale/refresh test, and a live-OpenCode refresh).
 - **Depends on:** T01, T04
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Desktop UI.
@@ -109,7 +109,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T06 - Fresh-descriptor gate on binding enable and admission
 
-- **Status:** PARTIAL (`enable_agent_binding_transaction` checks only `has_fresh_compatible_endpoint`; versioned CAS, idempotency receipts and audit already exist).
+- **Status:** PARTIAL (enable gate enforced inside the enable transaction when the profile's module declares a descriptor: stale, missing or superseded revision fails with `DESCRIPTOR_STALE` mapped to `409 RESOURCE_STALE` and no write; exact replay returns the receipt; desktop enable reads or refreshes the descriptor and sends the revision. Not done: stale-option rejection at Send admission (AC-005), Enable-failure reason and Refresh focus return in the UI, `src-tauri` build check because gdk-3.0 is missing here).
 - **Depends on:** T05
 - **Cross-package prerequisites:** Feature 001 composer admission and draft preservation (Wave 1) for the AC-005 send-side half.
 - **Owner:** Storage, Agent Runtime, Conversation Runtime.

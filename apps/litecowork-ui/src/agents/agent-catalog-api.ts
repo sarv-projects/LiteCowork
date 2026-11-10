@@ -60,6 +60,7 @@ export interface AgentCatalogApi {
     agentBindingId: string;
     expectedVersion: number;
     requestId: string;
+    descriptorRevision?: string | null;
   }): Promise<AgentBinding>;
   disableBinding(input: {
     workspaceId: string;

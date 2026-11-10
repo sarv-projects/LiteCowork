@@ -1,14 +1,18 @@
-//! Read-only AgentControlDescriptor routes.
+//! AgentControlDescriptor routes.
 //!
-//! The current local probes do not yet publish a trusted AgentModule descriptor. The
-//! route reports that state explicitly and never manufactures a descriptor from a
-//! catalog or RuntimeOffer. This keeps the composer and session-admission boundary
-//! fail-closed while providing the canonical read path for qualified modules.
+//! A descriptor is served only for a profile whose stored provider identity selects
+//! a trusted AgentModule (today: OpenCode 2.0.32) and only while its stored revision
+//! is unexpired. The routes never manufacture a descriptor from a catalog or
+//! RuntimeOffer, so the composer and session-admission boundary stay fail-closed for
+//! every module-less agent. Refresh runs one bounded probe under the module budget.
 #![allow(clippy::result_large_err)]
 
 use super::{
     ApiState, ensure_workspace_owner_for, map_agent_store_error, operator_error, selected_workspace,
 };
+use crate::agents::descriptor_service::{AgentDescriptorService, RefreshError};
+use crate::agents::module_registry::AgentModuleManifest;
+use axum::response::IntoResponse;
 use axum::{
     Router,
     body::Body,
@@ -18,12 +22,16 @@ use axum::{
     response::Response,
     routing::{get, post},
 };
+use std::sync::Arc;
 use storage_core::AgentCatalogStore;
 
 #[derive(Clone)]
 struct AgentControlApiState {
     store: super::SqliteWorkspaceStore,
     principal_id: String,
+    runtime_id: String,
+    local_incarnation_id: String,
+    service: Arc<AgentDescriptorService>,
 }
 
 impl FromRef<ApiState> for AgentControlApiState {
@@ -31,6 +39,9 @@ impl FromRef<ApiState> for AgentControlApiState {
         Self {
             store: state.store.clone(),
             principal_id: state.principal_id.clone(),
+            runtime_id: state.runtime_id.clone(),
+            local_incarnation_id: state.local_incarnation_id.clone(),
+            service: AgentDescriptorService::shared(),
         }
     }
 }
@@ -59,12 +70,24 @@ where
 
 #[cfg(test)]
 fn test_router(store: super::SqliteWorkspaceStore, principal_id: String) -> Router {
+    test_router_with(store, principal_id, AgentDescriptorService::shared())
+}
+
+#[cfg(test)]
+fn test_router_with(
+    store: super::SqliteWorkspaceStore,
+    principal_id: String,
+    service: Arc<AgentDescriptorService>,
+) -> Router {
     routes_with_state::<AgentControlApiState>()
         .route_layer(middleware::from_fn(super::authenticate))
         .route_layer(middleware::from_fn(no_store_middleware))
         .with_state(AgentControlApiState {
             store,
             principal_id,
+            runtime_id: "agent-control-runtime".to_owned(),
+            local_incarnation_id: "agent-control-incarnation".to_owned(),
+            service,
         })
 }
 
@@ -73,43 +96,30 @@ async fn get_control_descriptor(
     headers: HeaderMap,
     Path(agent_profile_id): Path<String>,
 ) -> Response {
-    if let Err(response) = validate_profile_id(&agent_profile_id) {
-        return response;
-    }
-    let workspace_id = match selected_workspace(&headers) {
+    let (module, now) = match resolve_module(&state, &headers, &agent_profile_id).await {
         Ok(value) => value,
         Err(response) => return response,
     };
-    let now = match super::operator_now() {
-        Ok(value) => value,
-        Err(response) => return response,
+    let Some(module) = module else {
+        // A discovered profile and its offer are observations, not a module-owned
+        // AgentControlDescriptor. Without a trusted module nothing is manufactured.
+        return unavailable_descriptor();
     };
+    let service = state.service.clone();
     let store = state.store.clone();
-    let principal = state.principal_id.clone();
-    let profile = tokio::task::spawn_blocking(move || {
-        ensure_workspace_owner_for(&store, &principal, &workspace_id)?;
-        let profiles = store
-            .list_agent_profiles(&principal, &workspace_id, &now)
-            .map_err(|error| map_agent_store_error(error, "Agent profiles are unavailable"))?;
-        Ok::<_, Response>(
-            profiles
-                .into_iter()
-                .find(|view| view.profile.agent_profile_id == agent_profile_id),
-        )
+    let runtime_id = state.runtime_id.clone();
+    let incarnation_id = state.local_incarnation_id.clone();
+    let current = tokio::task::spawn_blocking(move || {
+        service.current(&store, &module, &runtime_id, &incarnation_id, &now)
     })
     .await;
-    let profile = match profile {
-        Ok(Ok(Some(profile))) => profile,
-        Ok(Ok(None)) => return unavailable_profile(),
-        Ok(Err(response)) => return response,
-        Err(_) => return unavailable(),
-    };
-
-    // A discovered profile and its offer are observations, not a module-owned
-    // AgentControlDescriptor. In particular, a model catalog does not establish
-    // auth readiness, native command semantics, or safe session admission.
-    let _ = profile;
-    unavailable_descriptor()
+    match current {
+        Ok(Ok(Some(descriptor))) => axum::Json(descriptor).into_response(),
+        // No unexpired descriptor: the caller must refresh. Never serve a stale one.
+        Ok(Ok(None)) => unavailable_descriptor(),
+        Ok(Err(error)) => map_agent_store_error(error, "Agent control descriptor is unavailable"),
+        Err(_) => unavailable(),
+    }
 }
 
 async fn refresh_control_descriptor(
@@ -117,40 +127,82 @@ async fn refresh_control_descriptor(
     headers: HeaderMap,
     Path(agent_profile_id): Path<String>,
 ) -> Response {
-    if let Err(response) = validate_profile_id(&agent_profile_id) {
-        return response;
-    }
-    let workspace_id = match selected_workspace(&headers) {
+    let (module, _) = match resolve_module(&state, &headers, &agent_profile_id).await {
         Ok(value) => value,
         Err(response) => return response,
     };
-    let now = match super::operator_now() {
-        Ok(value) => value,
-        Err(response) => return response,
+    let Some(module) = module else {
+        return unavailable_descriptor();
     };
+    let service = state.service.clone();
     let store = state.store.clone();
-    let principal = state.principal_id.clone();
-    let profile_exists = tokio::task::spawn_blocking(move || {
-        ensure_workspace_owner_for(&store, &principal, &workspace_id)?;
-        let profiles = store
-            .list_agent_profiles(&principal, &workspace_id, &now)
-            .map_err(|error| map_agent_store_error(error, "Agent profiles are unavailable"))?;
-        Ok::<_, Response>(
-            profiles
-                .iter()
-                .any(|view| view.profile.agent_profile_id == agent_profile_id),
+    let runtime_id = state.runtime_id.clone();
+    let incarnation_id = state.local_incarnation_id.clone();
+    // The bounded probe runs on a blocking thread, outside any storage transaction.
+    let refreshed = tokio::task::spawn_blocking(move || {
+        service.refresh(
+            &store,
+            &module,
+            &runtime_id,
+            &incarnation_id,
+            time::OffsetDateTime::now_utc(),
         )
     })
     .await;
-    match profile_exists {
-        Ok(Ok(true)) => {
-            // Refresh would invoke a trusted lifecycle adapter. None is wired for
-            // these transitional probes, so the request remains read-only.
-            unavailable_descriptor()
-        }
-        Ok(Ok(false)) => unavailable_profile(),
-        Ok(Err(response)) => response,
+    match refreshed {
+        Ok(Ok(descriptor)) => axum::Json(descriptor).into_response(),
+        Ok(Err(RefreshError::Throttled)) => operator_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "RATE_LIMITED",
+            "Agent descriptor refresh is limited to three probes per minute for this module",
+        ),
+        Ok(Err(RefreshError::Unavailable)) => unavailable_descriptor(),
+        Ok(Err(RefreshError::Store)) => operator_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL",
+            "Agent control descriptor could not be recorded",
+        ),
         Err(_) => unavailable(),
+    }
+}
+
+/// Validates the path, authorizes the Workspace owner, and resolves the profile's
+/// trusted module from the stored provider identity (None when it has no module).
+async fn resolve_module(
+    state: &AgentControlApiState,
+    headers: &HeaderMap,
+    agent_profile_id: &str,
+) -> Result<(Option<AgentModuleManifest>, String), Response> {
+    validate_profile_id(agent_profile_id)?;
+    let workspace_id = selected_workspace(headers)?;
+    let now = super::operator_now()?;
+    let store = state.store.clone();
+    let principal = state.principal_id.clone();
+    let service = state.service.clone();
+    let profile_id = agent_profile_id.to_owned();
+    let now_for_lookup = now.clone();
+    let looked_up = tokio::task::spawn_blocking(move || {
+        ensure_workspace_owner_for(&store, &principal, &workspace_id)?;
+        let profiles = store
+            .list_agent_profiles(&principal, &workspace_id, &now_for_lookup)
+            .map_err(|error| map_agent_store_error(error, "Agent profiles are unavailable"))?;
+        Ok::<_, Response>(
+            profiles
+                .into_iter()
+                .find(|view| view.profile.agent_profile_id == profile_id)
+                .map(|view| {
+                    service
+                        .module_for_provider(&view.profile.provider_key)
+                        .cloned()
+                }),
+        )
+    })
+    .await;
+    match looked_up {
+        Ok(Ok(Some(module))) => Ok((module, now)),
+        Ok(Ok(None)) => Err(unavailable_profile()),
+        Ok(Err(response)) => Err(response),
+        Err(_) => Err(unavailable()),
     }
 }
 
@@ -361,5 +413,185 @@ mod tests {
             1,
             "failed refresh must not replace the observed profile"
         );
+    }
+
+    fn seed_runtime(store: &super::super::SqliteWorkspaceStore) {
+        use storage_core::{
+            DeviceIdentityRecord, RuntimeIncarnationLocalObservationRecord,
+            RuntimeIncarnationRecord, RuntimeLifecycleStore, RuntimeRecord,
+        };
+        let public_key = [23_u8; 32];
+        store
+            .register_local_incarnation(
+                RuntimeRecord {
+                    runtime_id: "agent-control-runtime".to_owned(),
+                    device_identity: DeviceIdentityRecord {
+                        device_id: format!(
+                            "ed25519-sha256:{}",
+                            hex::encode(<sha2::Sha256 as sha2::Digest>::digest(public_key))
+                        ),
+                        public_key: format!("ed25519:{}", hex::encode(public_key)),
+                        key_version: 1,
+                        issued_at: NOW.to_owned(),
+                        display_name: None,
+                    },
+                    runtime_version: "test".to_owned(),
+                    platform: "linux".to_owned(),
+                    architecture: "x86_64".to_owned(),
+                    roles: vec!["OPERATOR_ENDPOINT".to_owned()],
+                    trust_zone: "PERSONAL_DEVICE".to_owned(),
+                    availability: "RECOVERING".to_owned(),
+                    startup_policy: "MANUAL".to_owned(),
+                    current_incarnation_id: "agent-control-incarnation".to_owned(),
+                    resource_capacity: serde_json::json!({"sampled_at":NOW}),
+                    last_seen: NOW.to_owned(),
+                },
+                RuntimeIncarnationRecord {
+                    runtime_incarnation_id: "agent-control-incarnation".to_owned(),
+                    runtime_id: "agent-control-runtime".to_owned(),
+                    process_started_at: NOW.to_owned(),
+                    litecowork_version: "test".to_owned(),
+                    recovered_from_unclean_shutdown: false,
+                    recovery_state: "RECOVERING".to_owned(),
+                    ready_at: None,
+                    stopped_at: None,
+                    version: 1,
+                },
+                RuntimeIncarnationLocalObservationRecord {
+                    runtime_incarnation_id: "agent-control-incarnation".to_owned(),
+                    os_boot_id: Some("agent-control-boot".to_owned()),
+                    observed_at: NOW.to_owned(),
+                },
+            )
+            .expect("Runtime incarnation registers");
+    }
+
+    fn seed_opencode_profile(store: &super::super::SqliteWorkspaceStore) {
+        store
+            .put_agent_profile(
+                AgentProfileRecord {
+                    agent_profile_id: "profile-opencode".to_owned(),
+                    provider_key: "OPENCODE".to_owned(),
+                    display_name: "OpenCode".to_owned(),
+                    discovered_at: NOW.to_owned(),
+                },
+                vec![AgentEndpointRecord {
+                    endpoint_id: "endpoint-opencode".to_owned(),
+                    agent_profile_id: "profile-opencode".to_owned(),
+                    protocol: "API".to_owned(),
+                    topology: "PROCESS_ADAPTER".to_owned(),
+                    protocol_version: Some("2.0.32".to_owned()),
+                    capabilities: serde_json::json!({"input.text":true}),
+                }],
+            )
+            .expect("OpenCode profile persists");
+    }
+
+    fn opencode_router(
+        store: super::super::SqliteWorkspaceStore,
+        version: Option<&'static str>,
+    ) -> Router {
+        let service = Arc::new(AgentDescriptorService::new(
+            crate::agents::modules::default_module_registry(),
+            Arc::new(crate::agents::descriptor_service::tests::FixtureProbe(
+                version,
+            )),
+        ));
+        test_router_with(store, OWNER.to_owned(), service)
+    }
+
+    async fn post(router: &Router, path: &str) -> Response {
+        let mut request = Request::post(path)
+            .header("x-workspace-id", WORKSPACE)
+            .body(Body::empty())
+            .expect("request is valid");
+        request
+            .extensions_mut()
+            .insert(super::super::AuthenticatedLocalPeer);
+        router
+            .clone()
+            .oneshot(request)
+            .await
+            .expect("route responds")
+    }
+
+    #[tokio::test]
+    async fn opencode_profile_serves_a_validated_descriptor_after_refresh_and_never_before() {
+        let (_directory, store) = fixture();
+        seed_runtime(&store);
+        seed_opencode_profile(&store);
+        let router = opencode_router(store, Some("2.0.32"));
+        let path = "/v1/agent-profiles/profile-opencode/control-descriptor";
+
+        // Nothing is manufactured before a refresh.
+        assert_eq!(
+            request(&router, path).await.status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+
+        let refreshed = post(&router, "/v1/agent-profiles/profile-opencode/refresh").await;
+        assert_eq!(refreshed.status(), StatusCode::OK);
+        assert_eq!(refreshed.headers()[header::CACHE_CONTROL], "no-store");
+        let refreshed_body: serde_json::Value = serde_json::from_slice(
+            &to_bytes(refreshed.into_body(), 262_144)
+                .await
+                .expect("body"),
+        )
+        .expect("descriptor JSON");
+
+        let served = request(&router, path).await;
+        assert_eq!(served.status(), StatusCode::OK);
+        assert_eq!(served.headers()[header::CACHE_CONTROL], "no-store");
+        let served_body: serde_json::Value =
+            serde_json::from_slice(&to_bytes(served.into_body(), 262_144).await.expect("body"))
+                .expect("descriptor JSON");
+        assert_eq!(
+            served_body["descriptor_digest"],
+            refreshed_body["descriptor_digest"]
+        );
+        assert_eq!(served_body["module_id"], "opencode");
+        assert_eq!(served_body["auth"]["state"], "UNKNOWN");
+        let text = served_body.to_string();
+        assert!(!text.contains("endpoint-opencode") && !text.contains("/usr"));
+    }
+
+    #[tokio::test]
+    async fn opencode_refresh_over_budget_returns_a_typed_throttle_and_keeps_reads_working() {
+        let (_directory, store) = fixture();
+        seed_runtime(&store);
+        seed_opencode_profile(&store);
+        let router = opencode_router(store, Some("2.0.32"));
+        for _ in 0..3 {
+            let response = post(&router, "/v1/agent-profiles/profile-opencode/refresh").await;
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+        let throttled = post(&router, "/v1/agent-profiles/profile-opencode/refresh").await;
+        assert_eq!(throttled.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body = to_bytes(throttled.into_body(), 8192).await.expect("body");
+        let value: serde_json::Value = serde_json::from_slice(&body).expect("JSON error");
+        assert_eq!(value["code"], "RATE_LIMITED");
+        // The stored descriptor is still readable after a refused refresh.
+        let served = request(
+            &router,
+            "/v1/agent-profiles/profile-opencode/control-descriptor",
+        )
+        .await;
+        assert_eq!(served.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn opencode_refresh_for_an_unpinned_version_stores_nothing() {
+        let (_directory, store) = fixture();
+        seed_runtime(&store);
+        seed_opencode_profile(&store);
+        let router = opencode_router(store, Some("2.0.28"));
+        let response = post(&router, "/v1/agent-profiles/profile-opencode/refresh").await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let served = request(
+            &router,
+            "/v1/agent-profiles/profile-opencode/control-descriptor",
+        )
+        .await;
+        assert_eq!(served.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 }

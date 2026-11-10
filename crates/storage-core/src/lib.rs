@@ -13,6 +13,13 @@ pub use execution::{
     StepAttemptAdmissionSnapshot, StepAttemptStore,
 };
 
+mod agent_descriptor;
+pub use agent_descriptor::{
+    AGENT_CONTROL_DESCRIPTOR_MAX_BYTES, AGENT_CONTROL_DESCRIPTOR_TTL_SECONDS,
+    AGENT_DESCRIPTOR_PROBES_PER_MINUTE, AgentControlDescriptorRecord, AgentDescriptorGate,
+    AgentDescriptorStore, validate_agent_control_descriptor_record,
+};
+
 mod agent_registry_cache;
 pub use agent_registry_cache::{
     AGENT_REGISTRY_CACHE_MAX_ENTRIES, AGENT_REGISTRY_CACHE_MAX_SNAPSHOT_BYTES,
@@ -924,6 +931,13 @@ pub struct AgentBindingEnableRequest {
     pub expected_version: u64,
     pub now: String,
     pub event: EventDraft,
+    /// When set, the profile's module declares an AgentControlDescriptor, so enable
+    /// needs `descriptor_revision` to equal the latest fresh descriptor digest of this
+    /// stream, checked in the same transaction (specs/002 T06).
+    #[serde(default)]
+    pub require_descriptor: Option<AgentDescriptorGate>,
+    #[serde(default)]
+    pub descriptor_revision: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

@@ -1,0 +1,27 @@
+{
+  "module_id": "opencode",
+  "module_version": "2.0.32",
+  "descriptor_api_version": 1,
+  "registry_agent_ids": [
+    "opencode"
+  ],
+  "supported_os": [
+    "LINUX",
+    "WINDOWS"
+  ],
+  "supported_architectures": [
+    "X86_64"
+  ],
+  "descriptor_ttl_seconds": 900,
+  "probe_budget_per_minute": 3,
+  "lifecycle_features": {
+    "discover_installation": true,
+    "install": false,
+    "update": false,
+    "uninstall": false,
+    "native_auth": false,
+    "secure_credential_slots": false,
+    "open_native_config": false
+  },
+  "credential_slots": []
+}

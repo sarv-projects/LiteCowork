@@ -25,6 +25,7 @@ import { RoutinesPage } from "./routines/RoutinesPage";
 import { desktopRoutineApi } from "./routines/desktop-routine-api";
 import type { AgentProviderKey } from "./agents/agent-catalog-api";
 import { desktopAgentCatalogApi } from "./agents/desktop-agent-catalog-api";
+import { desktopAgentControlDescriptorApi } from "./agents/desktop-agent-control-api";
 import {
   AgentBindingRefreshFence,
   agentActionFeedbackForWorkspace,
@@ -1142,11 +1143,21 @@ function App() {
       updateAgentActionFeedback(binding.workspaceId, { message: null, error: null });
     }
     try {
+      // A module-backed agent (OpenCode) is enabled only against the latest fresh
+      // descriptor revision: read the current one and refresh it when none is fresh.
+      let descriptorRevision: string | null = null;
+      if (operation === "enable"
+        && agentProfiles.find(profile => profile.agentProfileId === binding.agentProfileId)?.providerKey === "OPENCODE") {
+        const descriptor = await desktopAgentControlDescriptorApi.get(binding.workspaceId, binding.agentProfileId)
+          .catch(() => desktopAgentControlDescriptorApi.refresh(binding.workspaceId, binding.agentProfileId));
+        descriptorRevision = descriptor.descriptor_digest;
+      }
       const updated = await invoke<AgentBindingView>(command, {
         workspaceId: binding.workspaceId,
         agentBindingId: binding.agentBindingId,
         expectedVersion: binding.version,
         requestId: pending.requestId,
+        ...(operation === "enable" ? { descriptorRevision } : {}),
       });
       if (updated.workspaceId !== binding.workspaceId
         || updated.agentBindingId !== binding.agentBindingId

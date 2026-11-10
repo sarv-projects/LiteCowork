@@ -7667,6 +7667,27 @@ async fn create_agent_binding(
     Ok((StatusCode::CREATED, Json(committed.binding)).into_response())
 }
 
+/// Optional `X-Agent-Descriptor-Revision` header: the descriptor digest the caller read.
+fn parse_descriptor_revision(headers: &HeaderMap) -> Result<Option<String>, Response> {
+    let Some(value) = headers.get("x-agent-descriptor-revision") else {
+        return Ok(None);
+    };
+    let text = value.to_str().ok().filter(|text| {
+        text.len() == 71
+            && text.strip_prefix("sha256:").is_some_and(|hex| {
+                hex.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            })
+    });
+    text.map(|text| Some(text.to_owned())).ok_or_else(|| {
+        operator_error(
+            StatusCode::BAD_REQUEST,
+            "INVALID_ARGUMENT",
+            "X-Agent-Descriptor-Revision must be a sha256 digest",
+        )
+    })
+}
+
 async fn enable_agent_binding(
     State(state): State<ApiState>,
     headers: HeaderMap,
@@ -7676,7 +7697,12 @@ async fn enable_agent_binding(
     ensure_workspace_owner(&state, &workspace_id)?;
     let expected_version = parse_if_match(&headers)?;
     let request_id = idempotency_key(&headers)?;
-    let request_payload = json!({"operation":"agent.binding.enable.v1", "workspace_id":workspace_id, "agent_binding_id":agent_binding_id, "expected_version":expected_version});
+    let descriptor_revision = parse_descriptor_revision(&headers)?;
+    let mut request_payload = json!({"operation":"agent.binding.enable.v1", "workspace_id":workspace_id, "agent_binding_id":agent_binding_id, "expected_version":expected_version});
+    if let Some(revision) = &descriptor_revision {
+        // Bound into the receipt digest so reusing a key with another revision conflicts.
+        request_payload["descriptor_revision"] = json!(revision);
+    }
     if let Some(replay) = state
         .store
         .get_agent_binding_mutation_receipt(&state.principal_id, &request_id, &request_payload)
@@ -7705,6 +7731,26 @@ async fn enable_agent_binding(
                 "Workspace agent binding is unavailable",
             )
         })?;
+    // A profile whose provider selects a trusted AgentModule may be enabled only against
+    // the latest fresh descriptor revision; module-less providers keep their existing gate.
+    let descriptor_service = crate::agents::descriptor_service::AgentDescriptorService::shared();
+    let require_descriptor = state
+        .store
+        .list_agent_profiles(&state.principal_id, &workspace_id, &now)
+        .map_err(|error| map_agent_store_error(error, "Agent profiles are unavailable"))?
+        .into_iter()
+        .find(|view| view.profile.agent_profile_id == binding.agent_profile_id)
+        .and_then(|view| {
+            descriptor_service
+                .module_for_provider(&view.profile.provider_key)
+                .map(|module| {
+                    crate::agents::descriptor_service::AgentDescriptorService::gate(
+                        module,
+                        &state.runtime_id,
+                        &state.local_incarnation_id,
+                    )
+                })
+        });
     let correlation_id = new_id("cor").map_err(|_| {
         operator_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -7759,8 +7805,19 @@ async fn enable_agent_binding(
             expected_version,
             now,
             event,
+            require_descriptor,
+            descriptor_revision,
         })
-        .map_err(|error| map_agent_store_error(error, "Agent binding could not be enabled"))?;
+        .map_err(|error| {
+            if matches!(&error, storage_core::StoreError::Invalid(message) if message.starts_with("DESCRIPTOR_STALE")) {
+                return operator_error(
+                    StatusCode::CONFLICT,
+                    "RESOURCE_STALE",
+                    "The agent control descriptor is missing, stale or changed; refresh it and try again",
+                );
+            }
+            map_agent_store_error(error, "Agent binding could not be enabled")
+        })?;
     Ok(Json(committed.binding))
 }
 

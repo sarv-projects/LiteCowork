@@ -1891,7 +1891,7 @@ paths:
             schema: {$ref: '#/components/schemas/ProbeLocalAgentProfileRequest'}
       responses:
         '200':
-          description: Explicit owner-triggered, bounded local adapter observation. Each request performs a new probe and records a refreshed expiring Runtime offer; it is not an idempotent domain mutation. Requires the selected Workspace owner and an active local RuntimeWorkspaceBinding. Codex and OpenCode are accepted. OpenCode accepts only the exactly qualified CLI versions 2.0.26 and 2.0.28 and reads /api/provider plus /api/model. Version 2.0.26 readiness uses /api/health with healthy=true and username litecowork; version 2.0.28 uses /api/info with exact version and owned child PID matching, and username opencode. It returns bounded sanitized catalog IDs and display names, never native provider/model objects, options, headers, keys, URLs, raw responses, or location paths. Catalog provider IDs are not connected-provider or authentication evidence. Unsupported versions fail closed without route fallback. OpenCode session-model selection is NOT_QUALIFIED and its offer is always incompatible, so the profile cannot be bound or enabled. Raw native messages, endpoint locators, account identifiers, and private configuration are omitted.
+          description: Explicit owner-triggered, bounded local adapter observation. Each request performs a new probe and records a refreshed expiring Runtime offer; it is not an idempotent domain mutation. Requires the selected Workspace owner and an active local RuntimeWorkspaceBinding. Codex and OpenCode are accepted. OpenCode accepts the observation-only CLI versions 2.0.26 and 2.0.28 and the accepted CLI version 2.0.32, and reads /api/provider plus /api/model. Version 2.0.26 readiness uses /api/health with healthy=true and username litecowork; version 2.0.28 uses /api/info with exact version and owned child PID matching, and username opencode. It returns bounded sanitized catalog IDs and display names, never native provider/model objects, options, headers, keys, URLs, raw responses, or location paths. Catalog provider IDs are not connected-provider or authentication evidence. Unsupported versions fail closed without route fallback. OpenCode session-model selection is NOT_QUALIFIED. The offer is compatible (and profile_admission_supported is true, Conversation admission only) only for CLI 2.0.32 with a complete probe and an observed host stop; every other outcome keeps the offer incompatible so the profile cannot be bound or enabled. Raw native messages, endpoint locators, account identifiers, and private configuration are omitted.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AgentProfileView'}
@@ -2054,6 +2054,11 @@ paths:
         schema: {type: string}
       - {$ref: '#/components/parameters/IdempotencyKey'}
       - {$ref: '#/components/parameters/IfMatch'}
+      - name: X-Agent-Descriptor-Revision
+        in: header
+        required: false
+        description: "Digest of the AgentControlDescriptor the caller read. Required in effect when the bound profile's provider has a trusted AgentModule (OpenCode). Enable then succeeds only against the latest unexpired descriptor revision and otherwise fails with RESOURCE_STALE and no state change. Providers without a module ignore it."
+        schema: {type: string, pattern: '^sha256:[0-9a-f]{64}$'}
       responses:
         '200':
           description: Binding enabled for new Conversation session and Task planning/Attempt admission. Exact owner-scoped receipt replay returns the original response before active-only binding reads, including after Workspace archival; fresh mutations remain blocked after archival.
@@ -5696,7 +5701,7 @@ components:
         inference_access_verified: {const: false}
         host_process_stopped: {type: boolean}
         writer_quiescence_proven: {const: false}
-        profile_admission_supported: {const: false}
+        profile_admission_supported: {type: boolean}
     OpenCodeProviderOption:
       type: object
       additionalProperties: false
