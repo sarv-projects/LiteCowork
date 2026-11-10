@@ -63,6 +63,8 @@ mod workspace_root_cleanup;
 #[cfg(test)]
 mod workspace_root_membership_migration_tests;
 #[cfg(all(test, unix))]
+mod workspace_root_lifecycle_tests;
+#[cfg(all(test, unix))]
 mod workspace_root_scan_tests;
 
 pub use automation_host::{

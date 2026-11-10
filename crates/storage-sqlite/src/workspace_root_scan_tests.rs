@@ -12,12 +12,12 @@ use storage_core::{
 };
 use zeroize::Zeroizing;
 
-const OWNER: &str = "scan-owner";
-const WORKSPACE: &str = "workspace-scan";
-const ROOT: &str = "root-scan";
-const RUNTIME: &str = "runtime-scan";
-const INCARNATION: &str = "incarnation-scan";
-const NOW: &str = "2026-10-16T10:00:00Z";
+pub(super) const OWNER: &str = "scan-owner";
+pub(super) const WORKSPACE: &str = "workspace-scan";
+pub(super) const ROOT: &str = "root-scan";
+pub(super) const RUNTIME: &str = "runtime-scan";
+pub(super) const INCARNATION: &str = "incarnation-scan";
+pub(super) const NOW: &str = "2026-10-16T10:00:00Z";
 
 struct ScanTestKeys;
 
@@ -46,12 +46,12 @@ impl WorkspaceBlobKeyProvider for ScanTestKeys {
     }
 }
 
-struct ScanFixture {
-    directory: tempfile::TempDir,
-    store: SqliteWorkspaceStore,
+pub(super) struct ScanFixture {
+    pub(super) directory: tempfile::TempDir,
+    pub(super) store: SqliteWorkspaceStore,
 }
 
-fn fixture() -> ScanFixture {
+pub(super) fn fixture() -> ScanFixture {
     let directory = tempfile::tempdir().expect("temporary scan store");
     let store = SqliteWorkspaceStore::open(
         directory.path().join("state").join("state.sqlite3"),
@@ -265,7 +265,7 @@ fn scan_commit(request_id: &str, runtime_id: &str) -> WorkspaceRootScanCommit {
     }
 }
 
-fn database_path(directory: &tempfile::TempDir) -> std::path::PathBuf {
+pub(super) fn database_path(directory: &tempfile::TempDir) -> std::path::PathBuf {
     directory.path().join("state").join("state.sqlite3")
 }
 

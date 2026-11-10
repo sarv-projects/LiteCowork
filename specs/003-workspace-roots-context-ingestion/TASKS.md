@@ -36,7 +36,7 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T02 - Qualify root lifecycle storage on both rows
 
-- **Status:** PARTIAL (create/list/pause/resume/revoke store methods in `crates/storage-core/src/lib.rs` and SQLite implementation with tests in `crates/storage-sqlite/src/workspace_root_scan_tests.rs`; overlap, revoke and status-gating negative coverage not proven on Windows)
+- **Status:** PARTIAL (Linux, 2026-11-10: `workspace_root_lifecycle` tests in `crates/storage-sqlite/src/workspace_root_lifecycle_tests.rs` pass 3/3 covering pause hides root from scan candidates, stale-version loser, revoke deletes private bindings and is terminal (AC-005), idempotent replay, changed-payload refusal and foreign principal NotFound. NOT yet covered: AC-001 fault injection between root and binding insert, AC-002 overlap body redaction (overlap is decided in the daemon adapter, not the store), concurrent pause/revoke race, Windows row. Create/list/pause/resume/revoke store methods in `crates/storage-core/src/lib.rs` and SQLite implementation with tests in `crates/storage-sqlite/src/workspace_root_scan_tests.rs`; overlap, revoke and status-gating negative coverage not proven on Windows)
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Resource and Storage
