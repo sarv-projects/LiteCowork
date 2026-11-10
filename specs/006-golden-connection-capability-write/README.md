@@ -2,6 +2,7 @@
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 **Revision:** 1.0 | **Updated:** 2026-11-09
+**Implementation state (2026-11-10):** Not implemented. T02 BLOCKED on the B-19 follow-up (GitHub OAuth client-secret finding, open decision), T05 BLOCKED behind it; migration v40 allocated.
 **Owners:** Connectors, Capability Fabric, Security, LiteSPM boundary, Desktop UI. Accepted by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
 
 ## User outcome

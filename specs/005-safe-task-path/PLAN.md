@@ -25,7 +25,7 @@ Allowed implementation paths are listed per task. The active source tree is in a
 
 ## Migration, rollout, rollback
 
-No migration has shipped for this package yet. T01 promotes one forward-only immutable migration (`docs/schemas/sqlite-v29.sql` or the next unused number at implementation time; `sqlite-v28.sql` is defined but unwired per docs/STORAGE.md). Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
+No migration has shipped for this package yet. T01 promotes one forward-only immutable migration (`docs/schemas/sqlite-v36.sql` per the Migration allocation in docs/LITECOWORK-BUILD-TASKS.md; v28 through v32 are already wired and a merged migration is never renumbered; if another package merges first take the next free number and update that table). Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
 
 ## Risks
 
@@ -39,3 +39,11 @@ No migration has shipped for this package yet. T01 promotes one forward-only imm
 - `python3 .specify/scripts/validate_feature_package.py`
 - Owner review recorded 2026-11-09 for B-17/B-18; B-35 pending
 - TASKS.md commands and denial, replay, restart and cancel cases
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+PROPOSED only; see the matching section in [TASKS.md](TASKS.md). Nothing here changes the accepted design of this package. Owner review is required first.
+
+- **P-38 Login-shell PATH-class capture for agents launched from a Linux desktop entry** (touches this package; row owned by package 002). Class **OWNER (open; not ADOPT, ADAPT or REJECT yet)**. Design impact if accepted: T07 and T13 of package 002; package 005 Environment admission. CONFLICT with environment scrubbing (A-58): stays open. Deferral: Blocked on the owner decision. Then a Linux desktop-entry launch test. Upstream: [src/login-shell-environment.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/login-shell-environment.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Section 14 (row P-38 and the conflict note).
+- **P-27 durable run record plus process-group liveness fence** (ADAPT): see TASKS.md PROP-P27 / plugin lessons. Study: [plugin study](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) Sections 2, 3 and 8. Upstream: [operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts), [run-tree.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/run-tree.ts).
+

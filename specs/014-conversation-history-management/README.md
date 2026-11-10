@@ -1,7 +1,8 @@
 # 014 - Conversation History Management
 
 - **Status:** IN_REVIEW - authored 2026-11-09; not owner-accepted; does not authorize implementation; not a claim of implementation or qualification.
-- **Revision:** 0.1 | **Updated:** 2026-11-09 | **Open blocker:** B-38 (delete semantics: tombstone plus purge window vs immediate purge), PROPOSED, pending owner.
+- **Revision:** 0.1 | **Updated:** 2026-11-09 | **Decision:** B-38 (delete semantics: tombstone plus purge window vs immediate purge) ACCEPTED as proposed by the owner (sarv-projects) on 2026-11-10, register A-62, and treated as unblocking implementation; whole-SPEC acceptance and the ACCEPTED/LOCKED flip are still pending, so the package stays IN_REVIEW.
+- **Implementation state (2026-11-10):** Storage layer only. T01, T02, T03 PARTIAL: migration v31 (`conversation_history_state` side table) and `ConversationHistoryStore` (rename, archive, status get/list) with tests in `conversation_history_tests.rs`. No route, search index, purge or UI. T04 onward NOT STARTED.
 - **Owners:** Conversation, Storage, Operator/API, Desktop UI (sidebar and Conversation header), Security/Privacy and Product.
 
 ## User outcome

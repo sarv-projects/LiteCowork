@@ -24,7 +24,7 @@ Allowed implementation paths are listed per task. The active source tree is in a
 
 ## Migration, rollout, rollback
 
-No migration has shipped for this package yet; the chain ends at `docs/schemas/sqlite-v28.sql`. Accepted changes (delivery lease and status transitions, SUPPRESSED rows, event-trigger cursor) land as the next immutable `sqlite-vNN.sql` in the task that needs them. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
+No migration has shipped for this package yet; the chain ends at `docs/schemas/sqlite-v32.sql`. Accepted changes (delivery lease and status transitions, SUPPRESSED rows, event-trigger cursor) are allocated v44 in docs/LITECOWORK-BUILD-TASKS.md (010-T01); take the next free number if another package merges first. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
 
 ## Risks
 
@@ -42,3 +42,10 @@ No migration has shipped for this package yet; the chain ends at `docs/schemas/s
 ## External workflow scope
 
 This package does not implement a graph schema, graph canvas or workflow execution engine. Its only V1-target integration task is the invocation of an existing qualified provider workflow as one CapabilityInvocation within an admitted Task; no production adapter is currently present. The provider owns graph authoring, graph revisions and internal execution states. Users may already use provider-native AI builders/MCP (for example n8n Assistant or Activepieces Build by Asking) inside the provider product, subject to that provider's feature/version/permission gates. What is deferred is direct LiteCowork-Coworker graph mutation through a provider API/MCP capability; that requires a separate owner ADR, exact permissions and a qualified provider-authoring adapter.
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+PROPOSED only; see the matching section in [TASKS.md](TASKS.md). Nothing here changes the accepted design of this package. Owner review is required first.
+
+- **P-31 QuiescenceReport (one "interruptible work" predicate; unknown means busy; lock then learn; inspect once)** (touches this package; row owned by package 011). Class **ADAPT**. Design impact if accepted: T12, T13, T14 of package 011; T11 of package 019; T10 of package 010. Deferral: Daemon half (`RuntimeLifecycleStore`, served `previewLocalRuntimeStop`) can be built and tested on Linux; the packaged quit path needs the Windows laptop. Not started. Upstream: [src/host-process.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/host-process.ts), [src/quit-confirmation.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/quit-confirmation.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 3 and 14 (row P-31).
+

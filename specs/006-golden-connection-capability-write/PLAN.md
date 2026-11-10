@@ -25,7 +25,7 @@ Allowed implementation paths are listed per task. The active source tree is in a
 
 ## Migration, rollout, rollback
 
-No migration has shipped for this package yet. T01 promotes one forward-only immutable migration (`docs/schemas/sqlite-v29.sql` or the next unused number): a `connections` table rebuild adding `REVOKED`, an `auth_attempts` table and the remote-revocation field; T07 replaces the `sqlite-v15.sql` dispatch triggers with admission-bound guards. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
+No migration has shipped for this package yet. T01 promotes one forward-only immutable migration (`docs/schemas/sqlite-v40.sql` per the Migration allocation in docs/LITECOWORK-BUILD-TASKS.md; take the next free number if another package merges first): a `connections` table rebuild adding `REVOKED`, an `auth_attempts` table and the remote-revocation field; T07 replaces the `sqlite-v15.sql` dispatch triggers with admission-bound guards. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
 
 ## Risks
 

@@ -22,7 +22,7 @@ Owners: Conversation, Agent Runtime, Product. Allowed implementation paths are l
 
 ## Migration, rollout, rollback
 
-No migration exists yet. The control-event and side-note records ship in the next immutable `docs/schemas/sqlite-vNN.sql` migration created by TASKS T05 (number chosen at implementation time after Feature 001 migrations). Rollback is revert to the previous committed revision and refuse new co-edit admission that needs the new field.
+Migration v32 (`docs/schemas/sqlite-v32.sql`, TASKS T05 storage layer, shipped 2026-11-10 and wired, `SCHEMA_VERSION` 32) holds the control-event and side-note records; v30 and v31 were taken by 001-T25 and 014-T03 first. Rollback is revert to the previous committed revision and refuse new co-edit admission that needs the new field.
 
 ## Risks
 

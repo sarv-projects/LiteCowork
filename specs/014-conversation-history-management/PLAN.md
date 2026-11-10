@@ -66,7 +66,7 @@ Feature 001 edits `conversations.rs` and `ConversationsPage.tsx` in the same wav
 
 ## 5. Persistence, migration, rollout
 
-- One forward-only migration after `sqlite-v28.sql` (next free number): status columns with default `ACTIVE`, list index, search index table, `conversation_purge_plans`, `conversation_purge_receipts`.
+- Migration v31 (shipped, `conversation_history_state` side table holding status, archived_at, deleted_at; `conversations` itself is NOT altered, because released migrations are immutable and the status lives in a side table keyed by conversation_id) is followed by a later forward-only migration (next free number after the allocation table in docs/LITECOWORK-BUILD-TASKS.md) for the search index table, `conversation_purge_plans` and `conversation_purge_receipts`.
 - Backfill of the search index runs in bounded batches with a per-Workspace watermark; the UI shows `BUILDING` until done.
 - Rollout: rename and archive first; search second; delete last, after T13 and T14 pass.
 

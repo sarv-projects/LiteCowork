@@ -61,7 +61,7 @@ Do not edit a candidate path just because it is listed. Only files needed for th
 
 ## 5. Persistence, migration, rollout
 
-- First inspect current sqlite-v1 through sqlite-v28 and schema validators in the chosen implementation worktree.
+- First inspect current sqlite-v1 through sqlite-v32 and schema validators in the chosen implementation worktree.
 - Reuse existing Conversation and AgentSession identities, event streams, snapshots and idempotency patterns.
 - The activation storage transaction is already present in the preserved dirty worktree; do not reimplement or cherry-pick it without review.
 - The final result commit may require new local schema fields/indexes or no migration if existing tables can satisfy the semantics. Decide only after exact storage model review.

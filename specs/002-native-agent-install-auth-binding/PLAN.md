@@ -8,7 +8,7 @@
 SPEC section 5 blockers B-11 and B-12 and the A-35 screen split were owner-accepted on 2026-11-09. Phases now follow TASKS.md:
 
 1. P1 prerequisite: make the OpenCode v2.0.32 profile truthfully bindable (002-T01), so Feature 001 Send is reachable from the UI.
-2. Contract promotion: AGENT-CONTROL, OpenAPI, error codes, events and the next immutable `sqlite-vNN.sql` together (002-T02).
+2. Contract promotion: AGENT-CONTROL, OpenAPI, error codes, events and the allocated immutable `sqlite-v33.sql` / `sqlite-v34.sql` together (002-T02; see the Migration allocation in docs/LITECOWORK-BUILD-TASKS.md).
 3. Module registry, descriptor storage and descriptor producer (002-T03 to 002-T05), then the fresh-descriptor enable gate (002-T06).
 4. Native sign-in observation and credential slots (002-T07, 002-T08).
 5. Composer options/commands and Settings operations wired into the Feature 011 screen (002-T09, 002-T10), honest install/update unavailability (002-T11).
@@ -43,3 +43,10 @@ Acceptance authorizes the migrations named in TASKS.md (Runtime-local descriptor
 - `python3 .specify/scripts/validate_feature_package.py`
 - Owner acceptance recorded 2026-11-09; owner USER sign-off still required for VERIFIED
 - TASKS.md commands and denial, replay, restart and cancel cases
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+PROPOSED only; see the matching section in [TASKS.md](TASKS.md). Nothing here changes the accepted design of this package. Owner review is required first.
+
+- **P-38 Login-shell PATH-class capture for agents launched from a Linux desktop entry** (owns the proposed row). Class **OWNER (open; not ADOPT, ADAPT or REJECT yet)**. Design impact if accepted: T07 and T13 of package 002; package 005 Environment admission. CONFLICT with environment scrubbing (A-58): stays open. Deferral: Blocked on the owner decision. Then a Linux desktop-entry launch test. Upstream: [src/login-shell-environment.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/login-shell-environment.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Section 14 (row P-38 and the conflict note).
+

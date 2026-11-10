@@ -70,7 +70,7 @@ Host compatibility profile rows (filled by T05 and T18):
 
 ## 5. Persistence, migration, rollout
 
-- One forward-only migration after `sqlite-v28.sql` (next free number at implementation time) adds the three tables in DATA-MODEL; no earlier migration changes.
+- One forward-only migration (allocated v39 in docs/LITECOWORK-BUILD-TASKS.md; the chain ends at `sqlite-v32.sql`; DEFERRED with the whole package, see TASKS.md) adds the three tables in DATA-MODEL; no earlier migration changes.
 - Rollout is per release row and per verb. A verb is enabled only when its profile row has CODE, SYSTEM and USER evidence.
 - No feature flag may enable a verb whose server-side route is missing or not advertised by the pinned LiteSPM.
 
@@ -103,3 +103,11 @@ Stop on any LiteCowork write to host config or LiteSPM storage, any inferred wir
 ## 9. Handoff
 
 Implementation starts only after 013-T01 records owner acceptance. The first implementation task must name the accepted revision and SHA, the LiteSPM pin from 013-T02, the clean worktree and the exact command.
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+PROPOSED only; see the matching section in [TASKS.md](TASKS.md). Nothing here changes the accepted design of this package. Owner review is required first.
+
+- **P-43 Lifecycle-script allowlist and classified patch policy for dependencies** (touches this package; row owned by package 019). Class **ADAPT**. Design impact if accepted: Package 013 (DEFERRED); T13 of package 019. Deferral: DEFERRED with LiteSPM (package 013). Upstream: [scripts/runtime-patch-policy.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/scripts/runtime-patch-policy.ts), [src/project-manager.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/project-manager.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 11 and 14 (row P-43).
+- **P-27 durable run record plus process-group liveness fence** (ADAPT): see TASKS.md PROP-P27 / plugin lessons. Study: [plugin study](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) Sections 2, 3 and 8. Upstream: [operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts), [run-tree.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/run-tree.ts).
+

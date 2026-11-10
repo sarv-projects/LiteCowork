@@ -221,7 +221,7 @@ Operator routes (target, from LEARNING section 18; promoted by T02): `GET /v1/co
 
 ## 8. Data model and lifecycle
 
-See [DATA-MODEL.md](DATA-MODEL.md). New tables (PROPOSED, next free `sqlite-vNN.sql`): `learning_candidates`, `coworker_learning_policies`, `memory_records`, `learning_work_items`, `suggestion_producer_cursors`. Lifecycles: Suggestion (existing), LearningCandidate (L-05), MemoryRecord ACTIVE -> SUPERSEDED | REVOKED -> PURGE_PENDING.
+See [DATA-MODEL.md](DATA-MODEL.md). New tables (PROPOSED, allocated `sqlite-v43.sql`): `learning_candidates`, `coworker_learning_policies`, `memory_records`, `learning_work_items`, `suggestion_producer_cursors`. Lifecycles: Suggestion (existing), LearningCandidate (L-05), MemoryRecord ACTIVE -> SUPERSEDED | REVOKED -> PURGE_PENDING.
 
 ## 9. Wiring
 

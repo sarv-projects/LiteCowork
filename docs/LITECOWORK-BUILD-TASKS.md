@@ -2,6 +2,25 @@
 
 This is the working delivery checklist for the active source tree. It is not a Git commit plan. Feature-specific work items belong in specs/NNN-*/TASKS.md. Product semantics remain in owner contracts; current evidence is in IMPLEMENTATION-STATUS.md.
 
+## Status snapshot (2026-11-10, tip e9abe46)
+
+The tables below are the plan and carry no per-row status. Per-task status lives in specs/NNN-*/TASKS.md; this snapshot only indexes it. Nothing is INTEGRATED with a live agent or QUALIFIED.
+
+| Group | State | Detail |
+|---|---|---|
+| BT-00 | Partly done | Route inventory generated and matches (178 served / 1 local-only / 53 target-only); CURRENT-RUN.md and IMPLEMENTATION-STATUS.md synced 2026-11-10 |
+| BT-01 | CODE and SERVED for BT-01.1, 01.2, 01.4; BT-01.3 CODE (ACP client, OpenCode HTTP adapter kept); BT-01.5 and 01.6 partial | 001 DONE/PARTIAL list in CURRENT-RUN.md; live OpenCode run (001-T09) NOT STARTED |
+| BT-02 | Linux storage tests only; Windows tasks DEFERRED to the owner's Windows laptop | 003-T02 PARTIAL |
+| BT-03 | Registry, descriptors, auth observation, Matchmaker CODE/SERVED; Claude Code module BLOCKED; relay (004) not started | 002 statuses |
+| BT-04 | Not started | 005; Windows Environment provider B-35 still PROPOSED |
+| BT-05 | 013 part: whole package DEFERRED by the owner (A-62). 006 part: BLOCKED on the B-19 follow-up | See the DEFERRED note in specs/013-litespm-package-lifecycle-bridge/TASKS.md |
+| BT-06 to BT-09 | Not started (pre-existing foundations only); 010-T19 deferred out of V1 | 007, 016, 008, 009, 010 |
+| BT-10 | Partly done for Linux; Windows and packaged rows DEFERRED | 011 DONE T01, T04, T05, T07, T08, T09, T10, T21 |
+| BT-11 | Storage layer only (014-T03 partial, migration v31) | Routes, search, purge, UI NOT STARTED |
+| BT-12 to BT-14 | Not started; B-39, B-40, B-41, D-01, B-45 accepted as proposed; B-42 open | 015 to 018, 020 |
+| BT-15 | CI and release machinery skeleton (CODE, never run on GitHub); B-43 and B-44 items DEFERRED | 019 |
+| Co-edit (012) | Storage layer only (012-T05 partial, migration v32) | Routes, service, UI NOT STARTED |
+
 ## BT-00 — Current baseline and documentation integrity
 
 | ID | Task | Exit evidence |

@@ -32,7 +32,7 @@ No new Environment provider (Feature 005 owns Linux bubblewrap and B-35). No Con
 
 ## 4. Current implementation/evidence boundary
 
-Verified against the checkout on branch `docs/audit-competitor-superset`. Highest migration is `docs/schemas/sqlite-v28.sql`.
+Verified against the checkout on branch `docs/audit-competitor-superset`. Highest migration file is `docs/schemas/sqlite-v32.sql` (wired, `SCHEMA_VERSION` 32); nothing in v29 to v32 touches task control.
 
 | Capability | Current evidence | Limitation |
 |---|---|---|
@@ -244,7 +244,7 @@ Accepted target routes (not yet in source): `POST /v1/tasks/{task_id}/pause`, `P
 
 ## 8. Data model and lifecycle
 
-See [DATA-MODEL.md](DATA-MODEL.md). New durable records (accepted target, next migration after `sqlite-v28.sql`): `task_control_requests` (idempotent pause/resume/steer/cancel requests with outcome), `task_resume_packets` (immutable ResumePacket, digest, source Attempt), and an `on_exhaustion` column on the stored escalation policy. Existing records reused: `tasks`, `task_spec_revisions` (`parent_revisions_json` already supports siblings), `attempts` (`parent_attempt_id`, `delegation_profile_id`, `delegation_profile_revision`), `execution_leases` (`epoch`), `delegation_results`, `verification_runs`, `coworker_revisions.enabled_delegation_profile_ids_json`.
+See [DATA-MODEL.md](DATA-MODEL.md). New durable records (accepted target, migration v42 per docs/LITECOWORK-BUILD-TASKS.md): `task_control_requests` (idempotent pause/resume/steer/cancel requests with outcome), `task_resume_packets` (immutable ResumePacket, digest, source Attempt), and an `on_exhaustion` column on the stored escalation policy. Existing records reused: `tasks`, `task_spec_revisions` (`parent_revisions_json` already supports siblings), `attempts` (`parent_attempt_id`, `delegation_profile_id`, `delegation_profile_revision`), `execution_leases` (`epoch`), `delegation_results`, `verification_runs`, `coworker_revisions.enabled_delegation_profile_ids_json`.
 
 ## 9. Wiring
 

@@ -62,7 +62,7 @@ flowchart TD
 
 ## 5. Migrations
 
-One forward-only migration (next free `sqlite-vNN.sql`, promoted in T02) adds `learning_candidates`, `coworker_learning_policies`, `memory_records`, `learning_work_items` and `suggestion_producer_cursors`, plus a partial index on `suggestions(workspace_id, proposed_by, created_at)`. Existing Coworkers get no policy row, which reads as REVIEW_ALL (AC-021). No existing table changes shape.
+One forward-only migration (allocated `sqlite-v43.sql`, promoted in T02) adds `learning_candidates`, `coworker_learning_policies`, `memory_records`, `learning_work_items` and `suggestion_producer_cursors`, plus a partial index on `suggestions(workspace_id, proposed_by, created_at)`. Existing Coworkers get no policy row, which reads as REVIEW_ALL (AC-021). No existing table changes shape.
 
 ## 6. Rollout
 

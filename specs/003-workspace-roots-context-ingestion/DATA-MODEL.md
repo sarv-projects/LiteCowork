@@ -31,4 +31,4 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-One additive migration in the next free immutable `docs/schemas/sqlite-vNN.sql` (TASKS T01). No migration exists today.
+One additive migration, allocated `docs/schemas/sqlite-v35.sql` (TASKS T01/T09; see the Migration allocation in docs/LITECOWORK-BUILD-TASKS.md). No 003 migration exists today; the 003-T02 workspace root lifecycle storage work (partial) uses existing tables.

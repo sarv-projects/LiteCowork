@@ -13,7 +13,7 @@ Verified against source on 2026-11-09. Served: `PATCH /v1/conversations/{convers
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 001 contract promotion of context dispatch and the B-07 adapter budget confirmation; orchestrator migration numbering if the receipt is made durable.
 - **Owner:** Conversation, Agent Runtime, API/schema owner.
-- **Allowed paths:** `docs/CONTEXT.md`, `docs/SCHEMAS.md`, `docs/API.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-vNN.sql` (new, only if the receipt is durable), `apps/litecowork-ui/src/api/operator-api.ts` (regenerated), this package.
+- **Allowed paths:** `docs/CONTEXT.md`, `docs/SCHEMAS.md`, `docs/API.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-vNN.sql` (new, only if the receipt is durable; v47 or the next free number because v33 to v46 are allocated), `apps/litecowork-ui/src/api/operator-api.ts` (regenerated), this package.
 - **Contract:** SPEC §5 B-15, §7.2 (`PortableRelayExport`, `PortableContextMaterializer`, `RelayExportError`), AC-002, AC-007, AC-008, AC-011.
 - **Change intent:** Promote the accepted bounds (1,024 messages, 4 MiB package, the smaller of 256 KiB and the adapter's declared text budget), the allowed reference kinds (`ResourceRef`, durable `ArtifactRef`), the exclusion list (`SYSTEM_NOTICE`, drafts, native handles, credentials, harness-private transcripts), the truncation receipt shape, and `RelayExportError` codes mapped to canonical error codes. Decide in this task whether the truncation receipt is a durable record or part of the turn's committed receipt; prefer the latter to avoid a migration.
 - **Acceptance:**

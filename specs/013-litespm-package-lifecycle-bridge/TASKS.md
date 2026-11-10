@@ -4,12 +4,18 @@
 **Spec revision:** 0.1 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
 **Owners:** domain owners named in SPEC.md. Blockers B-36 and B-37 are PROPOSED, pending owner.
 
+**DEFERRED note (owner decision A-62, 2026-11-10; applies to every task in this file, T01 to T21 including the folded LiteSPM pin task T20):**
+- *Why:* the owner deferred all LiteSPM-dependent work. The bridge needs an upstream LiteSPM build that publishes a descriptor, an approval-recording method and package `operation.get` (interop LLD Appendix A; absent at pinned `84d5fab`), and B-36 and B-37 are PROPOSED, not accepted.
+- *What unblocks it:* (1) owner accepts B-36 and B-37 (task T01); (2) a pinned LiteSPM release with the missing methods, or an owner decision to adapt to the current surface; (3) a machine with that LiteSPM build installed.
+- *Where to test later:* the owner's native Windows x64 laptop first (release matrix row 1), then native Linux x64; WSL2 and containers do not count. Test the real LiteSPM service over its pinned transport, plan/approve/apply/receipt, lost-response reconcile, and the Discover Managed and Connections tabs.
+- *Today:* Discover shows truthful `LITESPM_PACKAGE_SERVICE_NOT_QUALIFIED` unavailable states; migration v39 is allocated but nothing is written. Nothing here is claimed done.
+
 ## Current baseline
 
 Verified against the checkout on branch `docs/audit-competitor-superset` on 2026-11-09.
 
 - **Operator:** `apps/litecoworkd/src/discover_operator.rs` (merged in `apps/litecoworkd/src/operator.rs` via `discover_operator::routes()`) serves `GET /v1/discover/search`, `GET /v1/discover/items/{item_id}`, `POST /v1/capabilities/{capability_id}/connect-or-install` (always `503 DEPENDENCY_UNAVAILABLE`, reason `LITESPM_PACKAGE_SERVICE_NOT_QUALIFIED`, `requested_scope_granted: false`, no receipt) and `POST /v1/capabilities/{capability_id}/test` (always `health: "UNKNOWN"`). Defect: `test_capability_connection` sets `checked_at` to `new_id("cor")` and `search_discover` passes the same kind of correlation ID as `now`. Test `capability_commands_require_an_idempotency_key_and_stay_truthful` lives in `apps/litecoworkd/src/routine_run_operator_tests.rs`.
-- **Storage:** `crates/storage-sqlite/src/discover.rs` (`SqliteDiscoverStore::search_catalog`, `describe_entry`, `PACKAGE_SERVICE_NOT_QUALIFIED`, `DiscoverProviderStatus` default `package_service_qualified: false`, `DISCOVER_MAX_RUNTIME_CAPABILITIES = 50`) projects `SkillRecord` rows and Runtime capability hosts only. `crates/storage-core/src/discover.rs` defines `DiscoverCatalogEntry` (with `validate()` refusing `authoritative = true`), `DiscoverInstallState`, `DiscoverEntrySource::LiteSpmPackage`. No package approval or receipt table exists; the migration chain ends at `docs/schemas/sqlite-v28.sql`.
+- **Storage:** `crates/storage-sqlite/src/discover.rs` (`SqliteDiscoverStore::search_catalog`, `describe_entry`, `PACKAGE_SERVICE_NOT_QUALIFIED`, `DiscoverProviderStatus` default `package_service_qualified: false`, `DISCOVER_MAX_RUNTIME_CAPABILITIES = 50`) projects `SkillRecord` rows and Runtime capability hosts only. `crates/storage-core/src/discover.rs` defines `DiscoverCatalogEntry` (with `validate()` refusing `authoritative = true`), `DiscoverInstallState`, `DiscoverEntrySource::LiteSpmPackage`. No package approval or receipt table exists; the migration chain ends at `docs/schemas/sqlite-v32.sql` (v39 is allocated to this package).
 - **Domain:** `crates/domain-invocations/src/capability_bridge.rs` `classify_agent_capability_route` with six unit tests; no production caller.
 - **Tauri:** `apps/litecowork-ui/src-tauri/src/discover_bridge.rs` `discover_request` supports operations `search` and `item` only (registered in `apps/litecowork-ui/src-tauri/src/lib.rs`).
 - **UI:** `apps/litecowork-ui/src/discover/DiscoverPage.tsx` (tabs Explore, "Installed / native", Managed, Connections; Managed and Connections render "Not available"), `discover-state.ts` (`connectActionOutcome()` disables every row action), `discover-api.ts`, `desktop-discover-api.ts`; test `apps/litecowork-ui/tests/discover-catalog-state.test.ts`.
@@ -20,7 +26,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T01 - Owner acceptance of SPEC and blockers
 
-- **Status:** BLOCKED - B-36 and B-37 are PROPOSED; pending owner acceptance (repository owner, sarv-projects).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED - B-36 and B-37 are PROPOSED; pending owner acceptance (repository owner, sarv-projects).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE (orchestrator records B-36/B-37 in the register and review packet).
 - **Owner:** Product (repository owner); Capability Fabric reviewer.
@@ -37,7 +43,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T02 - Re-pin LiteSPM and record the bridge contract baseline (lane steps 0-1)
 
-- **Status:** BLOCKED (owner acceptance, T01; upstream publication of descriptor/approval/operation-get, LiteSPM owner).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01; upstream publication of descriptor/approval/operation-get, LiteSPM owner).
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE; upstream LiteSPM parity requests A1-A6 (LiteSPM owner).
 - **Owner:** Capability Fabric; LiteSPM owner for the published contract.
@@ -54,7 +60,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T03 - Promote accepted interfaces into owner docs and schemas
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T02
 - **Cross-package prerequisites:** Feature 006 review of the connect-or-install split (O-03) and of the grant-invalidation notification.
 - **Owner:** API, Storage, Events, Capability Fabric owners.
@@ -72,7 +78,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T04 - LiteSpmClient: transport, handshake, version negotiation and peer authentication
 
-- **Status:** BLOCKED (owner acceptance, T01). Nothing exists; reusable framing in `crates/operator-ipc`, SID helper in `crates/windows-local-security`.
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01). Nothing exists; reusable framing in `crates/operator-ipc`, SID helper in `crates/windows-local-security`.
 - **Depends on:** T01, T02, T03
 - **Cross-package prerequisites:** Feature 011 local IPC peer-identity profile (Wave 0).
 - **Owner:** Capability Fabric, Security.
@@ -91,7 +97,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T05 - Host compatibility profile and advertised-operation gating
 
-- **Status:** BLOCKED (owner acceptance, T01; B-37).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01; B-37).
 - **Depends on:** T01, T04
 - **Cross-package prerequisites:** Feature 002 exact agent identity and version for OpenCode v2.0.32 (binding creatable).
 - **Owner:** Capability Fabric, Agent Runtime.
@@ -108,7 +114,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T06 - Live inventory read-through and Discover projection
 
-- **Status:** BLOCKED (owner acceptance, T01). PARTIAL foundation: Discover search/describe and `DiscoverProviderStatus` exist in `crates/storage-sqlite/src/discover.rs`.
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01). PARTIAL foundation: Discover search/describe and `DiscoverProviderStatus` exist in `crates/storage-sqlite/src/discover.rs`.
 - **Depends on:** T01, T04, T05
 - **Cross-package prerequisites:** NONE
 - **Owner:** Capability Fabric, Operator.
@@ -127,7 +133,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T07 - Approval and operation-receipt storage with CAS and idempotency
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T03
 - **Cross-package prerequisites:** Feature 005 Trust/approval primitive review (approval is owner-only, single-use).
 - **Owner:** Storage, Trust.
@@ -145,7 +151,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T08 - Plan and approval routes with owner-only authorization
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T05, T06, T07
 - **Cross-package prerequisites:** NONE
 - **Owner:** Operator, Trust, Capability Fabric.
@@ -162,7 +168,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T09 - Apply, receipt, read-back and UNKNOWN reconciliation with startup sweep
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T07, T08
 - **Cross-package prerequisites:** Feature 011 Runtime startup recovery hook (`recover_and_persist_startup_blockers` in `apps/litecoworkd/src/runtime.rs`).
 - **Owner:** Capability Fabric, Storage, Runtime.
@@ -181,7 +187,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T10 - Adopt and unmanage (observe-first)
 
-- **Status:** BLOCKED (owner acceptance, T01; upstream unmanage absent at `f77a3a3`, O-06).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01; upstream unmanage absent at `f77a3a3`, O-06).
 - **Depends on:** T01, T09
 - **Cross-package prerequisites:** NONE
 - **Owner:** Capability Fabric.
@@ -198,7 +204,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T11 - Rollback, remove, update and repair
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T09, T10
 - **Cross-package prerequisites:** NONE
 - **Owner:** Capability Fabric.
@@ -215,7 +221,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T12 - Tauri package lifecycle bridge commands
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T06, T08, T09
 - **Cross-package prerequisites:** Feature 011 packaged sidecar and Windows named-pipe IPC.
 - **Owner:** Desktop bridge.
@@ -231,7 +237,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T13 - Discover UI: Installed / native, Managed, plan review and lifecycle verbs
 
-- **Status:** BLOCKED (owner acceptance, T01). PARTIAL foundation: tabs and truthful unavailable states in `DiscoverPage.tsx`; `connectActionOutcome()` in `discover-state.ts`.
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01). PARTIAL foundation: tabs and truthful unavailable states in `DiscoverPage.tsx`; `connectActionOutcome()` in `discover-state.ts`.
 - **Depends on:** T01, T12
 - **Cross-package prerequisites:** Feature 011 app-wide keyboard and focus baseline.
 - **Owner:** Desktop UI.
@@ -250,7 +256,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T14 - Capability bridge input producer and Feature 006 handoff
 
-- **Status:** BLOCKED (owner acceptance, T01). PARTIAL foundation: `classify_agent_capability_route` exists with tests and no caller.
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01). PARTIAL foundation: `classify_agent_capability_route` exists with tests and no caller.
 - **Depends on:** T01, T09
 - **Cross-package prerequisites:** Feature 006 assignment/grant model and grant-invalidation consumer.
 - **Owner:** Capability Fabric, Feature 006 owner.
@@ -267,7 +273,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T15 - Discover truthfulness fixes (timestamps, fail-closed connect-or-install)
 
-- **Status:** BLOCKED (owner acceptance, T01). PARTIAL: fail-closed 503 already correct; timestamp defect present in `discover_operator.rs`.
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01). PARTIAL: fail-closed 503 already correct; timestamp defect present in `discover_operator.rs`.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Operator.
@@ -283,7 +289,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T16 - Failure, crash and race matrix; create the canonical test target
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T09-T11, T14
 - **Cross-package prerequisites:** NONE
 - **Owner:** Capability Fabric, Testing.
@@ -300,7 +306,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T17 - Cross-layer trace for every user-visible verb (AGENTS.md section 4)
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T13, T16
 - **Cross-package prerequisites:** NONE
 - **Owner:** Capability Fabric, Desktop UI.
@@ -315,7 +321,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T18 - Qualification on the release rows (E2E-06, LSI rows)
 
-- **Status:** BLOCKED (owner acceptance, T01; pinned LiteSPM build available on the release machines).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01; pinned LiteSPM build available on the release machines).
 - **Depends on:** T01, T13-T17
 - **Cross-package prerequisites:** Feature 019 release matrix rows and evidence bundle process; Feature 006 grant/use for the E2E-06 tail; Feature 002 OpenCode v2.0.32 binding.
 - **Owner:** Product, Testing, Capability Fabric.
@@ -332,7 +338,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T19 - Documentation sync
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01, T18
 - **Cross-package prerequisites:** orchestrator owns register, specs/README.md and traceability index.
 - **Owner:** Documentation owners.
@@ -348,7 +354,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T20 - Pin the LiteSPM bridge and mirror its safety contract (P-17)
 
-- **Status:** NOT STARTED - added under this package's IN_REVIEW status. Folds proposed task P-17 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 (and Section 2) into this package.
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note), NOT STARTED - added under this package's IN_REVIEW status. Folds proposed task P-17 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 (and Section 2) into this package.
 - **Depends on:** T04
 - **Cross-package prerequisites:** NONE
 - **Owner:** Package Lifecycle, Connections, Storage.
@@ -365,7 +371,7 @@ Gaps to V1: the whole bridge (client, profile, inventory, plan/approval/apply/re
 
 ## 013-T21 - Package VERIFIED for V1
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** DEFERRED (owner A-62, 2026-11-10; see the package DEFERRED note) and BLOCKED (owner acceptance, T01).
 - **Depends on:** T01-T20
 - **Cross-package prerequisites:** Feature 019 release sign-off process.
 - **Owner:** Product (repository owner).
@@ -409,6 +415,26 @@ T01 -> T02 -> T03 -> T04 -> T05 -> T06. T03 -> T07. (T05, T06, T07) -> T08 -> T0
 | T18, T20 | Feature 019 release matrix rows and evidence bundle | Qualification is per release row |
 
 Cross-package task IDs are named by outcome because other packages are being renumbered in the same planning pass; the orchestrator resolves them in the traceability index. Waves: observe and inventory (T02-T06, T13 read-only) in Wave 2; plan/apply/receipt (T07-T12, T14) in Wave 3; qualification in Wave 3 to 6.
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+Status: PROPOSED. None of the items below is an accepted task. They come from the DeepSeek Harness studies ([desktop deep-dive](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) register A-63, proposals P-31 to P-46; [plugin deep-dive](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) register A-58). Owner review is required before any item becomes a numbered task in this package. They are labelled `PROP-Pnn` so they do not collide with the stable task IDs that `.specify/scripts/validate_feature_package.py` checks. On acceptance: assign the next free task ID in this file, copy the upstream permalink, class and reuse statement into the task, and update the [reuse map](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md). Upstream pin `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` (MIT, Copyright (c) 2026 DeepSeek). No upstream code is imported (AGENTS.md section 7).
+
+### Proposals owned elsewhere that touch this package (pointer only)
+
+- **PROP-P43 (P-43) Lifecycle-script allowlist and classified patch policy for dependencies** [PROPOSED, not accepted, owner review required]: row owned by package 019; class **ADAPT**; would touch here: Package 013 (DEFERRED); T13 of package 019. Upstream permalinks: [scripts/runtime-patch-policy.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/scripts/runtime-patch-policy.ts), [src/project-manager.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/project-manager.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 11 and 14 (row P-43). Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
+
+### Plugin-architecture lessons recorded for this DEFERRED package
+
+All items are PROPOSED, not accepted, and wait for package 013 to be un-deferred. Each is a reference design only; nothing is imported.
+
+- Durable run record plus process-group liveness fence: [operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts). Class: **ADAPT (liveness check is an ADOPT candidate)**. Why: Crash-safe operations need a record of the process tree started, checked on restart (plugin study Sections 2 and 3). Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
+- Atomic restore of manifest and lock on a rejected mutation: [operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts). Class: **ADAPT**. Why: Mirror LiteSPM byte-exact restore (plugin study Section 2). Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
+- Pre-flight compatibility read, keep the working version: [operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts). Class: **ADAPT**. Why: Reads the incoming manifest before install so an incompatible version never replaces a working one (plugin study Section 2; `evaluatePluginCompatibility` is in the same file and `versions.ts`). Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
+- Credential refusal in approvals and install specs: [build-approval.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/build-approval.ts). Class: **ADOPT (small rules)**. Why: Refusing credentials embedded in specs is a few lines of rule (plugin study Sections 4 and 5; `HTTP_USER_INFO` in `install-spec.ts`). Reuse: Rule only, reimplement. If any text or structure is carried over, MIT applies (upstream LICENSE, "Copyright (c) 2026 DeepSeek"): keep that copyright line and the MIT permission notice in the third-party notices produced by task T13 of package 019, and cite the upstream path and SHA `fcc0ad46` in the code comment.
+- Absolute-path-only install specs: [install-spec.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/install-spec.ts). Class: **ADOPT (rule)**. Why: Never resolve a path against an implicit working directory (plugin study Section 5). Reuse: Rule only, reimplement. If any text or structure is carried over, MIT applies (upstream LICENSE, "Copyright (c) 2026 DeepSeek"): keep that copyright line and the MIT permission notice in the third-party notices produced by task T13 of package 019, and cite the upstream path and SHA `fcc0ad46` in the code comment.
+- Fail-closed reachability probe before network operations: [git-transport.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/git-transport.ts). Class: **ADAPT**. Why: Non-interactive probe before a Git network operation (plugin study Section 5); also relevant to package 006. Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
+
 
 ## Completion evidence
 

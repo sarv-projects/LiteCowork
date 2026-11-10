@@ -2,6 +2,7 @@
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 **Revision:** 1.0 | **Updated:** 2026-11-09
+**Implementation state (2026-11-10):** CODE and SERVED, fail-closed, no live agent run. T01 (sync), T03, T04 CODE-COMPLETE; PARTIAL: T02, T05, T06, T07, T09, T10, T11, T13, T14, T16, T17 (ACP client), T18 (Matchmaker). BLOCKED: T08 (needs migration v33 for the credential receipt), T12 (needs an installed Claude Code CLI). DEFERRED: T15 (release matrix, Windows laptop). NOT STARTED: T19. Allocated migrations v33 (T04 store) and v34 (T07 observations) are not wired yet.
 **Owners:** Agent Runtime, Security/Trust, Desktop UI, Product, Conversation Runtime. Accepted by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
 
 ## User outcome

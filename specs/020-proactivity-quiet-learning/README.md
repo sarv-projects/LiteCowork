@@ -1,7 +1,8 @@
 # 020 - Proactivity and Quiet Learning
 
 - **Status:** IN_REVIEW - authored complete for owner review on 2026-11-09; not owner-accepted; authorizes no implementation; not a claim of implementation or qualification.
-- **Revision:** 0.1 | **Updated:** 2026-11-09 | **Blocker:** B-45 (first learning source and auto-commit eligibility policy), PROPOSED, pending owner. Design decision D-01 (first Suggestion producers) is accepted only with the package.
+- **Revision:** 0.1 | **Updated:** 2026-11-09 | **Decision:** B-45 (first learning source and auto-commit eligibility policy) ACCEPTED as proposed 2026-11-10 (A-62); whole-SPEC acceptance pending. Design decision D-01 (first Suggestion producers) was also ACCEPTED as proposed on 2026-11-10 (A-62).
+- **Implementation state (2026-11-10):** Not implemented beyond pre-existing partial foundations; D-01 and B-45 accepted as proposed 2026-11-10, SPEC acceptance pending; migration v43 allocated.
 - **Owners:** Responsibility domain, Coworker, Storage, Operator/API, Desktop UI, Security/Trust, Product.
 - **Release matrix rows:** Windows 11/10 x64 + OpenCode v2.0.32 first; Linux x64 + OpenCode v2.0.32 second.
 

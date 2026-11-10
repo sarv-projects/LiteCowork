@@ -59,7 +59,7 @@ Each task lists exact allowed paths. Summary: `crates/storage-core/src/usage.rs`
 
 ## 5. Migrations
 
-The usage record table is created by Feature 001's migration. This package adds at most one forward-only migration (next free `sqlite-vNN.sql`) for a covering index if 001's migration lacks one. Logs and crash records are files, not tables. No migration ships in IN_REVIEW.
+The usage record table is created by Feature 001's migration. This package adds at most one forward-only migration (allocated v46 in docs/LITECOWORK-BUILD-TASKS.md, only if needed) for a covering index if 001's migration lacks one. Logs and crash records are files, not tables. No migration ships in IN_REVIEW.
 
 ## 6. Rollout
 
@@ -78,3 +78,11 @@ The usage record table is created by Feature 001's migration. This package adds 
 | Telemetry slows turns | Bounded channel, drop debug entries (AC-015) |
 | Vocabulary drift between 001 and the LLD | Mapping promoted with 001 in one change (T02) |
 | OpenCode exposes no counters | Fall back to ESTIMATED_LOCAL labelled "(est.)"; never present it as measured |
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+PROPOSED only; see the matching section in [TASKS.md](TASKS.md). Nothing here changes the accepted design of this package. Owner review is required first.
+
+- **P-33 Bounded rotating JSONL journal with partial-line repair, disable-on-uncertain-write, and an isolated support-bundle collector** (owns the proposed row). Class **ADOPT (algorithm port)**. Design impact if accepted: T07, T08 and T10 of package 018; T15 of package 011. Deferral: Not started. Rust daemon crate; unit tests run on Linux. The reader semantics (dedupe by device and inode, never parse an unterminated tail) are acceptance cases. Upstream: [src/operation-journal.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/operation-journal.ts), [src/operation-history.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/operation-history.ts), [src/operation-report-job.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/operation-report-job.ts), [src/crash-report.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/crash-report.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 8 and 14 (row P-33).
+- **P-44 Streaming secret redactor for subprocess output that holds back a buffer whose prefix could still become a secret** (owns the proposed row). Class **ADOPT (algorithm port)**. Design impact if accepted: T07 of package 018; T03 of package 017. Deferral: Not started. Rust unit tests with a secret split at every byte offset run on Linux. Upstream: [scripts/packaging-run.mjs](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/scripts/packaging-run.mjs), [scripts/packaging-step.mjs](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/scripts/packaging-step.mjs). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 8 and 14 (row P-44).
+

@@ -2,6 +2,7 @@
 
 - **Status:** IN_REVIEW - authored complete for owner review on 2026-11-09; not owner-accepted; authorizes no implementation; not a claim of implementation or qualification.
 - **Revision:** 0.1 | **Updated:** 2026-11-09 | **Blockers:** B-43 (signing identity and update channel), B-44 (licensing/packaging decision), both PROPOSED, pending owner.
+- **Implementation state (2026-11-10):** CODE skeleton, nothing run on GitHub. DONE: T02, T14, T15. PARTIAL: T03 (CI workflow), T05 (secret scan), T06 (CSP audit), T08, T10 (Linux deb config and scripts, no deb built), T12 (updater state, not mounted), T16, T17, T18, T21, plus CODEOWNERS. BLOCKED/deferred as release dependent: T01, T09, T11, T13 (B-43, B-44). Plans no daemon migration.
 - **Owners:** Release Engineering, Security, Desktop Shell, Runtime (Feature 011 interface), QA/Accessibility, Product.
 - **Release matrix rows:** Windows 11/10 x64 + OpenCode v2.0.32 first; Linux x64 + OpenCode v2.0.32 second; WSL2 never counts.
 

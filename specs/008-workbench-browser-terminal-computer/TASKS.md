@@ -23,7 +23,7 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 005 Environment admission contract (the terminal binds to its admitted Environment identity); Feature 003 ResourceRevision identity (Diff sources).
 - **Owner:** Desktop shell, Browser provider, Environments, Trust (contract owners)
-- **Allowed paths:** `docs/CHROME-BROWSER-LLD.md`, `docs/V1-INTEGRATED-TERMINAL-LLD.md`, `docs/ENVIRONMENTS.md`, `docs/EVENTS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/domain-event.schema.json`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-v29.sql` (new; use the next free number at implementation time), `apps/litecowork-ui/src/generated/` (regenerated `operator-api.ts` via `pnpm --dir apps/litecowork-ui run api:generate`), this package
+- **Allowed paths:** `docs/CHROME-BROWSER-LLD.md`, `docs/V1-INTEGRATED-TERMINAL-LLD.md`, `docs/ENVIRONMENTS.md`, `docs/EVENTS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/domain-event.schema.json`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-v41.sql` (new, allocated in docs/LITECOWORK-BUILD-TASKS.md; v29 is already taken by Feature 001), `apps/litecowork-ui/src/generated/` (regenerated `operator-api.ts` via `pnpm --dir apps/litecowork-ui run api:generate`), this package
 - **Contract:** SPEC §5 (B-22, B-23, B-32), §7.2, §15; AC-002, AC-004, AC-005, AC-009, AC-013, AC-014
 - **Change intent:** In one reviewed change, promote: pinned Chromium channel/version and managed-profile policy; BrowserSession, BrowserControlLease, ChromeAttachConsent epoch and BrowserActionReceipt operations; TerminalSession create/attach/input/resize/stop, ShellProfile discovery, `CommandReceipt` and `QuiescenceReceipt`; Workbench Activity read and RevisionDiff read; events (`environment.control.lease.changed.v1` promoted from target, plus terminal session/receipt events); error codes mapping `BrowserControlError` reason codes and `TerminalError`; one immutable SQLite migration for the session/lease/receipt tables. Each operationId is marked target-only in the route inventory until its handler lands.
 - **Acceptance:**
@@ -75,6 +75,8 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 ## 008-T04 - Managed Chromium provider with isolated profile (B-22)
 
 - **Status:** NOT STARTED
+- **Reference (DeepSeek Harness, MIT, pinned `fcc0ad46`, no code copied yet):** upstream [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159), reuse map [DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md).
+  - **P-45 Default-deny webview and session permissions, including the main one, plus a guest network filter.** Class: **ADAPT**. Upstream permalinks: [src/browser-guests.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/browser-guests.ts), [src/microphone-permissions.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/microphone-permissions.ts), [src/policy-test-auth.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/policy-test-auth.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 9 and 14 (row P-45). Why: Upstream shows a counter-example (the shell main session grants non-media permissions). Tauri has no equivalent default grant; keep it that way and add a test that notification, clipboard-read and geolocation requests are denied. The CSP audit already exists in `scripts/v1_csp_audit.py`. Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE (browser does not need a Task Environment; Runtime process supervision from Feature 011 lifecycle applies)
 - **Owner:** Browser provider, Security
@@ -113,6 +115,8 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 ## 008-T06 - Browser Workbench view with consent, take control and return
 
 - **Status:** NOT STARTED
+- **Reference (DeepSeek Harness, MIT, pinned `fcc0ad46`, no code copied yet):** upstream [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159), reuse map [DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md).
+  - **P-45 Default-deny webview and session permissions, including the main one, plus a guest network filter.** Class: **ADAPT**. Upstream permalinks: [src/browser-guests.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/browser-guests.ts), [src/microphone-permissions.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/microphone-permissions.ts), [src/policy-test-auth.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/policy-test-auth.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 9 and 14 (row P-45). Why: Upstream shows a counter-example (the shell main session grants non-media permissions). Tauri has no equivalent default grant; keep it that way and add a test that notification, clipboard-read and geolocation requests are denied. The CSP audit already exists in `scripts/v1_csp_audit.py`. Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
 - **Depends on:** T02, T05
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI
@@ -169,6 +173,7 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 ## 008-T09 - Safe shell discovery and Linux PTY under an admitted bubblewrap Environment
 
 - **Status:** BLOCKED (needs an admitted Linux bubblewrap Environment from Feature 005, owner Environments)
+- **DEFERRED/BLOCKED note:** Why: needs an admitted Linux bubblewrap Environment from Feature 005. Unblocks when: Feature 005 Linux Environment admission. Test later at: native Linux desktop with bubblewrap installed.
 - **Depends on:** T08
 - **Cross-package prerequisites:** Feature 005 Linux bubblewrap Environment admission and attestation task; Feature 005 B-17 qualification.
 - **Owner:** Environments, Security
@@ -223,6 +228,7 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 ## 008-T12 - Windows ConPTY provider under a qualified Windows Environment
 
 - **Status:** BLOCKED (Feature 005 blocker B-35, Windows Environment provider, PROPOSED, owner Environments/Security)
+- **DEFERRED/BLOCKED note:** Why: needs a qualified Windows Environment (B-35, Feature 005 task T17). Unblocks when: 005-T17 done. Test later at: the owner's Windows laptop (ConPTY).
 - **Depends on:** T10
 - **Cross-package prerequisites:** Feature 005 B-35 Windows Environment provider task (AppContainer + restricted token + Job Object + WFP egress, all ENFORCED and attested).
 - **Owner:** Environments, Security
@@ -420,6 +426,15 @@ T01 and T02 start first (T02 needs nothing). Browser lane: T01 -> T03, T04 -> T0
 | T17 | Feature 019 release matrix and packaged build; Feature 001 qualified route | Packaged E2E-08 per row |
 
 Cross-package task numbers are named by package and outcome because those packages' TASKS.md are being renumbered in the same release-planning change.
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+Status: PROPOSED. None of the items below is an accepted task. They come from the DeepSeek Harness studies ([desktop deep-dive](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) register A-63, proposals P-31 to P-46; [plugin deep-dive](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) register A-58). Owner review is required before any item becomes a numbered task in this package. They are labelled `PROP-Pnn` so they do not collide with the stable task IDs that `.specify/scripts/validate_feature_package.py` checks. On acceptance: assign the next free task ID in this file, copy the upstream permalink, class and reuse statement into the task, and update the [reuse map](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md). Upstream pin `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` (MIT, Copyright (c) 2026 DeepSeek). No upstream code is imported (AGENTS.md section 7).
+
+### Proposals owned elsewhere that touch this package (pointer only)
+
+- **PROP-P45 (P-45) Default-deny webview and session permissions, including the main one, plus a guest network filter** [PROPOSED, not accepted, owner review required]: row owned by package 019; class **ADAPT**; would touch here: T06 of package 019; T04 and T06 of package 008. Upstream permalinks: [src/browser-guests.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/browser-guests.ts), [src/microphone-permissions.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/microphone-permissions.ts), [src/policy-test-auth.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/policy-test-auth.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 9 and 14 (row P-45). Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
+
 
 ## Completion evidence
 

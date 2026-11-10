@@ -29,7 +29,7 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-None shipped yet. The `connections` table already exists in `docs/schemas/sqlite-v1.sql` (status CHECK without `REVOKED`, `secret_refs_json`) and has no Rust store. T01 designs a forward-only migration that rebuilds it with `REVOKED` and a remote-revocation field and adds `auth_attempts` (state, expiry, digests only). T07 replaces the `sqlite-v15.sql` Invocation creation and DISPATCHED triggers with guards that admit only the combined dispatch transaction. Token bytes never enter SQLite; only SecretRef ids do.
+None shipped yet. The `connections` table already exists in `docs/schemas/sqlite-v1.sql` (status CHECK without `REVOKED`, `secret_refs_json`) and has no Rust store. T01 designs a forward-only migration (allocated v40 in docs/LITECOWORK-BUILD-TASKS.md) that rebuilds it with `REVOKED` and a remote-revocation field and adds `auth_attempts` (state, expiry, digests only). T07 replaces the `sqlite-v15.sql` Invocation creation and DISPATCHED triggers with guards that admit only the combined dispatch transaction. Token bytes never enter SQLite; only SecretRef ids do.
 
 ## Current implementation boundary (2026-11-06)
 

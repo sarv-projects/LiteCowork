@@ -75,5 +75,5 @@ Durable presentation is an authorized message snapshot/upsert with opaque cursor
 
 ## 8. Migration/compatibility
 
-Existing migration chain is sqlite-v1 through sqlite-v28. Do not edit released migrations. Activation and final-result transaction code in the active main worktree currently uses existing tables. A final-result transaction may reuse current entities/events/receipts; any additional durable column/index/table requires approved forward-only migration, source checksum/schema fingerprint updates, migration test and old-binary compatibility assessment.
+Existing migration chain is sqlite-v1 through sqlite-v32 (v28 delegation settings revisions, v29 durable turn, v30 REPORTED turn activity records and v31/v32 from Features 014/012 are all wired; `SCHEMA_VERSION` is 32). Do not edit released migrations. Activation and final-result transaction code in the active main worktree currently uses existing tables. A final-result transaction may reuse current entities/events/receipts; any additional durable column/index/table requires approved forward-only migration, source checksum/schema fingerprint updates, migration test and old-binary compatibility assessment.
 

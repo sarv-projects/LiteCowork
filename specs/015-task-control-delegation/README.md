@@ -1,7 +1,8 @@
 # 015 - Task Control and Heterogeneous Delegation
 
 - **Status:** IN_REVIEW - authored complete for owner review; does not authorize implementation until the owner accepts the SPEC and blocker B-39.
-- **Revision:** 0.1 | **Updated:** 2026-11-09 | **Blocker:** B-39 (first heterogeneous delegation pair and Environment sharing rule), PROPOSED, pending owner.
+- **Revision:** 0.1 | **Updated:** 2026-11-09 | **Decision:** B-39 (first heterogeneous delegation pair and Environment sharing rule) ACCEPTED as proposed 2026-11-10 (A-62); whole-SPEC acceptance pending, package stays IN_REVIEW.
+- **Implementation state (2026-11-10):** Not implemented beyond pre-existing partial foundations; migration v42 allocated.
 - **Owners:** Task Runtime, Delegation, Storage, Operator/API, Desktop UI (Work screen), Security/Trust and Product.
 - **Release rows:** Linux x86_64 first; Windows x64 UNAVAILABLE until Feature 005 B-35 qualifies.
 

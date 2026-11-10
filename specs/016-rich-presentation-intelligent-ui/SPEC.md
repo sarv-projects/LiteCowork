@@ -32,7 +32,7 @@ No DIAGRAM (Mermaid) rendering, MEDIA blocks inside a RichPresentation, HOST_PRO
 
 ## 4. Current implementation/evidence boundary
 
-Verified against branch `docs/audit-competitor-superset`; highest migration `docs/schemas/sqlite-v28.sql`.
+Verified against branch `docs/audit-competitor-superset`; highest migration file `docs/schemas/sqlite-v32.sql` (016 plans no migration).
 
 | Capability | Current evidence | Limitation |
 |---|---|---|

@@ -56,6 +56,24 @@ Each feature contract must cover:
 
 Do not equate a package lifecycle with code status. Use the evidence scale in IMPLEMENTATION-STATUS.md. An implementation task must update the global owner, machine schema, UI action/screen contract, wiring, traceability and tests in the same reviewed change. Feature completion requires a real journey rather than schema counts or component presence.
 
+### Implementation snapshot (2026-11-10)
+
+The lifecycle column above is design status. Code status at tip e9abe46:
+
+| Package | Implemented so far (evidence class CODE or SERVED unless stated) | Not implemented, deferred or blocked |
+|---|---|---|
+| 001 | Durable turn outbox and single-flight (v29), Stop and Retry, restart sweep, transient frames, usage records, sliding context window, REPORTED activity (v30, served read, UI cards), ResourceRef text materialization, ACP adapter and normalizer, Runtime DEGRADED on Operator endpoint failure | T12 BLOCKED, T09 and T28 NOT STARTED (live OpenCode), binary attachments, permission answer channel, O-05 real input budget |
+| 002 | OpenCode AgentModule manifest, descriptor store and routes, enable gate, ACP client, auth observation service, served begin-authentication and open-native-config (fail-closed), model picker view-model, Matchmaker | T08 and T12 BLOCKED, T15 DEFERRED, T19 NOT STARTED, no live run, no Tauri commands |
+| 003 | Linux workspace root lifecycle storage tests (T02 partial) | Windows tasks DEFERRED (T03, T04 Windows part, T05, T06); T01, T07, T09 to T18 NOT STARTED |
+| 011 | IPC bounds, runtime health rows, local preferences, Workspace rename (served), shortcut registry, SettingsPage merge, read-only stop preview (served), Dashboard, keep-awake state machine | T02, T03, T17 DEFERRED; T13 request half, T23 not done |
+| 012 | Migration v32 storage (T05 partial) | Routes, service, UI NOT STARTED |
+| 013 | Nothing | Whole package DEFERRED by the owner |
+| 014 | Migration v31 side table and `ConversationHistoryStore` (T01 to T03 partial) | Routes, search, purge, UI NOT STARTED |
+| 019 | CI skeleton, CODEOWNERS, secret scan, CSP audit, release schemas, matrix, evidence bundle, Linux deb config and scripts, updater UI reducer | B-43 and B-44 items DEFERRED; CI never ran on GitHub; no deb built |
+| 004 to 010, 015 to 018, 020 | Pre-existing foundations only | Not started; see each TASKS.md |
+
+Test baselines at this snapshot: `cargo test -p litecowork-storage-sqlite --lib` 624 pass; `cargo test -p litecoworkd --bin litecoworkd` 656 pass, 1 ignored; UI `pnpm test` 5 pre-existing failures; served routes 178 / 1 local-only / 53 target-only; `SCHEMA_VERSION` 32. Full per-task detail: [CURRENT-RUN.md](../CURRENT-RUN.md) "Handoff status by package".
+
 Validation command: python3 .specify/scripts/validate_feature_package.py
 
 ## Reference comparison and scope note

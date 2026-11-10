@@ -2,6 +2,7 @@
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 **Revision:** 1.0 | **Updated:** 2026-11-09 | **Owner acceptance:** repository owner, 2026-11-09, via [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)
+**Implementation state (2026-11-10):** Not implemented. T09 BLOCKED on a Feature 005 Linux Environment, T12 BLOCKED on B-35 (Windows); migration v41 allocated.
 **Component owners:** Desktop shell, Environments, Browser provider, Trust, Desktop UI.
 
 ## User outcome

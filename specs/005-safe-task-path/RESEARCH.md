@@ -85,3 +85,17 @@ These findings are source/route/UI inspection, not an end-to-end Task USER test.
 - B-35 (Windows Environment provider) is PROPOSED and needs the owner.
 - The Linux-row planning harness and version (SPEC §18).
 - Whether a broker-only connector Step needs an admitted Environment (SPEC §18, shared with 006).
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+Research note, not a decision. Source: [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159) at the pinned SHA (MIT, Copyright (c) 2026 DeepSeek). Local read-only clone `repo_take/deepseek-harness` is gitignored and never staged. Upstream paths below were checked to exist at that SHA on 2026-11-10.
+
+Read-depth limits from the study (do not over-trust): `scripts/` about 58% read, tests about 5% read, installer UI text partly unread. See [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 0 and 15 before turning any item into a design.
+
+- **P-38 Login-shell PATH-class capture for agents launched from a Linux desktop entry.** Class **OWNER (open; not ADOPT, ADAPT or REJECT yet)**. Upstream: [src/login-shell-environment.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/login-shell-environment.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Section 14 (row P-38 and the conflict note). Lesson: CONFLICT, stays open: capturing the login-shell environment merges ambient variables over the inherited environment, which conflicts with environment scrubbing (A-58, Section 9 of the desktop study and the Env scrubbing lesson in the plugin study) and with the T07 and T13 environment rules of package 002. Only a PATH-class allowlist could be considered, and only after an owner decision. Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React). No reuse is allowed before the owner decision. Where it applies: T07 and T13 of package 002; package 005 Environment admission. Deferral: Blocked on the owner decision. Then a Linux desktop-entry launch test. **Open conflict with environment scrubbing (A-58); owner decision required.**
+
+Plugin-architecture lessons (see [plugin study](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) Section 8):
+  - Capability seam: Definition, Provider, Consumer (ADR P-20): [docs/capability-seams.md](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/docs/capability-seams.md). Class **ADAPT**. Environments and Effects as consumers of a provider seam. Reuse: pattern only, reimplement; no upstream code imported.
+  - Durable run record plus process-group liveness fence (P-27): [packages/boot/plugin-manager/src/run-tree.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/run-tree.ts). Class **ADAPT**. Attempt recovery cross-check. Reuse: pattern only, reimplement; no upstream code imported.
+  - Atomic restore on a rejected mutation: [packages/boot/plugin-manager/src/operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts). Class **ADAPT**. Effect rollback cross-check. Reuse: pattern only, reimplement; no upstream code imported.
+
