@@ -719,6 +719,15 @@ async fn retry_conversation_turn(
             )
         })?;
 
+    // An exact repeat of an already applied Retry key replays its receipt (no second
+    // attempt, no second intent) even though the turn version has moved on.
+    if let Some(replayed) = conv_store
+        .find_conversation_turn_command_replay(&workspace_id, &conversation_id, &turn_id, &request_id)
+        .map_err(map_store_error)?
+    {
+        return Ok(turn_command_receipt(replayed, correlation_id));
+    }
+
     if turn.version != expected_version {
         return Err(error(
             StatusCode::PRECONDITION_FAILED,
@@ -735,7 +744,6 @@ async fn retry_conversation_turn(
         ));
     }
 
-    let new_session_id = new_id("ses").map_err(|_| internal())?;
     let next_version = turn.version + 1;
     let next_retry_ordinal = turn.retry_ordinal + 1;
     let ctx = event_context(&state.runtime_id, &correlation_id).map_err(|_| internal())?;
@@ -752,13 +760,7 @@ async fn retry_conversation_turn(
         causation_id: Some(request_id),
         schema_version: 1,
         event_type: "conversation.turn.retried.v1".to_owned(),
-        payload: json!({
-            "turn_id": turn_id,
-            "agent_session_id": new_session_id,
-            "prior_agent_session_id": turn.agent_session_id,
-            "retry_ordinal": next_retry_ordinal,
-            "aggregate_version": next_version,
-        }),
+        payload: retry_event_payload(&turn_id, turn.agent_session_id.as_deref(), next_retry_ordinal, next_version),
         recorded_at: ctx.recorded_at.clone(),
     };
 
@@ -769,9 +771,7 @@ async fn retry_conversation_turn(
         conversation_id.clone(),
         turn_id.clone(),
         turn.version,
-        TurnCommand::Retry {
-            agent_session_id: new_session_id,
-        },
+        TurnCommand::Retry,
         event,
     )
     .await
@@ -839,6 +839,22 @@ async fn cancel_conversation_turn(
             )
         })?;
 
+    if let Some(replayed) = conv_store
+        .find_conversation_turn_command_replay(&workspace_id, &conversation_id, &turn_id, &request_id)
+        .map_err(map_store_error)?
+    {
+        return Ok(turn_command_receipt(replayed, correlation_id));
+    }
+
+    if turn.status == ConversationTurnStatus::CancelRequested {
+        // A Stop is already in flight. Repeating it never settles the turn: only the
+        // supervisor's observed quiescence commits CANCELLED. Re-signal and report.
+        if let Some(ref supervisor) = state.supervisor {
+            supervisor.request_cancel(&turn_id, turn.retry_ordinal);
+        }
+        return Ok(turn_command_receipt(turn, correlation_id));
+    }
+
     if turn.version != expected_version {
         return Err(error(
             StatusCode::PRECONDITION_FAILED,
@@ -887,7 +903,9 @@ async fn cancel_conversation_turn(
                 recorded_at: ctx.recorded_at.clone(),
             };
 
-            let req_turn = run_turn_transition(
+            // Only the request is committed here. CANCELLED is committed by the
+            // supervisor after it observes the native session quiescent (AC-010).
+            let requested = run_turn_transition(
                 state.store.clone(),
                 state.principal_id.clone(),
                 workspace_id.clone(),
@@ -899,81 +917,10 @@ async fn cancel_conversation_turn(
             )
             .await
             .map_err(map_store_error)?;
-
-            let settle_ctx =
-                event_context(&state.runtime_id, &correlation_id).map_err(|_| internal())?;
-            let settle_event = EventDraft {
-                event_id: settle_ctx.event_id,
-                workspace_id: workspace_id.clone(),
-                entity_type: "ConversationTurn".to_owned(),
-                entity_id: turn_id.clone(),
-                origin_runtime_id: state.runtime_id.clone(),
-                entity_revision: req_turn.version + 1,
-                hlc_timestamp: settle_ctx.hlc_timestamp,
-                correlation_id: settle_ctx.correlation_id,
-                causation_id: Some(request_id),
-                schema_version: 1,
-                event_type: "conversation.turn.settled.v1".to_owned(),
-                payload: json!({
-                    "turn_id": turn_id,
-                    "from": "CANCEL_REQUESTED",
-                    "to": "CANCELLED",
-                    "aggregate_version": req_turn.version + 1,
-                }),
-                recorded_at: settle_ctx.recorded_at.clone(),
-            };
-
-            run_turn_transition(
-                state.store.clone(),
-                state.principal_id.clone(),
-                workspace_id.clone(),
-                conversation_id.clone(),
-                turn_id.clone(),
-                req_turn.version,
-                TurnCommand::SettleCancelled {
-                    settled_at: settle_ctx.recorded_at,
-                },
-                settle_event,
-            )
-            .await
-            .map_err(map_store_error)?
-        }
-        ConversationTurnStatus::CancelRequested => {
-            let settle_event = EventDraft {
-                event_id: ctx.event_id,
-                workspace_id: workspace_id.clone(),
-                entity_type: "ConversationTurn".to_owned(),
-                entity_id: turn_id.clone(),
-                origin_runtime_id: state.runtime_id.clone(),
-                entity_revision: turn.version + 1,
-                hlc_timestamp: ctx.hlc_timestamp,
-                correlation_id: ctx.correlation_id,
-                causation_id: Some(request_id),
-                schema_version: 1,
-                event_type: "conversation.turn.settled.v1".to_owned(),
-                payload: json!({
-                    "turn_id": turn_id,
-                    "from": "CANCEL_REQUESTED",
-                    "to": "CANCELLED",
-                    "aggregate_version": turn.version + 1,
-                }),
-                recorded_at: ctx.recorded_at.clone(),
-            };
-
-            run_turn_transition(
-                state.store.clone(),
-                state.principal_id.clone(),
-                workspace_id.clone(),
-                conversation_id.clone(),
-                turn_id.clone(),
-                turn.version,
-                TurnCommand::SettleCancelled {
-                    settled_at: ctx.recorded_at.clone(),
-                },
-                settle_event,
-            )
-            .await
-            .map_err(map_store_error)?
+            if let Some(ref supervisor) = state.supervisor {
+                supervisor.request_cancel(&turn_id, requested.retry_ordinal);
+            }
+            requested
         }
         ConversationTurnStatus::Open => {
             let fail_event = EventDraft {
@@ -1027,6 +974,37 @@ async fn cancel_conversation_turn(
     };
 
     Ok((StatusCode::ACCEPTED, Json(receipt)).into_response())
+}
+
+fn retry_event_payload(
+    turn_id: &str,
+    prior_agent_session_id: Option<&str>,
+    retry_ordinal: u32,
+    aggregate_version: u64,
+) -> Value {
+    let mut payload = json!({
+        "turn_id": turn_id,
+        "retry_ordinal": retry_ordinal,
+        "aggregate_version": aggregate_version,
+    });
+    if let Some(prior) = prior_agent_session_id {
+        payload["prior_agent_session_id"] = json!(prior);
+    }
+    payload
+}
+
+/// 202 receipt for a Retry or Cancel command that was already applied or is in flight.
+fn turn_command_receipt(turn: ConversationTurn, correlation_id: String) -> Response {
+    let receipt = ConversationTurnReceipt {
+        accepted_at: turn.settled_at.clone().unwrap_or_else(|| turn.created_at.clone()),
+        turn_id: turn.turn_id,
+        conversation_id: turn.conversation_id,
+        user_message_id: turn.user_message_id,
+        status: turn.status,
+        correlation_id,
+        presentation_preference: turn.presentation_preference,
+    };
+    (StatusCode::ACCEPTED, Json(receipt)).into_response()
 }
 
 async fn ensure_conversation_available(

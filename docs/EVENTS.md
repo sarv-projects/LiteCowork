@@ -391,7 +391,7 @@ must not be copied into domain events, ordinary logs, or aggregate snapshots.
 | `conversation.message.added` | `message_id`, `conversation_id`, `author`, `content_digest`, `resource_refs` |
 | `conversation.turn.created` | `turn_id`, `conversation_id`, `user_message_id`, `agent_binding_id`, `aggregate_version` |
 | `rich.presentation.published` | `presentation_id`, `conversation_id`, `message_id`, `schema_version`, `renderer_contract_version`, `semantic_content_digest`, `document_digest`, `document_size_bytes`, `producer_agent_session_id?`, `host_instruction_digest?`, `host_skill_refs[]`, `aggregate_version` |
-| `conversation.turn.retried` | `turn_id`, `prior_agent_session_id?`, `agent_session_id`, `retry_ordinal`, `aggregate_version` |
+| `conversation.turn.retried` | `turn_id`, `prior_agent_session_id?`, `retry_ordinal`, `aggregate_version` (the turn returns to OPEN with no session; the fresh AgentSession is reserved by the dispatcher afterwards) |
 | `conversation.turn.resumed` | `turn_id`, `user_request_id`, `prior_agent_session_id?`, `agent_session_id`, `aggregate_version` |
 | `conversation.turn.status.changed` | `turn_id`, `from`, `to`, `reason_code`, `agent_session_id?`, `aggregate_version` |
 | `conversation.turn.settled` | `turn_id`, `from`, `to`, `reason_code?`, `agent_session_id?`, `aggregate_version` |

@@ -95,7 +95,7 @@ fn spawned_runtime_lifecycle_restarts_with_current_incarnation() {
         .as_str()
         .expect("current incarnation is exposed")
         .to_owned();
-    assert_degraded_lifecycle(&first_lifecycle, &runtime_id, &first_incarnation);
+    assert_ready_lifecycle(&first_lifecycle, &runtime_id, &first_incarnation);
     assert!(lifecycle_request(directory.path(), "lifecycle-after-client-close").is_ok());
     assert!(
         first_child
@@ -130,14 +130,14 @@ fn spawned_runtime_lifecycle_restarts_with_current_incarnation() {
         .as_str()
         .expect("restarted current incarnation is exposed")
         .to_owned();
-    assert_degraded_lifecycle(&restarted_lifecycle, &runtime_id, &restarted_incarnation);
+    assert_ready_lifecycle(&restarted_lifecycle, &runtime_id, &restarted_incarnation);
     assert_ne!(restarted_incarnation, first_incarnation);
     assert_durable_current_incarnation(
         directory.path(),
         &runtime_id,
         &restarted_incarnation,
-        "DEGRADED",
-        "DEGRADED",
+        "READY",
+        "ONLINE",
     );
 
     let (restarted_status, restarted_stdout, restarted_stderr) =
@@ -219,8 +219,8 @@ fn spawned_runtime_exits_uncleanly_after_operator_endpoint_failure_and_restarts(
         directory.path(),
         &runtime_id,
         &restarted_incarnation,
-        "DEGRADED",
-        "DEGRADED",
+        "READY",
+        "ONLINE",
     );
     let (restart_status, restart_stdout, restart_stderr) = restarted_child.terminate_and_wait();
     assert!(
@@ -313,31 +313,21 @@ fn lifecycle_request(data_directory: &Path, request_id: &str) -> Result<Value, S
     })
 }
 
-pub(super) fn assert_degraded_lifecycle(value: &Value, runtime_id: &str, incarnation_id: &str) {
+pub(super) fn assert_ready_lifecycle(value: &Value, runtime_id: &str, incarnation_id: &str) {
     assert!(value.get("local_principal_id").is_none());
     assert_eq!(value["runtime_id"], runtime_id);
-    assert_eq!(value["availability"], "DEGRADED");
+    assert_eq!(value["availability"], "ONLINE");
     assert_eq!(value["incarnation"]["runtime_id"], runtime_id);
     assert_eq!(
         value["incarnation"]["runtime_incarnation_id"],
         incarnation_id
     );
-    assert_eq!(value["incarnation"]["recovery_state"], "DEGRADED");
+    assert_eq!(value["incarnation"]["recovery_state"], "READY");
     assert!(
-        !value["incarnation"]["recovered_from_unclean_shutdown"]
-            .as_bool()
-            .expect("unclean-shutdown state is boolean")
-    );
-    let blockers = value["blockers"]
-        .as_array()
-        .expect("degraded lifecycle has typed blockers");
-    assert!(
-        blockers.iter().any(|blocker| {
-            blocker["safe_message"]
-                .as_str()
-                .is_some_and(|message| message.contains("Task execution admission"))
-        }),
-        "Runtime must report the unavailable Task admission dependency"
+        value["blockers"]
+            .as_array()
+            .expect("blockers are an array")
+            .is_empty()
     );
 }
 

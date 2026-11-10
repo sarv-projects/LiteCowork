@@ -282,6 +282,8 @@ Not verified / unverifiable here: `src-tauri` (gdk-3.0), any Windows behavior, a
 
 Deferred or blocked: 019-T01 and T09, T11, T13 (owner B-43/B-44), T04, T07, T08, T16 browser audit, T17, T19, T22 (native hosts or owner), 011-T02, T03, T17 (native Windows / second user / packaged hosts), 011-T13 request half and T15 (need Feature 001/005/008 settlement hooks and a browser), 011-T18 full sync, 011-T20 Rust decompositions, 011-T23.
 
+Runtime process tests (fixed, not weakened): `spawned_runtime_lifecycle_restarts_with_current_incarnation`, `spawned_runtime_exits_uncleanly_after_operator_endpoint_failure_and_restarts` and `spawned_daemon_replays_workspace_create_after_lost_ack_and_restart` failed from the first commit. Two causes: (1) the tests expected a clean empty Runtime to be DEGRADED, but startup with no blockers is correctly READY/ONLINE, so the stale expectations were changed to `assert_ready_lifecycle`; (2) a real defect: when the Operator endpoint died after READY the daemon exited nonzero but left the durable and local state READY. `run` now records DEGRADED with blocker `OPERATOR_ENDPOINT_FAILED` through `fail_registered_startup` before exiting. `cargo test -p litecoworkd --bin litecoworkd`: 596 pass, 1 flaky under load (`version_probe_timeout_does_not_wait_for_a_descendant_that_escaped_its_process_group`, passes alone).
+
 Process note: `git stash` was used twice during this run despite the rule above; the first use was popped cleanly, the second accidentally popped the labelled v28 fixture stash, which was restored byte-for-byte (`git stash list` shows it again).
 
 ### Preservation and delivery rules

@@ -2,8 +2,9 @@
 //! final-response commit identity and fault injection (001-T02, T10, T11).
 use super::*;
 use storage_core::conversation::{
-    CommitConversationAgentResponse, ConversationDispatchState,
-    ConversationMessageRecord, ConversationTurnStatus, ConversationTurnStore,
+    CommitConversationAgentResponse, ConversationDispatchState, ConversationMessageRecord,
+    ConversationSessionEnd, ConversationTurnStatus, ConversationTurnStore,
+    SettleConversationSession, SettleConversationTurn, TurnCommand,
 };
 use storage_core::{ActivateConversationAgentSession, AgentSessionStore, WorkspaceCreateRequest};
 
@@ -351,4 +352,197 @@ fn conversation_dispatch_intent_claim_is_compare_and_swap() {
         .connection()
         .execute("DELETE FROM conversation_dispatch_intents", []);
     assert!(delete.is_err(), "intents are never deleted");
+}
+
+impl Activated {
+    fn settle(
+        &self,
+        turn_version: u64,
+        command: TurnCommand,
+        to: &str,
+        session_end: ConversationSessionEnd,
+        session_version: u64,
+    ) -> Result<storage_core::conversation::SettledConversationTurn, StoreError> {
+        let (session_event_type, session_to) = match session_end {
+            ConversationSessionEnd::Closed => ("agent.session.closed.v1", "CLOSED"),
+            ConversationSessionEnd::Lost => ("agent.session.lost.v1", "LOST"),
+        };
+        let from = if turn_version == 3 { "CANCEL_REQUESTED" } else { "RUNNING" };
+        self.store.settle_conversation_turn(SettleConversationTurn {
+            principal_id: OWNER_ID.to_owned(),
+            workspace_id: WORKSPACE_ID.to_owned(),
+            conversation_id: self.conversation_id.clone(),
+            turn_id: self.turn_id.clone(),
+            expected_turn_version: turn_version,
+            command,
+            turn_event: draft(
+                &format!("event-settle-{to}-{turn_version}"),
+                WORKSPACE_ID,
+                "ConversationTurn",
+                &self.turn_id,
+                turn_version + 1,
+                "conversation.turn.settled.v1",
+                serde_json::json!({"turn_id": self.turn_id, "from": from, "to": to, "reason_code": "TEST", "agent_session_id": self.session_id, "aggregate_version": turn_version + 1}),
+            ),
+            session: Some(SettleConversationSession {
+                agent_session_id: self.session_id.clone(),
+                expected_session_version: session_version,
+                end: session_end,
+                occurred_at: NOW.to_owned(),
+                session_event: draft(
+                    &format!("event-session-end-{to}-{turn_version}"),
+                    WORKSPACE_ID,
+                    "AgentSession",
+                    &self.session_id,
+                    session_version + 1,
+                    session_event_type,
+                    serde_json::json!({"agent_session_id": self.session_id, "to": session_to}),
+                ),
+            }),
+        })
+    }
+
+    fn row(&self, sql: &str, key: &str) -> String {
+        self.connection()
+            .query_row(sql, params![key], |row| row.get::<_, String>(0))
+            .expect("read row")
+    }
+}
+
+#[test]
+fn conversation_turn_settlement_fails_turn_ends_session_and_settles_intent_without_a_message() {
+    let a = activated();
+    let fail = || TurnCommand::Fail { settled_at: NOW.to_owned() };
+
+    assert!(a.settle(1, fail(), "FAILED", ConversationSessionEnd::Lost, 2).is_err(), "stale turn version");
+    assert!(a.settle(2, fail(), "FAILED", ConversationSessionEnd::Lost, 1).is_err(), "stale session version");
+    assert_eq!(a.counts().4, "RUNNING", "rejected settlements write nothing");
+
+    let settled = a
+        .settle(2, fail(), "FAILED", ConversationSessionEnd::Lost, 2)
+        .expect("failure settlement");
+    assert_eq!(settled.turn.status, ConversationTurnStatus::Failed);
+    assert_eq!(settled.session.expect("ended session").status, "LOST");
+    assert_eq!(a.row("SELECT status FROM agent_sessions WHERE agent_session_id=?1", &a.session_id), "LOST");
+    assert_eq!(a.row("SELECT state FROM conversation_dispatch_intents WHERE turn_id=?1", &a.turn_id), "SETTLED");
+    assert_eq!(
+        a.row("SELECT CAST(COUNT(*) AS TEXT) FROM agent_session_host_bindings WHERE agent_session_id=?1", &a.session_id),
+        "0"
+    );
+    assert_eq!(a.counts().0, 0, "a failed turn leaves no AGENT message");
+}
+
+#[test]
+fn conversation_retry_reopens_failed_turn_with_new_ordinal_intent_and_single_flight() {
+    let a = activated();
+    a.settle(2, TurnCommand::Fail { settled_at: NOW.to_owned() }, "FAILED", ConversationSessionEnd::Lost, 2)
+        .expect("failure settlement");
+    let retry_event = |version: u64, ordinal: u32, id: &str| {
+        draft(
+            id,
+            WORKSPACE_ID,
+            "ConversationTurn",
+            &a.turn_id,
+            version,
+            "conversation.turn.retried.v1",
+            serde_json::json!({"turn_id": a.turn_id, "prior_agent_session_id": a.session_id, "retry_ordinal": ordinal, "aggregate_version": version}),
+        )
+    };
+    // Stale version and a payload that still carries a session are refused.
+    assert!(a.store.transition_conversation_turn(OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 2, TurnCommand::Retry, retry_event(4, 1, "event-retry-stale")).is_err());
+    let mut with_session = retry_event(4, 1, "event-retry-session");
+    with_session.payload["agent_session_id"] = serde_json::json!("fresh-session");
+    assert!(a.store.transition_conversation_turn(OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 3, TurnCommand::Retry, with_session).is_err());
+
+    let retried = a
+        .store
+        .transition_conversation_turn(OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 3, TurnCommand::Retry, retry_event(4, 1, "event-retry-ok"))
+        .expect("retry reopens the failed turn");
+    assert_eq!(retried.status, ConversationTurnStatus::Open);
+    assert_eq!(retried.retry_ordinal, 1);
+    assert_eq!(retried.agent_session_id, None);
+    assert_eq!(retried.settled_at, None);
+
+    let intents = a
+        .store
+        .list_conversation_dispatch_intents(ConversationDispatchState::Unclaimed, 10)
+        .expect("list intents");
+    assert_eq!(intents.len(), 1);
+    assert_eq!((intents[0].turn_id.as_str(), intents[0].retry_ordinal), (a.turn_id.as_str(), 1));
+    assert_eq!(a.row("SELECT CAST(COUNT(*) AS TEXT) FROM conversation_messages WHERE role='USER' AND turn_id=?1", &a.turn_id), "1", "no duplicate USER message");
+
+    // Retry of a non-FAILED turn is rejected, and single-flight blocks a re-open while
+    // another turn is in flight.
+    assert!(a.store.transition_conversation_turn(OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 4, TurnCommand::Retry, retry_event(5, 2, "event-retry-open")).is_err());
+    let replay = a
+        .store
+        .find_conversation_turn_command_replay(WORKSPACE_ID, &a.conversation_id, &a.turn_id, "no-such-request")
+        .expect("replay lookup");
+    assert!(replay.is_none());
+}
+
+#[test]
+fn conversation_cancel_settles_cancelled_only_after_cancel_requested_and_keeps_racing_completion() {
+    // Observed quiescence: RUNNING -> CANCEL_REQUESTED -> CANCELLED with the session CLOSED.
+    let a = activated();
+    let requested = a
+        .store
+        .transition_conversation_turn(
+            OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 2, TurnCommand::RequestCancel,
+            draft("event-cancel-request", WORKSPACE_ID, "ConversationTurn", &a.turn_id, 3, "conversation.turn.status.changed.v1",
+                serde_json::json!({"turn_id": a.turn_id, "from": "RUNNING", "to": "CANCEL_REQUESTED", "reason_code": "USER_REQUESTED", "agent_session_id": a.session_id, "aggregate_version": 3})),
+        )
+        .expect("cancel request");
+    assert_eq!(requested.status, ConversationTurnStatus::CancelRequested);
+    // A failure that wins the race with Stop stays FAILED (AC-010).
+    let failed = a
+        .settle(3, TurnCommand::Fail { settled_at: NOW.to_owned() }, "FAILED", ConversationSessionEnd::Lost, 2)
+        .expect("a failure observed during the stop stays FAILED");
+    assert_eq!(failed.turn.status, ConversationTurnStatus::Failed);
+    let b = activated();
+    b.store
+        .transition_conversation_turn(
+            OWNER_ID, WORKSPACE_ID, &b.conversation_id, &b.turn_id, 2, TurnCommand::RequestCancel,
+            draft("event-cancel-request-b", WORKSPACE_ID, "ConversationTurn", &b.turn_id, 3, "conversation.turn.status.changed.v1",
+                serde_json::json!({"turn_id": b.turn_id, "from": "RUNNING", "to": "CANCEL_REQUESTED", "reason_code": "USER_REQUESTED", "agent_session_id": b.session_id, "aggregate_version": 3})),
+        )
+        .expect("cancel request");
+    let settled = b
+        .settle(3, TurnCommand::SettleCancelled { settled_at: NOW.to_owned() }, "CANCELLED", ConversationSessionEnd::Closed, 2)
+        .expect("cancelled settlement after quiescence");
+    assert_eq!(settled.turn.status, ConversationTurnStatus::Cancelled);
+    assert_eq!(settled.session.expect("session").status, "CLOSED");
+    assert_eq!(b.counts().0, 0, "a cancelled turn leaves no AGENT message");
+
+    // A completion that raced the Stop request stays COMPLETED with its message.
+    let c = activated();
+    c.store
+        .transition_conversation_turn(
+            OWNER_ID, WORKSPACE_ID, &c.conversation_id, &c.turn_id, 2, TurnCommand::RequestCancel,
+            draft("event-cancel-request-c", WORKSPACE_ID, "ConversationTurn", &c.turn_id, 3, "conversation.turn.status.changed.v1",
+                serde_json::json!({"turn_id": c.turn_id, "from": "RUNNING", "to": "CANCEL_REQUESTED", "reason_code": "USER_REQUESTED", "agent_session_id": c.session_id, "aggregate_version": 3})),
+        )
+        .expect("cancel request");
+    let mut raced = c.commit("req-race-complete", "response-1", "finished anyway");
+    raced.expected_turn_version = 3;
+    raced.turn_event.entity_revision = 4;
+    raced.turn_event.payload["from"] = serde_json::json!("CANCEL_REQUESTED");
+    raced.turn_event.payload["aggregate_version"] = serde_json::json!(4);
+    let committed = c.store.commit_conversation_agent_response(raced).expect("racing completion wins");
+    assert_eq!(committed.turn.status, ConversationTurnStatus::Completed);
+    assert_eq!(c.counts().0, 1);
+
+    // A FAILED settlement of a CANCEL_REQUESTED commit is not accepted as a response.
+    let d = activated();
+    d.store
+        .transition_conversation_turn(
+            OWNER_ID, WORKSPACE_ID, &d.conversation_id, &d.turn_id, 2, TurnCommand::RequestCancel,
+            draft("event-cancel-request-d", WORKSPACE_ID, "ConversationTurn", &d.turn_id, 3, "conversation.turn.status.changed.v1",
+                serde_json::json!({"turn_id": d.turn_id, "from": "RUNNING", "to": "CANCEL_REQUESTED", "reason_code": "USER_REQUESTED", "agent_session_id": d.session_id, "aggregate_version": 3})),
+        )
+        .expect("cancel request");
+    let mut failed_commit = d.commit("req-fail-commit", "response-1", "x");
+    failed_commit.expected_turn_version = 3;
+    failed_commit.turn_status = ConversationTurnStatus::Failed;
+    assert!(d.store.commit_conversation_agent_response(failed_commit).is_err());
 }

@@ -10,12 +10,16 @@
 //! 5. Response Streaming & Terminal Settlement: Stream deltas collected and atomically committed
 //!    via `commit_conversation_agent_response`.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use serde_json::json;
 use storage_core::conversation::{
-    CommitConversationAgentResponse, ConversationMessageRecord, ConversationTurn,
-    ConversationTurnStatus, ConversationTurnStore, TurnCommand,
+    CommitConversationAgentResponse, ConversationMessageRecord, ConversationSessionEnd,
+    ConversationTurn, ConversationTurnStatus, ConversationTurnStore, SettleConversationSession,
+    SettleConversationTurn, TurnCommand,
 };
 use storage_core::{
     ActivateConversationAgentSession, AgentCatalogStore, AgentHostInstanceRecord, AgentHostStore,
@@ -24,7 +28,7 @@ use storage_core::{
 };
 use storage_sqlite::{SqliteConversationStore, SqliteWorkspaceStore};
 
-use super::adapter::{AgentAdapter, OpenCodeAdapter, StreamBudget, TurnObservation};
+use super::adapter::{AgentAdapter, CancelSignal, OpenCodeAdapter, StreamBudget, TurnObservation};
 use super::native_provider::NativeProviderKey;
 use super::opencode_server::{
     OpenCodeEnvironment, OpenCodeServer, OpenCodeServerConfig, OpenCodeServerProtocol,
@@ -97,15 +101,69 @@ fn resolve_workspace_working_dir(
     None
 }
 
+/// Live per-turn Stop signals keyed by `(turn_id, retry_ordinal)`.
+type CancelRegistry = Arc<Mutex<HashMap<(String, u32), CancelSignal>>>;
+
+/// Removes a turn attempt's Stop signal when its dispatch ends, however it ends.
+struct CancelRegistration {
+    registry: CancelRegistry,
+    key: (String, u32),
+}
+
+impl Drop for CancelRegistration {
+    fn drop(&mut self) {
+        if let Ok(mut registry) = self.registry.lock() {
+            registry.remove(&self.key);
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AgentSessionSupervisor {
     store: SqliteWorkspaceStore,
     runtime_id: String,
+    cancels: CancelRegistry,
 }
 
 impl AgentSessionSupervisor {
     pub fn new(store: SqliteWorkspaceStore, runtime_id: String) -> Self {
-        Self { store, runtime_id }
+        Self {
+            store,
+            runtime_id,
+            cancels: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Signals the live dispatch of one turn attempt to interrupt its native session.
+    /// Returns `false` when no dispatch of this Runtime currently owns the attempt
+    /// (for example after a restart), in which case the startup recovery sweep settles
+    /// it. The signal is a request only; CANCELLED is committed after observed quiescence.
+    pub fn request_cancel(&self, turn_id: &str, retry_ordinal: u32) -> bool {
+        let Ok(registry) = self.cancels.lock() else {
+            return false;
+        };
+        match registry.get(&(turn_id.to_owned(), retry_ordinal)) {
+            Some(signal) => {
+                signal.request();
+                true
+            }
+            None => false,
+        }
+    }
+
+    fn register_cancel(&self, turn_id: &str, retry_ordinal: u32) -> (CancelSignal, CancelRegistration) {
+        let signal = CancelSignal::new();
+        let key = (turn_id.to_owned(), retry_ordinal);
+        if let Ok(mut registry) = self.cancels.lock() {
+            registry.insert(key.clone(), signal.clone());
+        }
+        (
+            signal,
+            CancelRegistration {
+                registry: Arc::clone(&self.cancels),
+                key,
+            },
+        )
     }
 
     /// Dispatches a submitted ConversationTurn through the full native agent lifecycle.
@@ -119,6 +177,7 @@ impl AgentSessionSupervisor {
     ) -> Result<(), String> {
         let store = self.store.clone();
         let runtime_id = self.runtime_id.clone();
+        let supervisor = self.clone();
         let principal = principal_id.to_owned();
         let workspace = workspace_id.to_owned();
         let conversation = conversation_id.to_owned();
@@ -139,37 +198,17 @@ impl AgentSessionSupervisor {
                 .map_err(|e| format!("Host resolution error: {e:?}"))?;
 
             let Some(host) = host_opt else {
-                // Settle turn FAILED: AGENT_UNAVAILABLE
-                let now = now_utc_rfc3339();
-                let settled_event = EventDraft {
-                    event_id: generate_id("ev"),
-                    workspace_id: workspace.clone(),
-                    entity_type: "ConversationTurn".to_owned(),
-                    entity_id: turn_id.clone(),
-                    origin_runtime_id: runtime_id.clone(),
-                    entity_revision: turn.version + 1,
-                    hlc_timestamp: now.clone(),
-                    correlation_id: correlation.clone(),
-                    causation_id: None,
-                    schema_version: 1,
-                    event_type: "conversation.turn.settled.v1".to_owned(),
-                    payload: json!({
-                        "turn_id": turn_id,
-                        "from": "OPEN",
-                        "to": "FAILED",
-                        "reason_code": "AGENT_UNAVAILABLE",
-                        "aggregate_version": turn.version + 1,
-                    }),
-                    recorded_at: now.clone(),
-                };
-                let _ = conv_store.transition_conversation_turn(
+                // No eligible host: settle the attempt FAILED (AGENT_UNAVAILABLE).
+                let _ = settle_attempt_failed(
+                    &store,
+                    &runtime_id,
                     &principal,
                     &workspace,
                     &conversation,
                     &turn_id,
-                    turn.version,
-                    TurnCommand::Fail { settled_at: now },
-                    settled_event,
+                    None,
+                    "AGENT_UNAVAILABLE",
+                    &correlation,
                 );
                 return Ok(());
             };
@@ -236,6 +275,8 @@ impl AgentSessionSupervisor {
             if !claimed {
                 return Ok(());
             }
+            let (cancel, _cancel_registration) =
+                supervisor.register_cancel(&turn_id, turn.retry_ordinal);
 
             // 4. Reserve STARTING session
             let session_id = generate_id("ses");
@@ -319,91 +360,28 @@ impl AgentSessionSupervisor {
                 &host.runtime_id,
                 &host.runtime_incarnation_id,
                 &correlation,
+                &cancel,
             );
 
-            if let Err(err) = run_res {
-                let now = now_utc_rfc3339();
-                // Check if turn was already activated (RUNNING) or still OPEN
-                let current_turn = conv_store
-                    .get_conversation_turn(&workspace, &conversation, &turn_id)
-                    .ok()
-                    .flatten();
-                let current_version = current_turn
-                    .as_ref()
-                    .map(|t| t.version)
-                    .unwrap_or(turn.version);
-                let current_status_str = current_turn
-                    .as_ref()
-                    .map(|t| match t.status {
-                        ConversationTurnStatus::Running => "RUNNING",
-                        _ => "OPEN",
-                    })
-                    .unwrap_or("OPEN");
-
-                let settled_event = EventDraft {
-                    event_id: generate_id("ev"),
-                    workspace_id: workspace.clone(),
-                    entity_type: "ConversationTurn".to_owned(),
-                    entity_id: turn_id.clone(),
-                    origin_runtime_id: runtime_id.clone(),
-                    entity_revision: current_version + 1,
-                    hlc_timestamp: now.clone(),
-                    correlation_id: correlation.clone(),
-                    causation_id: None,
-                    schema_version: 1,
-                    event_type: "conversation.turn.settled.v1".to_owned(),
-                    payload: json!({
-                        "turn_id": turn_id,
-                        "from": current_status_str,
-                        "to": "FAILED",
-                        "reason_code": "CONVERSATION_SESSION_ADMISSION_UNAVAILABLE",
-                        "aggregate_version": current_version + 1,
-                    }),
-                    recorded_at: now.clone(),
-                };
-                let _ = conv_store.transition_conversation_turn(
-                    &principal,
-                    &workspace,
-                    &conversation,
-                    &turn_id,
-                    current_version,
-                    TurnCommand::Fail {
-                        settled_at: now.clone(),
-                    },
-                    settled_event,
-                );
-
-                if current_status_str == "OPEN" {
-                    let _ = store.mark_starting_conversation_agent_session_lost(
-                        MarkStartingConversationAgentSessionLost {
-                            workspace_id: workspace.clone(),
-                            agent_session_id: session_id.clone(),
-                            expected_version: 1,
-                            occurred_at: now.clone(),
-                            event: EventDraft {
-                                event_id: generate_id("ev"),
-                                workspace_id: workspace.clone(),
-                                entity_type: "AgentSession".to_owned(),
-                                entity_id: session_id.clone(),
-                                origin_runtime_id: runtime_id.clone(),
-                                entity_revision: 2,
-                                hlc_timestamp: now.clone(),
-                                correlation_id: correlation.clone(),
-                                causation_id: None,
-                                schema_version: 1,
-                                event_type: "agent.session.lost.v1".to_owned(),
-                                payload: json!({
-                                    "agent_session_id": session_id,
-                                    "from": "STARTING",
-                                    "to": "LOST",
-                                    "reason_code": "NATIVE_SPAWN_FAILED",
-                                }),
-                                recorded_at: now.clone(),
-                            },
-                        },
+            match run_res {
+                Ok(_outcome) => {}
+                Err(err) => {
+                    // Settle whatever the store currently holds: the attempt FAILED and
+                    // its session LOST, so Retry can reserve a fresh session. A turn the
+                    // user already cancelled or a settled one is left untouched.
+                    let _ = settle_attempt_failed(
+                        &store,
+                        &runtime_id,
+                        &principal,
+                        &workspace,
+                        &conversation,
+                        &turn_id,
+                        Some(&session_id),
+                        "CONVERSATION_SESSION_ADMISSION_UNAVAILABLE",
+                        &correlation,
                     );
+                    return Err(err);
                 }
-                return Err(err);
             }
 
             Ok(())
@@ -411,6 +389,316 @@ impl AgentSessionSupervisor {
         .await
         .map_err(|e| format!("Task execution error: {e:?}"))?
     }
+}
+
+/// How a dispatched turn attempt ended when it did not fail.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TurnOutcome {
+    /// The final response was committed atomically (COMPLETED).
+    Committed,
+    /// A requested Stop was followed by observed quiescence and CANCELLED was committed.
+    Cancelled,
+    /// A Stop was requested but quiescence was not observed in time. The turn stays
+    /// CANCEL_REQUESTED and the startup recovery sweep owns the rest; nothing is faked.
+    StopUnconfirmed,
+}
+
+fn status_wire(status: ConversationTurnStatus) -> &'static str {
+    match status {
+        ConversationTurnStatus::Open => "OPEN",
+        ConversationTurnStatus::Running => "RUNNING",
+        ConversationTurnStatus::WaitingUser => "WAITING_USER",
+        ConversationTurnStatus::WaitingDependency => "WAITING_DEPENDENCY",
+        ConversationTurnStatus::Completed => "COMPLETED",
+        ConversationTurnStatus::Failed => "FAILED",
+        ConversationTurnStatus::CancelRequested => "CANCEL_REQUESTED",
+        ConversationTurnStatus::Cancelled => "CANCELLED",
+    }
+}
+
+/// UTC timestamp in the storage layer's canonical nine-digit fractional form.
+fn canonical_now() -> String {
+    let now = time::OffsetDateTime::now_utc();
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}Z",
+        now.year(),
+        now.month() as u8,
+        now.day(),
+        now.hour(),
+        now.minute(),
+        now.second(),
+        now.nanosecond()
+    )
+}
+
+/// Schema-shaped `agent.session.closed.v1` / `agent.session.lost.v1` payload.
+fn session_end_event(
+    workspace_id: &str,
+    runtime_id: &str,
+    session: &AgentSessionRecord,
+    end: ConversationSessionEnd,
+    correlation_id: &str,
+    now: &str,
+) -> EventDraft {
+    let (event_type, state) = match end {
+        ConversationSessionEnd::Closed => ("agent.session.closed.v1", "CLOSED"),
+        ConversationSessionEnd::Lost => ("agent.session.lost.v1", "LOST"),
+    };
+    EventDraft {
+        event_id: generate_id("ev"),
+        workspace_id: workspace_id.to_owned(),
+        entity_type: "AgentSession".to_owned(),
+        entity_id: session.agent_session_id.clone(),
+        origin_runtime_id: runtime_id.to_owned(),
+        entity_revision: session.version + 1,
+        hlc_timestamp: now.to_owned(),
+        correlation_id: correlation_id.to_owned(),
+        causation_id: None,
+        schema_version: 1,
+        event_type: event_type.to_owned(),
+        payload: json!({
+            "agent_session_id": session.agent_session_id,
+            "scope": {
+                "kind": "CONVERSATION",
+                "conversation_id": session.conversation_id,
+                "conversation_turn_id": session.conversation_turn_id,
+            },
+            "task_spec_revision": null,
+            "agent_binding_id": session.agent_binding_id,
+            "endpoint_id": session.endpoint_id,
+            "runtime_id": session.runtime_id,
+            "runtime_incarnation_id": session.runtime_incarnation_id,
+            "session_state": state,
+            "reported_at": now,
+        }),
+        recorded_at: now.to_owned(),
+    }
+}
+
+/// Settles a turn attempt FAILED (no answer is committed) and ends its AgentSession
+/// LOST, from whatever state the store currently holds, so Retry can reserve a fresh
+/// session. A turn that is already settled is left untouched; only a session still
+/// STARTING behind it is released.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn settle_attempt_failed(
+    store: &SqliteWorkspaceStore,
+    runtime_id: &str,
+    principal_id: &str,
+    workspace_id: &str,
+    conversation_id: &str,
+    turn_id: &str,
+    session_id: Option<&str>,
+    reason_code: &str,
+    correlation_id: &str,
+) -> Result<(), String> {
+    let conv_store = SqliteConversationStore::new(store.clone());
+    let turn = conv_store
+        .get_conversation_turn(workspace_id, conversation_id, turn_id)
+        .map_err(|e| format!("Read turn error: {e:?}"))?
+        .ok_or_else(|| "ConversationTurn not found".to_owned())?;
+    let session = match session_id.or(turn.agent_session_id.as_deref()) {
+        Some(id) => store
+            .get_agent_session(workspace_id, id)
+            .map_err(|e| format!("Read session error: {e:?}"))?,
+        None => None,
+    }
+    .filter(|record| !matches!(record.status.as_str(), "CLOSED" | "LOST"));
+    let now = canonical_now();
+    if turn.status.is_terminal() {
+        if let Some(record) = session.filter(|record| record.status == "STARTING") {
+            let event = session_end_event(
+                workspace_id,
+                runtime_id,
+                &record,
+                ConversationSessionEnd::Lost,
+                correlation_id,
+                &now,
+            );
+            store
+                .mark_starting_conversation_agent_session_lost(
+                    MarkStartingConversationAgentSessionLost {
+                        workspace_id: workspace_id.to_owned(),
+                        agent_session_id: record.agent_session_id.clone(),
+                        expected_version: record.version,
+                        occurred_at: now.clone(),
+                        event,
+                    },
+                )
+                .map_err(|e| format!("Release starting session error: {e:?}"))?;
+        }
+        return Ok(());
+    }
+    let mut payload = json!({
+        "turn_id": turn_id,
+        "from": status_wire(turn.status),
+        "to": "FAILED",
+        "reason_code": reason_code,
+        "aggregate_version": turn.version + 1,
+    });
+    if let Some(pointer) = turn.agent_session_id.as_deref() {
+        payload["agent_session_id"] = json!(pointer);
+    }
+    let turn_event = EventDraft {
+        event_id: generate_id("ev"),
+        workspace_id: workspace_id.to_owned(),
+        entity_type: "ConversationTurn".to_owned(),
+        entity_id: turn_id.to_owned(),
+        origin_runtime_id: runtime_id.to_owned(),
+        entity_revision: turn.version + 1,
+        hlc_timestamp: now.clone(),
+        correlation_id: correlation_id.to_owned(),
+        causation_id: None,
+        schema_version: 1,
+        event_type: "conversation.turn.settled.v1".to_owned(),
+        payload,
+        recorded_at: now.clone(),
+    };
+    let ended = session.map(|record| SettleConversationSession {
+        expected_session_version: record.version,
+        end: ConversationSessionEnd::Lost,
+        occurred_at: now.clone(),
+        session_event: session_end_event(
+            workspace_id,
+            runtime_id,
+            &record,
+            ConversationSessionEnd::Lost,
+            correlation_id,
+            &now,
+        ),
+        agent_session_id: record.agent_session_id,
+    });
+    conv_store
+        .settle_conversation_turn(SettleConversationTurn {
+            principal_id: principal_id.to_owned(),
+            workspace_id: workspace_id.to_owned(),
+            conversation_id: conversation_id.to_owned(),
+            turn_id: turn_id.to_owned(),
+            expected_turn_version: turn.version,
+            command: TurnCommand::Fail {
+                settled_at: now.clone(),
+            },
+            turn_event,
+            session: ended,
+        })
+        .map(|_| ())
+        .map_err(|e| format!("Settle failed turn error: {e:?}"))
+}
+
+/// Commits CANCELLED for a CANCEL_REQUESTED turn after the native session was observed
+/// quiescent, closing its AgentSession in the same transaction. Fails (so the caller
+/// takes the failure path) if the turn is not CANCEL_REQUESTED.
+#[allow(clippy::too_many_arguments)]
+fn settle_attempt_cancelled(
+    store: &SqliteWorkspaceStore,
+    runtime_id: &str,
+    principal_id: &str,
+    workspace_id: &str,
+    conversation_id: &str,
+    turn_id: &str,
+    session_id: &str,
+    correlation_id: &str,
+) -> Result<(), String> {
+    let conv_store = SqliteConversationStore::new(store.clone());
+    let turn = conv_store
+        .get_conversation_turn(workspace_id, conversation_id, turn_id)
+        .map_err(|e| format!("Read turn error: {e:?}"))?
+        .ok_or_else(|| "ConversationTurn not found".to_owned())?;
+    if turn.status != ConversationTurnStatus::CancelRequested {
+        return Err(format!(
+            "native stop observed but the turn is {} rather than CANCEL_REQUESTED",
+            status_wire(turn.status)
+        ));
+    }
+    let session = store
+        .get_agent_session(workspace_id, session_id)
+        .map_err(|e| format!("Read session error: {e:?}"))?
+        .ok_or_else(|| "AgentSession not found".to_owned())?;
+    let now = canonical_now();
+    let mut payload = json!({
+        "turn_id": turn_id,
+        "from": "CANCEL_REQUESTED",
+        "to": "CANCELLED",
+        "reason_code": "USER_REQUESTED",
+        "aggregate_version": turn.version + 1,
+    });
+    if let Some(pointer) = turn.agent_session_id.as_deref() {
+        payload["agent_session_id"] = json!(pointer);
+    }
+    let turn_event = EventDraft {
+        event_id: generate_id("ev"),
+        workspace_id: workspace_id.to_owned(),
+        entity_type: "ConversationTurn".to_owned(),
+        entity_id: turn_id.to_owned(),
+        origin_runtime_id: runtime_id.to_owned(),
+        entity_revision: turn.version + 1,
+        hlc_timestamp: now.clone(),
+        correlation_id: correlation_id.to_owned(),
+        causation_id: None,
+        schema_version: 1,
+        event_type: "conversation.turn.settled.v1".to_owned(),
+        payload,
+        recorded_at: now.clone(),
+    };
+    conv_store
+        .settle_conversation_turn(SettleConversationTurn {
+            principal_id: principal_id.to_owned(),
+            workspace_id: workspace_id.to_owned(),
+            conversation_id: conversation_id.to_owned(),
+            turn_id: turn_id.to_owned(),
+            expected_turn_version: turn.version,
+            command: TurnCommand::SettleCancelled {
+                settled_at: now.clone(),
+            },
+            turn_event,
+            session: Some(SettleConversationSession {
+                expected_session_version: session.version,
+                end: ConversationSessionEnd::Closed,
+                occurred_at: now.clone(),
+                session_event: session_end_event(
+                    workspace_id,
+                    runtime_id,
+                    &session,
+                    ConversationSessionEnd::Closed,
+                    correlation_id,
+                    &now,
+                ),
+                agent_session_id: session.agent_session_id,
+            }),
+        })
+        .map(|_| ())
+        .map_err(|e| format!("Settle cancelled turn error: {e:?}"))
+}
+
+/// Runs one store commit and retries only transient storage failures. Every retry
+/// repeats the same deterministic commit, so an earlier attempt whose acknowledgement
+/// was lost is answered from its stored receipt (exact replay) rather than written
+/// twice, and the provider prompt is never resent to repair a local write (T06).
+fn retry_transient_store_commit<T>(
+    attempts: usize,
+    backoff: Duration,
+    mut commit: impl FnMut() -> Result<T, storage_core::StoreError>,
+) -> Result<T, storage_core::StoreError> {
+    use storage_core::StoreError;
+    let mut last = None;
+    for attempt in 0..attempts.max(1) {
+        match commit() {
+            Ok(value) => return Ok(value),
+            Err(
+                error @ (StoreError::Busy
+                | StoreError::Database(_)
+                | StoreError::Io(_)
+                | StoreError::Blob(_)
+                | StoreError::ExecutorStopped),
+            ) => {
+                last = Some(error);
+                if attempt + 1 < attempts {
+                    std::thread::sleep(backoff);
+                }
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Err(last.unwrap_or(StoreError::ExecutorStopped))
 }
 
 // Twelve distinct turn-identity inputs; a parameter struct would only relabel
@@ -433,7 +721,8 @@ fn execute_agent_turn(
     host_runtime_id: &str,
     host_runtime_incarnation_id: &str,
     correlation_id: &str,
-) -> Result<(), String> {
+    cancel: &CancelSignal,
+) -> Result<TurnOutcome, String> {
     let conv_store = SqliteConversationStore::new(store.clone());
 
     // Parse the stored provider key once at the boundary. The canonical stored
@@ -493,7 +782,7 @@ fn execute_agent_turn(
             // Drive the native boundary through the provider-neutral AgentAdapter
             // (001-T04) rather than hand-parsing SSE. The OpenCode v2 HTTP path is
             // the one non-ACP adapter; it owns the server for the life of the turn.
-            let mut adapter = OpenCodeAdapter::new(server);
+            let mut adapter = OpenCodeAdapter::new(server).with_cancel(cancel.clone());
 
             // Phase 1: version/capability probe (B-03). A failed probe is a typed
             // FAILED turn with the USER message kept and no fallback (AC-015).
@@ -602,9 +891,24 @@ fn execute_agent_turn(
             let accumulated_text = match observation {
                 Ok(TurnObservation::Completed { answer_text }) => answer_text,
                 Ok(TurnObservation::Stopped) => {
-                    // A stop observation is not a settlement; the caller's error
-                    // path reconciles it through session state, never a resend.
-                    return Err("OpenCode turn stopped before completion".to_owned());
+                    // Observed quiescence after a requested Stop: only now is
+                    // CANCELLED committed, together with the session CLOSED.
+                    settle_attempt_cancelled(
+                        store,
+                        runtime_id,
+                        principal_id,
+                        workspace_id,
+                        conversation_id,
+                        turn_id,
+                        session_id,
+                        correlation_id,
+                    )?;
+                    return Ok(TurnOutcome::Cancelled);
+                }
+                Ok(TurnObservation::StopUnconfirmed) => {
+                    // The interrupt was sent but quiescence was not observed in time.
+                    // The turn stays CANCEL_REQUESTED; CANCELLED is never fabricated.
+                    return Ok(TurnOutcome::StopUnconfirmed);
                 }
                 Ok(TurnObservation::Failed { reason_code }) | Err(reason_code) => {
                     return Err(format!(
@@ -715,14 +1019,109 @@ fn execute_agent_turn(
                 },
             };
 
-            conv_store
-                .commit_conversation_agent_response(commit_resp)
-                .map_err(|e| format!("Commit response error: {e:?}"))?;
+            retry_transient_store_commit(3, Duration::from_millis(100), || {
+                conv_store.commit_conversation_agent_response(commit_resp.clone())
+            })
+            .map_err(|e| format!("Commit response error: {e:?}"))?;
 
-            Ok(())
+            Ok(TurnOutcome::Committed)
         }
         _ => Err(format!(
             "Agent provider '{provider_key}' is not supported or not configured for execution in this runtime"
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use storage_core::StoreError;
+
+    #[test]
+    fn conversation_final_settlement_retries_only_transient_store_failures() {
+        let mut calls = 0;
+        let committed = retry_transient_store_commit(3, Duration::from_millis(1), || {
+            calls += 1;
+            if calls < 3 {
+                Err(StoreError::Busy)
+            } else {
+                Ok("receipt")
+            }
+        });
+        assert_eq!(committed.expect("third attempt commits"), "receipt");
+        assert_eq!(calls, 3);
+
+        let mut calls = 0;
+        let rejected: Result<(), _> = retry_transient_store_commit(3, Duration::from_millis(1), || {
+            calls += 1;
+            Err(StoreError::Invalid("CONVERSATION_RESPONSE_IDENTITY_CONFLICT".to_owned()))
+        });
+        assert!(matches!(rejected, Err(StoreError::Invalid(_))));
+        assert_eq!(calls, 1, "a deterministic rejection is never retried");
+
+        let mut calls = 0;
+        let exhausted: Result<(), _> = retry_transient_store_commit(2, Duration::from_millis(1), || {
+            calls += 1;
+            Err(StoreError::Database("busy".to_owned()))
+        });
+        assert!(matches!(exhausted, Err(StoreError::Database(_))));
+        assert_eq!(calls, 2);
+    }
+
+    #[test]
+    fn conversation_stop_signal_reaches_only_the_registered_attempt_and_is_released() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+                .expect("private test directory");
+        }
+        let store = storage_sqlite::SqliteWorkspaceStore::open(
+            directory.path().join("state.sqlite3"),
+            std::sync::Arc::new(storage_sqlite::FileBlobStore::new(
+                directory.path().join("blobs"),
+                NoKeys,
+            )),
+            storage_sqlite::SqliteConfig {
+                writer_queue_capacity: 2,
+                busy_timeout: Duration::from_secs(1),
+            },
+        )
+        .expect("store opens");
+        let supervisor = AgentSessionSupervisor::new(store, "runtime".to_owned());
+        assert!(!supervisor.request_cancel("turn-1", 0), "nothing registered");
+        let (signal, registration) = supervisor.register_cancel("turn-1", 0);
+        assert!(!signal.is_requested());
+        assert!(!supervisor.request_cancel("turn-1", 1), "another retry ordinal");
+        assert!(!supervisor.request_cancel("turn-2", 0), "another turn");
+        assert!(supervisor.request_cancel("turn-1", 0));
+        assert!(signal.is_requested());
+        drop(registration);
+        assert!(!supervisor.request_cancel("turn-1", 0), "released when dispatch ends");
+    }
+
+    struct NoKeys;
+
+    impl storage_sqlite::WorkspaceBlobKeyProvider for NoKeys {
+        fn current_key(
+            &self,
+            _workspace_id: &str,
+            _purpose: storage_core::BlobPurpose,
+        ) -> Result<storage_sqlite::WorkspaceBlobKey, StoreError> {
+            Ok(storage_sqlite::WorkspaceBlobKey {
+                version: 1,
+                bytes: zeroize::Zeroizing::new([7_u8; 32]),
+            })
+        }
+
+        fn key_by_version(
+            &self,
+            workspace_id: &str,
+            purpose: storage_core::BlobPurpose,
+            _version: u32,
+        ) -> Result<storage_sqlite::WorkspaceBlobKey, StoreError> {
+            self.current_key(workspace_id, purpose)
+        }
     }
 }

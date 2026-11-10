@@ -1586,7 +1586,6 @@
         "type": "object",
         "required": [
           "turn_id",
-          "agent_session_id",
           "retry_ordinal",
           "aggregate_version"
         ],
@@ -1596,10 +1595,6 @@
             "minLength": 1
           },
           "prior_agent_session_id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "agent_session_id": {
             "type": "string",
             "minLength": 1
           },

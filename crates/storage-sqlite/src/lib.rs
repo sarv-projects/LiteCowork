@@ -24242,6 +24242,9 @@ fn map_database_error(error: rusqlite::Error) -> StoreError {
                 {
                     return StoreError::Invalid("AGENT_NOT_LEAD_ELIGIBLE".to_owned());
                 }
+                if error.to_string().contains("CONVERSATION_TURN_IN_PROGRESS") {
+                    return StoreError::Invalid("CONVERSATION_TURN_IN_PROGRESS".to_owned());
+                }
                 return StoreError::Database("database constraint rejected the write".to_owned());
             }
             _ => {}

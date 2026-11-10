@@ -31,6 +31,8 @@
               module tests."
 )]
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -55,6 +57,29 @@ pub(crate) struct StreamBudget {
     /// Absolute ceiling on a single turn regardless of activity. A safety stop
     /// far above any expected turn, not the primary bound.
     pub hard_ceiling: Duration,
+    /// After an interrupt is acknowledged, the longest the loop waits to observe
+    /// native quiescence before reporting [`TurnObservation::StopUnconfirmed`].
+    pub quiescence_timeout: Duration,
+}
+
+/// Cooperative per-turn Stop signal shared between the Operator-facing supervisor
+/// handle and the blocking drive loop (001-T07). Setting it is a request, not a
+/// settlement: only observed quiescence settles a cancelled turn.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CancelSignal(Arc<AtomicBool>);
+
+impl CancelSignal {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn request(&self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+
+    pub(crate) fn is_requested(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
 }
 
 impl Default for StreamBudget {
@@ -63,6 +88,7 @@ impl Default for StreamBudget {
             idle_timeout: Duration::from_secs(120),
             poll_interval: Duration::from_millis(500),
             hard_ceiling: Duration::from_secs(1800),
+            quiescence_timeout: Duration::from_secs(15),
         }
     }
 }
@@ -73,6 +99,7 @@ impl StreamBudget {
             && !self.poll_interval.is_zero()
             && self.poll_interval <= self.idle_timeout
             && self.idle_timeout <= self.hard_ceiling
+            && !self.quiescence_timeout.is_zero()
     }
 }
 
@@ -105,6 +132,10 @@ pub(crate) enum TurnObservation {
     /// The adapter observed a stop in response to an interrupt. This is a stop
     /// observation, not a durable settlement (AC-010); the supervisor decides.
     Stopped,
+    /// A Stop was requested and the interrupt was sent (or could not be sent), but native
+    /// quiescence was not observed within the quiescence timeout. The turn must stay
+    /// CANCEL_REQUESTED; CANCELLED is never fabricated.
+    StopUnconfirmed,
 }
 
 /// Closed set of typed adapter failures. No provider string crosses this
@@ -416,6 +447,7 @@ pub(crate) struct OpenCodeAdapter {
     /// Captured once per turn so the normalizer's safe drop counters can be
     /// reported as observability facts after the stream ends.
     last_counters: NormalizerCounters,
+    cancel: Option<CancelSignal>,
 }
 
 impl OpenCodeAdapter {
@@ -423,7 +455,14 @@ impl OpenCodeAdapter {
         Self {
             server,
             last_counters: NormalizerCounters::default(),
+            cancel: None,
         }
+    }
+
+    /// Attach the per-turn Stop signal the drive loop observes.
+    pub(crate) fn with_cancel(mut self, cancel: CancelSignal) -> Self {
+        self.cancel = Some(cancel);
+        self
     }
 
     /// The safe normalizer drop counters observed during the last driven turn.
@@ -495,8 +534,16 @@ impl AgentAdapter for OpenCodeAdapter {
             .subscribe_events()
             .map_err(Self::map_transport_error)?;
         let mut normalizer = OpenCodeEventNormalizer::new(native_session_id);
-        let observation =
-            drive_opencode_stream(&mut stream, &mut normalizer, budget, Instant::now());
+        let cancel = self.cancel.clone();
+        let server = &mut self.server;
+        let observation = drive_opencode_stream_cancellable(
+            &mut stream,
+            &mut normalizer,
+            budget,
+            Instant::now(),
+            cancel.as_ref(),
+            &mut || server.abort_session(native_session_id).unwrap_or(false),
+        );
         self.last_counters = normalizer.counters();
         observation
     }
@@ -557,14 +604,42 @@ fn drive_opencode_stream<S: RawEventSource>(
     budget: StreamBudget,
     started_at: Instant,
 ) -> Result<TurnObservation, TurnFailure> {
+    drive_opencode_stream_cancellable(stream, normalizer, budget, started_at, None, &mut || false)
+}
+
+/// The drive loop with a cooperative Stop. When `cancel` is set the loop calls
+/// `interrupt` exactly once; an unacknowledged interrupt, or no observed
+/// quiescence within `budget.quiescence_timeout`, ends in `StopUnconfirmed`. After an
+/// acknowledged interrupt the first terminal observation (idle, provider error frame
+/// or closed stream) is a stop observation, never a completion: a completion that
+/// was already observed before the interrupt was sent has been returned earlier.
+fn drive_opencode_stream_cancellable<S: RawEventSource>(
+    stream: &mut S,
+    normalizer: &mut OpenCodeEventNormalizer,
+    budget: StreamBudget,
+    started_at: Instant,
+    cancel: Option<&CancelSignal>,
+    interrupt: &mut dyn FnMut() -> bool,
+) -> Result<TurnObservation, TurnFailure> {
     let hard_deadline = started_at + budget.hard_ceiling;
     let mut idle_deadline = started_at + budget.idle_timeout;
+    let mut quiescence_deadline: Option<Instant> = None;
     let mut answer_text = String::new();
     let mut saw_text = false;
 
     loop {
         let now = Instant::now();
-        if now >= hard_deadline || now >= idle_deadline {
+        if quiescence_deadline.is_none() && cancel.is_some_and(CancelSignal::is_requested) {
+            if !interrupt() {
+                return Ok(TurnObservation::StopUnconfirmed);
+            }
+            quiescence_deadline = Some(Instant::now() + budget.quiescence_timeout);
+        }
+        if let Some(deadline) = quiescence_deadline {
+            if now >= deadline {
+                return Ok(TurnObservation::StopUnconfirmed);
+            }
+        } else if now >= hard_deadline || now >= idle_deadline {
             // A quiet stream is bounded here, not by a fixed cap.
             if saw_text && !answer_text.trim().is_empty() {
                 // Text was produced but the stream never idled; treat the
@@ -575,6 +650,7 @@ fn drive_opencode_stream<S: RawEventSource>(
             }
             return Err(TurnFailure::Timeout);
         }
+        let stopping = quiescence_deadline.is_some();
 
         match stream.next_raw(budget.poll_interval) {
             Ok(Some(event)) => {
@@ -592,6 +668,9 @@ fn drive_opencode_stream<S: RawEventSource>(
                         answer_text = text;
                     }
                     Some(NormalizedAgentEvent::Idle) => {
+                        if stopping {
+                            return Ok(TurnObservation::Stopped);
+                        }
                         if saw_text && !answer_text.trim().is_empty() {
                             return Ok(TurnObservation::Completed {
                                 answer_text: answer_text.trim().to_owned(),
@@ -602,6 +681,9 @@ fn drive_opencode_stream<S: RawEventSource>(
                     Some(NormalizedAgentEvent::ExecutionSettled {
                         outcome: super::normalizer::ToolOutcome::Failed,
                     }) => {
+                        if stopping {
+                            return Ok(TurnObservation::Stopped);
+                        }
                         return Err(TurnFailure::ProviderError);
                     }
                     // Reasoning, tool, file, todo, step, usage and other
@@ -614,6 +696,9 @@ fn drive_opencode_stream<S: RawEventSource>(
             // above decides whether the quiet has lasted too long.
             Ok(None) => {}
             Err(OpenCodeError::StreamClosed) => {
+                if stopping {
+                    return Ok(TurnObservation::Stopped);
+                }
                 if saw_text && !answer_text.trim().is_empty() {
                     return Ok(TurnObservation::Completed {
                         answer_text: answer_text.trim().to_owned(),
@@ -682,6 +767,7 @@ mod tests {
             idle_timeout: Duration::from_secs(1),
             poll_interval: Duration::from_secs(2),
             hard_ceiling: Duration::from_secs(10),
+            ..StreamBudget::default()
         };
         assert!(!bad.is_valid());
     }
@@ -710,7 +796,7 @@ mod tests {
 #[cfg(test)]
 mod selected_adapter_conversation_opencode_turn_fixture_tests {
     use super::*;
-    use serde_json::Value;
+    use serde_json::{Value, json};
     use std::collections::VecDeque;
 
     const FIXTURE: &str = include_str!("fixtures/opencode_v2_0_32_turn.jsonl");
@@ -820,6 +906,7 @@ mod selected_adapter_conversation_opencode_turn_fixture_tests {
             idle_timeout: Duration::from_millis(30),
             poll_interval: Duration::from_millis(5),
             hard_ceiling: Duration::from_secs(1),
+            ..StreamBudget::default()
         };
         let observation =
             drive_opencode_stream(&mut QuietSource, &mut normalizer, budget, Instant::now());
@@ -875,6 +962,140 @@ mod selected_adapter_conversation_opencode_turn_fixture_tests {
         assert_eq!(counters.foreign_session, 1);
         assert_eq!(counters.unknown, 1);
         assert_eq!(counters.uncorrelated, 0);
+    }
+
+    /// A source that yields scripted frames, then goes quiet (or closes).
+    struct ScriptedSource {
+        frames: std::collections::VecDeque<Result<Option<RawEvent>, OpenCodeError>>,
+        then_quiet: bool,
+    }
+
+    impl RawEventSource for ScriptedSource {
+        fn next_raw(&mut self, timeout: Duration) -> Result<Option<RawEvent>, OpenCodeError> {
+            match self.frames.pop_front() {
+                Some(frame) => frame,
+                None if self.then_quiet => {
+                    std::thread::sleep(timeout.min(Duration::from_millis(2)));
+                    Ok(None)
+                }
+                None => Err(OpenCodeError::StreamClosed),
+            }
+        }
+    }
+
+    fn idle_frame() -> RawEvent {
+        RawEvent {
+            event_type: Some("session.idle".to_owned()),
+            data: json!({"type": "session.idle", "properties": {"sessionID": FIXTURE_SESSION}}),
+        }
+    }
+
+    fn stop_budget() -> StreamBudget {
+        StreamBudget {
+            idle_timeout: Duration::from_millis(500),
+            poll_interval: Duration::from_millis(5),
+            hard_ceiling: Duration::from_secs(5),
+            quiescence_timeout: Duration::from_millis(40),
+        }
+    }
+
+    #[test]
+    fn selected_adapter_conversation_stop_interrupts_once_and_reports_observed_quiescence() {
+        let cancel = CancelSignal::new();
+        cancel.request();
+        let mut source = ScriptedSource {
+            frames: [Ok(Some(idle_frame()))].into_iter().collect(),
+            then_quiet: false,
+        };
+        let mut normalizer = OpenCodeEventNormalizer::new(FIXTURE_SESSION);
+        let mut interrupts = 0;
+        let observation = drive_opencode_stream_cancellable(
+            &mut source,
+            &mut normalizer,
+            stop_budget(),
+            Instant::now(),
+            Some(&cancel),
+            &mut || {
+                interrupts += 1;
+                true
+            },
+        );
+        assert_eq!(observation, Ok(TurnObservation::Stopped));
+        assert_eq!(interrupts, 1, "the interrupt is sent exactly once");
+    }
+
+    #[test]
+    fn selected_adapter_conversation_stop_without_quiescence_is_unconfirmed_not_stopped() {
+        let cancel = CancelSignal::new();
+        cancel.request();
+        let mut source = ScriptedSource {
+            frames: std::collections::VecDeque::new(),
+            then_quiet: true,
+        };
+        let mut normalizer = OpenCodeEventNormalizer::new(FIXTURE_SESSION);
+        let observation = drive_opencode_stream_cancellable(
+            &mut source,
+            &mut normalizer,
+            stop_budget(),
+            Instant::now(),
+            Some(&cancel),
+            &mut || true,
+        );
+        assert_eq!(observation, Ok(TurnObservation::StopUnconfirmed));
+    }
+
+    #[test]
+    fn selected_adapter_conversation_unacknowledged_interrupt_is_unconfirmed() {
+        let cancel = CancelSignal::new();
+        cancel.request();
+        let mut source = ScriptedSource {
+            frames: std::collections::VecDeque::new(),
+            then_quiet: true,
+        };
+        let mut normalizer = OpenCodeEventNormalizer::new(FIXTURE_SESSION);
+        let observation = drive_opencode_stream_cancellable(
+            &mut source,
+            &mut normalizer,
+            stop_budget(),
+            Instant::now(),
+            Some(&cancel),
+            &mut || false,
+        );
+        assert_eq!(observation, Ok(TurnObservation::StopUnconfirmed));
+    }
+
+    #[test]
+    fn selected_adapter_conversation_completion_before_the_stop_request_stays_completed() {
+        // The terminal text and idle arrive before the Stop is requested: the race is
+        // won by the completion and the interrupt is never sent.
+        let cancel = CancelSignal::new();
+        let mut frames = std::collections::VecDeque::new();
+        frames.push_back(Ok(Some(RawEvent {
+            event_type: Some("message.part.updated".to_owned()),
+            data: json!({"type": "message.part.updated", "properties": {"part": {
+                "type": "text", "sessionID": FIXTURE_SESSION, "messageID": "m", "id": "p",
+                "text": "done", "time": {"start": 1, "end": 2}}}}),
+        })));
+        frames.push_back(Ok(Some(idle_frame())));
+        let mut source = ScriptedSource { frames, then_quiet: false };
+        let mut normalizer = OpenCodeEventNormalizer::new(FIXTURE_SESSION);
+        let mut interrupts = 0;
+        let observation = drive_opencode_stream_cancellable(
+            &mut source,
+            &mut normalizer,
+            stop_budget(),
+            Instant::now(),
+            Some(&cancel),
+            &mut || {
+                interrupts += 1;
+                true
+            },
+        );
+        assert_eq!(
+            observation,
+            Ok(TurnObservation::Completed { answer_text: "done".to_owned() })
+        );
+        assert_eq!(interrupts, 0);
     }
 
     #[test]

@@ -614,6 +614,165 @@ impl ConversationTurnStore for SqliteConversationStore {
         })
     }
 
+    fn settle_conversation_turn(
+        &self,
+        settlement: SettleConversationTurn,
+    ) -> Result<SettledConversationTurn, StoreError> {
+        let valid_identity = |value: &str| {
+            !value.trim().is_empty() && value.len() <= 256 && !value.chars().any(char::is_control)
+        };
+        if !valid_identity(&settlement.principal_id)
+            || !valid_identity(&settlement.workspace_id)
+            || !valid_identity(&settlement.conversation_id)
+            || !valid_identity(&settlement.turn_id)
+            || settlement.expected_turn_version == 0
+            || !matches!(
+                settlement.command,
+                TurnCommand::Fail { .. } | TurnCommand::SettleCancelled { .. }
+            )
+            || settlement.session.as_ref().is_some_and(|session| {
+                !valid_identity(&session.agent_session_id) || session.expected_session_version == 0
+            })
+        {
+            return Err(StoreError::Invalid(
+                "Conversation turn settlement identity is invalid".to_owned(),
+            ));
+        }
+        let mut settlement = settlement;
+        if let Some(session) = settlement.session.as_mut() {
+            session.occurred_at = canonicalize_utc_timestamp(&session.occurred_at)?;
+        }
+        let blobs = Arc::clone(&self.store.inner.blobs);
+        self.run(move |connection| {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(map_database_error)?;
+            let allowed: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2 AND status='ACTIVE')",
+                params![settlement.workspace_id, settlement.principal_id], |row| row.get(0),
+            ).map_err(map_database_error)?;
+            if !allowed { return Err(StoreError::NotFound); }
+            let current = load_turn(&tx, &settlement.workspace_id, &settlement.conversation_id, &settlement.turn_id)?
+                .ok_or(StoreError::NotFound)?;
+            if current.version != settlement.expected_turn_version {
+                return Err(StoreError::Conflict { expected: Some(settlement.expected_turn_version), actual: Some(current.version) });
+            }
+            let next = domain_conversation::transition(&current, settlement.expected_turn_version, settlement.command.clone())
+                .map_err(|error| match error {
+                    domain_conversation::TurnTransitionError::StaleVersion => StoreError::Conflict { expected: Some(settlement.expected_turn_version), actual: Some(current.version) },
+                    other => StoreError::Invalid(format!("Conversation turn transition rejected: {other:?}")),
+                })?;
+            validate_turn_transition_event(&settlement.turn_event, &current, &next, &settlement.command)?;
+            if settlement.turn_event.workspace_id != settlement.workspace_id {
+                return Err(StoreError::Invalid("ConversationTurn event Workspace mismatch".to_owned()));
+            }
+
+            let mut ended_session = None;
+            if let Some(end) = settlement.session.as_ref() {
+                let mut session = load_agent_session(&tx, &settlement.workspace_id, &end.agent_session_id)?
+                    .ok_or(StoreError::NotFound)?;
+                if session.scope_kind != "CONVERSATION"
+                    || session.conversation_id.as_deref() != Some(settlement.conversation_id.as_str())
+                    || session.conversation_turn_id.as_deref() != Some(settlement.turn_id.as_str())
+                {
+                    return Err(StoreError::Invalid("AgentSession scope does not match the settled turn".to_owned()));
+                }
+                if session.version != end.expected_session_version {
+                    return Err(StoreError::Conflict { expected: Some(end.expected_session_version), actual: Some(session.version) });
+                }
+                let (target_status, expected_event_type) = match end.end {
+                    ConversationSessionEnd::Closed => ("CLOSED", "agent.session.closed.v1"),
+                    ConversationSessionEnd::Lost => ("LOST", "agent.session.lost.v1"),
+                };
+                let status_ok = match end.end {
+                    ConversationSessionEnd::Closed => matches!(session.status.as_str(), "ACTIVE" | "INTERRUPTING" | "CLOSING"),
+                    ConversationSessionEnd::Lost => matches!(session.status.as_str(), "STARTING" | "ACTIVE" | "INTERRUPTING" | "CLOSING"),
+                };
+                if !status_ok {
+                    return Err(StoreError::Invalid(format!("AgentSession cannot end {target_status} from {}", session.status)));
+                }
+                let next_session_version = session.version.checked_add(1)
+                    .ok_or_else(|| StoreError::Invalid("AgentSession version exhausted".to_owned()))?;
+                if end.session_event.workspace_id != settlement.workspace_id
+                    || end.session_event.entity_type != "AgentSession"
+                    || end.session_event.entity_id != session.agent_session_id
+                    || end.session_event.event_type != expected_event_type
+                    || end.session_event.entity_revision != next_session_version
+                {
+                    return Err(StoreError::Invalid("AgentSession settlement event is inconsistent".to_owned()));
+                }
+                let updated = tx.execute(
+                    "UPDATE agent_sessions SET status=?1, closed_at=?2, last_event_at=?2, version=?3 WHERE workspace_id=?4 AND agent_session_id=?5 AND version=?6",
+                    params![target_status, end.occurred_at, to_sql_i64(next_session_version, "AgentSession version")?, settlement.workspace_id, session.agent_session_id, to_sql_i64(end.expected_session_version, "AgentSession version")?],
+                ).map_err(map_database_error)?;
+                if updated != 1 {
+                    return Err(StoreError::Conflict { expected: Some(end.expected_session_version), actual: None });
+                }
+                if end.end == ConversationSessionEnd::Closed {
+                    tx.execute(
+                        "UPDATE agent_host_instances SET state='READY', last_used_at=?1, idle_since=?1 WHERE host_instance_id=(SELECT host_instance_id FROM agent_session_host_bindings WHERE agent_session_id=?2)",
+                        params![end.occurred_at, session.agent_session_id],
+                    ).map_err(map_database_error)?;
+                }
+                tx.execute(
+                    "DELETE FROM agent_session_host_bindings WHERE agent_session_id=?1",
+                    params![session.agent_session_id],
+                ).map_err(map_database_error)?;
+                session.status = target_status.to_owned();
+                session.closed_at = Some(end.occurred_at.clone());
+                session.last_event_at = Some(end.occurred_at.clone());
+                session.version = next_session_version;
+                ended_session = Some(session);
+            }
+
+            let state_bytes = canonical_json(&next)?;
+            let blob = blobs.put(&settlement.workspace_id, BlobPurpose::AggregateState, &state_bytes, super::STATE_MEDIA_TYPE)?;
+            let state_ref = AggregateStateRef { blob, entity_revision: next.version, record_schema_version: 1 };
+            let next_version = i64::try_from(next.version).map_err(|_| StoreError::Invalid("ConversationTurn version exhausted".to_owned()))?;
+            let updated = tx.execute(
+                "UPDATE conversation_turns SET status=?1,settled_at=?2,version=?3 WHERE turn_id=?4 AND conversation_id=?5 AND version=?6",
+                params![status_string(next.status)?, next.settled_at, next_version, settlement.turn_id, settlement.conversation_id, i64::try_from(settlement.expected_turn_version).unwrap_or(-1)],
+            ).map_err(map_database_error)?;
+            if updated != 1 {
+                return Err(StoreError::Conflict { expected: Some(settlement.expected_turn_version), actual: None });
+            }
+            tx.execute(
+                "UPDATE conversation_dispatch_intents SET state='SETTLED', settled_at=?1, version=version+1 WHERE turn_id=?2 AND retry_ordinal=?3 AND state<>'SETTLED'",
+                params![next.settled_at, settlement.turn_id, i64::from(current.retry_ordinal)],
+            ).map_err(map_database_error)?;
+            insert_domain_event(&tx, &settlement.turn_event, &state_ref)?;
+            if let (Some(end), Some(session)) = (settlement.session.as_ref(), ended_session.as_ref()) {
+                let session_bytes = canonical_json(session)?;
+                let session_blob = blobs.put(&settlement.workspace_id, BlobPurpose::AggregateState, &session_bytes, "application/vnd.litecowork.agent-session+json")?;
+                let session_ref = AggregateStateRef { blob: session_blob, entity_revision: session.version, record_schema_version: 1 };
+                insert_domain_event(&tx, &end.session_event, &session_ref)?;
+            }
+            tx.commit().map_err(map_database_error)?;
+            Ok(SettledConversationTurn { turn: next, session: ended_session })
+        })
+    }
+
+    fn find_conversation_turn_command_replay(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        request_id: &str,
+    ) -> Result<Option<ConversationTurn>, StoreError> {
+        if workspace_id.trim().is_empty() || turn_id.trim().is_empty() || request_id.trim().is_empty() {
+            return Err(StoreError::Invalid("Conversation command replay identity is invalid".to_owned()));
+        }
+        let (workspace, conversation, turn, request) = (workspace_id.to_owned(), conversation_id.to_owned(), turn_id.to_owned(), request_id.to_owned());
+        self.run(move |connection| {
+            let replayed: bool = connection.query_row(
+                "SELECT EXISTS(SELECT 1 FROM domain_events WHERE workspace_id=?1 AND entity_type='ConversationTurn' AND entity_id=?2 AND causation_id=?3)",
+                params![workspace, turn, request], |row| row.get(0),
+            ).map_err(map_database_error)?;
+            if !replayed { return Ok(None); }
+            load_turn(connection, &workspace, &conversation, &turn)
+        })
+    }
+
     fn claim_conversation_dispatch_intent(
         &self,
         turn_id: &str,
@@ -831,7 +990,13 @@ impl ConversationTurnStore for SqliteConversationStore {
                     actual: Some(current_turn.version),
                 });
             }
-            if current_turn.status != ConversationTurnStatus::Running {
+            // A completion that raced a Stop request stays COMPLETED with its message
+            // (AC-010); every other status, and any non-Completed settlement of a
+            // CANCEL_REQUESTED turn, is rejected.
+            let status_allows_commit = current_turn.status == ConversationTurnStatus::Running
+                || (current_turn.status == ConversationTurnStatus::CancelRequested
+                    && commit.turn_status == ConversationTurnStatus::Completed);
+            if !status_allows_commit {
                 return Err(StoreError::Invalid(
                     format!("ConversationTurn is not RUNNING (status: {:?})", current_turn.status),
                 ));
@@ -948,7 +1113,7 @@ impl ConversationTurnStore for SqliteConversationStore {
                 _ => return Err(StoreError::Invalid("Unsupported terminal turn status".to_owned())),
             };
             let turn_settled = tx.execute(
-                "UPDATE conversation_turns SET status=?1, settled_at=?2, version=?3 WHERE turn_id=?4 AND conversation_id=?5 AND status='RUNNING' AND version=?6",
+                "UPDATE conversation_turns SET status=?1, settled_at=?2, version=?3 WHERE turn_id=?4 AND conversation_id=?5 AND status IN ('RUNNING','CANCEL_REQUESTED') AND version=?6",
                 params![
                     turn_status_db_str,
                     commit.message.created_at,
@@ -1358,7 +1523,7 @@ impl ConversationTurnStore for SqliteConversationStore {
             if event.workspace_id != workspace {
                 return Err(StoreError::Invalid("ConversationTurn event Workspace mismatch".to_owned()));
             }
-            if matches!(command, TurnCommand::Retry { .. } | TurnCommand::Resume { .. }) {
+            if matches!(command, TurnCommand::Resume { .. }) {
                 let Some(session_id) = next.agent_session_id.as_deref() else {
                     return Err(StoreError::Invalid("Conversation session is not ready".to_owned()));
                 };
@@ -1381,6 +1546,21 @@ impl ConversationTurnStore for SqliteConversationStore {
             ).map_err(map_database_error)?;
             if updated != 1 {
                 return Err(StoreError::Conflict { expected: Some(expected_version), actual: None });
+            }
+            if matches!(command, TurnCommand::Retry) {
+                let other_in_flight: bool = tx.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversation_turns WHERE conversation_id=?1 AND turn_id<>?2 AND status IN ('OPEN','RUNNING','WAITING_USER','WAITING_DEPENDENCY','CANCEL_REQUESTED'))",
+                    params![conversation, id], |row| row.get(0),
+                ).map_err(map_database_error)?;
+                if other_in_flight {
+                    return Err(StoreError::Invalid(CONVERSATION_TURN_IN_PROGRESS.to_owned()));
+                }
+                // The new attempt owes a dispatch; the same transaction that reopens the
+                // turn records it so a crash cannot strand an OPEN turn without an intent.
+                tx.execute(
+                    "INSERT INTO conversation_dispatch_intents(turn_id,retry_ordinal,conversation_id,state,created_at) VALUES(?1,?2,?3,'UNCLAIMED',?4)",
+                    params![id, i64::from(next.retry_ordinal), conversation, event.recorded_at],
+                ).map_err(map_database_error)?;
             }
             if next.status.is_terminal() {
                 // A settled attempt owes no further dispatch (outbox state SETTLED).
@@ -1797,7 +1977,7 @@ fn validate_turn_transition_event(
     command: &TurnCommand,
 ) -> Result<(), StoreError> {
     let expected_type = match command {
-        TurnCommand::Retry { .. } => "conversation.turn.retried.v1",
+        TurnCommand::Retry => "conversation.turn.retried.v1",
         TurnCommand::Resume { .. } => "conversation.turn.resumed.v1",
         TurnCommand::Complete { .. }
         | TurnCommand::Fail { .. }
@@ -1810,10 +1990,9 @@ fn validate_turn_transition_event(
         _ => "conversation.turn.status.changed.v1",
     };
     let allowed_payload_keys: &[&str] = match command {
-        TurnCommand::Retry { .. } => &[
+        TurnCommand::Retry => &[
             "turn_id",
             "prior_agent_session_id",
-            "agent_session_id",
             "retry_ordinal",
             "aggregate_version",
         ],
@@ -1845,12 +2024,7 @@ fn validate_turn_transition_event(
         ],
     };
     let required_payload_keys: &[&str] = match command {
-        TurnCommand::Retry { .. } => &[
-            "turn_id",
-            "agent_session_id",
-            "retry_ordinal",
-            "aggregate_version",
-        ],
+        TurnCommand::Retry => &["turn_id", "retry_ordinal", "aggregate_version"],
         TurnCommand::Resume { .. } => &[
             "turn_id",
             "user_request_id",
@@ -1866,14 +2040,9 @@ fn validate_turn_transition_event(
     let payload_matches =
         payload_has_exact_keys(&event.payload, required_payload_keys, allowed_payload_keys)
             && match command {
-                TurnCommand::Retry { .. } => {
+                TurnCommand::Retry => {
                     event.payload.get("turn_id").and_then(Value::as_str)
                         == Some(current.turn_id.as_str())
-                        && event
-                            .payload
-                            .get("agent_session_id")
-                            .and_then(Value::as_str)
-                            == next.agent_session_id.as_deref()
                         && optional_event_string_matches(
                             &event.payload,
                             "prior_agent_session_id",

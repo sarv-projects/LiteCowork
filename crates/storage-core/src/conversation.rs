@@ -265,6 +265,24 @@ pub trait ConversationTurnStore: Send + Sync {
         event: EventDraft,
     ) -> Result<ConversationTurn, StoreError>;
 
+    /// Settles a turn without a final answer together with its AgentSession; see
+    /// [`SettleConversationTurn`]. Stale turn or session versions fail with no write.
+    fn settle_conversation_turn(
+        &self,
+        settlement: SettleConversationTurn,
+    ) -> Result<SettledConversationTurn, StoreError>;
+
+    /// Returns the turn that an earlier command with this idempotency key already
+    /// produced (the `causation_id` of its canonical turn event), so an exact repeat of
+    /// a Retry or Cancel request replays instead of failing on the moved version.
+    fn find_conversation_turn_command_replay(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        request_id: &str,
+    ) -> Result<Option<ConversationTurn>, StoreError>;
+
     /// Compare-and-swap claim of the durable dispatch intent for one admitted turn
     /// attempt (UNCLAIMED to CLAIMED). Returns `false` when another dispatcher already
     /// holds the claim or the intent is SETTLED. Must precede the STARTING reservation.
@@ -291,6 +309,47 @@ pub trait ConversationTurnStore: Send + Sync {
         state: ConversationDispatchState,
         limit: usize,
     ) -> Result<Vec<ConversationDispatchIntent>, StoreError>;
+}
+
+/// Terminal state the settled turn's AgentSession reaches (no final answer is committed).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConversationSessionEnd {
+    /// Observed native quiescence: the session ends CLOSED.
+    Closed,
+    /// The native session is unknown or gone: the session ends LOST.
+    Lost,
+}
+
+/// The AgentSession ended together with a turn settlement.
+#[derive(Clone, Debug)]
+pub struct SettleConversationSession {
+    pub agent_session_id: String,
+    pub expected_session_version: u64,
+    pub end: ConversationSessionEnd,
+    pub occurred_at: String,
+    pub session_event: EventDraft,
+}
+
+/// Atomically settles a turn that produced no final answer (FAILED, or CANCELLED after
+/// observed quiescence), ends its AgentSession, releases the ephemeral host binding and
+/// settles the dispatch intent. No AGENT message is ever written by this operation.
+#[derive(Clone, Debug)]
+pub struct SettleConversationTurn {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub turn_id: String,
+    pub expected_turn_version: u64,
+    /// `TurnCommand::Fail` or `TurnCommand::SettleCancelled`.
+    pub command: TurnCommand,
+    pub turn_event: EventDraft,
+    pub session: Option<SettleConversationSession>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SettledConversationTurn {
+    pub turn: ConversationTurn,
+    pub session: Option<AgentSessionRecord>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
