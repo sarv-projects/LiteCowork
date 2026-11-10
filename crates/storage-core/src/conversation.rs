@@ -445,6 +445,11 @@ pub struct ConversationContextPackage {
     pub target_agent_binding_id: String,
     pub through_message_id: String,
     pub messages: Vec<ConversationContextMessage>,
+    /// Count of older committed messages that precede `messages` and were left out by
+    /// the B-07 window (message count or byte bound). `0` means the full committed
+    /// prefix is present. The oldest omitted message is message 1 of the Conversation.
+    #[serde(default)]
+    pub omitted_message_count: u32,
 }
 
 /// A committed message paired with its immutable Conversation aggregate revision.
@@ -482,12 +487,6 @@ pub fn build_conversation_context_package(
             "Conversation context identity is invalid".to_owned(),
         ));
     }
-    if messages.len() > CONVERSATION_CONTEXT_MAX_MESSAGES {
-        return Err(StoreError::Invalid(
-            "CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned(),
-        ));
-    }
-
     let mut ordered = messages.iter().collect::<Vec<_>>();
     ordered.sort_by_key(|source| source.conversation_revision);
     if ordered.windows(2).any(|pair| {
@@ -507,7 +506,7 @@ pub fn build_conversation_context_package(
         })?;
 
     let mut projected = Vec::new();
-    let mut projected_bytes =
+    let base_bytes =
         conversation_id.len() + target_agent_binding_id.len() + through_message_id.len() + 64;
     for source in ordered {
         if source.conversation_revision > boundary_revision {
@@ -537,25 +536,43 @@ pub fn build_conversation_context_package(
             let encoded_len = serde_json::to_vec(&context_message)
                 .map_err(|_| StoreError::Invalid("Conversation context is invalid".to_owned()))?
                 .len();
-            projected_bytes = projected_bytes
-                .checked_add(encoded_len + 1)
-                .ok_or_else(|| {
-                    StoreError::Invalid("CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned())
-                })?;
-            if projected_bytes > CONVERSATION_CONTEXT_MAX_BYTES {
-                return Err(StoreError::Invalid(
-                    "CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned(),
-                ));
-            }
-            projected.push(context_message);
+            projected.push((context_message, encoded_len + 1));
         }
     }
+
+    // B-07 window: keep the most recent contiguous messages, ending at the boundary,
+    // that fit the message-count and byte bounds. Older messages are counted, never
+    // silently dropped. The boundary message itself must fit or the turn is refused.
+    let mut kept_bytes = base_bytes;
+    let mut keep_from = projected.len();
+    while keep_from > 0 {
+        let (_, size) = &projected[keep_from - 1];
+        if projected.len() - keep_from >= CONVERSATION_CONTEXT_MAX_MESSAGES
+            || kept_bytes + size > CONVERSATION_CONTEXT_MAX_BYTES
+        {
+            break;
+        }
+        kept_bytes += size;
+        keep_from -= 1;
+    }
+    if keep_from == projected.len() {
+        return Err(StoreError::Invalid(
+            "CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned(),
+        ));
+    }
+    let omitted_message_count = u32::try_from(keep_from).unwrap_or(u32::MAX);
+    let messages = projected
+        .into_iter()
+        .skip(keep_from)
+        .map(|(message, _)| message)
+        .collect();
 
     Ok(ConversationContextPackage {
         conversation_id: conversation_id.to_owned(),
         target_agent_binding_id: target_agent_binding_id.to_owned(),
         through_message_id: through_message_id.to_owned(),
-        messages: projected,
+        messages,
+        omitted_message_count,
     })
 }
 
@@ -744,5 +761,66 @@ mod conversation_context_tests {
             build_conversation_context_package("conversation-a", "agent-a", "m-large", &sources,)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn context_window_boundary_at_1024_and_1025_messages_omits_only_the_oldest() {
+        let build = |count: usize| {
+            let messages = (0..count)
+                .map(|index| {
+                    message(
+                        &format!("m{index:05}"),
+                        "c",
+                        if index % 2 == 0 { "USER" } else { "AGENT" },
+                        "x",
+                        "2026-01-01T00:00:01Z",
+                        (index % 2 == 1).then_some("agent-a"),
+                        None,
+                    )
+                })
+                .collect::<Vec<_>>();
+            let through = format!("m{:05}", count - 1);
+            build_conversation_context_package("c", "agent-b", &through, &ordered(&messages))
+        };
+        // The boundary message must be a USER message for dispatch; here only the
+        // window arithmetic is under test.
+        let exact = build(1_024).expect("exactly the bound");
+        assert_eq!((exact.messages.len(), exact.omitted_message_count), (1_024, 0));
+        let over = build(1_025).expect("one over is windowed, not refused");
+        assert_eq!((over.messages.len(), over.omitted_message_count), (1_024, 1));
+        assert_eq!(over.messages[0].message_id, "m00001");
+        assert_eq!(over.messages.last().expect("boundary").message_id, "m01024");
+    }
+
+    #[test]
+    fn context_window_byte_bound_keeps_the_boundary_and_refuses_when_it_alone_is_too_large() {
+        let big = "x".repeat(1024 * 1024);
+        let messages = [
+            message("m-1", "c", "USER", &big, "2026-01-01T00:00:01Z", None, None),
+            message("m-2", "c", "AGENT", &big, "2026-01-01T00:00:02Z", Some("a"), None),
+            message("m-3", "c", "USER", &big, "2026-01-01T00:00:03Z", None, None),
+            message("m-4", "c", "AGENT", &big, "2026-01-01T00:00:04Z", Some("a"), None),
+            message("m-5", "c", "USER", &big, "2026-01-01T00:00:05Z", None, None),
+        ];
+        let windowed = build_conversation_context_package("c", "b", "m-5", &ordered(&messages))
+            .expect("older messages are windowed out");
+        assert_eq!(windowed.messages.len(), 3);
+        assert_eq!(windowed.omitted_message_count, 2);
+        assert_eq!(windowed.messages[0].message_id, "m-3");
+
+        let too_big = [message(
+            "m-only",
+            "c",
+            "USER",
+            &"x".repeat(4 * 1024 * 1024),
+            "2026-01-01T00:00:01Z",
+            None,
+            None,
+        )];
+        let refused = build_conversation_context_package("c", "b", "m-only", &ordered(&too_big));
+        assert!(matches!(
+            refused,
+            Err(crate::StoreError::Invalid(ref code)) if code == "CONVERSATION_CONTEXT_LIMIT_EXCEEDED"
+        ));
     }
 }

@@ -1395,24 +1395,28 @@ impl ConversationTurnStore for SqliteConversationStore {
                     "Conversation message has duplicate append revisions".to_owned(),
                 ));
             }
-            if message_count < 0
-                || message_count as usize > CONVERSATION_CONTEXT_MAX_MESSAGES
-                || context_bytes < 0
-                || context_bytes as usize > CONVERSATION_CONTEXT_MAX_BYTES
-            {
-                return Err(StoreError::Invalid(
-                    "CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned(),
+            // The B-07 window applies after this read: only the most recent
+            // CONVERSATION_CONTEXT_MAX_MESSAGES committed messages are loaded and the
+            // package builder reduces further by bytes, counting what it omits.
+            if message_count < 0 || context_bytes < 0 {
+                return Err(StoreError::Integrity(
+                    "Conversation context size is invalid".to_owned(),
                 ));
             }
 
             let mut statement = transaction
                 .prepare(
-                    "SELECT m.message_id,m.conversation_id,m.author_json,m.role,m.agent_session_id,m.agent_binding_id,m.turn_id,m.content_json,m.resource_refs_json,m.source_channel_ref_json,m.created_at,e.entity_revision FROM conversation_messages m JOIN domain_events e ON e.workspace_id=?2 AND e.entity_type='Conversation' AND e.entity_id=m.conversation_id AND e.type='conversation.message.added.v1' AND json_extract(e.payload_json,'$.message_id')=m.message_id WHERE m.conversation_id=?1 AND e.entity_revision<=?3 ORDER BY e.entity_revision,m.message_id",
+                    "SELECT m.message_id,m.conversation_id,m.author_json,m.role,m.agent_session_id,m.agent_binding_id,m.turn_id,m.content_json,m.resource_refs_json,m.source_channel_ref_json,m.created_at,e.entity_revision FROM conversation_messages m JOIN domain_events e ON e.workspace_id=?2 AND e.entity_type='Conversation' AND e.entity_id=m.conversation_id AND e.type='conversation.message.added.v1' AND json_extract(e.payload_json,'$.message_id')=m.message_id WHERE m.conversation_id=?1 AND e.entity_revision<=?3 ORDER BY e.entity_revision DESC,m.message_id DESC LIMIT ?4",
                 )
                 .map_err(map_database_error)?;
-            let rows = statement
+            let mut rows = statement
                 .query_map(
-                    params![conversation, workspace, through_revision],
+                    params![
+                        conversation,
+                        workspace,
+                        through_revision,
+                        CONVERSATION_CONTEXT_MAX_MESSAGES as i64
+                    ],
                     |row| {
                         Ok((
                             row.get::<_, String>(0)?,
@@ -1434,6 +1438,8 @@ impl ConversationTurnStore for SqliteConversationStore {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(map_database_error)?;
             drop(statement);
+            rows.reverse();
+            let oldest_loaded_revision = rows.first().map(|row| row.11);
             let messages = rows
                 .into_iter()
                 .map(|row| {
@@ -1471,12 +1477,27 @@ impl ConversationTurnStore for SqliteConversationStore {
                 })
                 .collect::<Result<Vec<_>, StoreError>>()?;
 
-            let context = build_conversation_context_package(
+            let mut context = build_conversation_context_package(
                 &conversation,
                 target_agent_binding_id,
                 &through_message_id,
                 &messages,
             )?;
+            if let (true, Some(oldest)) = (
+                message_count as usize > CONVERSATION_CONTEXT_MAX_MESSAGES,
+                oldest_loaded_revision,
+            ) {
+                let older: i64 = transaction
+                    .query_row(
+                        "SELECT COUNT(DISTINCT m.message_id) FROM conversation_messages m JOIN domain_events e ON e.workspace_id=?2 AND e.entity_type='Conversation' AND e.entity_id=m.conversation_id AND e.type='conversation.message.added.v1' AND json_extract(e.payload_json,'$.message_id')=m.message_id WHERE m.conversation_id=?1 AND e.entity_revision<?3 AND m.role<>'SYSTEM_NOTICE'",
+                        params![conversation, workspace, oldest],
+                        |row| row.get(0),
+                    )
+                    .map_err(map_database_error)?;
+                context.omitted_message_count = context
+                    .omitted_message_count
+                    .saturating_add(u32::try_from(older).unwrap_or(u32::MAX));
+            }
             transaction.commit().map_err(map_database_error)?;
             Ok(context)
         })

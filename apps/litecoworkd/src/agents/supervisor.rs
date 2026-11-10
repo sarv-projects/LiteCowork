@@ -891,6 +891,13 @@ fn execute_agent_turn(
                     turn_id,
                 )
                 .map_err(|e| format!("Load context error: {e:?}"))?;
+            // B-07: reduce an over-budget prefix with the explicit notice, or refuse
+            // the turn with a typed error. Never a silent truncation.
+            let (context, _context_reduction) = super::conversation_prompt::window_conversation_context(
+                context,
+                super::conversation_prompt::MAX_NATIVE_CONVERSATION_INPUT_BYTES,
+            )
+            .map_err(|e| format!("Context window error: {e:?}"))?;
 
             // Phase 3: dispatch the bounded committed context only after the
             // activation commit above. The native message id correlates native
