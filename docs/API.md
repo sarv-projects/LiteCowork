@@ -1045,10 +1045,12 @@ from the first page after a Runtime inventory notification.
 
 ## Agents
 
-Implementation status (2026-10-22): `beginAgentAuthentication`,
-`openAgentNativeConfiguration`, `PUT /v1/agent-bindings/{id}/configuration`,
+Implementation status (2026-11-10): `beginAgentAuthentication` and
+`openAgentNativeConfiguration` are **served** (fail-closed: they act only on a method or
+target declared by the profile's fresh module descriptor, and the V1 OpenCode module
+declares none). `PUT /v1/agent-bindings/{id}/configuration`,
 `getAgentSessionOptions`, `getAgentHarnessCapabilities`, `installRegistryAgent` and
-`updateRegistryAgent` are all **target-only** — declared, never mounted, never called.
+`updateRegistryAgent` are **target-only** — declared, never mounted, never called.
 Served today: inventory/registry list and refresh, profile probe, control-descriptor
 refresh, credential submission, binding CRUD with enable/disable/default, and the quota
 observation.

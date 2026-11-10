@@ -14,7 +14,7 @@ This document maps V1 product areas to normative domain owners, actual implement
 | Feature design/lifecycle | ../specs/README.md and V1-FEATURE-SDD-REGISTER.md |
 | Release proof | ACCEPTANCE-AND-E2E-PLAN.md, TESTING.md |
 
-The composed Operator has 176 OpenAPI route registrations, one authenticated local-only operation outside OpenAPI and 55 OpenAPI operations not mounted. These are registration counts, not counts of integrated or qualified product capabilities.
+The composed Operator has 178 OpenAPI route registrations, one authenticated local-only operation outside OpenAPI and 53 OpenAPI operations not mounted. These are registration counts, not counts of integrated or qualified product capabilities.
 
 ## 2. Ten product areas
 
@@ -66,7 +66,7 @@ See IMPLEMENTATION-STATUS.md for evidence and ACCEPTANCE-AND-E2E-PLAN.md for rel
 | Concern | Normative owner set | Current coverage and implementation boundary |
 |---|---|---|
 | Domain schema, identity and lifecycle | DATA-MODEL.md, STATE-MACHINES.md, SCHEMAS.md, `schemas/*.json`, `schemas/sqlite-v*.sql` | Broad target model and machine contracts exist. A field or enum in a schema is not evidence that every producer, validator, route and UI consumer accepts it; use the source-backed crosswalks in IMPLEMENTATION-STATUS.md and the owning domain docs. |
-| API and authenticated transport | API.md, `schemas/operator-api.openapi.yaml`, PROTOCOLS.md, LOCAL-OPERATOR-IPC.md | 231 OpenAPI operations are defined; 176 are registered by the composed Operator, one local-only route is outside OpenAPI and 55 operations are unmounted. Registration is not service/provider/UI qualification. |
+| API and authenticated transport | API.md, `schemas/operator-api.openapi.yaml`, PROTOCOLS.md, LOCAL-OPERATOR-IPC.md | 231 OpenAPI operations are defined; 178 are registered by the composed Operator, one local-only route is outside OpenAPI and 53 operations are unmounted. Registration is not service/provider/UI qualification. |
 | Events, projections and integration | EVENTS.md, `schemas/domain-event.schema.json`, SERVICES.md, PRESENTATION-RUNTIME.md, FAILURE-RECOVERY.md | 148 versioned event types are schema-aligned. Domain events, Operator stream frames and UI reducer actions are distinct. Each event needs a real producer/consumer and recovery path before its UI is treated as live. |
 | Flows, races and failure recovery | FLOWS.md, V1-END-TO-END-FLOW-AND-RACE-CONTRACTS.md, FAILURE-RECOVERY.md and domain owners | FL01–FL25 and race classes define acceptance targets. Only the exact tests listed in IMPLEMENTATION-STATUS.md are evidence; structural or unit passes do not qualify full journeys. |
 | HLD, ownership and rationale | ../ARCHITECTURE.md, COVERAGE-MATRIX.md, `adr/`, domain owner contracts | Architecture defines boundaries and ownership; ADRs explain accepted rationale. An implementation or product proposal cannot silently create a second authority. |

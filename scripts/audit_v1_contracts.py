@@ -64,8 +64,8 @@ def main() -> int:
             f"unknown={len((served|target)-set(openapi))}"
         )
     counts = (len(inventory.get("served", [])), len(outside), len(inventory.get("target_only", [])))
-    if counts != (176, 1, 55):
-        errors.append(f"Route inventory count drift: {counts}; expected (176, 1, 55)")
+    if counts != (178, 1, 53):
+        errors.append(f"Route inventory count drift: {counts}; expected (178, 1, 53)")
     if inventory.get("version") != 3:
         errors.append(f"Unexpected route inventory version: {inventory.get('version')}")
 

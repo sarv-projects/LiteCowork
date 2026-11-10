@@ -9,9 +9,9 @@ This is an inventory, not proof that every sentence is correct, implemented,
 integrated or qualified. The authority chain is in docs/README.md. Current source
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
-- Included files: 364
-- Included lines: 72682
-- Included bytes: 6424157
+- Included files: 365
+- Included lines: 73095
+- Included bytes: 6511485
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,10 +25,10 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 144 | 48393 |
-| repository root | 6 | 1682 |
+| docs/ | 145 | 48782 |
+| repository root | 6 | 1690 |
 | scripts/ | 1 | 14 |
-| specs/ | 201 | 21813 |
+| specs/ | 201 | 21829 |
 
 ## Complete file manifest
 
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 81 | 6032 | 2fc07511243a861e |
-| CURRENT-RUN.md | 296 | 44031 | e8b5d03c5e869f79 |
+| CURRENT-RUN.md | 304 | 45423 | dde447d4716d8274 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 92 | 7389 | 5a5a73e85c542f17 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -56,7 +56,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/AGENT-ACCOUNT-ROUTE-MATRIX.md | 105 | 13947 | 4c6732bf0ea16f6e |
 | docs/AGENT-CONTROL.md | 1347 | 55342 | 6700424469327bdb |
 | docs/AGENT-FABRIC.md | 497 | 32590 | 2a40c04496cfb4ec |
-| docs/API.md | 2421 | 171438 | e20aeacb04656f70 |
+| docs/API.md | 2423 | 171597 | b99f5e6833629d4e |
 | docs/ARTIFACTS-EVIDENCE.md | 378 | 23528 | 578bcdabd6d2a17d |
 | docs/AUTOMATION.md | 705 | 41619 | 015fc6660d91eb00 |
 | docs/BENCHMARKS.md | 754 | 45114 | 42f307511fe0d5ac |
@@ -70,11 +70,12 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
 | docs/CONTEXT.md | 272 | 19955 | f80c31cda1a4c7aa |
-| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 171 | 77894 | de728b80aa8f2b08 |
+| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 172 | 78944 | 396f5dafa067aca3 |
 | docs/COVERAGE-MATRIX.md | 174 | 25381 | 9a370eb0721ef07c |
 | docs/COWORKER-FLOWS.md | 166 | 20076 | 309015aa4fe4a14a |
 | docs/COWORKERS-TARGET.md | 456 | 58061 | 3afdfb6005644afe |
 | docs/DATA-MODEL.md | 2696 | 129279 | 2fcec5def6e6fb65 |
+| docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md | 384 | 70730 | 97743025fb1a3d01 |
 | docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md | 82 | 14250 | e3b3fa1b9b4e1c43 |
 | docs/DELEGATION.md | 903 | 52244 | c8cd329d755fbff7 |
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
@@ -85,11 +86,11 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/EVENTS.md | 929 | 69386 | e4aae09464d8030b |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
 | docs/FAILURE-RECOVERY.md | 213 | 17867 | 71418bc2b863c859 |
-| docs/FEATURE-AND-UI-CONTRACT-COVERAGE.md | 137 | 21086 | 21343252489808be |
+| docs/FEATURE-AND-UI-CONTRACT-COVERAGE.md | 137 | 21086 | ad7b88fd491bc896 |
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 313 | 63498 | 2b4755fa36488931 |
+| docs/IMPLEMENTATION-STATUS.md | 315 | 63893 | 636075cf307f6dd8 |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -126,7 +127,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/RUNTIME-MESH.md | 744 | 36915 | 5df0580b7369d59d |
 | docs/SCHEMAS.md | 1631 | 74000 | b33cf6312eae963e |
 | docs/SECURITY.md | 299 | 17184 | 77bdfeb2b19ebbfa |
-| docs/SEMANTIC-SERVED-UI-MAP.md | 185 | 31230 | 467123d5c22bcf17 |
+| docs/SEMANTIC-SERVED-UI-MAP.md | 185 | 31230 | fda7b3af64f6079c |
 | docs/SERVICES.md | 1582 | 101551 | 43c93b0fb23f464f |
 | docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md | 111 | 18984 | e5d28f0061fcff69 |
 | docs/SOURCE-RECONCILIATION.md | 179 | 16220 | 5567fad3a3b603ea |
@@ -212,11 +213,11 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/002-native-agent-install-auth-binding/README.md | 39 | 3876 | 50eec7b4d2b49f3c |
 | specs/002-native-agent-install-auth-binding/RESEARCH.md | 89 | 13458 | 1ea5ea1e8b676d86 |
 | specs/002-native-agent-install-auth-binding/SPEC.md | 470 | 53356 | e9c894e35b18e44c |
-| specs/002-native-agent-install-auth-binding/TASKS.md | 378 | 48628 | a8e8c5c58f2f7ff3 |
+| specs/002-native-agent-install-auth-binding/TASKS.md | 378 | 57641 | 311e975d961207d5 |
 | specs/002-native-agent-install-auth-binding/contracts/README.md | 9 | 351 | 650e7a2f3b6ee610 |
-| specs/002-native-agent-install-auth-binding/contracts/api-events.md | 28 | 2672 | a283cfae2ae53b9c |
+| specs/002-native-agent-install-auth-binding/contracts/api-events.md | 28 | 2802 | 5ae5f5673f99b2db |
 | specs/002-native-agent-install-auth-binding/contracts/errors-recovery.md | 9 | 1197 | d1caa1de6e7d6b2f |
-| specs/002-native-agent-install-auth-binding/contracts/ui-behavior.md | 91 | 9162 | ff2f35d24055a87a |
+| specs/002-native-agent-install-auth-binding/contracts/ui-behavior.md | 107 | 13621 | 94925ea0d73c11d6 |
 | specs/003-workspace-roots-context-ingestion/DATA-MODEL.md | 34 | 3046 | 013f11741e693131 |
 | specs/003-workspace-roots-context-ingestion/PLAN.md | 43 | 3598 | 7cce94bb89f51fa0 |
 | specs/003-workspace-roots-context-ingestion/README.md | 35 | 3033 | fc65989b6e6a885b |

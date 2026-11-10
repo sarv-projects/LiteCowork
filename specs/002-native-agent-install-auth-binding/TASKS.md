@@ -1,6 +1,6 @@
 # Tasks - Native Agent Install, Auth and Binding
 
-**Feature:** 002 | **Status:** ACCEPTED/LOCKED - implementation authorized; tasks not started unless marked.
+**Feature:** 002 | **Status:** ACCEPTED/LOCKED - implementation authorized; see each task Status line. Windows rows, T15 release-matrix qualification and release/signing/packaging items are DEFERRED to the owner's laptop testing (standing owner instruction); LiteSPM-dependent parts are deferred likewise.
 **Spec revision:** 1.0 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
 
 ## Current baseline
@@ -128,7 +128,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T07 - Native sign-in begin and auth observation
 
-- **Status:** NOT STARTED (`beginAgentAuthentication` is OpenAPI target-only; `AgentAuthDescriptor`/`AgentAuthState` types exist in `control_descriptor.rs`; inventory reports auth `UNKNOWN`).
+- **Status:** PARTIAL 2026-11-10 (CODE + SERVED, fail-closed). `beginAgentAuthentication` is served by `agent_auth_operator.rs` and `AgentAuthService` (`agents/auth_service.rs`): it acts only on a method declared by the profile's fresh module descriptor, returns the in-flight challenge instead of a second launch, records `AUTHENTICATING`/`NEEDS_AUTH`/`ERROR` observations, reads an unreported or expired observation back as `UNKNOWN` (never success), refuses an undeclared method with `INVALID_ARGUMENT`, and reseals the observed state into the next descriptor. Observations are Runtime-local and in-memory (no migration); a restart returns `UNKNOWN`. Deviations and open items: the production `NativeLoginLauncher` is `UnqualifiedLauncher`, so every declared method is refused (503) and the OpenCode module still declares no auth method, because a native login cannot be launched or verified without a live OpenCode 2.0.32 binary; no completion re-probe hook is wired to a module; no Tauri command exists for Sign in (`src-tauri` cannot be built here, gdk-3.0 missing); the SPEC AuthObservation DDL is not added. UI: `DescriptorSummary` shows Sign in only for a declared `NATIVE_FLOW` method and an Authenticating text state. Evidence: `agent_auth_*` and `agent_auth_begin_*` tests (litecoworkd), `agent-control-descriptor-panel.test.mjs`. Windows launch DEFERRED (Windows rows are deferred to laptop testing).
 - **Depends on:** T05
 - **Cross-package prerequisites:** Feature 011 authenticated IPC and OS-open helper (Wave 0).
 - **Owner:** Agent Runtime, Security/Trust, Desktop UI.
@@ -147,7 +147,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T08 - Replay-safe credential slot submission
 
-- **Status:** PARTIAL (`submit_agent_credential` in `agent_credentials_operator.rs` validates descriptor freshness, writes through `OsSecretStore` and zeroizes; the route returns `503` because exact durable replay is not implemented).
+- **Status:** BLOCKED (retryable) 2026-11-10: the durable idempotency receipt needs a new additive table (migration v31) and the matching `SecretStore` crash-reconcile path. Adding a migration touches the version-gated migration matrix, the failpoint suite and `docs/STORAGE.md`, and needs the full storage suite (about 10 minutes) plus the OS credential-store qualification script on the release-matrix OS, so it was not shipped in this slice. The route keeps returning `503 DEPENDENCY_UNAVAILABLE` rather than ship a non-idempotent secret write (this task's stop rule). OpenCode and Claude Code declare no `LITECOWORK_SECRET_STORE` slot in V1, so no user flow is affected. `StoredAgentDescriptorSource` is also still not wired to the credential route.
 - **Depends on:** T05
 - **Cross-package prerequisites:** Feature 011 SecretStore qualification on the release-matrix OS (`scripts/qualify-os-credential-store.sh`).
 - **Owner:** Security/Trust, Storage.
@@ -164,7 +164,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T09 - Composer model, effort and declared native commands from the descriptor
 
-- **Status:** NOT STARTED (`apps/litecowork-ui/src/conversations/conversation-agent-surface.ts` `deriveConversationAgentSurface` has tests but no production caller; `ConversationsPage.tsx` uses `buildConversationAgentChoices` only; "/ for actions" is placeholder copy).
+- **Status:** PARTIAL 2026-11-10 (CODE, UI view-model only). `conversation-model-picker.ts` adds `deriveModelPicker`, `buildModelSelection` and `deriveCommandList`: descriptor-backed model list with selected check and provider-default marker, Effort row only when declared, distinct LOADING/ERROR/DENIED/OFFLINE/STALE/BLOCKED/EMPTY texts, listbox announcement text, a payload `{optionId, providerModelId, descriptorRevision}` that refuses an undeclared model, and the "No commands declared by this agent" slash state. The placeholder "/ for actions" hint was already removed (guarded by `conversation-empty-state-truthfulness.test.mjs`). Not done, per this task's stop rule (no picker without a consuming send path): the popover component is not mounted in `ConversationsPage.tsx`, `getAgentSessionOptions` is not served, and the dispatcher does not revalidate the option at admission. Tests: `tests/conversation-model-picker.test.ts` (6).
 - **Depends on:** T05, T06
 - **Cross-package prerequisites:** Feature 001 composer and Send admission (Wave 1); Feature 004 consumes the same picker gating.
 - **Owner:** Desktop UI, Agent Runtime.
@@ -183,7 +183,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T10 - Supply 002 operations to the Feature 011 Settings -> Agents screen
 
-- **Status:** PARTIAL (`AgentCatalogSettings.tsx` renders catalog, inventory, probes, profiles, bindings and default lead; no sign-in, descriptor matrix or native-config action).
+- **Status:** PARTIAL 2026-11-10 (CODE + SERVED, fail-closed). `openAgentNativeConfiguration` is served by `agent_native_config_operator.rs`: the caller supplies only a `targetId`; an id with a path separator or control character is rejected, a target not declared in the fresh module descriptor is rejected before any opener is consulted, and the production `UnqualifiedOpener` refuses declared targets with 503. UI: `DescriptorSummary` shows five independent axes (Detection, Installation, Configuration, Authentication, Readiness), declared Sign in and Open native config controls only, a disabled state when no desktop command is supplied, and the "native harness state" label for MCP/hooks/extensions (AC-007, AC-011). Not done: Tauri commands in `agent_binding_bridge.rs` (`src-tauri` cannot be built here), per-card probe loading test (AC-012 UI), and a real opener. Tests: `native_config_open_rejects_undeclared_targets_and_caller_paths`, `agent-control-descriptor-panel.test.mjs`.
 - **Depends on:** T05, T07
 - **Cross-package prerequisites:** Feature 011 Settings -> Agents screen and control table (A-35 owner). This task links to that screen and does not republish it.
 - **Owner:** Desktop UI (operation wiring), Feature 011 (screen).
@@ -202,7 +202,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T11 - Catalog, inventory and honest install/update unavailability for V1
 
-- **Status:** PARTIAL (registry and inventory served; install/update are OpenAPI target-only with no handler).
+- **Status:** PARTIAL 2026-11-10 (CODE). Registry and inventory remain served; Install and Update are shown as unavailable with the reason "No qualified installer for this module in V1" and no Install or Update control exists to focus (test `install and update are visibly unavailable and no install control is offered`). Not done: the "Install guide" external link (no verified guide URL per module), and "Add existing installation" through the native picker plus exact module validation.
 - **Depends on:** T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Desktop UI.
@@ -220,7 +220,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T12 - Claude Code CLI as the second AgentModule (B-11)
 
-- **Status:** NOT STARTED (only the `CLAUDE_CODE` inventory candidate exists in `apps/litecoworkd/src/agents/native_cli.rs`).
+- **Status:** BLOCKED (retryable) 2026-11-10: the module needs the exact Claude Code CLI version, its non-interactive streaming transport and native auth method pinned from an installed CLI, and none is installed in this sandbox. Shipping a manifest with a guessed version pin would violate AC-017 and the T12 stop rule, so `CLAUDE_CODE` stays inventory-only, `NativeProviderKey::ClaudeCode` still selects no module and the probe allowlist is unchanged. Windows x64 pinning is DEFERRED to laptop testing; Linux x64 pinning needs the CLI installed.
 - **Depends on:** T03, T05, T07
 - **Cross-package prerequisites:** Feature 004 Claude Code dispatch arm in `AgentSessionSupervisor` (Wave 4) consumes this module; Feature 001 supervisor durability.
 - **Owner:** Agent Runtime, Security/Trust.
@@ -237,7 +237,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T13 - Failure, restart and race recovery for probe, descriptor, auth and binding
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL 2026-11-10 (CODE). Added `agent_lifecycle_recovery_restart_revalidates_the_descriptor_until_reprobed` (a new RuntimeIncarnation never inherits a descriptor until re-probed) and `agent_lifecycle_recovery_failed_probe_leaves_the_prior_descriptor_intact` (crash or unpinned probe leaves the prior descriptor current and no partial row) in `descriptor_service.rs`; auth unknown and cancel are covered by `agent_auth_*`; descriptor race and TTL by existing `descriptor_*` storage tests. The planned integration file `tests/agent_lifecycle_recovery.rs` was not created because `litecoworkd` is a binary crate whose internals are not importable from `tests/`. Not done: credential replay after crash (blocked with T08), duplicate create/enable replay beyond existing receipt tests, and the `scripts/v1_resilience_matrix.py` row.
 - **Depends on:** T05-T08
 - **Cross-package prerequisites:** Feature 011 Runtime incarnation and restart observation.
 - **Owner:** Agent Runtime, Storage.
@@ -255,7 +255,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T14 - Cross-layer trace for every 002 user-visible operation
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL 2026-11-10 (DOCS). Trace table for Probe, Create/Enable/Disable binding, Refresh descriptor, Sign in, Select model and Open native config is in `contracts/ui-behavior.md` with real symbol names and test ids. Three breaks are recorded rather than hidden (no Tauri command for Sign in, Open native config or the picker; `getAgentSessionOptions` still target-only; no qualified launcher or opener). `docs/V1-UI-ACTION-STATE-LEDGER.md` rows were not added because that ledger is keyed by UIV1 ids owned by the documentation owner.
 - **Depends on:** T09, T10, T13
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Desktop UI.
@@ -271,7 +271,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T15 - Release-matrix qualification (CODE, SYSTEM, USER)
 
-- **Status:** NOT STARTED
+- **Status:** DEFERRED 2026-11-10 by owner instruction: release-matrix qualification (Windows x64 and Linux x64 packaged runs, owner USER evidence) depends on Windows hardware, the packaged installer and release items, and is to be tested later on the owner's laptop. No QUALIFIED claim is made anywhere in this package.
 - **Depends on:** T12, T14
 - **Cross-package prerequisites:** Feature 019 release matrix rows and packaged installer; Feature 001 E2E-01 Send path; Feature 004 E2E-02 relay for the Claude Code row.
 - **Owner:** Agent Runtime, Product (owner USER evidence).
@@ -289,7 +289,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T16 - Documentation and ledger sync
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL 2026-11-10 (DOCS). `served-route-inventory.json` regenerated (178 served / 1 local-only / 53 target-only; three audit scripts, `tests/test_architecture_validator.py`, IMPLEMENTATION-STATUS, the register, coverage and semantic maps updated), `docs/API.md` and `contracts/api-events.md` state the two newly served fail-closed routes. SPEC section 4 and the function ledger F13 rows were not rewritten because T15 produced no evidence; no claim is above CODE/SERVED. Closing register rows B-11/B-12 is left to the orchestrator.
 - **Depends on:** T15
 - **Cross-package prerequisites:** orchestrator-owned register and traceability updates.
 - **Owner:** Agent Runtime, documentation owner.
@@ -305,7 +305,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T17 - Define the native-agent adapter as an ACP client (P-11)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-11 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package. This is the register A-54 ACP direction (see docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md); rationale and the borrowable mapping stay in that register row and the synthesis doc, not restated here.
+- **Status:** PARTIAL 2026-11-10 (CODE, commit bf9b8e0). `agents/acp_client.rs` implements a bounded-framing ACP client (initialize, session/new, session/prompt, session/update, session/cancel, request_permission, fs and terminal routing to the Client owner, foreign-session traffic ignored, one cancel, fail-closed faults) with tests `acp_client_adapter_*` (6). Open: the ACP SDK package version and protocol revision are still not pinned in RESEARCH.md (no network fetch of the published SDK was done), so that acceptance box is unmet; the module is not wired to any dispatch path.
 - **Depends on:** T03
 - **Cross-package prerequisites:** Feature 001 adapter-trait task (Feature 001 T04) is the Conversation-side integration point; this package's Adapter 1.0 registry task T03 is the local integration point.
 - **Owner:** Agent Runtime.
@@ -323,7 +323,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T18 - Agent Matchmaker ranking for a job (P-12)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-12 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package.
+- **Status:** PARTIAL 2026-11-10 (CODE). `agents/matchmaker.rs` `rank_agents` ranks eligible bindings by capabilities declared in fresh descriptors, gives a plain-language reason per candidate, excludes disabled, not-lead-eligible, missing and stale-descriptor candidates with a reason and no rank, keeps caller order on ties and always reports `advisory: true` (tests `agent_matchmaker_*`, 3). Not done: the Operator route (adds an OpenAPI operation and route counts), the UI surface in `apps/litecowork-ui/src/`, and the job-text need extraction is a fixed keyword table, not a model.
 - **Depends on:** T05, T17
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, UI.

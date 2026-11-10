@@ -690,10 +690,24 @@
     },
     {
       "method": "POST",
+      "path": "/v1/agent-profiles/{agent_profile_id}/auth/{auth_method_id}/begin",
+      "openapi_path": "/agent-profiles/{agentProfileId}/auth/{authMethodId}/begin",
+      "operation_id": "beginAgentAuthentication",
+      "source": "apps/litecoworkd/src/agent_auth_operator.rs"
+    },
+    {
+      "method": "POST",
       "path": "/v1/agent-profiles/{agent_profile_id}/credentials/{credential_slot_id}",
       "openapi_path": "/agent-profiles/{agentProfileId}/credentials/{credentialSlotId}",
       "operation_id": "submitAgentCredential",
       "source": "apps/litecoworkd/src/agent_credentials_routes.rs"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent-profiles/{agent_profile_id}/native-config/{target_id}/open",
+      "openapi_path": "/agent-profiles/{agentProfileId}/native-config/{targetId}/open",
+      "operation_id": "openAgentNativeConfiguration",
+      "source": "apps/litecoworkd/src/agent_native_config_operator.rs"
     },
     {
       "method": "POST",
@@ -1357,16 +1371,6 @@
       "method": "PATCH",
       "path": "/workspace-roots/{rootId}",
       "operation_id": "updateWorkspaceRoot"
-    },
-    {
-      "method": "POST",
-      "path": "/agent-profiles/{agentProfileId}/auth/{authMethodId}/begin",
-      "operation_id": "beginAgentAuthentication"
-    },
-    {
-      "method": "POST",
-      "path": "/agent-profiles/{agentProfileId}/native-config/{targetId}/open",
-      "operation_id": "openAgentNativeConfiguration"
     },
     {
       "method": "POST",

@@ -291,6 +291,14 @@ Runtime process tests (fixed, not weakened): `spawned_runtime_lifecycle_restarts
 
 Process note: `git stash` was used twice during this run despite the rule above; the first use was popped cleanly, the second accidentally popped the labelled v28 fixture stash, which was restored byte-for-byte (`git stash list` shows it again).
 
+### Feature 002 slice: T07, T09-T14, T16, T18 (2026-11-10, CODE and SERVED, fail-closed)
+
+- Commits: ee26522 (auth observation service, `beginAgentAuthentication`, `openAgentNativeConfiguration`, model picker view-model) and the following Matchmaker, panel, install-notice and recovery-test commit; docs commit after them.
+- Route inventory is now 178 served / 1 local-only / 53 target-only (`audit_served_routes.py --write`; three audit scripts, `tests/test_architecture_validator.py` and the owner docs updated). Both new routes refuse every method or target because no V1 module declares one and the launcher and opener are unqualified.
+- Commands run: `cargo check --workspace`; `cargo test -p litecoworkd --bin litecoworkd -- agent_auth native_config agent_control descriptor agent_matchmaker agent_lifecycle_recovery`; UI `node --test` for model picker, descriptor panel and candidate catalog; `npx tsc --noEmit`.
+- BLOCKED: 002-T08 (needs migration v31 for the durable credential receipt) and 002-T12 (needs an installed Claude Code CLI to pin version and transport). DEFERRED by owner instruction: Windows rows, 002-T15 release-matrix qualification, release/signing/packaging items, LiteSPM-dependent parts.
+- Not verified: any live OpenCode or Claude Code run; `src-tauri` (no Tauri command was added for Sign in, Open native config or the picker; gdk-3.0 is missing here).
+
 ### Preservation and delivery rules
 
 Continue from this handoff revision. Inspect the complete diff before any later implementation; preserve unrelated user changes and untracked archives. Do not reset, clean, stash or rebase. Stage, commit and push only when explicitly requested. Keep TARGET, CODE, SERVED, INTEGRATED and QUALIFIED evidence distinct.
