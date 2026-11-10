@@ -226,6 +226,7 @@ fn fixture() -> (tempfile::TempDir, SqliteWorkspaceStore, axum::Router) {
 
     let (_, stream_shutdown) = tokio::sync::watch::channel(false);
     let router = build_operator_router(ApiState {
+        supervisor: crate::operator::test_supervisor(&store.clone(), RUNTIME),
         store: store.clone(),
         principal_id: OWNER.to_owned(),
         runtime_id: RUNTIME.to_owned(),

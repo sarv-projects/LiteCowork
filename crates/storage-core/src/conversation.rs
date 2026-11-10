@@ -969,9 +969,15 @@ mod conversation_context_tests {
         // The boundary message must be a USER message for dispatch; here only the
         // window arithmetic is under test.
         let exact = build(1_024).expect("exactly the bound");
-        assert_eq!((exact.messages.len(), exact.omitted_message_count), (1_024, 0));
+        assert_eq!(
+            (exact.messages.len(), exact.omitted_message_count),
+            (1_024, 0)
+        );
         let over = build(1_025).expect("one over is windowed, not refused");
-        assert_eq!((over.messages.len(), over.omitted_message_count), (1_024, 1));
+        assert_eq!(
+            (over.messages.len(), over.omitted_message_count),
+            (1_024, 1)
+        );
         assert_eq!(over.messages[0].message_id, "m00001");
         assert_eq!(over.messages.last().expect("boundary").message_id, "m01024");
     }
@@ -981,9 +987,25 @@ mod conversation_context_tests {
         let big = "x".repeat(1024 * 1024);
         let messages = [
             message("m-1", "c", "USER", &big, "2026-01-01T00:00:01Z", None, None),
-            message("m-2", "c", "AGENT", &big, "2026-01-01T00:00:02Z", Some("a"), None),
+            message(
+                "m-2",
+                "c",
+                "AGENT",
+                &big,
+                "2026-01-01T00:00:02Z",
+                Some("a"),
+                None,
+            ),
             message("m-3", "c", "USER", &big, "2026-01-01T00:00:03Z", None, None),
-            message("m-4", "c", "AGENT", &big, "2026-01-01T00:00:04Z", Some("a"), None),
+            message(
+                "m-4",
+                "c",
+                "AGENT",
+                &big,
+                "2026-01-01T00:00:04Z",
+                Some("a"),
+                None,
+            ),
             message("m-5", "c", "USER", &big, "2026-01-01T00:00:05Z", None, None),
         ];
         let windowed = build_conversation_context_package("c", "b", "m-5", &ordered(&messages))

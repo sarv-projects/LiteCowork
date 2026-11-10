@@ -416,8 +416,7 @@ fn run_with_identity_providers(
     // This is currently reachable only from the process-supervisor signal handler.
     // Do not wire an Operator route to this receiver until RuntimeLifecycleService
     // can prove Task/Attempt, Effect, lease, and local service-reference settlement.
-    if let Err(error) = operator.wait_for_shutdown_signal_or_endpoint_failure(&shutdown_receiver)
-    {
+    if let Err(error) = operator.wait_for_shutdown_signal_or_endpoint_failure(&shutdown_receiver) {
         // The Operator endpoint is gone while the Runtime still reports READY. Publish
         // DEGRADED to the durable catalog and the private status before exiting
         // nonzero, so the next start observes an unclean prior incarnation.

@@ -178,7 +178,7 @@ pub(crate) fn rank_agents(
         scored.push((supported.len(), candidate, reason));
     }
     // Higher score first; ties keep the caller's order so ranking is deterministic.
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|entry| std::cmp::Reverse(entry.0));
     let ranked = scored
         .into_iter()
         .enumerate()
@@ -256,7 +256,11 @@ mod tests {
         let mut missing = candidate("missing", true);
         missing.descriptor = None;
         let far_future = SystemTime::now() + std::time::Duration::from_secs(7200);
-        let result = rank_agents("read a file", &[disabled, ineligible, stale, missing], far_future);
+        let result = rank_agents(
+            "read a file",
+            &[disabled, ineligible, stale, missing],
+            far_future,
+        );
         assert!(result.ranked.is_empty());
         assert_eq!(result.excluded.len(), 4);
         assert!(result.excluded[2].reason.contains("stale"));
@@ -269,7 +273,11 @@ mod tests {
             &[candidate("b", false), candidate("a", false)],
             SystemTime::now(),
         );
-        let ids: Vec<_> = result.ranked.iter().map(|r| r.agent_binding_id.as_str()).collect();
+        let ids: Vec<_> = result
+            .ranked
+            .iter()
+            .map(|r| r.agent_binding_id.as_str())
+            .collect();
         assert_eq!(ids, ["b", "a"]);
         assert!(result.advisory);
         assert!(result.ranked[0].reason.contains("names no capability"));

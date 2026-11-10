@@ -1303,6 +1303,10 @@ mod tests {
             .expect("Workspace grants this local Runtime binding");
 
         let (_shutdown_sender, stream_shutdown) = tokio::sync::watch::channel(false);
+        let supervisor = Arc::new(crate::agents::AgentSessionSupervisor::new(
+            store.clone(),
+            RUNTIME.to_owned(),
+        ));
         let state = ApiState {
             store,
             principal_id: OWNER.to_owned(),
@@ -1316,6 +1320,7 @@ mod tests {
             stream_admission: Arc::new(tokio::sync::Semaphore::new(2)),
             runtime_inventory_revision: Arc::new(AtomicU64::new(1)),
             stream_shutdown,
+            supervisor,
         };
         let router = super::routes()
             .route_layer(middleware::from_fn(super::super::authenticate))

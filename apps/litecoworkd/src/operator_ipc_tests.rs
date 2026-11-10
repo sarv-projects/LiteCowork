@@ -162,6 +162,7 @@ async fn authenticated_context_document_deletion_route_enforces_owner_admission_
         ).expect("attach active ContextDocument metadata");
     let (_, stream_shutdown) = tokio::sync::watch::channel(false);
     let router = super::build_operator_router(super::ApiState {
+        supervisor: crate::operator::test_supervisor(&store, RUNTIME),
         store,
         principal_id: OWNER.to_owned(),
         runtime_id: RUNTIME.to_owned(),
@@ -2713,6 +2714,7 @@ async fn workspace_root_status_routes_distinguish_receipt_conflicts_from_stale_v
         )
         .route_layer(middleware::from_fn(authenticate))
         .with_state(super::ApiState {
+            supervisor: crate::operator::test_supervisor(&store, RUNTIME),
             store,
             principal_id: OWNER.to_owned(),
             runtime_id: RUNTIME.to_owned(),
@@ -8154,7 +8156,9 @@ async fn conversation_turn_delta_stream_forwards_only_the_subscribed_conversatio
                 .header(header::CONTENT_TYPE, "application/json")
                 .header("x-workspace-id", WORKSPACE)
                 .extension(AuthenticatedLocalPeer)
-                .body(Body::from(serde_json::to_vec(&subscription).expect("subscription")))
+                .body(Body::from(
+                    serde_json::to_vec(&subscription).expect("subscription"),
+                ))
                 .expect("stream request"),
         )
         .await
@@ -8173,8 +8177,8 @@ async fn conversation_turn_delta_stream_forwards_only_the_subscribed_conversatio
     }
     assert_eq!(kinds, ["stream.ready", "projection"]);
 
-    let frame = |conversation: &str, sequence: u64, text: &str| {
-        crate::transient_frames::TransientFrame {
+    let frame =
+        |conversation: &str, sequence: u64, text: &str| crate::transient_frames::TransientFrame {
             workspace_id: WORKSPACE.to_owned(),
             conversation_id: conversation.to_owned(),
             bytes: serde_json::to_vec(&json!({
@@ -8187,8 +8191,7 @@ async fn conversation_turn_delta_stream_forwards_only_the_subscribed_conversatio
                 "text_delta": text,
             }))
             .expect("delta json"),
-        }
-    };
+        };
     let bus = crate::transient_frames::transient_bus();
     bus.publish(frame(OTHER, 1, "not mine"));
     bus.publish(frame(MINE, 1, "hello"));

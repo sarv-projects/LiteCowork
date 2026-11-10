@@ -88,10 +88,16 @@ fn conversation_history_rename_commits_title_event_without_title_and_replays() {
     let committed = history
         .rename_conversation(rename("rename-one", "Quarterly plan", 1))
         .expect("rename commits");
-    assert_eq!(committed.conversation.title.as_deref(), Some("Quarterly plan"));
+    assert_eq!(
+        committed.conversation.title.as_deref(),
+        Some("Quarterly plan")
+    );
     assert_eq!(committed.conversation.version, 2);
     let payload = committed.event.payload.to_string();
-    assert!(!payload.contains("Quarterly plan"), "event must not carry the title");
+    assert!(
+        !payload.contains("Quarterly plan"),
+        "event must not carry the title"
+    );
     assert!(payload.contains("title_digest"));
 
     let replay = history

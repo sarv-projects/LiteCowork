@@ -142,7 +142,10 @@ fn conversation_presentation_snapshot_is_bounded_paged_and_keeps_semantic_truth(
         "RICH"
     );
     assert_eq!(first.active_turn.as_ref().unwrap()["version"], 3);
-    assert!(first.retryable_turn.is_none(), "a running turn is not retryable");
+    assert!(
+        first.retryable_turn.is_none(),
+        "a running turn is not retryable"
+    );
 
     // Once that turn FAILS and is the latest, the snapshot exposes it for Retry with its
     // aggregate version and typed settlement reason.
@@ -174,7 +177,9 @@ fn conversation_presentation_snapshot_is_bounded_paged_and_keeps_semantic_truth(
         )
         .unwrap();
     assert!(failed.active_turn.is_none());
-    let retryable = failed.retryable_turn.expect("latest FAILED turn is retryable");
+    let retryable = failed
+        .retryable_turn
+        .expect("latest FAILED turn is retryable");
     assert_eq!(retryable["turn_id"], "turn-active");
     assert_eq!(retryable["version"], 4);
     assert_eq!(retryable["reason_code"], "AGENT_TURN_TIMEOUT");

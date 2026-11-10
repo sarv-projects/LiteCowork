@@ -154,7 +154,11 @@ impl AgentSessionSupervisor {
         }
     }
 
-    fn register_cancel(&self, turn_id: &str, retry_ordinal: u32) -> (CancelSignal, CancelRegistration) {
+    fn register_cancel(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+    ) -> (CancelSignal, CancelRegistration) {
         let signal = CancelSignal::new();
         let key = (turn_id.to_owned(), retry_ordinal);
         if let Ok(mut registry) = self.cancels.lock() {
@@ -860,7 +864,11 @@ fn execute_agent_turn(
                         retry_ordinal,
                         {
                             let activity_store = conv_store.clone();
-                            Box::new(move |record| activity_store.append_conversation_turn_activity(record).is_ok())
+                            Box::new(move |record| {
+                                activity_store
+                                    .append_conversation_turn_activity(record)
+                                    .is_ok()
+                            })
                         },
                     )),
                 ])));
@@ -960,14 +968,16 @@ fn execute_agent_turn(
             .map_err(|e| format!("Resource materialization failed: {}", e.reason_code()))?;
             // B-07: reduce an over-budget prefix with the explicit notice, or refuse
             // the turn with a typed error. Never a silent truncation.
-            let (context, _context_reduction) = super::conversation_prompt::window_conversation_context(
-                context,
-                super::conversation_prompt::MAX_NATIVE_CONVERSATION_INPUT_BYTES,
-            )
-            .map_err(|e| format!("Context window error: {e:?}"))?;
-            let prompt_bytes = super::conversation_prompt::encode_conversation_context_prompt(&context)
-                .map(|prompt| prompt.len())
-                .unwrap_or(0);
+            let (context, _context_reduction) =
+                super::conversation_prompt::window_conversation_context(
+                    context,
+                    super::conversation_prompt::MAX_NATIVE_CONVERSATION_INPUT_BYTES,
+                )
+                .map_err(|e| format!("Context window error: {e:?}"))?;
+            let prompt_bytes =
+                super::conversation_prompt::encode_conversation_context_prompt(&context)
+                    .map(|prompt| prompt.len())
+                    .unwrap_or(0);
 
             // Phase 3: dispatch the bounded committed context only after the
             // activation commit above. The native message id correlates native
@@ -1158,16 +1168,34 @@ mod tests {
     #[test]
     fn conversation_usage_attribution_prefers_reported_then_estimate_then_unknown() {
         use super::super::adapter::ReportedUsage;
-        let reported = ReportedUsage { input_tokens: 10, output_tokens: 20, observed: true };
+        let reported = ReportedUsage {
+            input_tokens: 10,
+            output_tokens: 20,
+            observed: true,
+        };
         let usage = turn_usage(reported, 4_000, 400).expect("reported usage");
-        assert_eq!(usage.attribution_source, UsageAttributionSource::ProviderReported);
+        assert_eq!(
+            usage.attribution_source,
+            UsageAttributionSource::ProviderReported
+        );
         assert_eq!((usage.input_tokens, usage.output_tokens), (10, 20));
 
         // A zero-token report (fixture-style) is not provider usage: estimate instead.
-        let zero = ReportedUsage { input_tokens: 0, output_tokens: 0, observed: true };
+        let zero = ReportedUsage {
+            input_tokens: 0,
+            output_tokens: 0,
+            observed: true,
+        };
         let usage = turn_usage(zero, 4_000, 3).expect("estimated usage");
-        assert_eq!(usage.attribution_source, UsageAttributionSource::EstimatedLocal);
-        assert_eq!((usage.input_tokens, usage.output_tokens), (1_000, 1), "max(1, bytes / 4)");
+        assert_eq!(
+            usage.attribution_source,
+            UsageAttributionSource::EstimatedLocal
+        );
+        assert_eq!(
+            (usage.input_tokens, usage.output_tokens),
+            (1_000, 1),
+            "max(1, bytes / 4)"
+        );
 
         // Nothing exchanged and nothing reported is UNKNOWN (None).
         assert!(turn_usage(ReportedUsage::default(), 0, 0).is_none());
@@ -1181,11 +1209,23 @@ mod tests {
         use super::super::adapter::{TurnObserver, UsageCollector};
         use super::super::normalizer::NormalizedAgentEvent;
         let mut collector = UsageCollector::default();
-        collector.on_event(&NormalizedAgentEvent::UsageRecorded { input_tokens: Some(5), output_tokens: None });
-        collector.on_event(&NormalizedAgentEvent::UsageRecorded { input_tokens: None, output_tokens: None });
-        collector.on_event(&NormalizedAgentEvent::UsageRecorded { input_tokens: Some(7), output_tokens: Some(9) });
+        collector.on_event(&NormalizedAgentEvent::UsageRecorded {
+            input_tokens: Some(5),
+            output_tokens: None,
+        });
+        collector.on_event(&NormalizedAgentEvent::UsageRecorded {
+            input_tokens: None,
+            output_tokens: None,
+        });
+        collector.on_event(&NormalizedAgentEvent::UsageRecorded {
+            input_tokens: Some(7),
+            output_tokens: Some(9),
+        });
         let total = collector.snapshot();
-        assert_eq!((total.input_tokens, total.output_tokens, total.observed), (12, 9, true));
+        assert_eq!(
+            (total.input_tokens, total.output_tokens, total.observed),
+            (12, 9, true)
+        );
     }
 
     #[test]
@@ -1203,18 +1243,22 @@ mod tests {
         assert_eq!(calls, 3);
 
         let mut calls = 0;
-        let rejected: Result<(), _> = retry_transient_store_commit(3, Duration::from_millis(1), || {
-            calls += 1;
-            Err(StoreError::Invalid("CONVERSATION_RESPONSE_IDENTITY_CONFLICT".to_owned()))
-        });
+        let rejected: Result<(), _> =
+            retry_transient_store_commit(3, Duration::from_millis(1), || {
+                calls += 1;
+                Err(StoreError::Invalid(
+                    "CONVERSATION_RESPONSE_IDENTITY_CONFLICT".to_owned(),
+                ))
+            });
         assert!(matches!(rejected, Err(StoreError::Invalid(_))));
         assert_eq!(calls, 1, "a deterministic rejection is never retried");
 
         let mut calls = 0;
-        let exhausted: Result<(), _> = retry_transient_store_commit(2, Duration::from_millis(1), || {
-            calls += 1;
-            Err(StoreError::Database("busy".to_owned()))
-        });
+        let exhausted: Result<(), _> =
+            retry_transient_store_commit(2, Duration::from_millis(1), || {
+                calls += 1;
+                Err(StoreError::Database("busy".to_owned()))
+            });
         assert!(matches!(exhausted, Err(StoreError::Database(_))));
         assert_eq!(calls, 2);
     }
@@ -1241,15 +1285,24 @@ mod tests {
         )
         .expect("store opens");
         let supervisor = AgentSessionSupervisor::new(store, "runtime".to_owned());
-        assert!(!supervisor.request_cancel("turn-1", 0), "nothing registered");
+        assert!(
+            !supervisor.request_cancel("turn-1", 0),
+            "nothing registered"
+        );
         let (signal, registration) = supervisor.register_cancel("turn-1", 0);
         assert!(!signal.is_requested());
-        assert!(!supervisor.request_cancel("turn-1", 1), "another retry ordinal");
+        assert!(
+            !supervisor.request_cancel("turn-1", 1),
+            "another retry ordinal"
+        );
         assert!(!supervisor.request_cancel("turn-2", 0), "another turn");
         assert!(supervisor.request_cancel("turn-1", 0));
         assert!(signal.is_requested());
         drop(registration);
-        assert!(!supervisor.request_cancel("turn-1", 0), "released when dispatch ends");
+        assert!(
+            !supervisor.request_cancel("turn-1", 0),
+            "released when dispatch ends"
+        );
     }
 
     struct NoKeys;

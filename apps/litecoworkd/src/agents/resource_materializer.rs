@@ -77,7 +77,10 @@ fn parse_ref(value: &Value, workspace_id: &str) -> Result<RefParts, MaterializeE
         Some(Value::String(id)) if !id.trim().is_empty() && id.len() <= 256 => Some(id.clone()),
         Some(_) => return Err(MaterializeError::NotAuthorized),
     };
-    Ok(RefParts { resource_id: resource_id.to_owned(), revision_id })
+    Ok(RefParts {
+        resource_id: resource_id.to_owned(),
+        revision_id,
+    })
 }
 
 fn display_word(name: &str) -> String {
@@ -103,10 +106,10 @@ fn materialize_one(
     if record.sensitivity == "RESTRICTED" {
         return Err(MaterializeError::Restricted);
     }
-    if let (Some(pinned), Some(head)) = (&part.revision_id, &record.current_revision_id) {
-        if pinned != head {
-            return Err(MaterializeError::StaleRevision);
-        }
+    if let (Some(pinned), Some(head)) = (&part.revision_id, &record.current_revision_id)
+        && pinned != head
+    {
+        return Err(MaterializeError::StaleRevision);
     }
     let stored = store
         .read_resource_content_bounded(
@@ -158,7 +161,10 @@ pub(crate) fn materialize_conversation_resources(
     for message in &mut package.messages {
         let mut parts: Vec<RefParts> = Vec::new();
         let mut push = |part: RefParts| {
-            if !parts.iter().any(|p| p.resource_id == part.resource_id && p.revision_id == part.revision_id) {
+            if !parts
+                .iter()
+                .any(|p| p.resource_id == part.resource_id && p.revision_id == part.revision_id)
+            {
                 parts.push(part);
             }
         };
@@ -175,7 +181,9 @@ pub(crate) fn materialize_conversation_resources(
         if let Some(existing) = message.content.as_array() {
             for block in existing {
                 if block.get("kind").and_then(Value::as_str) == Some("RESOURCE") {
-                    let reference = block.get("resource_ref").ok_or(MaterializeError::NotAuthorized)?;
+                    let reference = block
+                        .get("resource_ref")
+                        .ok_or(MaterializeError::NotAuthorized)?;
                     push(parse_ref(reference, workspace_id)?);
                 } else {
                     blocks.push(block.clone());
@@ -210,7 +218,10 @@ pub(crate) fn check_resource_refs(
     let mut seen: Vec<RefParts> = Vec::new();
     for value in refs {
         let part = parse_ref(value, workspace_id)?;
-        if !seen.iter().any(|p| p.resource_id == part.resource_id && p.revision_id == part.revision_id) {
+        if !seen
+            .iter()
+            .any(|p| p.resource_id == part.resource_id && p.revision_id == part.revision_id)
+        {
             seen.push(part);
         }
     }
@@ -233,7 +244,8 @@ mod tests {
         BlobPurpose, EventDraft, ResourceRecord, ResourceRevisionRecord, WorkspaceCreateRequest,
     };
     use storage_sqlite::{
-        FileBlobStore, SqliteConfig, SqliteWorkspaceStore, WorkspaceBlobKey, WorkspaceBlobKeyProvider,
+        FileBlobStore, SqliteConfig, SqliteWorkspaceStore, WorkspaceBlobKey,
+        WorkspaceBlobKeyProvider,
     };
 
     const WORKSPACE: &str = "materialize-workspace";
@@ -244,9 +256,17 @@ mod tests {
     struct Keys;
     impl WorkspaceBlobKeyProvider for Keys {
         fn current_key(&self, _w: &str, _p: BlobPurpose) -> Result<WorkspaceBlobKey, StoreError> {
-            Ok(WorkspaceBlobKey { version: 1, bytes: zeroize::Zeroizing::new([73_u8; 32]) })
+            Ok(WorkspaceBlobKey {
+                version: 1,
+                bytes: zeroize::Zeroizing::new([73_u8; 32]),
+            })
         }
-        fn key_by_version(&self, w: &str, p: BlobPurpose, v: u32) -> Result<WorkspaceBlobKey, StoreError> {
+        fn key_by_version(
+            &self,
+            w: &str,
+            p: BlobPurpose,
+            v: u32,
+        ) -> Result<WorkspaceBlobKey, StoreError> {
             if v != 1 {
                 return Err(StoreError::Blob("unknown test key version".to_owned()));
             }
@@ -258,12 +278,16 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).expect("private dir");
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+                .expect("private dir");
         }
         SqliteWorkspaceStore::open(
             directory.path().join("state.sqlite3"),
             Arc::new(FileBlobStore::new(directory.path().join("blobs"), Keys)),
-            SqliteConfig { writer_queue_capacity: 8, busy_timeout: std::time::Duration::from_secs(2) },
+            SqliteConfig {
+                writer_queue_capacity: 8,
+                busy_timeout: std::time::Duration::from_secs(2),
+            },
         )
         .expect("store opens")
     }
@@ -287,7 +311,15 @@ mod tests {
             .expect("workspace commits");
     }
 
-    fn resource(store: &SqliteWorkspaceStore, workspace_id: &str, resource_id: &str, name: &str, media: &str, sensitivity: &str, content: &[u8]) -> String {
+    fn resource(
+        store: &SqliteWorkspaceStore,
+        workspace_id: &str,
+        resource_id: &str,
+        name: &str,
+        media: &str,
+        sensitivity: &str,
+        content: &[u8],
+    ) -> String {
         use sha2::{Digest, Sha256};
         let revision_id = format!("revision-{resource_id}");
         let digest = format!("sha256:{:x}", Sha256::digest(content));
@@ -344,7 +376,10 @@ mod tests {
         revision_id
     }
 
-    fn package(refs: serde_json::Value, extra_block: Option<serde_json::Value>) -> ConversationContextPackage {
+    fn package(
+        refs: serde_json::Value,
+        extra_block: Option<serde_json::Value>,
+    ) -> ConversationContextPackage {
         let mut content = vec![json!({"kind":"TEXT","text":"summarize the attachment"})];
         content.extend(extra_block);
         ConversationContextPackage {
@@ -364,9 +399,15 @@ mod tests {
         }
     }
 
-    fn reference(workspace_id: &str, resource_id: &str, revision_id: Option<&str>) -> serde_json::Value {
+    fn reference(
+        workspace_id: &str,
+        resource_id: &str,
+        revision_id: Option<&str>,
+    ) -> serde_json::Value {
         match revision_id {
-            Some(revision) => json!({"workspace_id":workspace_id,"resource_id":resource_id,"revision_id":revision}),
+            Some(revision) => {
+                json!({"workspace_id":workspace_id,"resource_id":resource_id,"revision_id":revision})
+            }
             None => json!({"workspace_id":workspace_id,"resource_id":resource_id}),
         }
     }
@@ -376,11 +417,22 @@ mod tests {
         let directory = tempfile::tempdir().expect("tempdir");
         let store = open(&directory);
         workspace(&store, WORKSPACE);
-        let revision = resource(&store, WORKSPACE, "notes", "notes.txt", "text/plain", "PERSONAL", b"alpha beta");
+        let revision = resource(
+            &store,
+            WORKSPACE,
+            "notes",
+            "notes.txt",
+            "text/plain",
+            "PERSONAL",
+            b"alpha beta",
+        );
         let materialized = materialize_conversation_resources(
             &store,
             WORKSPACE,
-            package(json!([reference(WORKSPACE, "notes", Some(&revision))]), None),
+            package(
+                json!([reference(WORKSPACE, "notes", Some(&revision))]),
+                None,
+            ),
         )
         .expect("text resource materializes");
         let message = &materialized.messages[0];
@@ -391,7 +443,10 @@ mod tests {
         assert!(text.starts_with("[Attached resource BEGIN id=notes revision=revision-notes name=notes.txt media_type=text/plain bytes=10 digest=sha256:"));
         assert!(text.contains("\nalpha beta\n[Attached resource END id=notes]"));
         // The materialized package encodes; the encoder still refuses unmaterialized refs.
-        assert!(crate::agents::conversation_prompt::encode_conversation_context_prompt(&materialized).is_ok());
+        assert!(
+            crate::agents::conversation_prompt::encode_conversation_context_prompt(&materialized)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -399,7 +454,15 @@ mod tests {
         let directory = tempfile::tempdir().expect("tempdir");
         let store = open(&directory);
         workspace(&store, WORKSPACE);
-        resource(&store, WORKSPACE, "notes", "notes.md", "text/markdown", "PUBLIC", b"hello");
+        resource(
+            &store,
+            WORKSPACE,
+            "notes",
+            "notes.md",
+            "text/markdown",
+            "PUBLIC",
+            b"hello",
+        );
         let block = json!({"kind":"RESOURCE","resource_ref":reference(WORKSPACE, "notes", None)});
         let out = materialize_conversation_resources(
             &store,
@@ -407,37 +470,125 @@ mod tests {
             package(json!([reference(WORKSPACE, "notes", None)]), Some(block)),
         )
         .expect("materializes");
-        assert_eq!(out.messages[0].content.as_array().expect("blocks").len(), 2, "text block plus one attachment");
+        assert_eq!(
+            out.messages[0].content.as_array().expect("blocks").len(),
+            2,
+            "text block plus one attachment"
+        );
     }
 
     #[test]
-    fn conversation_resource_materialization_refuses_foreign_stale_binary_restricted_and_oversized() {
+    fn conversation_resource_materialization_refuses_foreign_stale_binary_restricted_and_oversized()
+    {
         let directory = tempfile::tempdir().expect("tempdir");
         let store = open(&directory);
         workspace(&store, WORKSPACE);
         workspace(&store, OTHER);
-        resource(&store, WORKSPACE, "notes", "notes.txt", "text/plain", "PERSONAL", b"x");
-        resource(&store, OTHER, "foreign", "foreign.txt", "text/plain", "PERSONAL", b"secret");
-        resource(&store, WORKSPACE, "image", "photo.png", "image/png", "PERSONAL", &[0x89, b'P', b'N', b'G']);
-        resource(&store, WORKSPACE, "locked", "locked.txt", "text/plain", "RESTRICTED", b"x");
-        resource(&store, WORKSPACE, "bad", "bad.txt", "text/plain", "PERSONAL", &[0xff, 0xfe, 0xfd]);
-        resource(&store, WORKSPACE, "huge", "huge.txt", "text/plain", "PERSONAL", &vec![b'a'; (MAX_ATTACHED_RESOURCE_BYTES + 1) as usize]);
-        let run = |refs: serde_json::Value| materialize_conversation_resources(&store, WORKSPACE, package(refs, None)).err();
+        resource(
+            &store,
+            WORKSPACE,
+            "notes",
+            "notes.txt",
+            "text/plain",
+            "PERSONAL",
+            b"x",
+        );
+        resource(
+            &store,
+            OTHER,
+            "foreign",
+            "foreign.txt",
+            "text/plain",
+            "PERSONAL",
+            b"secret",
+        );
+        resource(
+            &store,
+            WORKSPACE,
+            "image",
+            "photo.png",
+            "image/png",
+            "PERSONAL",
+            &[0x89, b'P', b'N', b'G'],
+        );
+        resource(
+            &store,
+            WORKSPACE,
+            "locked",
+            "locked.txt",
+            "text/plain",
+            "RESTRICTED",
+            b"x",
+        );
+        resource(
+            &store,
+            WORKSPACE,
+            "bad",
+            "bad.txt",
+            "text/plain",
+            "PERSONAL",
+            &[0xff, 0xfe, 0xfd],
+        );
+        resource(
+            &store,
+            WORKSPACE,
+            "huge",
+            "huge.txt",
+            "text/plain",
+            "PERSONAL",
+            &vec![b'a'; (MAX_ATTACHED_RESOURCE_BYTES + 1) as usize],
+        );
+        let run = |refs: serde_json::Value| {
+            materialize_conversation_resources(&store, WORKSPACE, package(refs, None)).err()
+        };
 
         // A ref naming another Workspace is refused by identity, and a foreign Resource id
         // under this Workspace does not resolve.
-        assert_eq!(run(json!([reference(OTHER, "foreign", None)])), Some(MaterializeError::NotAuthorized));
-        assert_eq!(run(json!([reference(WORKSPACE, "foreign", None)])), Some(MaterializeError::NotFound));
-        assert_eq!(run(json!([reference(WORKSPACE, "missing", None)])), Some(MaterializeError::NotFound));
+        assert_eq!(
+            run(json!([reference(OTHER, "foreign", None)])),
+            Some(MaterializeError::NotAuthorized)
+        );
+        assert_eq!(
+            run(json!([reference(WORKSPACE, "foreign", None)])),
+            Some(MaterializeError::NotFound)
+        );
+        assert_eq!(
+            run(json!([reference(WORKSPACE, "missing", None)])),
+            Some(MaterializeError::NotFound)
+        );
         // A pinned revision that is not the current head is a changed revision.
-        assert_eq!(run(json!([reference(WORKSPACE, "notes", Some("revision-old"))])), Some(MaterializeError::StaleRevision));
-        assert_eq!(run(json!([reference(WORKSPACE, "image", None)])), Some(MaterializeError::BinaryUnavailable));
-        assert_eq!(run(json!([reference(WORKSPACE, "locked", None)])), Some(MaterializeError::Restricted));
-        assert_eq!(run(json!([reference(WORKSPACE, "bad", None)])), Some(MaterializeError::NotText));
-        assert_eq!(run(json!([reference(WORKSPACE, "huge", None)])), Some(MaterializeError::TooLarge));
-        assert_eq!(run(json!("not-an-array")), Some(MaterializeError::NotAuthorized));
+        assert_eq!(
+            run(json!([reference(WORKSPACE, "notes", Some("revision-old"))])),
+            Some(MaterializeError::StaleRevision)
+        );
+        assert_eq!(
+            run(json!([reference(WORKSPACE, "image", None)])),
+            Some(MaterializeError::BinaryUnavailable)
+        );
+        assert_eq!(
+            run(json!([reference(WORKSPACE, "locked", None)])),
+            Some(MaterializeError::Restricted)
+        );
+        assert_eq!(
+            run(json!([reference(WORKSPACE, "bad", None)])),
+            Some(MaterializeError::NotText)
+        );
+        assert_eq!(
+            run(json!([reference(WORKSPACE, "huge", None)])),
+            Some(MaterializeError::TooLarge)
+        );
+        assert_eq!(
+            run(json!("not-an-array")),
+            Some(MaterializeError::NotAuthorized)
+        );
         // Submit-time check applies the same rules without building a package.
-        assert_eq!(check_resource_refs(&store, WORKSPACE, &[reference(WORKSPACE, "image", None)]), Err(MaterializeError::BinaryUnavailable));
-        assert_eq!(check_resource_refs(&store, WORKSPACE, &[reference(WORKSPACE, "notes", None)]), Ok(()));
+        assert_eq!(
+            check_resource_refs(&store, WORKSPACE, &[reference(WORKSPACE, "image", None)]),
+            Err(MaterializeError::BinaryUnavailable)
+        );
+        assert_eq!(
+            check_resource_refs(&store, WORKSPACE, &[reference(WORKSPACE, "notes", None)]),
+            Ok(())
+        );
     }
 }

@@ -1836,28 +1836,44 @@ async fn conversation_stop_and_retry_failed_turn_lifecycle() {
 
     // Retry reopens the FAILED turn: OPEN, ordinal + 1, no session, one new UNCLAIMED
     // intent, and no second USER message.
-    let response = fixture.command("turn-failed", "retry", "retry-key-1", 3).await;
+    let response = fixture
+        .command("turn-failed", "retry", "retry-key-1", 3)
+        .await;
     assert_eq!(response.status(), StatusCode::ACCEPTED);
-    let bytes = to_bytes(response.into_body(), 64 * 1024).await.expect("receipt body");
+    let bytes = to_bytes(response.into_body(), 64 * 1024)
+        .await
+        .expect("receipt body");
     let receipt: ConversationTurnReceipt = serde_json::from_slice(&bytes).expect("receipt");
-    assert_eq!(receipt.status, storage_core::conversation::ConversationTurnStatus::Open);
+    assert_eq!(
+        receipt.status,
+        storage_core::conversation::ConversationTurnStatus::Open
+    );
     let (status, ordinal, version, session) = fixture.turn_row("turn-failed");
-    assert_eq!((status.as_str(), ordinal, version, session), ("OPEN", 1, 4, None));
+    assert_eq!(
+        (status.as_str(), ordinal, version, session),
+        ("OPEN", 1, 4, None)
+    );
     let intents = fixture.intents("turn-failed");
     assert_eq!(intents[0], (0, "SETTLED".to_owned()));
     assert_eq!(intents[1].0, 1);
     assert_eq!(intents.len(), 2);
 
     // A duplicate retry key replays the receipt and creates no second attempt.
-    let replay = fixture.command("turn-failed", "retry", "retry-key-1", 3).await;
+    let replay = fixture
+        .command("turn-failed", "retry", "retry-key-1", 3)
+        .await;
     assert_eq!(replay.status(), StatusCode::ACCEPTED);
     assert_eq!(fixture.turn_row("turn-failed").1, 1);
     assert_eq!(fixture.intents("turn-failed").len(), 2);
 
     // A stale If-Match with a new key returns 412; a non-FAILED turn returns 409.
-    let stale = fixture.command("turn-failed", "retry", "retry-key-2", 3).await;
+    let stale = fixture
+        .command("turn-failed", "retry", "retry-key-2", 3)
+        .await;
     assert_eq!(stale.status(), StatusCode::PRECONDITION_FAILED);
-    let not_failed = fixture.command("turn-failed", "retry", "retry-key-3", 4).await;
+    let not_failed = fixture
+        .command("turn-failed", "retry", "retry-key-3", 4)
+        .await;
     assert_eq!(not_failed.status(), StatusCode::CONFLICT);
 }
 
@@ -1865,7 +1881,10 @@ async fn conversation_stop_and_retry_failed_turn_lifecycle() {
 async fn turn_activity_records_route_returns_reported_rows_scoped_to_the_turn_attempt() {
     let fixture = turn_command_fixture("turn-activity-route-workspace");
     fixture.seed_turn("turn-activity", "RUNNING", 2, 0);
-    for (sequence, kind, status, label) in [(2, "TOOL", "SUCCEEDED", None), (1, "TOOL", "STARTED", Some("bash"))] {
+    for (sequence, kind, status, label) in [
+        (2, "TOOL", "SUCCEEDED", None),
+        (1, "TOOL", "STARTED", Some("bash")),
+    ] {
         fixture
             .connection()
             .execute(
@@ -1881,12 +1900,22 @@ async fn turn_activity_records_route_returns_reported_rows_scoped_to_the_turn_at
             .expect("activity request");
         request.extensions_mut().insert(AuthenticatedLocalPeer);
         let router = fixture.router.clone();
-        async move { router.oneshot(request).await.expect("activity route responds") }
+        async move {
+            router
+                .oneshot(request)
+                .await
+                .expect("activity route responds")
+        }
     };
-    let uri = format!("/v1/conversations/{}/turns/turn-activity/activity", fixture.conversation_id);
+    let uri = format!(
+        "/v1/conversations/{}/turns/turn-activity/activity",
+        fixture.conversation_id
+    );
     let response = get(WORKSPACE_A, uri.clone()).await;
     assert_eq!(response.status(), StatusCode::OK);
-    let bytes = to_bytes(response.into_body(), 64 * 1024).await.expect("body");
+    let bytes = to_bytes(response.into_body(), 64 * 1024)
+        .await
+        .expect("body");
     let page: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
     assert_eq!(page["attribution"], "REPORTED");
     assert_eq!(page["items"].as_array().expect("items").len(), 2);
@@ -1895,8 +1924,15 @@ async fn turn_activity_records_route_returns_reported_rows_scoped_to_the_turn_at
 
     // Another retry ordinal has no records, and another Workspace cannot read this one.
     let other_attempt = get(WORKSPACE_A, format!("{uri}?retry_ordinal=1")).await;
-    let bytes = to_bytes(other_attempt.into_body(), 64 * 1024).await.expect("body");
-    assert!(serde_json::from_slice::<serde_json::Value>(&bytes).expect("json")["items"].as_array().expect("items").is_empty());
+    let bytes = to_bytes(other_attempt.into_body(), 64 * 1024)
+        .await
+        .expect("body");
+    assert!(
+        serde_json::from_slice::<serde_json::Value>(&bytes).expect("json")["items"]
+            .as_array()
+            .expect("items")
+            .is_empty()
+    );
     let foreign = get(WORKSPACE_B, uri).await;
     assert_eq!(foreign.status(), StatusCode::NOT_FOUND);
 }
@@ -1906,7 +1942,9 @@ async fn conversation_retry_is_refused_while_another_turn_is_in_flight() {
     let fixture = turn_command_fixture("turn-retry-in-flight-workspace");
     fixture.seed_turn("turn-old-failed", "FAILED", 3, 0);
     fixture.seed_turn("turn-waiting", "WAITING_USER", 2, 0);
-    let response = fixture.command("turn-old-failed", "retry", "retry-blocked", 3).await;
+    let response = fixture
+        .command("turn-old-failed", "retry", "retry-blocked", 3)
+        .await;
     let (status, error) = read_operator_error(response).await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(error["code"], "CONVERSATION_TURN_IN_PROGRESS");
@@ -1922,22 +1960,36 @@ async fn conversation_cancel_commits_only_the_request_and_never_fabricates_cance
     // The route commits CANCEL_REQUESTED only; CANCELLED needs the supervisor's observed
     // quiescence, and no live dispatch owns this seeded attempt.
     assert!(!fixture.supervisor.request_cancel("turn-running", 0));
-    let response = fixture.command("turn-running", "cancel", "cancel-key-1", 2).await;
+    let response = fixture
+        .command("turn-running", "cancel", "cancel-key-1", 2)
+        .await;
     assert_eq!(response.status(), StatusCode::ACCEPTED);
-    let bytes = to_bytes(response.into_body(), 64 * 1024).await.expect("receipt body");
+    let bytes = to_bytes(response.into_body(), 64 * 1024)
+        .await
+        .expect("receipt body");
     let receipt: ConversationTurnReceipt = serde_json::from_slice(&bytes).expect("receipt");
-    assert_eq!(receipt.status, storage_core::conversation::ConversationTurnStatus::CancelRequested);
+    assert_eq!(
+        receipt.status,
+        storage_core::conversation::ConversationTurnStatus::CancelRequested
+    );
     let (status, _, version, _) = fixture.turn_row("turn-running");
     assert_eq!((status.as_str(), version), ("CANCEL_REQUESTED", 3));
 
     // An exact repeat replays; a repeat with a new key re-signals but never settles.
-    let replay = fixture.command("turn-running", "cancel", "cancel-key-1", 2).await;
+    let replay = fixture
+        .command("turn-running", "cancel", "cancel-key-1", 2)
+        .await;
     assert_eq!(replay.status(), StatusCode::ACCEPTED);
-    let again = fixture.command("turn-running", "cancel", "cancel-key-2", 3).await;
+    let again = fixture
+        .command("turn-running", "cancel", "cancel-key-2", 3)
+        .await;
     assert_eq!(again.status(), StatusCode::ACCEPTED);
     let (status, _, version, _) = fixture.turn_row("turn-running");
     assert_eq!((status.as_str(), version), ("CANCEL_REQUESTED", 3));
-    assert_eq!(fixture.intents("turn-running"), vec![(0, "CLAIMED".to_owned())]);
+    assert_eq!(
+        fixture.intents("turn-running"),
+        vec![(0, "CLAIMED".to_owned())]
+    );
 }
 
 #[test]
@@ -1995,7 +2047,11 @@ fn conversation_session_recovery_settles_prior_incarnation_attempts_idempotently
     assert_eq!(sessions, 0);
     let messages: i64 = fixture
         .connection()
-        .query_row("SELECT COUNT(*) FROM conversation_messages WHERE role='AGENT'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM conversation_messages WHERE role='AGENT'",
+            [],
+            |row| row.get(0),
+        )
         .expect("count agent messages");
     assert_eq!(messages, 0, "recovery never invents an answer");
 
@@ -2003,4 +2059,69 @@ fn conversation_session_recovery_settles_prior_incarnation_attempts_idempotently
     let again = recover();
     assert_eq!(again.intents_settled, 0);
     assert_eq!(again.failures, 0);
+}
+
+#[test]
+fn conversation_routes_project_the_operators_single_native_session_supervisor() {
+    // A Stop can only interrupt the dispatch that registered the attempt, so every
+    // Conversation route projection must carry the Operator's one process-lifetime
+    // supervisor and its live Stop registry. A supervisor rebuilt per request holds an
+    // empty registry: Stop would report success while the turn kept running, and the
+    // registered signal would never be requested.
+    let directory = tempfile::tempdir().expect("temporary supervisor projection directory");
+    #[cfg(unix)]
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+        .expect("private test directory");
+    let store = SqliteWorkspaceStore::open(
+        directory.path().join("state.sqlite3"),
+        Arc::new(FileBlobStore::new(
+            directory.path().join("blobs"),
+            PaginationTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("real temporary SQLite store opens");
+    let (_shutdown_sender, stream_shutdown) = tokio::sync::watch::channel(false);
+    // Built before the literal, exactly as the serving Operator builds it: the store
+    // moves into the state, so the supervisor must be constructed from its clone first.
+    let supervisor = Arc::new(crate::agents::AgentSessionSupervisor::new(
+        store.clone(),
+        RUNTIME.to_owned(),
+    ));
+    let state = super::super::ApiState {
+        store,
+        principal_id: OWNER.to_owned(),
+        runtime_id: RUNTIME.to_owned(),
+        local_incarnation_id: "supervisor-projection-incarnation".to_owned(),
+        lifecycle_blockers: Vec::new(),
+        runtime_identity: Arc::new(
+            storage_sqlite::RuntimeOsPrincipalIdentity::test_support(RUNTIME)
+                .expect("test-only OS identity is available"),
+        ),
+        stream_admission: Arc::new(tokio::sync::Semaphore::new(2)),
+        runtime_inventory_revision: Arc::new(std::sync::atomic::AtomicU64::new(1)),
+        stream_shutdown,
+        supervisor,
+    };
+
+    let first = ConversationApiState::from_ref(&state)
+        .supervisor
+        .expect("the Operator state serves native dispatch");
+    let second = ConversationApiState::from_ref(&state)
+        .supervisor
+        .expect("the Operator state serves native dispatch");
+    assert!(
+        Arc::ptr_eq(&first, &second),
+        "every Conversation request must observe the same live Stop registry"
+    );
+    assert!(
+        Arc::ptr_eq(&first, &state.supervisor),
+        "the projection must carry the Operator's supervisor, not a freshly built one"
+    );
+    // Nothing is registered for this attempt, so no live dispatch owns it and there is
+    // nothing to signal: the route must report that honestly rather than claim a Stop.
+    assert!(!first.request_cancel("turn-not-dispatched", 0));
 }

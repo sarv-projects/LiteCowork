@@ -88,7 +88,10 @@ async fn error_code(response: Response) -> (Value, StatusCode) {
     let body = to_bytes(response.into_body(), 8192)
         .await
         .expect("bounded error body");
-    (serde_json::from_slice::<Value>(&body).expect("error JSON"), status)
+    (
+        serde_json::from_slice::<Value>(&body).expect("error JSON"),
+        status,
+    )
 }
 
 #[tokio::test]
@@ -98,16 +101,27 @@ async fn workspace_rename_commits_trimmed_name_and_replays_exact_key() {
     create_workspace(&store, "rename-ok");
     let router = router_for(&store);
 
-    let first = rename_request(router.clone(), "rename-ok", "1", "rename-key-1", "  Renamed  ").await;
+    let first = rename_request(
+        router.clone(),
+        "rename-ok",
+        "1",
+        "rename-key-1",
+        "  Renamed  ",
+    )
+    .await;
     assert_eq!(first.status(), StatusCode::OK);
-    let first_body = to_bytes(first.into_body(), 16384).await.expect("bounded body");
+    let first_body = to_bytes(first.into_body(), 16384)
+        .await
+        .expect("bounded body");
     let first_json: Value = serde_json::from_slice(&first_body).expect("Workspace JSON");
     assert_eq!(first_json["name"], "Renamed");
     assert_eq!(first_json["version"], 2);
 
     let replay = rename_request(router.clone(), "rename-ok", "1", "rename-key-1", "Renamed").await;
     assert_eq!(replay.status(), StatusCode::OK);
-    let replay_body = to_bytes(replay.into_body(), 16384).await.expect("bounded body");
+    let replay_body = to_bytes(replay.into_body(), 16384)
+        .await
+        .expect("bounded body");
     assert_eq!(
         serde_json::from_slice::<Value>(&replay_body).expect("Workspace JSON")["version"],
         2
@@ -143,7 +157,10 @@ async fn workspace_rename_stale_version_returns_current_name_without_writing() {
     assert_eq!(json["code"], "STALE_WORKSPACE_VERSION");
     assert_eq!(json["details"]["current_name"], "Latest");
     assert_eq!(json["details"]["current_version"], 2);
-    assert_eq!(store.get_workspace("rename-stale").unwrap().unwrap().name, "Latest");
+    assert_eq!(
+        store.get_workspace("rename-stale").unwrap().unwrap().name,
+        "Latest"
+    );
     assert_eq!(renamed_event_count(&directory, "rename-stale"), 1);
 }
 
@@ -154,7 +171,10 @@ async fn workspace_rename_rejects_invalid_names_and_missing_headers_without_writ
     create_workspace(&store, "rename-invalid");
     let router = router_for(&store);
 
-    for (index, name) in ["", "   ", "bad\u{0007}name", &"n".repeat(201)].into_iter().enumerate() {
+    for (index, name) in ["", "   ", "bad\u{0007}name", &"n".repeat(201)]
+        .into_iter()
+        .enumerate()
+    {
         let response = rename_request(
             router.clone(),
             "rename-invalid",
@@ -174,8 +194,17 @@ async fn workspace_rename_rejects_invalid_names_and_missing_headers_without_writ
         .header("content-type", "application/json")
         .body(Body::from(json!({"name": "X"}).to_string()))
         .expect("request is valid HTTP");
-    missing_version.extensions_mut().insert(AuthenticatedLocalPeer);
-    let (json, status) = error_code(router.clone().oneshot(missing_version).await.expect("responds")).await;
+    missing_version
+        .extensions_mut()
+        .insert(AuthenticatedLocalPeer);
+    let (json, status) = error_code(
+        router
+            .clone()
+            .oneshot(missing_version)
+            .await
+            .expect("responds"),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(json["code"], "INVALID_ARGUMENT");
 
@@ -199,15 +228,34 @@ async fn workspace_rename_is_rejected_for_archived_workspace() {
         .expect("archive request is valid HTTP");
     archive.extensions_mut().insert(AuthenticatedLocalPeer);
     assert_eq!(
-        router.clone().oneshot(archive).await.expect("responds").status(),
+        router
+            .clone()
+            .oneshot(archive)
+            .await
+            .expect("responds")
+            .status(),
         StatusCode::OK
     );
 
-    let response = rename_request(router, "rename-archived", "2", "rename-archived-key", "Nope").await;
+    let response = rename_request(
+        router,
+        "rename-archived",
+        "2",
+        "rename-archived-key",
+        "Nope",
+    )
+    .await;
     let (json, status) = error_code(response).await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(json["code"], "WORKSPACE_ARCHIVED");
-    assert_eq!(store.get_workspace("rename-archived").unwrap().unwrap().name, "Original name");
+    assert_eq!(
+        store
+            .get_workspace("rename-archived")
+            .unwrap()
+            .unwrap()
+            .name,
+        "Original name"
+    );
     assert_eq!(renamed_event_count(&directory, "rename-archived"), 0);
 }
 
@@ -244,7 +292,10 @@ async fn workspace_rename_concurrent_requests_commit_exactly_one() {
     }
     assert_eq!(ok, 1, "exactly one rename commits");
     assert_eq!(conflict, 3);
-    assert_eq!(store.get_workspace("rename-race").unwrap().unwrap().version, 2);
+    assert_eq!(
+        store.get_workspace("rename-race").unwrap().unwrap().version,
+        2
+    );
     assert_eq!(renamed_event_count(&directory, "rename-race"), 1);
     let _ = Path::new("");
 }

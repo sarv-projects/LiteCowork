@@ -164,15 +164,16 @@ impl<R: BufRead, W: Write> AcpClient<R, W> {
         let mut exchange = Exchange::default();
         let mut cancel_sent = false;
         loop {
-            if let (Some(signal), Some(session_id)) = (cancel, session) {
-                if signal.is_requested() && !cancel_sent {
-                    cancel_sent = true;
-                    self.send(&json!({
-                        "jsonrpc": "2.0",
-                        "method": acp_method::SESSION_CANCEL,
-                        "params": {"sessionId": session_id}
-                    }))?;
-                }
+            if let (Some(signal), Some(session_id)) = (cancel, session)
+                && signal.is_requested()
+                && !cancel_sent
+            {
+                cancel_sent = true;
+                self.send(&json!({
+                    "jsonrpc": "2.0",
+                    "method": acp_method::SESSION_CANCEL,
+                    "params": {"sessionId": session_id}
+                }))?;
             }
             let message = self.read_message()?;
             let method_name = message.get("method").and_then(Value::as_str);
@@ -378,8 +379,7 @@ impl<R: BufRead, W: Write> AcpClient<R, W> {
                 break;
             }
         }
-        let value: Value =
-            serde_json::from_slice(&line).map_err(|_| AcpClientFault::Malformed)?;
+        let value: Value = serde_json::from_slice(&line).map_err(|_| AcpClientFault::Malformed)?;
         if value.is_object() {
             Ok(value)
         } else {
@@ -525,7 +525,11 @@ mod acp_client_adapter_tests {
             self.writes.push((path.to_owned(), contents.to_owned()));
             Ok(())
         }
-        fn terminal_create(&mut self, command: &str, _: &[String]) -> Result<String, AcpClientError> {
+        fn terminal_create(
+            &mut self,
+            command: &str,
+            _: &[String],
+        ) -> Result<String, AcpClientError> {
             self.terminals.push(format!("create:{command}"));
             Ok("term-1".to_owned())
         }
@@ -544,7 +548,10 @@ mod acp_client_adapter_tests {
     }
 
     fn respond(sender: &mpsc::Sender<Vec<u8>>, request: &Value, result: Value) {
-        emit(sender, json!({"jsonrpc":"2.0","id":request["id"],"result":result}));
+        emit(
+            sender,
+            json!({"jsonrpc":"2.0","id":request["id"],"result":result}),
+        );
     }
 
     #[test]
@@ -553,26 +560,64 @@ mod acp_client_adapter_tests {
             let init = recv_line(&input).unwrap();
             assert_eq!(init["method"], "initialize");
             assert_eq!(init["params"]["clientCapabilities"]["terminal"], true);
-            respond(&output, &init, json!({"protocolVersion": 1, "agentCapabilities": {}}));
+            respond(
+                &output,
+                &init,
+                json!({"protocolVersion": 1, "agentCapabilities": {}}),
+            );
             let new = recv_line(&input).unwrap();
             assert_eq!(new["method"], "session/new");
             respond(&output, &new, json!({"sessionId": "s1"}));
             let prompt = recv_line(&input).unwrap();
             assert_eq!(prompt["method"], "session/prompt");
-            emit(&output, json!({"jsonrpc":"2.0","method":"session/update","params":{
-                "sessionId":"s1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"hi"}}}}));
+            emit(
+                &output,
+                json!({"jsonrpc":"2.0","method":"session/update","params":{
+                "sessionId":"s1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"hi"}}}}),
+            );
             // Client-surface requests.
             for (id, method, params) in [
-                (101, "session/request_permission", json!({"sessionId":"s1","toolCall":{"toolCallId":"t1","title":"Run tests"},
-                    "options":[{"optionId":"yes","name":"Allow","kind":"allow_once"},{"optionId":"no","name":"Reject","kind":"reject_once"}]})),
-                (102, "fs/read_text_file", json!({"sessionId":"s1","path":"notes.txt"})),
-                (103, "fs/write_text_file", json!({"sessionId":"s1","path":"out.txt","content":"data"})),
-                (104, "terminal/create", json!({"sessionId":"s1","command":"ls","args":["-l"]})),
-                (105, "terminal/output", json!({"sessionId":"s1","terminalId":"term-1"})),
-                (106, "terminal/kill", json!({"sessionId":"s1","terminalId":"term-1"})),
-                (107, "terminal/release", json!({"sessionId":"s1","terminalId":"term-1"})),
+                (
+                    101,
+                    "session/request_permission",
+                    json!({"sessionId":"s1","toolCall":{"toolCallId":"t1","title":"Run tests"},
+                    "options":[{"optionId":"yes","name":"Allow","kind":"allow_once"},{"optionId":"no","name":"Reject","kind":"reject_once"}]}),
+                ),
+                (
+                    102,
+                    "fs/read_text_file",
+                    json!({"sessionId":"s1","path":"notes.txt"}),
+                ),
+                (
+                    103,
+                    "fs/write_text_file",
+                    json!({"sessionId":"s1","path":"out.txt","content":"data"}),
+                ),
+                (
+                    104,
+                    "terminal/create",
+                    json!({"sessionId":"s1","command":"ls","args":["-l"]}),
+                ),
+                (
+                    105,
+                    "terminal/output",
+                    json!({"sessionId":"s1","terminalId":"term-1"}),
+                ),
+                (
+                    106,
+                    "terminal/kill",
+                    json!({"sessionId":"s1","terminalId":"term-1"}),
+                ),
+                (
+                    107,
+                    "terminal/release",
+                    json!({"sessionId":"s1","terminalId":"term-1"}),
+                ),
             ] {
-                emit(&output, json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}));
+                emit(
+                    &output,
+                    json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}),
+                );
                 let reply = recv_line(&input).unwrap();
                 assert_eq!(reply["id"], id, "{method}");
                 assert!(reply.get("error").is_none(), "{method} must succeed");
@@ -588,10 +633,15 @@ mod acp_client_adapter_tests {
             decision: Some(AcpPermissionDecision::Allow),
             ..Recorder::default()
         };
-        let outcome = client.prompt(&session, "hello", &mut handler, None).unwrap();
+        let outcome = client
+            .prompt(&session, "hello", &mut handler, None)
+            .unwrap();
         agent.join().unwrap();
         assert_eq!(outcome.stop_reason, AcpStopReason::EndTurn);
-        assert_eq!(outcome.updates, vec![AcpSessionUpdate::AgentMessageChunk { text: "hi".into() }]);
+        assert_eq!(
+            outcome.updates,
+            vec![AcpSessionUpdate::AgentMessageChunk { text: "hi".into() }]
+        );
         assert_eq!(handler.permissions.len(), 1);
         assert_eq!(handler.permissions[0].title, "Run tests");
         assert_eq!(handler.reads, ["notes.txt"]);
@@ -603,17 +653,30 @@ mod acp_client_adapter_tests {
     #[test]
     fn acp_client_adapter_never_applies_foreign_session_traffic() {
         let (mut client, agent) = connect(|input, output| {
-            respond(&output, &recv_line(&input).unwrap(), json!({"sessionId": "s1"}));
+            respond(
+                &output,
+                &recv_line(&input).unwrap(),
+                json!({"sessionId": "s1"}),
+            );
             let prompt = recv_line(&input).unwrap();
-            emit(&output, json!({"jsonrpc":"2.0","method":"session/update","params":{
-                "sessionId":"other","update":{"sessionUpdate":"agent_message_chunk","content":{"text":"leak"}}}}));
+            emit(
+                &output,
+                json!({"jsonrpc":"2.0","method":"session/update","params":{
+                "sessionId":"other","update":{"sessionUpdate":"agent_message_chunk","content":{"text":"leak"}}}}),
+            );
             // A foreign-session fs write must be refused before the handler runs.
-            emit(&output, json!({"jsonrpc":"2.0","id":9,"method":"fs/write_text_file",
-                "params":{"sessionId":"other","path":"x","content":"y"}}));
+            emit(
+                &output,
+                json!({"jsonrpc":"2.0","id":9,"method":"fs/write_text_file",
+                "params":{"sessionId":"other","path":"x","content":"y"}}),
+            );
             let reply = recv_line(&input).unwrap();
             assert!(reply.get("error").is_some());
             // So is an unknown agent method.
-            emit(&output, json!({"jsonrpc":"2.0","id":10,"method":"vendor/unknown","params":{}}));
+            emit(
+                &output,
+                json!({"jsonrpc":"2.0","id":10,"method":"vendor/unknown","params":{}}),
+            );
             assert_eq!(recv_line(&input).unwrap()["error"]["code"], -32601);
             respond(&output, &prompt, json!({"stopReason":"end_turn"}));
         });
@@ -624,22 +687,38 @@ mod acp_client_adapter_tests {
         assert!(outcome.updates.is_empty());
         assert_eq!(outcome.foreign_dropped, 1);
         assert_eq!(outcome.refused_requests, 2);
-        assert!(handler.writes.is_empty(), "foreign session must not reach the handler");
+        assert!(
+            handler.writes.is_empty(),
+            "foreign session must not reach the handler"
+        );
     }
 
     #[test]
     fn acp_client_adapter_refuses_path_escape_and_never_invents_a_permission_grant() {
         let (mut client, agent) = connect(|input, output| {
-            respond(&output, &recv_line(&input).unwrap(), json!({"sessionId": "s1"}));
+            respond(
+                &output,
+                &recv_line(&input).unwrap(),
+                json!({"sessionId": "s1"}),
+            );
             let prompt = recv_line(&input).unwrap();
-            emit(&output, json!({"jsonrpc":"2.0","id":1,"method":"fs/read_text_file",
-                "params":{"sessionId":"s1","path":"../../etc/passwd"}}));
+            emit(
+                &output,
+                json!({"jsonrpc":"2.0","id":1,"method":"fs/read_text_file",
+                "params":{"sessionId":"s1","path":"../../etc/passwd"}}),
+            );
             assert!(recv_line(&input).unwrap().get("error").is_some());
-            emit(&output, json!({"jsonrpc":"2.0","id":2,"method":"session/request_permission",
+            emit(
+                &output,
+                json!({"jsonrpc":"2.0","id":2,"method":"session/request_permission",
                 "params":{"sessionId":"s1","toolCall":{"toolCallId":"t","title":"x"},
-                "options":[{"optionId":"yes","name":"A","kind":"allow_once"}]}}));
+                "options":[{"optionId":"yes","name":"A","kind":"allow_once"}]}}),
+            );
             // Deny with no reject option, and Defer: both answer cancelled, never allow.
-            assert_eq!(recv_line(&input).unwrap()["result"]["outcome"]["outcome"], "cancelled");
+            assert_eq!(
+                recv_line(&input).unwrap()["result"]["outcome"]["outcome"],
+                "cancelled"
+            );
             respond(&output, &prompt, json!({"stopReason":"end_turn"}));
         });
         let session = client.session_new("/w").unwrap();
@@ -654,20 +733,32 @@ mod acp_client_adapter_tests {
         let cancel = CancelSignal::new();
         let for_agent = cancel.clone();
         let (mut client, agent) = connect(move |input, output| {
-            respond(&output, &recv_line(&input).unwrap(), json!({"sessionId": "s1"}));
+            respond(
+                &output,
+                &recv_line(&input).unwrap(),
+                json!({"sessionId": "s1"}),
+            );
             let prompt = recv_line(&input).unwrap();
             // Wake the client loop so it observes the cancel request.
             for_agent.request();
-            emit(&output, json!({"jsonrpc":"2.0","method":"session/update","params":{
-                "sessionId":"s1","update":{"sessionUpdate":"plan","entries":[{}]}}}));
+            emit(
+                &output,
+                json!({"jsonrpc":"2.0","method":"session/update","params":{
+                "sessionId":"s1","update":{"sessionUpdate":"plan","entries":[{}]}}}),
+            );
             let cancel_message = recv_line(&input).unwrap();
             assert_eq!(cancel_message["method"], "session/cancel");
-            assert!(cancel_message.get("id").is_none(), "cancel is a notification");
+            assert!(
+                cancel_message.get("id").is_none(),
+                "cancel is a notification"
+            );
             respond(&output, &prompt, json!({"stopReason":"cancelled"}));
         });
         let session = client.session_new("/w").unwrap();
         let mut handler = Recorder::default();
-        let outcome = client.prompt(&session, "p", &mut handler, Some(&cancel)).unwrap();
+        let outcome = client
+            .prompt(&session, "p", &mut handler, Some(&cancel))
+            .unwrap();
         agent.join().unwrap();
         assert_eq!(outcome.stop_reason, AcpStopReason::Cancelled);
     }
@@ -689,9 +780,15 @@ mod acp_client_adapter_tests {
 
         let (mut errored, agent) = connect(|input, output| {
             let request = recv_line(&input).unwrap();
-            emit(&output, json!({"jsonrpc":"2.0","id":request["id"],"error":{"code":-1,"message":"no"}}));
+            emit(
+                &output,
+                json!({"jsonrpc":"2.0","id":request["id"],"error":{"code":-1,"message":"no"}}),
+            );
         });
-        assert_eq!(errored.initialize(1).unwrap_err(), AcpClientFault::AgentError);
+        assert_eq!(
+            errored.initialize(1).unwrap_err(),
+            AcpClientFault::AgentError
+        );
         agent.join().unwrap();
     }
 

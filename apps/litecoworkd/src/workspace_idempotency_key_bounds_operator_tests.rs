@@ -428,6 +428,7 @@ fn register_native_root_runtime(store: &SqliteWorkspaceStore) {
 fn native_root_state(store: SqliteWorkspaceStore) -> super::super::ApiState {
     let (_, stream_shutdown) = tokio::sync::watch::channel(false);
     super::super::ApiState {
+        supervisor: crate::operator::test_supervisor(&store, RUNTIME),
         store,
         principal_id: OWNER.to_owned(),
         runtime_id: RUNTIME.to_owned(),

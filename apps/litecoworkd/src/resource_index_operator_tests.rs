@@ -47,6 +47,7 @@ async fn indexed_resource_search_route_returns_exact_pinned_source_evidence_and_
     fn router_for(store: SqliteWorkspaceStore, principal_id: &str, runtime_id: &str) -> Router {
         let (_, stream_shutdown) = tokio::sync::watch::channel(false);
         super::super::build_operator_router(super::super::ApiState {
+            supervisor: crate::operator::test_supervisor(&store, runtime_id),
             store,
             principal_id: principal_id.to_owned(),
             runtime_id: runtime_id.to_owned(),
@@ -306,6 +307,7 @@ async fn indexed_resource_search_route_paginates_without_duplicates() {
     fn router_for(store: SqliteWorkspaceStore) -> Router {
         let (_, stream_shutdown) = tokio::sync::watch::channel(false);
         super::super::build_operator_router(super::super::ApiState {
+            supervisor: crate::operator::test_supervisor(&store, RUNTIME),
             store,
             principal_id: OWNER.to_owned(),
             runtime_id: RUNTIME.to_owned(),

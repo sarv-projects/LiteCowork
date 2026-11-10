@@ -1,6 +1,4 @@
-use super::{
-    RuntimeState, STATE_FILE, read_state, runtime_process_tests::assert_ready_lifecycle,
-};
+use super::{RuntimeState, STATE_FILE, read_state, runtime_process_tests::assert_ready_lifecycle};
 use base64::Engine;
 use operator_ipc::{
     DEFAULT_MAX_IN_FLIGHT_BODY_BYTES, InFlightBodyBudget, LogicalHeader, PROTOCOL_VERSION,

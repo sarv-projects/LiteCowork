@@ -878,9 +878,17 @@ fn conversation_turn_creation_rejects_a_second_nonterminal_turn_and_admits_after
 
     // Every nonterminal status blocks admission; a terminal one does not.
     let connection = Connection::open(state_database(&directory)).expect("settle first turn");
-    for status in ["RUNNING", "WAITING_USER", "WAITING_DEPENDENCY", "CANCEL_REQUESTED"] {
+    for status in [
+        "RUNNING",
+        "WAITING_USER",
+        "WAITING_DEPENDENCY",
+        "CANCEL_REQUESTED",
+    ] {
         connection
-            .execute("UPDATE conversation_turns SET status=?1 WHERE turn_id='turn-one'", [status])
+            .execute(
+                "UPDATE conversation_turns SET status=?1 WHERE turn_id='turn-one'",
+                [status],
+            )
             .expect("move the first turn to a nonterminal status");
         assert!(
             matches!(

@@ -580,6 +580,7 @@ mod tests {
     fn router_for(store: SqliteWorkspaceStore, principal_id: &str) -> Router {
         let (_, stream_shutdown) = tokio::sync::watch::channel(false);
         super::super::build_operator_router(super::super::ApiState {
+            supervisor: crate::operator::test_supervisor(&store, RUNTIME),
             store,
             principal_id: principal_id.to_owned(),
             runtime_id: RUNTIME.to_owned(),

@@ -67,6 +67,7 @@ class OperatorStreamContractTests(unittest.TestCase):
                 "items": [],
                 "next_cursor": None,
                 "active_turn": None,
+                "retryable_turn": None,
             },
         }
         self.assertTrue(self.frames.is_valid(projection))
@@ -97,7 +98,7 @@ class OperatorStreamContractTests(unittest.TestCase):
             "cursor": "cursor-2", "payload": {
                 "conversation_id": "conversation-1", "stream_cursor": "conversation:1",
                 "origin_sequence": "9", "items": [message], "next_cursor": None,
-                "active_turn": None,
+                "active_turn": None, "retryable_turn": None,
             },
         }
         upsert = {

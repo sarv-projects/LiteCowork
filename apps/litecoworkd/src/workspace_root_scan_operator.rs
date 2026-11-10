@@ -1565,6 +1565,10 @@ mod route_tests {
         let runtime_identity =
             RuntimeOsPrincipalIdentity::test_support(RUNTIME).expect("test OS identity");
         let (_shutdown_sender, stream_shutdown) = tokio::sync::watch::channel(false);
+        let supervisor = Arc::new(crate::agents::AgentSessionSupervisor::new(
+            store.clone(),
+            RUNTIME.to_owned(),
+        ));
         let state = super::super::ApiState {
             store,
             principal_id: OWNER.to_owned(),
@@ -1575,6 +1579,7 @@ mod route_tests {
             stream_admission: Arc::new(tokio::sync::Semaphore::new(1)),
             runtime_inventory_revision: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             stream_shutdown,
+            supervisor,
         };
         RouteFixture {
             _directory: directory,
@@ -1593,6 +1598,7 @@ mod route_tests {
             stream_admission: state.stream_admission.clone(),
             runtime_inventory_revision: state.runtime_inventory_revision.clone(),
             stream_shutdown: state.stream_shutdown.clone(),
+            supervisor: state.supervisor.clone(),
         }
     }
 

@@ -8,8 +8,8 @@
 
 use super::*;
 use storage_core::conversation::{
-    CONVERSATION_SESSION_ADMISSION_UNAVAILABLE, CONVERSATION_TURN_IN_PROGRESS, ConversationTurn, ConversationTurnStatus,
-    PresentationPreference, TurnCommand, request_payload_value,
+    CONVERSATION_SESSION_ADMISSION_UNAVAILABLE, CONVERSATION_TURN_IN_PROGRESS, ConversationTurn,
+    ConversationTurnStatus, PresentationPreference, TurnCommand, request_payload_value,
 };
 use storage_core::{
     ConversationMessageRecord, ConversationRecord, ConversationStore, ConversationTurnReceipt,
@@ -101,10 +101,9 @@ impl FromRef<ApiState> for ConversationApiState {
             store: state.store.clone(),
             principal_id: state.principal_id.clone(),
             runtime_id: state.runtime_id.clone(),
-            supervisor: Some(Arc::new(crate::agents::AgentSessionSupervisor::new(
-                state.store.clone(),
-                state.runtime_id.clone(),
-            ))),
+            // The Operator's single process-lifetime supervisor, never a new one: the
+            // Stop registry must be the same map the admitted turn registered into.
+            supervisor: Some(Arc::clone(&state.supervisor)),
         }
     }
 }
@@ -773,7 +772,12 @@ async fn retry_conversation_turn(
     // An exact repeat of an already applied Retry key replays its receipt (no second
     // attempt, no second intent) even though the turn version has moved on.
     if let Some(replayed) = conv_store
-        .find_conversation_turn_command_replay(&workspace_id, &conversation_id, &turn_id, &request_id)
+        .find_conversation_turn_command_replay(
+            &workspace_id,
+            &conversation_id,
+            &turn_id,
+            &request_id,
+        )
         .map_err(map_store_error)?
     {
         return Ok(turn_command_receipt(replayed, correlation_id));
@@ -811,7 +815,12 @@ async fn retry_conversation_turn(
         causation_id: Some(request_id),
         schema_version: 1,
         event_type: "conversation.turn.retried.v1".to_owned(),
-        payload: retry_event_payload(&turn_id, turn.agent_session_id.as_deref(), next_retry_ordinal, next_version),
+        payload: retry_event_payload(
+            &turn_id,
+            turn.agent_session_id.as_deref(),
+            next_retry_ordinal,
+            next_version,
+        ),
         recorded_at: ctx.recorded_at.clone(),
     };
 
@@ -883,7 +892,12 @@ async fn cancel_conversation_turn(
         })?;
 
     if let Some(replayed) = conv_store
-        .find_conversation_turn_command_replay(&workspace_id, &conversation_id, &turn_id, &request_id)
+        .find_conversation_turn_command_replay(
+            &workspace_id,
+            &conversation_id,
+            &turn_id,
+            &request_id,
+        )
         .map_err(map_store_error)?
     {
         return Ok(turn_command_receipt(replayed, correlation_id));
@@ -1039,7 +1053,10 @@ fn retry_event_payload(
 /// 202 receipt for a Retry or Cancel command that was already applied or is in flight.
 fn turn_command_receipt(turn: ConversationTurn, correlation_id: String) -> Response {
     let receipt = ConversationTurnReceipt {
-        accepted_at: turn.settled_at.clone().unwrap_or_else(|| turn.created_at.clone()),
+        accepted_at: turn
+            .settled_at
+            .clone()
+            .unwrap_or_else(|| turn.created_at.clone()),
         turn_id: turn.turn_id,
         conversation_id: turn.conversation_id,
         user_message_id: turn.user_message_id,
@@ -1155,19 +1172,56 @@ async fn check_turn_resources(
     }
     let store = state.store.clone();
     let workspace_id = workspace_id.to_owned();
-    let outcome = tokio::task::spawn_blocking(move || check_resource_refs(&store, &workspace_id, &refs))
-        .await
-        .map_err(|_| internal())?;
+    let outcome =
+        tokio::task::spawn_blocking(move || check_resource_refs(&store, &workspace_id, &refs))
+            .await
+            .map_err(|_| internal())?;
     outcome.map_err(|refusal| match refusal {
-        MaterializeError::NotFound => error(StatusCode::NOT_FOUND, "NOT_FOUND", "An attached Resource was not found in this Workspace"),
-        MaterializeError::StaleRevision => error(StatusCode::CONFLICT, "RESOURCE_STALE", "An attached Resource changed; reattach its current revision"),
-        MaterializeError::StoreUnavailable => error(StatusCode::SERVICE_UNAVAILABLE, "RESOURCE_UNAVAILABLE", "Attached Resources could not be read"),
-        MaterializeError::BinaryUnavailable => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "Only text Resources can be attached to a Conversation turn"),
-        MaterializeError::TooLarge => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "An attached Resource is too large"),
-        MaterializeError::NotText => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "An attached Resource is not valid text"),
-        MaterializeError::Restricted => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "A restricted Resource cannot be attached to a Conversation turn"),
-        MaterializeError::TooMany => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "Too many Resources are attached"),
-        MaterializeError::NotAuthorized => error(StatusCode::BAD_REQUEST, "INVALID_RESOURCE_REF", "An attached Resource reference is not valid for this Workspace"),
+        MaterializeError::NotFound => error(
+            StatusCode::NOT_FOUND,
+            "NOT_FOUND",
+            "An attached Resource was not found in this Workspace",
+        ),
+        MaterializeError::StaleRevision => error(
+            StatusCode::CONFLICT,
+            "RESOURCE_STALE",
+            "An attached Resource changed; reattach its current revision",
+        ),
+        MaterializeError::StoreUnavailable => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "RESOURCE_UNAVAILABLE",
+            "Attached Resources could not be read",
+        ),
+        MaterializeError::BinaryUnavailable => error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "INVALID_RESOURCE_REF",
+            "Only text Resources can be attached to a Conversation turn",
+        ),
+        MaterializeError::TooLarge => error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "INVALID_RESOURCE_REF",
+            "An attached Resource is too large",
+        ),
+        MaterializeError::NotText => error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "INVALID_RESOURCE_REF",
+            "An attached Resource is not valid text",
+        ),
+        MaterializeError::Restricted => error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "INVALID_RESOURCE_REF",
+            "A restricted Resource cannot be attached to a Conversation turn",
+        ),
+        MaterializeError::TooMany => error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "INVALID_RESOURCE_REF",
+            "Too many Resources are attached",
+        ),
+        MaterializeError::NotAuthorized => error(
+            StatusCode::BAD_REQUEST,
+            "INVALID_RESOURCE_REF",
+            "An attached Resource reference is not valid for this Workspace",
+        ),
     })
 }
 

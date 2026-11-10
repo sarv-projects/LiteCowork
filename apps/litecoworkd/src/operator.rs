@@ -182,6 +182,25 @@ struct ApiState {
     stream_admission: Arc<tokio::sync::Semaphore>,
     runtime_inventory_revision: Arc<AtomicU64>,
     stream_shutdown: tokio::sync::watch::Receiver<bool>,
+    /// One native Conversation session supervisor per Operator process. Submit, Retry
+    /// and Stop must all observe the same live Stop registry: a supervisor built per
+    /// request would hold an empty registry, so a Stop would signal no attempt while
+    /// the dispatched turn kept running under a different instance.
+    supervisor: Arc<crate::agents::AgentSessionSupervisor>,
+}
+
+/// Test-only supervisor handle for route fixtures. Production builds exactly one
+/// supervisor in `OperatorServer::start`; fixtures use this so their router carries
+/// the same single-registry shape the serving Operator has.
+#[cfg(test)]
+pub(crate) fn test_supervisor(
+    store: &SqliteWorkspaceStore,
+    runtime_id: impl AsRef<str>,
+) -> Arc<crate::agents::AgentSessionSupervisor> {
+    Arc::new(crate::agents::AgentSessionSupervisor::new(
+        store.clone(),
+        runtime_id.as_ref().to_owned(),
+    ))
 }
 
 #[derive(Clone)]
@@ -1239,6 +1258,12 @@ impl OperatorServer {
                 .map(std::path::PathBuf::from);
             let endpoint = OperatorIpcEndpoint::derive(data_directory, &runtime_identity)?;
             let (stream_shutdown_sender, stream_shutdown) = tokio::sync::watch::channel(false);
+            // Built once, before the router: every route projection clones this Arc so
+            // an admitted turn and the Stop that interrupts it share one registry.
+            let supervisor = Arc::new(crate::agents::AgentSessionSupervisor::new(
+                store.clone(),
+                runtime_id.clone(),
+            ));
             let state = ApiState {
                 store,
                 principal_id,
@@ -1249,6 +1274,7 @@ impl OperatorServer {
                 stream_admission: Arc::new(tokio::sync::Semaphore::new(2)),
                 runtime_inventory_revision: Arc::new(AtomicU64::new(1)),
                 stream_shutdown,
+                supervisor,
             };
             let sweeper_state = state.clone();
             let trigger_host_context = automation_operator::trigger_host_context(&state);

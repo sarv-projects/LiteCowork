@@ -80,9 +80,11 @@ fn settle(control: Option<OwnerControlEventInsert>) -> SettleConversationTurn {
 fn control_event_count(directory: &tempfile::TempDir) -> i64 {
     Connection::open(state_database(directory))
         .expect("open state")
-        .query_row("SELECT COUNT(*) FROM conversation_control_events", [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT COUNT(*) FROM conversation_control_events",
+            [],
+            |row| row.get(0),
+        )
         .expect("count control events")
 }
 
@@ -110,7 +112,12 @@ fn conversation_coedit_side_note_commits_replays_and_stays_out_of_the_prompt() {
         "changed payload under one key must not replay"
     );
     let listed = conversations
-        .list_owner_side_notes("owner-local", "workspace-turn", "conversation-turn", "turn-one")
+        .list_owner_side_notes(
+            "owner-local",
+            "workspace-turn",
+            "conversation-turn",
+            "turn-one",
+        )
         .unwrap();
     assert_eq!(listed, vec![first]);
 
@@ -133,7 +140,12 @@ fn conversation_coedit_side_note_refuses_terminal_over_budget_and_foreign_withou
     conversations.create_conversation_turn(turn).unwrap();
     assert_eq!(
         conversations
-            .append_owner_side_note(side_note("note-big", "n-big", "turn-one", &"x".repeat(4_001)))
+            .append_owner_side_note(side_note(
+                "note-big",
+                "n-big",
+                "turn-one",
+                &"x".repeat(4_001)
+            ))
             .unwrap_err(),
         StoreError::Invalid("SIDE_NOTE_OVER_BUDGET".to_owned())
     );
@@ -165,7 +177,11 @@ fn conversation_coedit_side_note_refuses_terminal_over_budget_and_foreign_withou
     );
     let rows: i64 = Connection::open(state_database(&directory))
         .unwrap()
-        .query_row("SELECT COUNT(*) FROM conversation_owner_side_notes", [], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM conversation_owner_side_notes",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(rows, 0);
 }
@@ -186,12 +202,19 @@ fn conversation_coedit_take_control_settles_cancelled_and_appends_control_event_
     assert_eq!(control_event_count(&directory), 1);
     // The append-only table refuses edits and deletes.
     let connection = Connection::open(state_database(&directory)).unwrap();
-    assert!(connection
-        .execute("UPDATE conversation_control_events SET kind='OWNER_RELEASED_CONTROL'", [])
-        .is_err());
-    assert!(connection
-        .execute("DELETE FROM conversation_control_events", [])
-        .is_err());
+    assert!(
+        connection
+            .execute(
+                "UPDATE conversation_control_events SET kind='OWNER_RELEASED_CONTROL'",
+                []
+            )
+            .is_err()
+    );
+    assert!(
+        connection
+            .execute("DELETE FROM conversation_control_events", [])
+            .is_err()
+    );
 }
 
 #[test]
@@ -216,7 +239,14 @@ fn conversation_coedit_failed_control_event_insert_rolls_back_the_settlement() {
     assert!(result.is_err());
     let status: String = Connection::open(state_database(&directory))
         .unwrap()
-        .query_row("SELECT status FROM conversation_turns WHERE turn_id='turn-one'", [], |r| r.get(0))
+        .query_row(
+            "SELECT status FROM conversation_turns WHERE turn_id='turn-one'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
-    assert_eq!(status, "CANCEL_REQUESTED", "turn must not be CANCELLED without the control event");
+    assert_eq!(
+        status, "CANCEL_REQUESTED",
+        "turn must not be CANCELLED without the control event"
+    );
 }

@@ -309,6 +309,7 @@ mod tests {
         )
         .expect("SQLite store opens");
         let state = ApiState {
+            supervisor: crate::operator::test_supervisor(&store, "handoff-runtime"),
             store,
             principal_id: "handoff-owner".to_owned(),
             runtime_id: "handoff-runtime".to_owned(),

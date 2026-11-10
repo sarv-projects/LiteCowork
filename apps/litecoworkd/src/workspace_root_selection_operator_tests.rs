@@ -32,6 +32,7 @@ const NOW: &str = "2026-10-15T12:00:00Z";
 fn router_for(store: SqliteWorkspaceStore, principal_id: &str) -> axum::Router {
     let (_, stream_shutdown) = tokio::sync::watch::channel(false);
     super::build_operator_router(super::ApiState {
+        supervisor: crate::operator::test_supervisor(&store, RUNTIME),
         store,
         principal_id: principal_id.to_owned(),
         runtime_id: RUNTIME.to_owned(),

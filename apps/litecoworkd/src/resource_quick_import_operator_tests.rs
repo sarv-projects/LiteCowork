@@ -43,6 +43,7 @@ async fn authenticated_quick_import_persists_route_payload_without_upload_sessio
         .expect("Workspace commits");
     let (_, stream_shutdown) = tokio::sync::watch::channel(false);
     let router = super::super::build_operator_router(super::super::ApiState {
+        supervisor: crate::operator::test_supervisor(&store.clone(), RUNTIME),
         store: store.clone(),
         principal_id: OWNER.to_owned(),
         runtime_id: RUNTIME.to_owned(),
@@ -175,6 +176,7 @@ async fn authenticated_quick_import_replays_after_workspace_archive() {
         .expect("Workspace commits");
     let (_, stream_shutdown) = tokio::sync::watch::channel(false);
     let router = super::super::build_operator_router(super::super::ApiState {
+        supervisor: crate::operator::test_supervisor(&store.clone(), RUNTIME),
         store: store.clone(),
         principal_id: OWNER.to_owned(),
         runtime_id: RUNTIME.to_owned(),

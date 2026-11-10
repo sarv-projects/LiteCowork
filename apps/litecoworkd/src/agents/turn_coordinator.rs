@@ -42,7 +42,13 @@ impl AgentTurnCoordinator {
         let turn_id = turn.turn_id.clone();
         tokio::spawn(async move {
             if let Err(error) = supervisor
-                .dispatch_turn(&principal_id, &workspace_id, &conversation_id, turn, &correlation_id)
+                .dispatch_turn(
+                    &principal_id,
+                    &workspace_id,
+                    &conversation_id,
+                    turn,
+                    &correlation_id,
+                )
                 .await
             {
                 eprintln!("{}", dispatch_diagnostic(&turn_id, &correlation_id, &error));

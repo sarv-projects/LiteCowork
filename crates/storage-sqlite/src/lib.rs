@@ -14624,7 +14624,7 @@ pub(crate) fn create_task_in_transaction(
             required_outputs_json, criteria_json, approvals_json, budget_json,
             delegation_budget_json, failover_json, spec.deadline, source_refs_json,
             placement_json, spec.preferred_lead_agent_binding_id, spec_author_json, spec.created_at,
-            delegation_policy_snapshot_json(&tx, &spec.workspace_id)?,
+            delegation_policy_snapshot_json(tx, &spec.workspace_id)?,
         ],
     ).map_err(map_database_error)?;
 
@@ -21962,7 +21962,11 @@ fn migrate_with_failpoint(
         migrate_workspace_delegation_settings(connection, failpoint)?;
     } else if !matches!(
         current_version,
-        V28_SCHEMA_VERSION | V29_SCHEMA_VERSION | V30_SCHEMA_VERSION | V31_SCHEMA_VERSION | V32_SCHEMA_VERSION
+        V28_SCHEMA_VERSION
+            | V29_SCHEMA_VERSION
+            | V30_SCHEMA_VERSION
+            | V31_SCHEMA_VERSION
+            | V32_SCHEMA_VERSION
     ) {
         return Err(StoreError::CorruptSchema(format!(
             "migration stopped at unexpected schema version {current_version}"

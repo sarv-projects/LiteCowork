@@ -422,9 +422,7 @@ pub(crate) mod tests {
         let good = service(Some("2.0.32"));
         let store = MemoryStore::default();
         let manifest = good.module_for_provider("OPENCODE").unwrap().clone();
-        let prior = good
-            .refresh(&store, &manifest, "rt", "rti", at(0))
-            .unwrap();
+        let prior = good.refresh(&store, &manifest, "rt", "rti", at(0)).unwrap();
         // The probe observes nothing usable (crash, timeout or unpinned version).
         let failing = service(None);
         assert_eq!(

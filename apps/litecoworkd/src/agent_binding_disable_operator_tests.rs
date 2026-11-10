@@ -251,6 +251,7 @@ fn seed_compatible_endpoint(fixture: &Fixture) {
 fn router_for_store(store: SqliteWorkspaceStore, principal_id: &str) -> Router {
     let (_shutdown_sender, stream_shutdown) = tokio::sync::watch::channel(false);
     super::super::build_operator_router(super::super::ApiState {
+        supervisor: crate::operator::test_supervisor(&store, RUNTIME),
         store,
         principal_id: principal_id.to_owned(),
         runtime_id: RUNTIME.to_owned(),

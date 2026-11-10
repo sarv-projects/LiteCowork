@@ -248,6 +248,7 @@ mod response_header_tests {
         let (shutdown_sender, stream_shutdown) = tokio::sync::watch::channel(false);
         (
             ApiState {
+                supervisor: crate::operator::test_supervisor(&store, RUNTIME),
                 store,
                 principal_id: OWNER.to_owned(),
                 runtime_id: RUNTIME.to_owned(),
@@ -265,6 +266,7 @@ mod response_header_tests {
 
     fn fork_state(state: &ApiState, principal_id: &str) -> ApiState {
         ApiState {
+            supervisor: state.supervisor.clone(),
             store: state.store.clone(),
             principal_id: principal_id.to_owned(),
             runtime_id: state.runtime_id.clone(),

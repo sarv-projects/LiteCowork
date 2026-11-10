@@ -110,14 +110,20 @@ impl UsageCollector {
 
 impl TurnObserver for UsageCollector {
     fn on_event(&mut self, event: &NormalizedAgentEvent) {
-        if let NormalizedAgentEvent::UsageRecorded { input_tokens, output_tokens } = event {
+        if let NormalizedAgentEvent::UsageRecorded {
+            input_tokens,
+            output_tokens,
+        } = event
+        {
             if input_tokens.is_none() && output_tokens.is_none() {
                 return;
             }
             if let Ok(mut usage) = self.0.lock() {
                 usage.observed = true;
                 usage.input_tokens = usage.input_tokens.saturating_add(input_tokens.unwrap_or(0));
-                usage.output_tokens = usage.output_tokens.saturating_add(output_tokens.unwrap_or(0));
+                usage.output_tokens = usage
+                    .output_tokens
+                    .saturating_add(output_tokens.unwrap_or(0));
             }
         }
     }
@@ -614,7 +620,9 @@ impl AgentAdapter for OpenCodeAdapter {
             Instant::now(),
             cancel.as_ref(),
             &mut || server.abort_session(native_session_id).unwrap_or(false),
-            self.observer.as_deref_mut().map(|o| o as &mut dyn TurnObserver),
+            self.observer
+                .as_deref_mut()
+                .map(|o| o as &mut dyn TurnObserver),
         );
         if let Some(observer) = self.observer.as_deref_mut() {
             observer.finish();
@@ -957,7 +965,10 @@ mod selected_adapter_conversation_opencode_turn_fixture_tests {
             let value: Value = serde_json::from_slice(&frame.bytes).expect("frame json");
             streamed.push_str(value["text_delta"].as_str().expect("delta text"));
         }
-        assert_eq!(streamed, answer_text, "transient text equals the committed answer");
+        assert_eq!(
+            streamed, answer_text,
+            "transient text equals the committed answer"
+        );
         assert!(!streamed.contains("REASONING"));
     }
 
@@ -1203,7 +1214,10 @@ mod selected_adapter_conversation_opencode_turn_fixture_tests {
                 "text": "done", "time": {"start": 1, "end": 2}}}}),
         })));
         frames.push_back(Ok(Some(idle_frame())));
-        let mut source = ScriptedSource { frames, then_quiet: false };
+        let mut source = ScriptedSource {
+            frames,
+            then_quiet: false,
+        };
         let mut normalizer = OpenCodeEventNormalizer::new(FIXTURE_SESSION);
         let mut interrupts = 0;
         let observation = drive_opencode_stream_cancellable(
@@ -1219,7 +1233,9 @@ mod selected_adapter_conversation_opencode_turn_fixture_tests {
         );
         assert_eq!(
             observation,
-            Ok(TurnObservation::Completed { answer_text: "done".to_owned() })
+            Ok(TurnObservation::Completed {
+                answer_text: "done".to_owned()
+            })
         );
         assert_eq!(interrupts, 0);
     }

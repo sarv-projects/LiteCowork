@@ -50,15 +50,25 @@ pub struct ConversationTurn {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TurnCommand {
-    Start { agent_session_id: String },
+    Start {
+        agent_session_id: String,
+    },
     WaitForUser,
     WaitForDependency,
     RequestAgain,
-    Resume { agent_session_id: String },
-    Complete { settled_at: String },
-    Fail { settled_at: String },
+    Resume {
+        agent_session_id: String,
+    },
+    Complete {
+        settled_at: String,
+    },
+    Fail {
+        settled_at: String,
+    },
     RequestCancel,
-    SettleCancelled { settled_at: String },
+    SettleCancelled {
+        settled_at: String,
+    },
     /// FAILED to OPEN with `retry_ordinal + 1` and no session pointer. A fresh
     /// Conversation-scoped session is reserved afterwards by the dispatcher.
     Retry,
@@ -353,7 +363,6 @@ mod tests {
             ),
             Err(TurnTransitionError::SessionMustBeFresh)
         );
-
     }
 
     #[test]

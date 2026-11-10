@@ -89,6 +89,7 @@ fn create_owned_workspace(
 fn operator_router(store: &SqliteWorkspaceStore, owner_id: &str, runtime_id: &str) -> Router {
     let (_, stream_shutdown) = tokio::sync::watch::channel(false);
     super::super::build_operator_router(super::super::ApiState {
+        supervisor: crate::operator::test_supervisor(&store.clone(), runtime_id),
         store: store.clone(),
         principal_id: owner_id.to_owned(),
         runtime_id: runtime_id.to_owned(),

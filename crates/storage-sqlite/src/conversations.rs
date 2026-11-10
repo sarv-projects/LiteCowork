@@ -805,10 +805,20 @@ impl ConversationTurnStore for SqliteConversationStore {
         turn_id: &str,
         request_id: &str,
     ) -> Result<Option<ConversationTurn>, StoreError> {
-        if workspace_id.trim().is_empty() || turn_id.trim().is_empty() || request_id.trim().is_empty() {
-            return Err(StoreError::Invalid("Conversation command replay identity is invalid".to_owned()));
+        if workspace_id.trim().is_empty()
+            || turn_id.trim().is_empty()
+            || request_id.trim().is_empty()
+        {
+            return Err(StoreError::Invalid(
+                "Conversation command replay identity is invalid".to_owned(),
+            ));
         }
-        let (workspace, conversation, turn, request) = (workspace_id.to_owned(), conversation_id.to_owned(), turn_id.to_owned(), request_id.to_owned());
+        let (workspace, conversation, turn, request) = (
+            workspace_id.to_owned(),
+            conversation_id.to_owned(),
+            turn_id.to_owned(),
+            request_id.to_owned(),
+        );
         self.run(move |connection| {
             let replayed: bool = connection.query_row(
                 "SELECT EXISTS(SELECT 1 FROM domain_events WHERE workspace_id=?1 AND entity_type='ConversationTurn' AND entity_id=?2 AND causation_id=?3)",
@@ -909,9 +919,16 @@ impl ConversationTurnStore for SqliteConversationStore {
         if !valid(&record.turn_id)
             || !valid(&record.conversation_id)
             || record.sequence == 0
-            || record.sequence as usize > storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT
-            || record.call_ref.as_deref().is_some_and(|v| !valid(v) || v.len() > 128)
-            || record.label.as_deref().is_some_and(|v| v.len() > 128 || v.chars().any(char::is_control))
+            || record.sequence as usize
+                > storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT
+            || record
+                .call_ref
+                .as_deref()
+                .is_some_and(|v| !valid(v) || v.len() > 128)
+            || record
+                .label
+                .as_deref()
+                .is_some_and(|v| v.len() > 128 || v.chars().any(char::is_control))
         {
             return Err(StoreError::Invalid(
                 "Conversation activity record is invalid".to_owned(),
@@ -947,7 +964,8 @@ impl ConversationTurnStore for SqliteConversationStore {
         retry_ordinal: u32,
         limit: usize,
     ) -> Result<Vec<storage_core::conversation::ConversationActivityRecord>, StoreError> {
-        if !(1..=storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT).contains(&limit) {
+        if !(1..=storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT).contains(&limit)
+        {
             return Err(StoreError::Invalid(
                 "Conversation activity page size is invalid".to_owned(),
             ));
@@ -2390,8 +2408,7 @@ impl ConversationHistoryStore for SqliteConversationStore {
         if title.trim().is_empty()
             || title.chars().count() > 160
             || title.chars().any(char::is_control)
-            || payload.get("operation").and_then(Value::as_str)
-                != Some("conversation.rename.v1")
+            || payload.get("operation").and_then(Value::as_str) != Some("conversation.rename.v1")
             || payload.get("title").and_then(Value::as_str) != Some(title.as_str())
             || commit.event.event_type != "conversation.renamed.v1"
         {
@@ -2408,7 +2425,10 @@ impl ConversationHistoryStore for SqliteConversationStore {
             &commit.conversation_id,
             commit.expected_version,
             commit.event,
-            HistoryMutation::Rename { title, title_digest },
+            HistoryMutation::Rename {
+                title,
+                title_digest,
+            },
         )
     }
 
@@ -2426,7 +2446,11 @@ impl ConversationHistoryStore for SqliteConversationStore {
         } else {
             "conversation.unarchive.v1"
         };
-        if commit.request.request_payload.get("operation").and_then(Value::as_str)
+        if commit
+            .request
+            .request_payload
+            .get("operation")
+            .and_then(Value::as_str)
             != Some(expected_operation)
             || commit.event.event_type != expected_event
         {
@@ -2587,9 +2611,7 @@ fn require_conversation_active(
 ) -> Result<(), StoreError> {
     match read_conversation_status(connection, conversation_id)? {
         ConversationStatus::Active => Ok(()),
-        ConversationStatus::Archived => {
-            Err(StoreError::Invalid(CONVERSATION_ARCHIVED.to_owned()))
-        }
+        ConversationStatus::Archived => Err(StoreError::Invalid(CONVERSATION_ARCHIVED.to_owned())),
         ConversationStatus::DeletionPending | ConversationStatus::Deleted => {
             Err(StoreError::Invalid(CONVERSATION_DELETED.to_owned()))
         }
@@ -2841,8 +2863,7 @@ impl ConversationCoeditStore for SqliteConversationStore {
                 "owner side note request is inconsistent".to_owned(),
             ));
         }
-        if commit.body.trim().is_empty()
-            || commit.body.chars().count() > OWNER_SIDE_NOTE_MAX_CHARS
+        if commit.body.trim().is_empty() || commit.body.chars().count() > OWNER_SIDE_NOTE_MAX_CHARS
         {
             return Err(StoreError::Invalid(SIDE_NOTE_OVER_BUDGET.to_owned()));
         }

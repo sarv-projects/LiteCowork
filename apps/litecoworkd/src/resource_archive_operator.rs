@@ -336,6 +336,7 @@ mod tests {
             .expect("owner Workspace commits");
         let (_, stream_shutdown) = tokio::sync::watch::channel(false);
         let router = super::super::build_operator_router(super::super::ApiState {
+            supervisor: crate::operator::test_supervisor(&store.clone(), RUNTIME),
             store: store.clone(),
             principal_id: OWNER.to_owned(),
             runtime_id: RUNTIME.to_owned(),
@@ -454,6 +455,7 @@ mod tests {
     fn router_for(fixture: &Fixture, principal_id: &str) -> axum::Router {
         let (_, stream_shutdown) = tokio::sync::watch::channel(false);
         super::super::build_operator_router(super::super::ApiState {
+            supervisor: crate::operator::test_supervisor(&fixture.store.clone(), RUNTIME),
             store: fixture.store.clone(),
             principal_id: principal_id.to_owned(),
             runtime_id: RUNTIME.to_owned(),

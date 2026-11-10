@@ -78,7 +78,12 @@ fn activated() -> Activated {
 }
 
 impl Activated {
-    fn commit(&self, request_id: &str, response_id: &str, text: &str) -> CommitConversationAgentResponse {
+    fn commit(
+        &self,
+        request_id: &str,
+        response_id: &str,
+        text: &str,
+    ) -> CommitConversationAgentResponse {
         CommitConversationAgentResponse {
             request: WorkspaceCreateRequest {
                 principal_id: OWNER_ID.to_owned(),
@@ -153,7 +158,16 @@ impl Activated {
                         (SELECT status FROM conversation_turns WHERE turn_id=?1),
                         (SELECT status FROM agent_sessions WHERE agent_session_id=?2)",
                 params![self.turn_id, self.session_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                },
             )
             .expect("read commit state")
     }
@@ -163,28 +177,51 @@ impl Activated {
 fn conversation_agent_response_commit_rejects_wrong_author_and_ordinal_without_partial_write() {
     let a = activated();
     let before = a.counts();
-    assert_eq!(before, (0, 0, 0, 0, "RUNNING".to_owned(), "ACTIVE".to_owned()));
+    assert_eq!(
+        before,
+        (0, 0, 0, 0, "RUNNING".to_owned(), "ACTIVE".to_owned())
+    );
 
     let mut wrong_author = a.commit("req-author", "response-1", "hello");
     wrong_author.message.author =
         serde_json::json!({"kind": "AGENT", "agent_binding_id": "some-other-binding"});
-    assert!(a.store.commit_conversation_agent_response(wrong_author).is_err());
+    assert!(
+        a.store
+            .commit_conversation_agent_response(wrong_author)
+            .is_err()
+    );
 
     let mut user_author = a.commit("req-user-author", "response-1", "hello");
     user_author.message.author = serde_json::json!({"kind": "USER", "principal_id": OWNER_ID});
-    assert!(a.store.commit_conversation_agent_response(user_author).is_err());
+    assert!(
+        a.store
+            .commit_conversation_agent_response(user_author)
+            .is_err()
+    );
 
     let mut wrong_ordinal = a.commit("req-ordinal", "response-1", "hello");
     wrong_ordinal.retry_ordinal = 1;
-    assert!(a.store.commit_conversation_agent_response(wrong_ordinal).is_err());
+    assert!(
+        a.store
+            .commit_conversation_agent_response(wrong_ordinal)
+            .is_err()
+    );
 
     let mut wrong_workspace = a.commit("req-workspace", "response-1", "hello");
     wrong_workspace.workspace_id = "another-workspace".to_owned();
-    assert!(a.store.commit_conversation_agent_response(wrong_workspace).is_err());
+    assert!(
+        a.store
+            .commit_conversation_agent_response(wrong_workspace)
+            .is_err()
+    );
 
     let mut wrong_session = a.commit("req-session", "response-1", "hello");
     wrong_session.agent_session_id = "another-session".to_owned();
-    assert!(a.store.commit_conversation_agent_response(wrong_session).is_err());
+    assert!(
+        a.store
+            .commit_conversation_agent_response(wrong_session)
+            .is_err()
+    );
 
     assert_eq!(a.counts(), before, "rejected commits write nothing");
 }
@@ -203,16 +240,16 @@ fn conversation_agent_response_commit_identity_replays_and_rejects_conflicts() {
         .expect("same identity and content replays the stored receipt");
     assert_eq!(replay, first);
 
-    let different_content = a
-        .store
-        .commit_conversation_agent_response(a.commit("req-third", "response-1", "changed"));
+    let different_content =
+        a.store
+            .commit_conversation_agent_response(a.commit("req-third", "response-1", "changed"));
     assert!(matches!(
         different_content,
         Err(StoreError::Invalid(ref message)) if message == "CONVERSATION_RESPONSE_IDENTITY_CONFLICT"
     ));
-    let different_response = a
-        .store
-        .commit_conversation_agent_response(a.commit("req-fourth", "response-2", "hello"));
+    let different_response =
+        a.store
+            .commit_conversation_agent_response(a.commit("req-fourth", "response-2", "hello"));
     assert!(matches!(
         different_response,
         Err(StoreError::Invalid(ref message)) if message == "CONVERSATION_RESPONSE_IDENTITY_CONFLICT"
@@ -241,10 +278,26 @@ fn conversation_agent_response_commit_rolls_back_on_fault_after_each_insert() {
         ("conversation_turn_usage_records", "INSERT", ""),
         ("conversation_dispatch_intents", "UPDATE", ""),
         ("agent_session_host_bindings", "DELETE", ""),
-        ("domain_events", "INSERT", "WHEN NEW.type = 'conversation.message.added.v1'"),
-        ("domain_events", "INSERT", "WHEN NEW.type = 'conversation.turn.settled.v1'"),
-        ("domain_events", "INSERT", "WHEN NEW.type = 'agent.session.closed.v1'"),
-        ("request_dedup", "INSERT", "WHEN NEW.request_id = 'req-fault'"),
+        (
+            "domain_events",
+            "INSERT",
+            "WHEN NEW.type = 'conversation.message.added.v1'",
+        ),
+        (
+            "domain_events",
+            "INSERT",
+            "WHEN NEW.type = 'conversation.turn.settled.v1'",
+        ),
+        (
+            "domain_events",
+            "INSERT",
+            "WHEN NEW.type = 'agent.session.closed.v1'",
+        ),
+        (
+            "request_dedup",
+            "INSERT",
+            "WHEN NEW.request_id = 'req-fault'",
+        ),
     ];
     for (index, (table, operation, condition)) in faults.iter().enumerate() {
         let connection = a.connection();
@@ -254,11 +307,20 @@ fn conversation_agent_response_commit_rolls_back_on_fault_after_each_insert() {
             ))
             .expect("install fault trigger");
         drop(connection);
-        let result = a
-            .store
-            .commit_conversation_agent_response(a.commit("req-fault", "response-1", "hello"));
-        assert!(result.is_err(), "fault on {operation} {table} must fail the commit");
-        assert_eq!(a.counts(), before, "fault on {operation} {table} rolls everything back");
+        let result = a.store.commit_conversation_agent_response(a.commit(
+            "req-fault",
+            "response-1",
+            "hello",
+        ));
+        assert!(
+            result.is_err(),
+            "fault on {operation} {table} must fail the commit"
+        );
+        assert_eq!(
+            a.counts(),
+            before,
+            "fault on {operation} {table} rolls everything back"
+        );
         a.connection()
             .execute_batch(&format!("DROP TRIGGER fault_{index};"))
             .expect("remove fault trigger");
@@ -338,16 +400,36 @@ fn conversation_dispatch_intent_claim_is_compare_and_swap() {
     assert_eq!(claimed.len(), 1);
     assert!(claimed[0].claimed_by_runtime_incarnation.is_some());
 
-    assert!(a.store.release_conversation_dispatch_intent(&a.turn_id, 0).expect("release"));
-    assert!(!a.store.release_conversation_dispatch_intent(&a.turn_id, 0).expect("release twice"));
-    assert!(a.store.claim_conversation_dispatch_intent(&a.turn_id, 0, "incarnation-next", NOW).expect("re-claim"));
+    assert!(
+        a.store
+            .release_conversation_dispatch_intent(&a.turn_id, 0)
+            .expect("release")
+    );
+    assert!(
+        !a.store
+            .release_conversation_dispatch_intent(&a.turn_id, 0)
+            .expect("release twice")
+    );
+    assert!(
+        a.store
+            .claim_conversation_dispatch_intent(&a.turn_id, 0, "incarnation-next", NOW)
+            .expect("re-claim")
+    );
 
     // Settlement through the final-response commit is terminal for the intent.
     a.store
         .commit_conversation_agent_response(a.commit("req-settle", "response-1", "hello"))
         .expect("commit settles");
-    assert!(!a.store.claim_conversation_dispatch_intent(&a.turn_id, 0, "incarnation-late", NOW).expect("late claim"));
-    assert!(!a.store.release_conversation_dispatch_intent(&a.turn_id, 0).expect("late release"));
+    assert!(
+        !a.store
+            .claim_conversation_dispatch_intent(&a.turn_id, 0, "incarnation-late", NOW)
+            .expect("late claim")
+    );
+    assert!(
+        !a.store
+            .release_conversation_dispatch_intent(&a.turn_id, 0)
+            .expect("late release")
+    );
     let delete = a
         .connection()
         .execute("DELETE FROM conversation_dispatch_intents", []);
@@ -363,7 +445,14 @@ impl Activated {
         session_end: ConversationSessionEnd,
         session_version: u64,
     ) -> Result<storage_core::conversation::SettledConversationTurn, StoreError> {
-        self.settle_with_usage(turn_version, command, to, session_end, session_version, None)
+        self.settle_with_usage(
+            turn_version,
+            command,
+            to,
+            session_end,
+            session_version,
+            None,
+        )
     }
 
     fn settle_with_usage(
@@ -379,7 +468,11 @@ impl Activated {
             ConversationSessionEnd::Closed => ("agent.session.closed.v1", "CLOSED"),
             ConversationSessionEnd::Lost => ("agent.session.lost.v1", "LOST"),
         };
-        let from = if turn_version == 3 { "CANCEL_REQUESTED" } else { "RUNNING" };
+        let from = if turn_version == 3 {
+            "CANCEL_REQUESTED"
+        } else {
+            "RUNNING"
+        };
         self.store.settle_conversation_turn(SettleConversationTurn {
             control_event: None,
             principal_id: OWNER_ID.to_owned(),
@@ -426,26 +519,55 @@ impl Activated {
 #[test]
 fn conversation_turn_settlement_fails_turn_ends_session_and_settles_intent_without_a_message() {
     let a = activated();
-    let fail = || TurnCommand::Fail { settled_at: NOW.to_owned() };
+    let fail = || TurnCommand::Fail {
+        settled_at: NOW.to_owned(),
+    };
 
-    assert!(a.settle(1, fail(), "FAILED", ConversationSessionEnd::Lost, 2).is_err(), "stale turn version");
-    assert!(a.settle(2, fail(), "FAILED", ConversationSessionEnd::Lost, 1).is_err(), "stale session version");
-    assert_eq!(a.counts().4, "RUNNING", "rejected settlements write nothing");
+    assert!(
+        a.settle(1, fail(), "FAILED", ConversationSessionEnd::Lost, 2)
+            .is_err(),
+        "stale turn version"
+    );
+    assert!(
+        a.settle(2, fail(), "FAILED", ConversationSessionEnd::Lost, 1)
+            .is_err(),
+        "stale session version"
+    );
+    assert_eq!(
+        a.counts().4,
+        "RUNNING",
+        "rejected settlements write nothing"
+    );
 
     let settled = a
         .settle(2, fail(), "FAILED", ConversationSessionEnd::Lost, 2)
         .expect("failure settlement");
     assert_eq!(settled.turn.status, ConversationTurnStatus::Failed);
     assert_eq!(settled.session.expect("ended session").status, "LOST");
-    assert_eq!(a.row("SELECT status FROM agent_sessions WHERE agent_session_id=?1", &a.session_id), "LOST");
-    assert_eq!(a.row("SELECT state FROM conversation_dispatch_intents WHERE turn_id=?1", &a.turn_id), "SETTLED");
+    assert_eq!(
+        a.row(
+            "SELECT status FROM agent_sessions WHERE agent_session_id=?1",
+            &a.session_id
+        ),
+        "LOST"
+    );
+    assert_eq!(
+        a.row(
+            "SELECT state FROM conversation_dispatch_intents WHERE turn_id=?1",
+            &a.turn_id
+        ),
+        "SETTLED"
+    );
     assert_eq!(
         a.row("SELECT CAST(COUNT(*) AS TEXT) FROM agent_session_host_bindings WHERE agent_session_id=?1", &a.session_id),
         "0"
     );
     assert_eq!(a.counts().0, 0, "a failed turn leaves no AGENT message");
     assert_eq!(
-        a.row("SELECT attribution_source FROM conversation_turn_usage_records WHERE turn_id=?1", &a.turn_id),
+        a.row(
+            "SELECT attribution_source FROM conversation_turn_usage_records WHERE turn_id=?1",
+            &a.turn_id
+        ),
         "UNKNOWN",
         "a failure with nothing observed records UNKNOWN usage"
     );
@@ -460,8 +582,17 @@ fn conversation_usage_record_written_at_settlement_keeps_the_reported_attributio
         input_tokens: 120,
         output_tokens: 7,
     };
-    a.settle_with_usage(2, TurnCommand::Fail { settled_at: NOW.to_owned() }, "FAILED", ConversationSessionEnd::Lost, 2, Some(usage))
-        .expect("failure settlement with observed usage");
+    a.settle_with_usage(
+        2,
+        TurnCommand::Fail {
+            settled_at: NOW.to_owned(),
+        },
+        "FAILED",
+        ConversationSessionEnd::Lost,
+        2,
+        Some(usage),
+    )
+    .expect("failure settlement with observed usage");
     let (source, input, output): (String, i64, i64) = a
         .connection()
         .query_row(
@@ -470,15 +601,26 @@ fn conversation_usage_record_written_at_settlement_keeps_the_reported_attributio
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .expect("usage record");
-    assert_eq!((source.as_str(), input, output), ("ESTIMATED_LOCAL", 120, 7));
+    assert_eq!(
+        (source.as_str(), input, output),
+        ("ESTIMATED_LOCAL", 120, 7)
+    );
     assert_eq!(a.counts().2, 1, "exactly one usage row for the attempt");
 }
 
 #[test]
 fn conversation_retry_reopens_failed_turn_with_new_ordinal_intent_and_single_flight() {
     let a = activated();
-    a.settle(2, TurnCommand::Fail { settled_at: NOW.to_owned() }, "FAILED", ConversationSessionEnd::Lost, 2)
-        .expect("failure settlement");
+    a.settle(
+        2,
+        TurnCommand::Fail {
+            settled_at: NOW.to_owned(),
+        },
+        "FAILED",
+        ConversationSessionEnd::Lost,
+        2,
+    )
+    .expect("failure settlement");
     let retry_event = |version: u64, ordinal: u32, id: &str| {
         draft(
             id,
@@ -491,14 +633,46 @@ fn conversation_retry_reopens_failed_turn_with_new_ordinal_intent_and_single_fli
         )
     };
     // Stale version and a payload that still carries a session are refused.
-    assert!(a.store.transition_conversation_turn(OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 2, TurnCommand::Retry, retry_event(4, 1, "event-retry-stale")).is_err());
+    assert!(
+        a.store
+            .transition_conversation_turn(
+                OWNER_ID,
+                WORKSPACE_ID,
+                &a.conversation_id,
+                &a.turn_id,
+                2,
+                TurnCommand::Retry,
+                retry_event(4, 1, "event-retry-stale")
+            )
+            .is_err()
+    );
     let mut with_session = retry_event(4, 1, "event-retry-session");
     with_session.payload["agent_session_id"] = serde_json::json!("fresh-session");
-    assert!(a.store.transition_conversation_turn(OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 3, TurnCommand::Retry, with_session).is_err());
+    assert!(
+        a.store
+            .transition_conversation_turn(
+                OWNER_ID,
+                WORKSPACE_ID,
+                &a.conversation_id,
+                &a.turn_id,
+                3,
+                TurnCommand::Retry,
+                with_session
+            )
+            .is_err()
+    );
 
     let retried = a
         .store
-        .transition_conversation_turn(OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 3, TurnCommand::Retry, retry_event(4, 1, "event-retry-ok"))
+        .transition_conversation_turn(
+            OWNER_ID,
+            WORKSPACE_ID,
+            &a.conversation_id,
+            &a.turn_id,
+            3,
+            TurnCommand::Retry,
+            retry_event(4, 1, "event-retry-ok"),
+        )
         .expect("retry reopens the failed turn");
     assert_eq!(retried.status, ConversationTurnStatus::Open);
     assert_eq!(retried.retry_ordinal, 1);
@@ -510,15 +684,35 @@ fn conversation_retry_reopens_failed_turn_with_new_ordinal_intent_and_single_fli
         .list_conversation_dispatch_intents(ConversationDispatchState::Unclaimed, 10)
         .expect("list intents");
     assert_eq!(intents.len(), 1);
-    assert_eq!((intents[0].turn_id.as_str(), intents[0].retry_ordinal), (a.turn_id.as_str(), 1));
+    assert_eq!(
+        (intents[0].turn_id.as_str(), intents[0].retry_ordinal),
+        (a.turn_id.as_str(), 1)
+    );
     assert_eq!(a.row("SELECT CAST(COUNT(*) AS TEXT) FROM conversation_messages WHERE role='USER' AND turn_id=?1", &a.turn_id), "1", "no duplicate USER message");
 
     // Retry of a non-FAILED turn is rejected, and single-flight blocks a re-open while
     // another turn is in flight.
-    assert!(a.store.transition_conversation_turn(OWNER_ID, WORKSPACE_ID, &a.conversation_id, &a.turn_id, 4, TurnCommand::Retry, retry_event(5, 2, "event-retry-open")).is_err());
+    assert!(
+        a.store
+            .transition_conversation_turn(
+                OWNER_ID,
+                WORKSPACE_ID,
+                &a.conversation_id,
+                &a.turn_id,
+                4,
+                TurnCommand::Retry,
+                retry_event(5, 2, "event-retry-open")
+            )
+            .is_err()
+    );
     let replay = a
         .store
-        .find_conversation_turn_command_replay(WORKSPACE_ID, &a.conversation_id, &a.turn_id, "no-such-request")
+        .find_conversation_turn_command_replay(
+            WORKSPACE_ID,
+            &a.conversation_id,
+            &a.turn_id,
+            "no-such-request",
+        )
         .expect("replay lookup");
     assert!(replay.is_none());
 }
@@ -538,7 +732,15 @@ fn conversation_cancel_settles_cancelled_only_after_cancel_requested_and_keeps_r
     assert_eq!(requested.status, ConversationTurnStatus::CancelRequested);
     // A failure that wins the race with Stop stays FAILED (AC-010).
     let failed = a
-        .settle(3, TurnCommand::Fail { settled_at: NOW.to_owned() }, "FAILED", ConversationSessionEnd::Lost, 2)
+        .settle(
+            3,
+            TurnCommand::Fail {
+                settled_at: NOW.to_owned(),
+            },
+            "FAILED",
+            ConversationSessionEnd::Lost,
+            2,
+        )
         .expect("a failure observed during the stop stays FAILED");
     assert_eq!(failed.turn.status, ConversationTurnStatus::Failed);
     let b = activated();
@@ -550,7 +752,15 @@ fn conversation_cancel_settles_cancelled_only_after_cancel_requested_and_keeps_r
         )
         .expect("cancel request");
     let settled = b
-        .settle(3, TurnCommand::SettleCancelled { settled_at: NOW.to_owned() }, "CANCELLED", ConversationSessionEnd::Closed, 2)
+        .settle(
+            3,
+            TurnCommand::SettleCancelled {
+                settled_at: NOW.to_owned(),
+            },
+            "CANCELLED",
+            ConversationSessionEnd::Closed,
+            2,
+        )
         .expect("cancelled settlement after quiescence");
     assert_eq!(settled.turn.status, ConversationTurnStatus::Cancelled);
     assert_eq!(settled.session.expect("session").status, "CLOSED");
@@ -570,7 +780,10 @@ fn conversation_cancel_settles_cancelled_only_after_cancel_requested_and_keeps_r
     raced.turn_event.entity_revision = 4;
     raced.turn_event.payload["from"] = serde_json::json!("CANCEL_REQUESTED");
     raced.turn_event.payload["aggregate_version"] = serde_json::json!(4);
-    let committed = c.store.commit_conversation_agent_response(raced).expect("racing completion wins");
+    let committed = c
+        .store
+        .commit_conversation_agent_response(raced)
+        .expect("racing completion wins");
     assert_eq!(committed.turn.status, ConversationTurnStatus::Completed);
     assert_eq!(c.counts().0, 1);
 
@@ -586,51 +799,112 @@ fn conversation_cancel_settles_cancelled_only_after_cancel_requested_and_keeps_r
     let mut failed_commit = d.commit("req-fail-commit", "response-1", "x");
     failed_commit.expected_turn_version = 3;
     failed_commit.turn_status = ConversationTurnStatus::Failed;
-    assert!(d.store.commit_conversation_agent_response(failed_commit).is_err());
+    assert!(
+        d.store
+            .commit_conversation_agent_response(failed_commit)
+            .is_err()
+    );
 }
 
 #[test]
 fn turn_activity_records_are_reported_ordered_idempotent_scoped_and_immutable() {
     use storage_core::conversation::ConversationActivityRecord;
     let a = activated();
-    let record = |sequence: u32, kind: &str, status: &str, label: &str| ConversationActivityRecord {
-        turn_id: a.turn_id.clone(),
-        retry_ordinal: 0,
-        conversation_id: a.conversation_id.clone(),
-        sequence,
-        kind: kind.to_owned(),
-        status: status.to_owned(),
-        call_ref: Some(format!("call-{sequence}")),
-        label: Some(label.to_owned()),
-        created_at: NOW.to_owned(),
-    };
-    a.store.append_conversation_turn_activity(record(2, "TOOL", "SUCCEEDED", "bash")).expect("append second");
-    a.store.append_conversation_turn_activity(record(1, "TOOL", "STARTED", "bash")).expect("append first");
+    let record =
+        |sequence: u32, kind: &str, status: &str, label: &str| ConversationActivityRecord {
+            turn_id: a.turn_id.clone(),
+            retry_ordinal: 0,
+            conversation_id: a.conversation_id.clone(),
+            sequence,
+            kind: kind.to_owned(),
+            status: status.to_owned(),
+            call_ref: Some(format!("call-{sequence}")),
+            label: Some(label.to_owned()),
+            created_at: NOW.to_owned(),
+        };
+    a.store
+        .append_conversation_turn_activity(record(2, "TOOL", "SUCCEEDED", "bash"))
+        .expect("append second");
+    a.store
+        .append_conversation_turn_activity(record(1, "TOOL", "STARTED", "bash"))
+        .expect("append first");
     // An exact repeat of a sequence is a no-op, not a duplicate and not an error.
-    a.store.append_conversation_turn_activity(record(1, "TOOL", "STARTED", "bash")).expect("repeat is idempotent");
+    a.store
+        .append_conversation_turn_activity(record(1, "TOOL", "STARTED", "bash"))
+        .expect("repeat is idempotent");
 
     let listed = a
         .store
         .list_conversation_turn_activity(WORKSPACE_ID, &a.conversation_id, &a.turn_id, 0, 50)
         .expect("list activity");
-    assert_eq!(listed.iter().map(|r| r.sequence).collect::<Vec<_>>(), [1, 2]);
+    assert_eq!(
+        listed.iter().map(|r| r.sequence).collect::<Vec<_>>(),
+        [1, 2]
+    );
     assert_eq!(listed[0].status, "STARTED");
 
     // Another Workspace and another retry ordinal see nothing.
-    assert!(a.store.list_conversation_turn_activity("other-workspace", &a.conversation_id, &a.turn_id, 0, 50).expect("scoped").is_empty());
-    assert!(a.store.list_conversation_turn_activity(WORKSPACE_ID, &a.conversation_id, &a.turn_id, 1, 50).expect("ordinal").is_empty());
+    assert!(
+        a.store
+            .list_conversation_turn_activity(
+                "other-workspace",
+                &a.conversation_id,
+                &a.turn_id,
+                0,
+                50
+            )
+            .expect("scoped")
+            .is_empty()
+    );
+    assert!(
+        a.store
+            .list_conversation_turn_activity(WORKSPACE_ID, &a.conversation_id, &a.turn_id, 1, 50)
+            .expect("ordinal")
+            .is_empty()
+    );
 
     // Always REPORTED, and rows cannot be rewritten into something else.
     let attribution: String = a
         .connection()
-        .query_row("SELECT attribution FROM conversation_turn_activity_records WHERE sequence=1", [], |row| row.get(0))
+        .query_row(
+            "SELECT attribution FROM conversation_turn_activity_records WHERE sequence=1",
+            [],
+            |row| row.get(0),
+        )
         .expect("attribution");
     assert_eq!(attribution, "REPORTED");
-    assert!(a.connection().execute("UPDATE conversation_turn_activity_records SET status='FAILED'", []).is_err());
-    assert!(a.connection().execute("UPDATE conversation_turn_activity_records SET attribution='EFFECT'", []).is_err());
+    assert!(
+        a.connection()
+            .execute(
+                "UPDATE conversation_turn_activity_records SET status='FAILED'",
+                []
+            )
+            .is_err()
+    );
+    assert!(
+        a.connection()
+            .execute(
+                "UPDATE conversation_turn_activity_records SET attribution='EFFECT'",
+                []
+            )
+            .is_err()
+    );
 
     // Invalid shapes are refused before any write.
-    assert!(a.store.append_conversation_turn_activity(record(0, "TOOL", "STARTED", "bash")).is_err());
-    assert!(a.store.append_conversation_turn_activity(record(1, "EFFECT", "STARTED", "bash")).is_err(), "closed kind set");
-    assert!(a.store.append_conversation_turn_activity(record(3, "TOOL", "STARTED", &"x".repeat(129))).is_err());
+    assert!(
+        a.store
+            .append_conversation_turn_activity(record(0, "TOOL", "STARTED", "bash"))
+            .is_err()
+    );
+    assert!(
+        a.store
+            .append_conversation_turn_activity(record(1, "EFFECT", "STARTED", "bash"))
+            .is_err(),
+        "closed kind set"
+    );
+    assert!(
+        a.store
+            .append_conversation_turn_activity(record(3, "TOOL", "STARTED", &"x".repeat(129)))
+            .is_err()
+    );
 }

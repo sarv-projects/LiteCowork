@@ -66,7 +66,8 @@ use storage_core::{
 use zeroize::Zeroizing;
 
 /// Removes the v28 and v29 objects and receipts so a fixture can return to the v27 boundary.
-pub(crate) const DOWNGRADE_V29_TO_V27_SQL: &str = "DROP TABLE IF EXISTS conversation_owner_side_notes;
+pub(crate) const DOWNGRADE_V29_TO_V27_SQL: &str =
+    "DROP TABLE IF EXISTS conversation_owner_side_notes;
              DROP TABLE IF EXISTS conversation_control_events;
              DELETE FROM schema_migrations WHERE version = 32;
              DROP TABLE IF EXISTS conversation_history_state;

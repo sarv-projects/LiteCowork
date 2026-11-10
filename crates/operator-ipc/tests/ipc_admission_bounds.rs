@@ -70,7 +70,9 @@ fn ipc_admission_bounds_combined_bodies_over_the_in_flight_limit_are_refused() {
     // 100 MiB (the per-frame maximum) plus 28 MiB fills the 128 MiB budget exactly.
     let first = budget.reserve_bytes(MAX_BODY_BYTES).expect("first body");
     let rest = DEFAULT_MAX_IN_FLIGHT_BODY_BYTES - MAX_BODY_BYTES;
-    let second = budget.reserve_bytes(rest).expect("second body fits exactly");
+    let second = budget
+        .reserve_bytes(rest)
+        .expect("second body fits exactly");
     assert!(matches!(
         budget.reserve_bytes(1),
         Err(ProtocolError::CapacityExceeded)
@@ -81,7 +83,9 @@ fn ipc_admission_bounds_combined_bodies_over_the_in_flight_limit_are_refused() {
         Err(ProtocolError::LimitExceeded)
     ));
     drop(first);
-    let again = budget.reserve_bytes(1).expect("released bytes are reusable");
+    let again = budget
+        .reserve_bytes(1)
+        .expect("released bytes are reusable");
     drop((second, again));
     budget
         .reserve_bytes(MAX_BODY_BYTES)
@@ -167,13 +171,13 @@ fn ipc_admission_bounds_eight_concurrent_peers_get_uninterleaved_correlated_resp
                 let request = connection.read_request(&budget).await.expect("request");
                 let id = request.header.request_id.clone();
                 let body = request.body().to_vec();
-                let response = ResponseFrame::new(
-                    response_header(&id, body.len() as u64),
-                    body,
-                    &budget,
-                )
-                .expect("response frame");
-                connection.write_response(&response).await.expect("responds");
+                let response =
+                    ResponseFrame::new(response_header(&id, body.len() as u64), body, &budget)
+                        .expect("response frame");
+                connection
+                    .write_response(&response)
+                    .await
+                    .expect("responds");
                 // Hold the slot until the client has consumed the response.
                 let _ = connection.wait_for_stream_disconnect().await;
             }));

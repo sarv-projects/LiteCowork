@@ -205,7 +205,8 @@ fn encode_with_budget(
     let transcript = serde_json::to_string(&Transcript {
         conversation_id: &package.conversation_id,
         through_message_id: &package.through_message_id,
-        notice: (package.omitted_message_count > 0).then(|| omission_notice(package.omitted_message_count)),
+        notice: (package.omitted_message_count > 0)
+            .then(|| omission_notice(package.omitted_message_count)),
         messages,
     })
     .map_err(|_| ConversationPromptError::InvalidContext)?;
@@ -359,10 +360,26 @@ mod tests {
     fn long_package(count: usize, text_len: usize) -> ConversationContextPackage {
         let mut messages = Vec::new();
         for index in 0..count {
-            let (role, binding) = if index % 2 == 0 { ("USER", None) } else { ("AGENT", Some("binding-a")) };
-            messages.push(message(&format!("m{index:05}"), role, &"x".repeat(text_len), binding, json!([])));
+            let (role, binding) = if index % 2 == 0 {
+                ("USER", None)
+            } else {
+                ("AGENT", Some("binding-a"))
+            };
+            messages.push(message(
+                &format!("m{index:05}"),
+                role,
+                &"x".repeat(text_len),
+                binding,
+                json!([]),
+            ));
         }
-        messages.push(message("user-current", "USER", "current request", None, json!([])));
+        messages.push(message(
+            "user-current",
+            "USER",
+            "current request",
+            None,
+            json!([]),
+        ));
         ConversationContextPackage {
             conversation_id: "conversation-one".to_owned(),
             target_agent_binding_id: "binding-b".to_owned(),
@@ -375,30 +392,50 @@ mod tests {
     #[test]
     fn conversation_context_dispatch_window_leaves_a_package_that_fits_unchanged() {
         let input = package();
-        let (out, reduction) = window_conversation_context(input.clone(), MAX_NATIVE_CONVERSATION_INPUT_BYTES)
-            .expect("fits");
+        let (out, reduction) =
+            window_conversation_context(input.clone(), MAX_NATIVE_CONVERSATION_INPUT_BYTES)
+                .expect("fits");
         assert_eq!(out, input);
         assert_eq!(reduction, None);
         // Exactly at the budget is accepted; one byte under that budget is not.
-        let exact = encode_conversation_context_prompt(&input).expect("encode").len();
-        assert!(window_conversation_context(input.clone(), exact).expect("exact").1.is_none());
+        let exact = encode_conversation_context_prompt(&input)
+            .expect("encode")
+            .len();
+        assert!(
+            window_conversation_context(input.clone(), exact)
+                .expect("exact")
+                .1
+                .is_none()
+        );
         let one_over = window_conversation_context(input, exact - 1);
-        assert_eq!(one_over.map(|(_, r)| r.is_some()), Ok(true), "one byte over reduces, never truncates silently");
+        assert_eq!(
+            one_over.map(|(_, r)| r.is_some()),
+            Ok(true),
+            "one byte over reduces, never truncates silently"
+        );
     }
 
     #[test]
     fn conversation_context_dispatch_window_keeps_recent_messages_with_a_visible_notice() {
         // About 400 KiB of history against the 256 KiB budget.
         let input = long_package(100, 4_000);
-        let (out, reduction) = window_conversation_context(input.clone(), MAX_NATIVE_CONVERSATION_INPUT_BYTES)
-            .expect("reduces");
+        let (out, reduction) =
+            window_conversation_context(input.clone(), MAX_NATIVE_CONVERSATION_INPUT_BYTES)
+                .expect("reduces");
         let reduction = reduction.expect("reduction receipt");
         assert!(reduction.omitted_messages > 0);
         assert_eq!(out.omitted_message_count, reduction.omitted_messages);
-        assert_eq!(out.messages.last().expect("current").message_id, "user-current");
+        assert_eq!(
+            out.messages.last().expect("current").message_id,
+            "user-current"
+        );
         // The kept messages are the newest contiguous suffix.
         let first_kept = &out.messages[0].message_id;
-        let position = input.messages.iter().position(|m| &m.message_id == first_kept).expect("kept");
+        let position = input
+            .messages
+            .iter()
+            .position(|m| &m.message_id == first_kept)
+            .expect("kept");
         assert_eq!(input.messages.len() - position, out.messages.len());
         assert_eq!(position as u32, reduction.omitted_messages);
         let prompt = encode_conversation_context_prompt(&out).expect("encodes within budget");
@@ -409,7 +446,8 @@ mod tests {
         assert!(prompt.len() <= MAX_NATIVE_CONVERSATION_INPUT_BYTES / 100 * 80);
         assert_eq!(reduction.prompt_bytes, prompt.len());
         // Deterministic: the same input reduces to the same window.
-        let (again, _) = window_conversation_context(input, MAX_NATIVE_CONVERSATION_INPUT_BYTES).expect("again");
+        let (again, _) =
+            window_conversation_context(input, MAX_NATIVE_CONVERSATION_INPUT_BYTES).expect("again");
         assert_eq!(again, out);
     }
 
@@ -417,7 +455,8 @@ mod tests {
     fn conversation_context_dispatch_window_refuses_when_the_current_message_cannot_fit() {
         let mut input = long_package(3, 100);
         let last = input.messages.len() - 1;
-        input.messages[last].content = json!([{"kind":"TEXT","text":"y".repeat(MAX_NATIVE_CONVERSATION_INPUT_BYTES)}]);
+        input.messages[last].content =
+            json!([{"kind":"TEXT","text":"y".repeat(MAX_NATIVE_CONVERSATION_INPUT_BYTES)}]);
         assert_eq!(
             window_conversation_context(input, MAX_NATIVE_CONVERSATION_INPUT_BYTES).map(|_| ()),
             Err(ConversationPromptError::InputTooLarge)
@@ -428,10 +467,14 @@ mod tests {
     fn conversation_context_dispatch_window_counts_messages_the_store_already_omitted() {
         let mut input = package();
         input.omitted_message_count = 5;
-        let (out, reduction) = window_conversation_context(input, MAX_NATIVE_CONVERSATION_INPUT_BYTES)
-            .expect("fits");
+        let (out, reduction) =
+            window_conversation_context(input, MAX_NATIVE_CONVERSATION_INPUT_BYTES).expect("fits");
         let reduction = reduction.expect("store omission is reported");
         assert_eq!(reduction.omitted_messages, 5);
-        assert!(encode_conversation_context_prompt(&out).expect("encode").contains("Messages 1..5 omitted"));
+        assert!(
+            encode_conversation_context_prompt(&out)
+                .expect("encode")
+                .contains("Messages 1..5 omitted")
+        );
     }
 }
