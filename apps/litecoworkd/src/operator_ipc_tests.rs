@@ -8074,3 +8074,132 @@ async fn workspace_archive_unix_ipc_blocker_is_fail_closed_without_writes() {
     );
     drop(store);
 }
+
+#[tokio::test]
+async fn conversation_turn_delta_stream_forwards_only_the_subscribed_conversation_frames() {
+    use futures_util::StreamExt;
+    use rusqlite::Connection;
+
+    const OWNER: &str = "ipc-delta-stream-owner";
+    const WORKSPACE: &str = "ipc-delta-stream-workspace";
+    const MINE: &str = "ipc-delta-stream-mine";
+    const OTHER: &str = "ipc-delta-stream-other";
+    const RUNTIME: &str = "ipc-delta-stream-runtime";
+    const NOW: &str = "2026-10-11T12:00:00.000000000Z";
+
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))
+        .expect("private directory");
+    let database = directory.path().join("state.sqlite3");
+    let store = SqliteWorkspaceStore::open(
+        &database,
+        Arc::new(FileBlobStore::new(
+            directory.path().join("blobs"),
+            IpcReplayTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("real SQLite store opens");
+    WorkspaceService::new(store.clone())
+        .create(CreateWorkspace {
+            workspace_id: WORKSPACE.to_owned(),
+            name: "Delta stream fixture".to_owned(),
+            owner_principal_id: OWNER.to_owned(),
+            event: EventContext {
+                event_id: "ipc-delta-stream-workspace-event".to_owned(),
+                origin_runtime_id: RUNTIME.to_owned(),
+                hlc_timestamp: NOW.to_owned(),
+                correlation_id: "ipc-delta-stream-correlation".to_owned(),
+                causation_id: None,
+                recorded_at: NOW.to_owned(),
+            },
+        })
+        .expect("Workspace commits");
+    let connection = Connection::open(&database).expect("fixture database opens");
+    for conversation_id in [MINE, OTHER] {
+        connection
+            .execute(
+                "INSERT INTO conversations(conversation_id,workspace_id,created_at) VALUES(?1,?2,?3)",
+                rusqlite::params![conversation_id, WORKSPACE, NOW],
+            )
+            .expect("Conversation fixture persists");
+    }
+    drop(connection);
+
+    let (_shutdown_sender, shutdown_receiver) = tokio::sync::watch::channel(false);
+    let router = Router::new()
+        .route("/v1/stream", post(subscribe_stream))
+        .with_state(StreamApiState {
+            store: store.clone(),
+            principal_id: OWNER.to_owned(),
+            runtime_id: RUNTIME.to_owned(),
+            local_incarnation_id: "ipc-delta-stream-incarnation".to_owned(),
+            runtime_inventory_revision: Arc::new(std::sync::atomic::AtomicU64::new(1)),
+            stream_admission: Arc::new(tokio::sync::Semaphore::new(1)),
+            stream_shutdown: shutdown_receiver,
+            task_stream_test_gate: None,
+            task_stream_snapshot_test_gate: None,
+        });
+    let subscription = json!({
+        "workspace_id": WORKSPACE,
+        "conversation_ids": [MINE],
+        "projection_types": ["conversation_presentation"]
+    });
+    let response = router
+        .oneshot(
+            Request::post("/v1/stream")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header("x-workspace-id", WORKSPACE)
+                .extension(AuthenticatedLocalPeer)
+                .body(Body::from(serde_json::to_vec(&subscription).expect("subscription")))
+                .expect("stream request"),
+        )
+        .await
+        .expect("stream route responds");
+    assert_eq!(response.status(), StatusCode::OK);
+    let mut body = response.into_body().into_data_stream();
+    let mut kinds = Vec::new();
+    while kinds.len() < 2 {
+        let chunk = tokio::time::timeout(Duration::from_secs(5), body.next())
+            .await
+            .expect("initial frame arrives")
+            .expect("stream open")
+            .expect("frame bytes");
+        let frame: Value = serde_json::from_slice(&chunk).expect("frame json");
+        kinds.push(frame["type"].as_str().expect("frame type").to_owned());
+    }
+    assert_eq!(kinds, ["stream.ready", "projection"]);
+
+    let frame = |conversation: &str, sequence: u64, text: &str| {
+        crate::transient_frames::TransientFrame {
+            workspace_id: WORKSPACE.to_owned(),
+            conversation_id: conversation.to_owned(),
+            bytes: serde_json::to_vec(&json!({
+                "type": "turn.delta",
+                "workspace_id": WORKSPACE,
+                "conversation_id": conversation,
+                "turn_id": "turn-1",
+                "retry_ordinal": 0,
+                "sequence": sequence,
+                "text_delta": text,
+            }))
+            .expect("delta json"),
+        }
+    };
+    let bus = crate::transient_frames::transient_bus();
+    bus.publish(frame(OTHER, 1, "not mine"));
+    bus.publish(frame(MINE, 1, "hello"));
+    let chunk = tokio::time::timeout(Duration::from_secs(5), body.next())
+        .await
+        .expect("delta arrives")
+        .expect("stream open")
+        .expect("frame bytes");
+    let delta: Value = serde_json::from_slice(&chunk).expect("delta json");
+    assert_eq!(delta["type"], "turn.delta");
+    assert_eq!(delta["conversation_id"], MINE);
+    assert_eq!(delta["text_delta"], "hello");
+    assert_eq!(delta["retry_ordinal"], 0);
+}

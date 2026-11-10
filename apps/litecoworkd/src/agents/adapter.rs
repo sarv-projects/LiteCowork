@@ -62,6 +62,16 @@ pub(crate) struct StreamBudget {
     pub quiescence_timeout: Duration,
 }
 
+/// Receives each normalized event of a driven turn, on the drive thread, so transient
+/// presentation frames and REPORTED activity can be derived without the adapter knowing
+/// about the Operator (001-T13, T25). Implementations must never block: the native read
+/// loop calls them inline.
+pub(crate) trait TurnObserver: Send {
+    fn on_event(&mut self, event: &NormalizedAgentEvent);
+    /// Called once when the drive loop ends, whatever the outcome.
+    fn finish(&mut self);
+}
+
 /// Cooperative per-turn Stop signal shared between the Operator-facing supervisor
 /// handle and the blocking drive loop (001-T07). Setting it is a request, not a
 /// settlement: only observed quiescence settles a cancelled turn.
@@ -448,6 +458,7 @@ pub(crate) struct OpenCodeAdapter {
     /// reported as observability facts after the stream ends.
     last_counters: NormalizerCounters,
     cancel: Option<CancelSignal>,
+    observer: Option<Box<dyn TurnObserver>>,
 }
 
 impl OpenCodeAdapter {
@@ -456,12 +467,19 @@ impl OpenCodeAdapter {
             server,
             last_counters: NormalizerCounters::default(),
             cancel: None,
+            observer: None,
         }
     }
 
     /// Attach the per-turn Stop signal the drive loop observes.
     pub(crate) fn with_cancel(mut self, cancel: CancelSignal) -> Self {
         self.cancel = Some(cancel);
+        self
+    }
+
+    /// Attach the per-turn observer that sees every normalized event.
+    pub(crate) fn with_observer(mut self, observer: Box<dyn TurnObserver>) -> Self {
+        self.observer = Some(observer);
         self
     }
 
@@ -536,14 +554,18 @@ impl AgentAdapter for OpenCodeAdapter {
         let mut normalizer = OpenCodeEventNormalizer::new(native_session_id);
         let cancel = self.cancel.clone();
         let server = &mut self.server;
-        let observation = drive_opencode_stream_cancellable(
+        let observation = drive_opencode_stream_observed(
             &mut stream,
             &mut normalizer,
             budget,
             Instant::now(),
             cancel.as_ref(),
             &mut || server.abort_session(native_session_id).unwrap_or(false),
+            self.observer.as_deref_mut().map(|o| o as &mut dyn TurnObserver),
         );
+        if let Some(observer) = self.observer.as_deref_mut() {
+            observer.finish();
+        }
         self.last_counters = normalizer.counters();
         observation
     }
@@ -621,6 +643,21 @@ fn drive_opencode_stream_cancellable<S: RawEventSource>(
     cancel: Option<&CancelSignal>,
     interrupt: &mut dyn FnMut() -> bool,
 ) -> Result<TurnObservation, TurnFailure> {
+    drive_opencode_stream_observed(
+        stream, normalizer, budget, started_at, cancel, interrupt, None,
+    )
+}
+
+/// The cancellable drive loop that also feeds every normalized event to `observer`.
+fn drive_opencode_stream_observed<S: RawEventSource>(
+    stream: &mut S,
+    normalizer: &mut OpenCodeEventNormalizer,
+    budget: StreamBudget,
+    started_at: Instant,
+    cancel: Option<&CancelSignal>,
+    interrupt: &mut dyn FnMut() -> bool,
+    mut observer: Option<&mut dyn TurnObserver>,
+) -> Result<TurnObservation, TurnFailure> {
     let hard_deadline = started_at + budget.hard_ceiling;
     let mut idle_deadline = started_at + budget.idle_timeout;
     let mut quiescence_deadline: Option<Instant> = None;
@@ -658,7 +695,11 @@ fn drive_opencode_stream_cancellable<S: RawEventSource>(
                 // idle watchdog so a busy-but-noisy stream is not cut off.
                 idle_deadline = Instant::now() + budget.idle_timeout;
                 let event_type = event.event_type.as_deref();
-                match normalizer.normalize(event_type, &event.data) {
+                let normalized = normalizer.normalize(event_type, &event.data);
+                if let (Some(observer), Some(normalized)) = (observer.as_deref_mut(), &normalized) {
+                    observer.on_event(normalized);
+                }
+                match normalized {
                     Some(NormalizedAgentEvent::TextDelta { text }) => {
                         saw_text = true;
                         answer_text.push_str(&text);
@@ -833,6 +874,38 @@ mod selected_adapter_conversation_opencode_turn_fixture_tests {
                 None => Err(OpenCodeError::StreamClosed),
             }
         }
+    }
+
+    #[test]
+    fn conversation_turn_delta_fixture_stream_publishes_the_answer_without_reasoning() {
+        use crate::transient_frames::{TransientFrameBus, TurnFramePublisher};
+        // A private bus keeps this test independent of the process-wide one.
+        let bus = TransientFrameBus::for_tests();
+        let mut rx = bus.subscribe();
+        let mut publisher = TurnFramePublisher::new(bus, "ws", "conv", "turn", 0);
+        let mut source = FixtureSource::from_fixture();
+        let mut normalizer = OpenCodeEventNormalizer::new(FIXTURE_SESSION);
+        let observation = drive_opencode_stream_observed(
+            &mut source,
+            &mut normalizer,
+            StreamBudget::default(),
+            Instant::now(),
+            None,
+            &mut || false,
+            Some(&mut publisher),
+        )
+        .expect("fixture drives to completion");
+        publisher.finish();
+        let TurnObservation::Completed { answer_text } = observation else {
+            panic!("expected Completed");
+        };
+        let mut streamed = String::new();
+        while let Ok(frame) = rx.try_recv() {
+            let value: Value = serde_json::from_slice(&frame.bytes).expect("frame json");
+            streamed.push_str(value["text_delta"].as_str().expect("delta text"));
+        }
+        assert_eq!(streamed, answer_text, "transient text equals the committed answer");
+        assert!(!streamed.contains("REASONING"));
     }
 
     #[test]

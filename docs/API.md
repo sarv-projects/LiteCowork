@@ -2322,8 +2322,9 @@ origin frontier from the same SQLite read transaction as their projected records
 inventory sends closed invalidation notifications, and consumers reread the authorized
 offers route for current state. The shared subscription schema retains the broader planned
 envelope and can validate combinations the local route does not serve. The schema-defined
-transient `turn.delta`, `turn.settled`, and `rich.draft` frame types are not emitted by the
-local Operator yet. This implementation status does not narrow the planned stream contract
+transient `turn.delta` and `turn.settled` frames are emitted by the local Operator on the
+single-Conversation projection stream from a bounded in-memory ring (256 frames; a slow reader loses the
+oldest frames and sees a sequence gap); `rich.draft` is not emitted yet. This implementation status does not narrow the planned stream contract
 above.
 
 While a Conversation turn is active, the stream may also deliver bounded transient

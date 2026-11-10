@@ -363,6 +363,20 @@ impl AgentSessionSupervisor {
                 &cancel,
             );
 
+            // Transient presentation control frame: a committed message supersedes the
+            // transient text; any other end leaves it marked incomplete in the UI.
+            {
+                let committed = matches!(run_res, Ok(TurnOutcome::Committed))
+                    .then(|| format!("msg-agent-{turn_id}-{}", turn.retry_ordinal));
+                crate::transient_frames::TurnFramePublisher::new(
+                    crate::transient_frames::transient_bus().clone(),
+                    &workspace,
+                    &conversation,
+                    &turn_id,
+                    turn.retry_ordinal,
+                )
+                .settle(committed.as_deref());
+            }
             match run_res {
                 Ok(_outcome) => {}
                 Err(err) => {
@@ -782,7 +796,15 @@ fn execute_agent_turn(
             // Drive the native boundary through the provider-neutral AgentAdapter
             // (001-T04) rather than hand-parsing SSE. The OpenCode v2 HTTP path is
             // the one non-ACP adapter; it owns the server for the life of the turn.
-            let mut adapter = OpenCodeAdapter::new(server).with_cancel(cancel.clone());
+            let mut adapter = OpenCodeAdapter::new(server)
+                .with_cancel(cancel.clone())
+                .with_observer(Box::new(crate::transient_frames::TurnFramePublisher::new(
+                    crate::transient_frames::transient_bus().clone(),
+                    workspace_id,
+                    conversation_id,
+                    turn_id,
+                    retry_ordinal,
+                )));
 
             // Phase 1: version/capability probe (B-03). A failed probe is a typed
             // FAILED turn with the USER message kept and no fallback (AC-015).
