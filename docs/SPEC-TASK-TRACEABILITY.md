@@ -110,7 +110,7 @@ A task is traced to a test only when its TASKS.md status line says so. Snapshot 
 | 019 | CI skeleton, CODEOWNERS, secret scan, CSP audit, release schemas, matrix, evidence bundle, Linux deb config and scripts, updater UI reducer | B-43 and B-44 items DEFERRED; CI never ran on GitHub; no deb built |
 | 004 to 010, 015 to 018, 020 | Pre-existing foundations only | Not started; see each TASKS.md |
 
-Test baselines at this snapshot: `cargo test -p litecowork-storage-sqlite --lib` 624 pass; `cargo test -p litecoworkd --bin litecoworkd` 656 pass, 1 ignored; UI `pnpm test` 5 pre-existing failures; served routes 178 / 1 local-only / 53 target-only; `SCHEMA_VERSION` 32. Full per-task detail: [CURRENT-RUN.md](../CURRENT-RUN.md) "Handoff status by package".
+Test baselines at this snapshot: `cargo test -p storage-sqlite --lib` 624 pass; `cargo test -p litecoworkd --bin litecoworkd` 656 pass, 1 ignored; UI `pnpm test` 5 pre-existing failures; served routes 178 / 1 local-only / 53 target-only; `SCHEMA_VERSION` 32. Full per-task detail: [CURRENT-RUN.md](../CURRENT-RUN.md) "Handoff status by package".
 
 ## .specify templates (copy source for new packages)
 

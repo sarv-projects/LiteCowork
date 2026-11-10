@@ -266,7 +266,7 @@ Evidence class is CODE or SERVED unless stated; nothing is INTEGRATED with a liv
 - **Feature 003:** Linux workspace root lifecycle storage tests only (`workspace_root_lifecycle_tests.rs`). Windows root tasks are DEFERRED to the owner's Windows laptop.
 - **Feature 013:** DEFERRED in full by the owner (LiteSPM). Discover still returns the truthful `LITESPM_PACKAGE_SERVICE_NOT_QUALIFIED` unavailable state.
 - **Runtime:** when the Operator endpoint fails after READY the daemon now records DEGRADED with blocker `OPERATOR_ENDPOINT_FAILED` before exiting nonzero (previously durable and local state stayed READY).
-- **Linux baselines:** `cargo test -p litecowork-storage-sqlite --lib` 624 pass; `cargo test -p litecoworkd --bin litecoworkd` 656 pass, 1 ignored; UI `pnpm test` 5 pre-existing failures. `src-tauri` is not buildable in the authoring sandbox (gdk-3.0 missing); toolchain 1.92.0 versus pinned 1.98.1; CI has never run on GitHub.
+- **Linux baselines:** `cargo test -p storage-sqlite --lib` 624 pass; `cargo test -p litecoworkd --bin litecoworkd` 656 pass, 1 ignored; UI `pnpm test` 5 pre-existing failures. `src-tauri` is not buildable in the authoring sandbox (gdk-3.0 missing); toolchain 1.92.0 versus pinned 1.98.1; CI has never run on GitHub.
 - **Owner decisions (register A-62):** B-38, D-01, B-45, B-39, B-40, B-41, the B-31 follow-up class, CONNECTOR_EVENT and E2E-14 to E2E-17 accepted; all of 013, every Windows row and release-dependent rows (B-43, B-44, packaging, release-matrix qualification) deferred; B-42, the B-19 follow-up, P-38 and housekeeping open.
 
 ## Test and validation evidence
