@@ -50,10 +50,12 @@ The composed Operator router is built in apps/litecoworkd/src/operator.rs and me
 The inventory currently records:
 
 - 178 OpenAPI operations registered by the composed Operator router.
-- One authenticated local-only workspace-root selection route outside OpenAPI.
+- Four routes served outside OpenAPI: POST /v1/stream (local Operator stream transport) and the three Feature 014 Conversation routes PATCH /v1/conversations/{conversation_id}, POST /v1/conversations/{conversation_id}/archive and POST /v1/conversations/{conversation_id}/unarchive. They are served but not yet in the OpenAPI document, which is contract-promotion debt rather than product qualification.
 - 53 OpenAPI operations that remain target-only and are not registered by the daemon router.
 
 002 update (2026-11-10, CODE/SERVED only): `beginAgentAuthentication` and `openAgentNativeConfiguration` are registered but fail closed for every V1 module (no declared method or target, unqualified launcher and opener); the credential route still returns 503 (no durable replay receipt); Matchmaker ranking exists as an engine only. See specs/002-native-agent-install-auth-binding/TASKS.md.
+
+014/016 update (2026-11-10, CODE, SERVED and contract level): the three Feature 014 Conversation routes are served by `apps/litecoworkd/src/conversation_operator.rs` (PATCH /v1/conversations/{conversation_id} for rename, POST .../archive and POST .../unarchive, each requiring `If-Match` and `Idempotency-Key`, plus a `status` query on the list route), which is why the inventory counts four routes outside OpenAPI. The 016 RichPresentation validator pair now agrees: the storage validator accepts the same five V1 block kinds as the desktop validator under one 512 KiB document cap that the served wire schema carries too, and a TABLE cell is compared with ECMAScript number formatting. No desktop UI, rendered test or live agent run covers either change, so nothing here is INTEGRATED or QUALIFIED.
 
 This is a route-registration inventory, not a claim that 178 product capabilities are fully integrated. Individual handlers may deliberately fail closed, return a read-only projection, expose a readiness check, or persist only a pre-execution record. A route count must never be substituted for a qualified-feature count.
 

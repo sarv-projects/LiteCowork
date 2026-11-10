@@ -107,9 +107,11 @@ def main() -> int:
         errors.append(
             f"OpenAPI/served inventory mismatch: {openapi_count} != {served_count}+{target_count}"
         )
-    if (served_count, outside_count, target_count) != (178, 1, 53):
+    # Four routes are served outside OpenAPI until the Feature 014 Conversation contracts and
+    # the pre-existing POST /v1/stream are promoted into operator-api.openapi.yaml.
+    if (served_count, outside_count, target_count) != (178, 4, 53):
         errors.append(
-            f"Composed route count drift: {(served_count, outside_count, target_count)}"
+            f"Composed route count drift: {(served_count, outside_count, target_count)}, expected (178, 4, 53)"
         )
     for required in ("Conversation", "Task", "Coworker", "Automation", "Discover",
                      "Library", "Workbench", "Settings"):

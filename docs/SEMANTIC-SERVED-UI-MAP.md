@@ -11,7 +11,7 @@ The machine inventory is docs/schemas/served-route-inventory.json, generated fro
 | Surface | Count | Meaning |
 |---|---:|---|
 | OpenAPI operations registered in the composed production Operator router | 178 | Method/path is registered by the composed router |
-| Authenticated local-only operation outside OpenAPI | 1 | POST /v1/stream; local Operator stream transport |
+| Routes served outside OpenAPI | 4 | POST /v1/stream (local Operator stream transport), plus the three Feature 014 Conversation routes served before their OpenAPI contracts are promoted: PATCH /v1/conversations/{conversation_id}, POST /v1/conversations/{conversation_id}/archive and POST /v1/conversations/{conversation_id}/unarchive |
 | OpenAPI operations not registered in the composed production router | 53 | Target contract only; do not call as live operations |
 
 A registered route is not proof that a handler performs a consequential operation. Some routes are read-only projections; some intentionally fail closed; some persist a definition but do not dispatch a provider. Assess three separate layers:

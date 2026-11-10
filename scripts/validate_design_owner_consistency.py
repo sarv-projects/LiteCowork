@@ -110,8 +110,12 @@ try:
         len(inventory.get("served_outside_openapi", [])),
         len(inventory.get("target_only", [])),
     )
-    if counts != (178, 1, 53):
-        issues.append(f"SERVED INVENTORY count drift: {counts}, expected (178, 1, 53)")
+    # The fourth outside-OpenAPI route count is deliberate: Feature 014 serves PATCH
+    # /v1/conversations/{conversation_id}, POST .../archive and POST .../unarchive before their
+    # OpenAPI contracts are promoted, alongside the pre-existing POST /v1/stream. Regenerate with
+    # scripts/audit_served_routes.py --write and re-run this guard after any route change.
+    if counts != (178, 4, 53):
+        issues.append(f"SERVED INVENTORY count drift: {counts}, expected (178, 4, 53)")
 except (OSError, json.JSONDecodeError) as exc:
     issues.append(f"SERVED INVENTORY unreadable: {exc}")
 
