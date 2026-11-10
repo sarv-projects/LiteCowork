@@ -39,7 +39,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 - **Depends on:** T01
 - **Cross-package prerequisites:** Feature 001 single-flight storage task (T11 in that package) and its migration.
 - **Owner:** Storage, Conversation.
-- **Allowed paths:** `docs/schemas/sqlite-v30.sql` (new; take the next free number after Feature 001 migrations), `crates/storage-core/src/conversation.rs`, `crates/storage-core/src/lib.rs`, `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/lib.rs`, `crates/storage-sqlite/src/conversation_coedit_tests.rs` (new).
+- **Allowed paths:** `docs/schemas/sqlite-v32.sql` (shipped), `crates/storage-core/src/conversation.rs`, `crates/storage-core/src/lib.rs`, `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/lib.rs`, `crates/storage-sqlite/src/conversation_coedit_tests.rs` (new).
 - **Contract:** SPEC 7.2, DATA-MODEL; AC-002, AC-003, AC-005, AC-006, AC-009.
 - **Change intent:** add `conversation_control_events` (append-only, workspace and conversation scoped, turn id, kind, occurred_at); a store method that settles the turn CANCELLED (`TurnCommand::SettleCancelled`) and appends `OWNER_TOOK_CONTROL` in one IMMEDIATE transaction with receipt; a side-note insert that checks the correlated turn is nonterminal and the body is within the limit inside the same transaction; neither path creates a turn.
 - **Acceptance:**

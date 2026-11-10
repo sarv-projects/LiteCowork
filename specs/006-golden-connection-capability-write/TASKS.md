@@ -132,7 +132,7 @@ Gaps to V1: recipe decision, Connection aggregate and service, keystore custody 
 - **Depends on:** T01
 - **Cross-package prerequisites:** 005 Trust wiring (removal of `trust` dead code) and Attempt admission, because Invocation dispatch rechecks lease and Trust decision
 - **Owner:** Storage, Capability Fabric
-- **Allowed paths:** `docs/schemas/sqlite-v29.sql` (same migration as T01 or the next one), `crates/storage-sqlite/src/capability_dispatch.rs`, `crates/storage-sqlite/src/invocations.rs`, `crates/storage-sqlite/src/invocation_dispatch_migration_tests.rs`, `crates/storage-core/src/capability_invocation.rs`
+- **Allowed paths:** `docs/schemas/sqlite-v40.sql` (same migration as T01), `crates/storage-sqlite/src/capability_dispatch.rs`, `crates/storage-sqlite/src/invocations.rs`, `crates/storage-sqlite/src/invocation_dispatch_migration_tests.rs`, `crates/storage-core/src/capability_invocation.rs`
 - **Contract:** CAPABILITY-INVOCATIONS; SPEC §6 ("External dispatch waits until one transaction rechecks owner, lease, grant, activation, Trust decision, and exact ApprovalUse"); AC-004, AC-005, AC-007
 - **Change intent:** Replace the two v15 triggers with guards that allow INSERT and the `CREATED -> DISPATCHED` transition only when the same transaction writes the matching ApprovalUse/Effect rows (for example a trigger that checks a per-transaction admission marker row written by `admit_transaction`). Direct `transition` to DISPATCHED through `SqliteCapabilityInvocationStore` stays refused with `INVOCATION_DISPATCH_ADMISSION_UNAVAILABLE`.
 - **Acceptance:**
