@@ -113,7 +113,7 @@ export function buildActivityCards(entries: readonly ActivityEntry[]): ActivityC
     const summary = state === "RUNNING" ? "Reported by the agent: running"
       : state === "SUCCEEDED" ? "Reported by the agent: finished"
       : state === "FAILED" ? "Reported by the agent: failed"
-      : state === "ASKED" ? "Reported by the agent: asked you a question"
+      : state === "ASKED" ? "Reported by the agent: the agent asked for permission. LiteCowork is not asking and cannot relay your answer yet, so the agent's own default applies"
       : "Reported by the agent";
     cards.push({ key: `${entry.sequence}`, title: titleFor(entry), state, summary });
   }

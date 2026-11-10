@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 364
-- Included lines: 72657
-- Included bytes: 6413806
+- Included lines: 72682
+- Included bytes: 6424157
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,10 +25,10 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 144 | 48389 |
-| repository root | 6 | 1681 |
+| docs/ | 144 | 48393 |
+| repository root | 6 | 1682 |
 | scripts/ | 1 | 14 |
-| specs/ | 201 | 21793 |
+| specs/ | 201 | 21813 |
 
 ## Complete file manifest
 
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 81 | 6032 | 2fc07511243a861e |
-| CURRENT-RUN.md | 295 | 43600 | 35cb851ca3b18e54 |
+| CURRENT-RUN.md | 296 | 44031 | e8b5d03c5e869f79 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 92 | 7389 | 5a5a73e85c542f17 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -70,7 +70,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
 | docs/CONTEXT.md | 272 | 19955 | f80c31cda1a4c7aa |
-| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 171 | 77263 | 570b8027db6b3a0b |
+| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 171 | 77894 | de728b80aa8f2b08 |
 | docs/COVERAGE-MATRIX.md | 174 | 25381 | 9a370eb0721ef07c |
 | docs/COWORKER-FLOWS.md | 166 | 20076 | 309015aa4fe4a14a |
 | docs/COWORKERS-TARGET.md | 456 | 58061 | 3afdfb6005644afe |
@@ -80,7 +80,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 24e98ff769f90585 |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 6c4bf09eb06991b9 |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
 | docs/EVENTS.md | 929 | 69386 | e4aae09464d8030b |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
@@ -89,7 +89,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 309 | 62130 | 0be7a85044004a38 |
+| docs/IMPLEMENTATION-STATUS.md | 313 | 63498 | 2b4755fa36488931 |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
@@ -154,7 +154,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/V1-REFERENCE-OMNIROUTE-OMNIRUSH-TERMINAL.md | 63 | 8162 | 21ee35867ca419f1 |
 | docs/V1-SETTINGS-CONTRACT-LEDGER.md | 235 | 58827 | 86e6b14097d318d3 |
 | docs/V1-TELEMETRY-USAGE-RESILIENCE-LLD.md | 351 | 37853 | 375da7f1482fe2da |
-| docs/V1-UI-ACTION-STATE-LEDGER.md | 62 | 12248 | d80a0bb4134daaea |
+| docs/V1-UI-ACTION-STATE-LEDGER.md | 62 | 12448 | 5d2c01ad37b7d5c9 |
 | docs/V1-UI-SCREEN-CONTRACT.md | 368 | 49901 | e77bc3e76f430090 |
 | docs/V1-WORKFLOW-EVENT-LLD.md | 139 | 14813 | aa20f0e960080e6e |
 | docs/VIABILITY-VS-COMPETITORS.md | 239 | 24161 | cac988e17f7a3ca5 |
@@ -200,13 +200,13 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/001-conversation-session-supervisor/DATA-MODEL.md | 79 | 9860 | 9a370e5e7553fa0a |
 | specs/001-conversation-session-supervisor/PLAN.md | 107 | 9742 | 76c4d8ce5fd6d0ff |
 | specs/001-conversation-session-supervisor/README.md | 30 | 3880 | b6531e9ee31f6dc3 |
-| specs/001-conversation-session-supervisor/RESEARCH.md | 102 | 14808 | c384b7f5c45b8890 |
+| specs/001-conversation-session-supervisor/RESEARCH.md | 106 | 15576 | 5a16830c6a0056fe |
 | specs/001-conversation-session-supervisor/SPEC.md | 385 | 54748 | 93ea63a3227d1868 |
-| specs/001-conversation-session-supervisor/TASKS.md | 554 | 79632 | 5bc5e82a7200a9ce |
+| specs/001-conversation-session-supervisor/TASKS.md | 554 | 81633 | cba4d32d2a6b1430 |
 | specs/001-conversation-session-supervisor/contracts/README.md | 12 | 841 | db996aef02f977b4 |
 | specs/001-conversation-session-supervisor/contracts/api-events.md | 63 | 6530 | 7579c4b6b3b0b386 |
 | specs/001-conversation-session-supervisor/contracts/errors-recovery.md | 78 | 9090 | 47de1c535b262d4f |
-| specs/001-conversation-session-supervisor/contracts/ui-behavior.md | 93 | 8362 | 08a69214e1ce3d1b |
+| specs/001-conversation-session-supervisor/contracts/ui-behavior.md | 109 | 13314 | 8395bc23740b1915 |
 | specs/002-native-agent-install-auth-binding/DATA-MODEL.md | 44 | 5409 | cdf255280824a44b |
 | specs/002-native-agent-install-auth-binding/PLAN.md | 45 | 3068 | ff8343b9d1b4c95f |
 | specs/002-native-agent-install-auth-binding/README.md | 39 | 3876 | 50eec7b4d2b49f3c |

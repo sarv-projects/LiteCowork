@@ -225,7 +225,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T12 - Wire Conversation-scoped UserRequest continuation (B-06)
 
-- **Status:** NOT STARTED - `apps/litecoworkd/src/user_request_operator.rs` and the domain WAITING_USER/WAITING_DEPENDENCY transitions exist (domain test `rejected_provider_input_returns_waiting_dependency_to_waiting_user`); the OpenCode adapter does not surface provider input requests to this path.
+- **Status:** BLOCKED (provider capability not evidenced; path recorded unavailable per the Stop rule) - the domain WAITING_USER/WAITING_DEPENDENCY transitions and `user_request_operator.rs` exist, but the OpenCode v2.0.32 normalizer maps no input-request event and neither the captured fixture nor any repository source shows the pinned server emitting one, so there is nothing to correlate to a Runtime-local provider input key. The finding is recorded in RESEARCH.md section 8.1. No speculative code was added. Unblocks when an owner runs the pinned OpenCode on a machine that has it and captures an input-request envelope (same capture as T23).
 - **Depends on:** T04, T07, T10
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, Agent Runtime, Trust.
@@ -382,7 +382,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T21 - Record the cross-layer trace for each user-visible operation
 
-- **Status:** NOT STARTED.
+- **Status:** PARTIAL (trace recorded for Send, Stop, Retry, Reload, Activity and Attach; Answer UserRequest and native permission rows are recorded as gaps) - `contracts/ui-behavior.md` section 9 holds the rows with the exact control, Tauri command, route, fence, recovery and evidence test. Per the Stop rule the missing hops are open tasks (T12 BLOCKED, T27 PARTIAL), not documented as present. WIRING edges were not flipped to served because T09 evidence does not exist.
 - **Depends on:** T07, T12-T18
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, UI, Agent Runtime.
@@ -398,7 +398,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T22 - Synchronize status documents and inventories
 
-- **Status:** NOT STARTED.
+- **Status:** PARTIAL (rows synced to current CODE evidence; closure waits on T09) - the served-route inventory was regenerated (176/1/55) and `audit_served_routes.py` matches it; `docs/IMPLEMENTATION-STATUS.md` has a 2026-11-10 Conversation status paragraph, register A-25 and A-26 carry dated updates but stay open (no live run, no rendered DOM test), and the UI action ledger attachment row states the text-only boundary. No row claims QUALIFIED. A-24 stays as previously recorded. SPEC section 4 was not rewritten because T09 evidence does not exist; the SPEC/AC statuses are unchanged.
 - **Depends on:** T09, T21
 - **Cross-package prerequisites:** NONE (orchestrator owns shared ledgers; this task supplies the edits for review).
 - **Owner:** Conversation, Documentation owners.
@@ -483,7 +483,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T27 - Surface native permission prompts inline and in Needs You (P-09)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-09 (audit C-3), owned jointly with Feature 002 (ACP `request_permission`, see Feature 002 T17), into this LOCKED package.
+- **Status:** PARTIAL (display only; answer channel BLOCKED) - `PermissionAsked` is persisted and framed as a REPORTED PERMISSION activity (T25) and the activity card says the agent asked for permission, that LiteCowork is not asking and cannot relay an answer yet, with no answer control. Not done: answering through the harness (the ACP `request_permission` path is Feature 002 T17 and no OpenCode permission-reply call is verified or implemented), the Needs You entry (a native permission has no LiteCowork UserRequest and showing an unanswerable prompt there would mislead), denial reaching the harness, and the unanswered-prompt timeout behavior (an unanswered OpenCode permission is currently bounded only by the idle watchdog). Acceptance boxes 1 to 3 therefore remain open. Evidence: `turn-activity.test.ts` (asked wording, no answer control).
 - **Depends on:** T24, T25
 - **Cross-package prerequisites:** Feature 002 ACP client `request_permission` path (Feature 002 T17) delivers the harness answer channel.
 - **Owner:** Agent Runtime, Conversation, UI.

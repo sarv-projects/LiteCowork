@@ -21,6 +21,10 @@ test("tool start and settle pairs collapse into one card worded as reported by t
   assert.equal(cards[0]!.state, "FAILED");
   assert.equal(cards[0]!.title, "Tool bash");
   assert.ok(cards.every((card) => card.summary.startsWith("Reported by the agent")));
+  const asked = cards.find((card) => card.state === "ASKED")!;
+  assert.match(asked.summary, /the agent asked for permission/);
+  assert.match(asked.summary, /LiteCowork is not asking/);
+  assert.doesNotMatch(asked.summary, /approve|allow|deny/i, "no answer control is implied");
 });
 
 test("the plan checklist is the latest reported todo count and never invents items", () => {

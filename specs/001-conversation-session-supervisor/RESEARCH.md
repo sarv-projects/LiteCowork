@@ -98,5 +98,9 @@ These are source-level UI findings, not a browser USER test. They require UI/API
 | R-07 | Usage | Native usage signals and trust label; no Conversation cross-agent usage writer is currently wired | Usage owner |
 | R-08 | Desktop stop/retry interaction | Add authoritative turn version to the safe active-turn projection; bind Stop to that turn and a real supervisor stop request; add failed-turn retry action with idempotency/version handling; enforce all nonterminal statuses in composer admission; add rendered tests for no-stream, stale-version, repeated-send and racing settlement cases | Desktop UI / Operator / Conversation |
 
+### 8.1 Finding for 001-T12 (2026-11-10): provider input requests
+
+The OpenCode v2.0.32 normalizer (`normalizer.rs`) recognizes `permission.asked` and `permission.updated` but no question or input-request event, and neither the captured fixture (`opencode_v2_0_32_turn.jsonl`) nor any source in this repository shows the pinned server emitting one. No OpenCode binary exists in this environment, so the absence cannot be confirmed against the live server (R-01 stays open). Until a live capture shows an input request with a correlatable key, a Conversation-scoped UserRequest cannot be produced from this route, and the continuation path is recorded as unavailable (the T12 Stop rule). A `permission.asked` event is a native permission (T27), not a UserRequest.
+
 No web research has been used to claim current upstream API behavior. Version-pinned native protocol research is a prerequisite task, not filled by assumptions.
 
