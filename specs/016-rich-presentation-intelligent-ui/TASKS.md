@@ -56,7 +56,7 @@ Gaps to V1: owner acceptance (B-40), validator drift, no producer, no chart or I
 
 ## 016-T03 - Single Rust validator crate and drift fix
 
-- **Status:** PARTIAL - Rust validation exists inside `crates/storage-sqlite/src/rich_presentations.rs` (TEXT_SLICE and LAYOUT only, 1 MiB cap); no shared crate.
+- **Status:** PARTIAL - the drift is fixed: `crates/storage-sqlite/src/rich_presentations.rs` now accepts TEXT_SLICE, LAYOUT, CARD, CALLOUT and TABLE under the desktop's 512 KiB cap, holding CARD titles, CALLOUT summaries and TABLE headers and cells to the semantic text, and the stale DIVIDER comment is gone. A TABLE cell is compared with ECMAScript `Number::toString` (so `1e-27` matches, not `0.000000000000000000000000001`) and row collection mirrors the desktop's clear-on-wrong-width rule, because either difference would refuse a table the desktop renders. Still open: no shared `domain-presentation` crate, and CHART and SAFE_CALCULATOR are not validated.
 - **Depends on:** T01, T02
 - **Cross-package prerequisites:** NONE
 - **Owner:** Presentation Runtime, Storage.
@@ -64,7 +64,7 @@ Gaps to V1: owner acceptance (B-40), validator drift, no producer, no chart or I
 - **Contract:** SPEC G-01, G-02, section 7.2; AC-001, AC-002, AC-006.
 - **Change intent:** move the closed-object, canonical-bytes, digest, slice, depth and provenance checks from `rich_presentations.rs` into `domain_presentation::validate_document`, add CARD, CALLOUT, TABLE (exact semantic Markdown table match), CHART and SAFE_CALCULATOR checks, set `MAX_DOCUMENT_BYTES` to 512 KiB, and have `SqliteRichPresentationStore::publish_rich_presentation` call it. Remove the stale DIVIDER comment. Dependencies limited to `serde_json`, `serde_json_canonicalizer`, `sha2` (already in the lockfile); no `jsonschema` crate.
 - **Acceptance:**
-  - [ ] 512 KiB accepted, 512 KiB + 1 rejected with `TooLarge` (AC-001).
+  - [x] The cap is 512 KiB on every surface and a document above it is rejected (AC-001): `rich_presentation_document_cap_agrees_with_the_desktop_and_the_wire_schema` pins the constant against the desktop validator and the served wire schema, and the existing over-cap case still fails. The exact-512-KiB-accepted publish case moves with the shared crate.
   - [ ] Every non-allowlisted kind rejected with `UnsupportedBlock`; actions, citations, HOST_PROJECTION and MCP_APP rejected (AC-002, AC-006).
   - [ ] Existing `rich_presentation_tests.rs` cases still pass after the move.
 - **Command:** `cargo test -p domain-presentation --locked` and `cargo test -p storage-sqlite --locked rich_presentation`

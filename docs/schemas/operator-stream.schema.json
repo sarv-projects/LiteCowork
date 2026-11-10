@@ -424,7 +424,7 @@
         "renderer_contract_version": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
         "semantic_content_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "document_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
-        "document_size_bytes": {"type": "integer", "minimum": 1, "maximum": 1048576},
+        "document_size_bytes": {"type": "integer", "minimum": 1, "maximum": 524288},
         "availability": {"enum": ["AVAILABLE", "FETCHING", "UNAVAILABLE", "POLICY_OMITTED", "UNSUPPORTED_VERSION", "INTEGRITY_FAILED"]}
       },
       "additionalProperties": false

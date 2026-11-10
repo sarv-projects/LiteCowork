@@ -10,7 +10,7 @@
 
 ## 1. Problem and user outcome
 
-LiteCowork answers are committed semantic messages. A RichPresentation is an optional, display-only projection that makes an answer easier to read (cards, callouts, tables, a chart), and generated images are files the user can keep. Today the pieces exist but do not agree: the desktop TypeScript validator accepts five block kinds with a 512 KiB cap, the Rust storage validator accepts only two kinds with a 1 MiB cap, nothing in production publishes a RichPresentation, charts and images have no renderer, and there is no Intelligent UI component. P10 asks for a typed, validated, accessible path in which malicious presentation can never mint host state or authority, and in which the semantic answer stays complete when rendering is disabled.
+LiteCowork answers are committed semantic messages. A RichPresentation is an optional, display-only projection that makes an answer easier to read (cards, callouts, tables, a chart), and generated images are files the user can keep. Today the pieces exist and the two validators agree: the desktop TypeScript validator and the Rust storage validator both accept the five V1 block kinds (TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE) under one 512 KiB document cap, which the served wire schema carries too. Nothing in production publishes a RichPresentation, charts and images have no renderer, and there is no Intelligent UI component. P10 asks for a typed, validated, accessible path in which malicious presentation can never mint host state or authority, and in which the semantic answer stays complete when rendering is disabled.
 
 **Outcome:** the user sees a well-formatted answer with tables, a chart that always has an equivalent data table, and one interactive "what-if" calculator whose numbers come from the answer itself. Turning rich presentation off, or any validation failure, shows the full original text. A generated image appears as a Library Artifact with its source Conversation and turn. Interactive app Artifacts open as an inert preview; nothing runs in the chat WebView.
 
@@ -37,8 +37,8 @@ Verified against branch `docs/audit-competitor-superset`; highest migration file
 | Capability | Current evidence | Limitation |
 |---|---|---|
 | Desktop validator | CODE: `apps/litecowork-ui/src/presentation/rich-presentation.ts` (`parseRichPresentationDocument`, `parseRichPresentationResponse`, `resolveRichResponseContent`, `isValidatedRichPresentation`); constants `MAX_DOCUMENT_BYTES = 512 * 1024`, `MAX_SEMANTIC_BYTES = 1024 * 1024`, `MAX_BLOCKS = 200`, `MAX_DEPTH = 8`, `MAX_JSON_VALUES = 30_000`, `MAX_JSON_DEPTH = 32`; accepts TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE; RFC 8785 canonical bytes and SHA-256 checks; any failure returns null | Charts, media, host projections and actions are not interpreted; citations and actions must be empty |
-| Rust validator | CODE: `validate_metadata`, `validate_document`, `validate_block` in `crates/storage-sqlite/src/rich_presentations.rs`; accepts only TEXT_SLICE and LAYOUT ("unqualified presentation block; trusted/source binder required") | Drift: CARD, CALLOUT and TABLE accepted by the desktop can never be published |
-| Size cap | `MAX_RICH_PRESENTATION_BYTES: u64 = 1_048_576` in `crates/storage-core/src/rich_presentation.rs` | 1 MiB in Rust against 512 KiB in TypeScript: a 512 KiB to 1 MiB document publishes but always falls back. The module doc comment mentions a DIVIDER kind that neither side accepts. |
+| Rust validator | CODE: `validate_metadata`, `validate_document`, `validate_block` in `crates/storage-sqlite/src/rich_presentations.rs`; accepts the same five V1 kinds as the desktop (TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE) with the same closed keys, and holds CARD titles, CALLOUT summaries and TABLE headers and cells to the semantic text | CHART and SAFE_CALCULATOR are not accepted yet (renderer contract version 2 belongs to T03) |
+| Size cap | `MAX_RICH_PRESENTATION_BYTES: u64 = 524_288` in `crates/storage-core/src/rich_presentation.rs`, matching `MAX_DOCUMENT_BYTES = 512 * 1024` in the desktop validator and `document_size_bytes.maximum` in `docs/schemas/operator-stream.schema.json` | Aligned on all three surfaces; `rich_presentation_document_cap_agrees_with_the_desktop_and_the_wire_schema` fails if any one of them changes alone |
 | Store | CODE: `RichPresentationStore` (`publish_rich_presentation`, `read_rich_presentation`, conversation presentation reads) and `SqliteRichPresentationStore`; table from migration `rich_presentation_optional_v12` | `publish_rich_presentation` is called only by tests (`rich_presentation_read_tests` in `apps/litecoworkd/src/presentation_operator.rs`); no production producer |
 | Read route | CODE/SERVED: `GET /v1/rich-presentations/{presentation_id}` (`get_rich_presentation`), `GET /v1/conversations/{conversation_id}/presentation`, `POST /v1/stream` in `apps/litecoworkd/src/presentation_operator.rs`; Tauri `get_rich_presentation` and `valid_rich_presentation_response` in `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs` | No publish route (by design: publishing is daemon-internal) |
 | Renderer | CODE/UI: `RichResponseView.tsx` renders TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE with an accessible table region and a "Read the original response" disclosure; used by `ConversationsPage.tsx` | No chart, image or Intelligent UI rendering |
@@ -148,11 +148,11 @@ export type RichBlock = TEXT_SLICE | LAYOUT | CARD | CALLOUT | TABLE;
 
 ```rust
 // crates/storage-core/src/rich_presentation.rs
-pub const MAX_RICH_PRESENTATION_BYTES: u64 = 1_048_576;
+pub const MAX_RICH_PRESENTATION_BYTES: u64 = 524_288;
 pub const RICH_PRESENTATION_MEDIA_TYPE: &str = "application/vnd.litecowork.rich-presentation+json";
 pub trait RichPresentationStore { fn publish_rich_presentation(&self, ..) -> ..; fn read_rich_presentation(&self, ..) -> ..; /* conversation reads */ }
 // crates/storage-sqlite/src/rich_presentations.rs (private)
-fn validate_metadata(..); fn validate_document(..); fn validate_block(..); // TEXT_SLICE, LAYOUT only
+fn validate_metadata(..); fn validate_document(..); fn validate_block(..); // TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE
 ```
 
 Served: `GET /v1/rich-presentations/{presentation_id}` (`get_rich_presentation`), Tauri `get_rich_presentation` in `conversation_bridge.rs`.
@@ -161,7 +161,7 @@ Served: `GET /v1/rich-presentations/{presentation_id}` (`get_rich_presentation`)
 
 ```rust
 // crates/domain-presentation/src/lib.rs (new crate)
-pub const MAX_DOCUMENT_BYTES: usize = 512 * 1024;   // replaces the 1 MiB storage cap for documents
+pub const MAX_DOCUMENT_BYTES: usize = 512 * 1024;   // the single document cap; storage already matches it
 pub const MAX_BLOCKS: usize = 200;
 pub const MAX_DEPTH: usize = 8;
 pub const MAX_JSON_VALUES: usize = 30_000;

@@ -12,8 +12,11 @@ fn fixture() -> (
     let conn = Connection::open(state_database(&dir)).unwrap();
     conn.execute_batch("PRAGMA foreign_keys=ON").unwrap();
     conn.execute("INSERT INTO conversations(conversation_id,workspace_id,created_at) VALUES('conversation-rich','workspace-rich',?1)", [AT]).unwrap();
-    conn.execute("INSERT INTO conversation_messages(message_id,conversation_id,author_json,role,turn_id,content_json,created_at) VALUES('message-rich','conversation-rich','{}','AGENT','turn-rich','[{\"kind\":\"TEXT\",\"text\":\"Hello 🌍\"}]',?1)", [AT]).unwrap();
-    let semantic = json!({"content":[{"kind":"TEXT","text":"Hello 🌍"}],"resource_refs":[]});
+    conn.execute("INSERT INTO conversation_messages(message_id,conversation_id,author_json,role,turn_id,content_json,created_at) VALUES('message-rich','conversation-rich','{}','AGENT','turn-rich','[{\"kind\":\"TEXT\",\"text\":\"Hello 🌍\"},{\"kind\":\"TEXT\",\"text\":\"## Summary\"},{\"kind\":\"TEXT\",\"text\":\"| Metric | Value |\"},{\"kind\":\"TEXT\",\"text\":\"| --- | --- |\"},{\"kind\":\"TEXT\",\"text\":\"| Cost | 12 |\"}]',?1)", [AT]).unwrap();
+    // The semantic text is every TEXT block joined by newlines, so the fixture answer
+    // carries one line per V1 block kind: a heading and a Markdown table a presentation
+    // is allowed to repeat, and never anything it invents.
+    let semantic = json!({"content":[{"kind":"TEXT","text":"Hello 🌍"},{"kind":"TEXT","text":"## Summary"},{"kind":"TEXT","text":"| Metric | Value |"},{"kind":"TEXT","text":"| --- | --- |"},{"kind":"TEXT","text":"| Cost | 12 |"}],"resource_refs":[]});
     let semantic_digest = digest(&canonical_json(&semantic).unwrap());
     let doc = json!({"schema_version":1,"renderer_contract_version":1,"presentation_id":"presentation-rich","message_id":"message-rich","semantic_content_digest":semantic_digest,
       "root_blocks":[{"kind":"TEXT_SLICE","source":{"start_utf8_byte":0,"end_utf8_byte_exclusive":10,"slice_digest":digest("Hello 🌍".as_bytes())}}],
@@ -649,6 +652,169 @@ fn update_document(request: &mut PublishRichPresentation, f: impl FnOnce(&mut Va
     request.presentation.document_ref.size_bytes = request.presentation.document_size_bytes;
     request.event.payload["document_digest"] = json!(request.presentation.document_digest);
     request.event.payload["document_size_bytes"] = json!(request.presentation.document_size_bytes);
+}
+/// Replaces the document's blocks and the provenance entry each block path requires.
+fn set_blocks(request: &mut PublishRichPresentation, blocks: Value, paths: &[&str]) {
+    update_document(request, |doc| {
+        doc["root_blocks"] = blocks;
+        doc["block_provenance"] = Value::Array(
+            paths
+                .iter()
+                .map(|path| {
+                    json!({"block_path":path,"origin":"SEMANTIC_MESSAGE","resource_refs":[],
+                    "artifact_refs":[],"evidence_refs":[],"verification_refs":[]})
+                })
+                .collect(),
+        );
+    });
+}
+fn hello_slice() -> Value {
+    json!({"kind":"TEXT_SLICE","source":{"start_utf8_byte":0,"end_utf8_byte_exclusive":10,
+        "slice_digest":digest("Hello 🌍".as_bytes())}})
+}
+/// The single document cap must stay 512 KiB on every surface that publishes or consumes
+/// a RichPresentation. A larger cap in storage, or in the wire schema, is the 016 defect:
+/// the document publishes and the desktop then refuses it and falls back for every read.
+#[test]
+fn rich_presentation_document_cap_agrees_with_the_desktop_and_the_wire_schema() {
+    assert_eq!(MAX_RICH_PRESENTATION_BYTES, 524_288);
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let desktop = format!("{root}/apps/litecowork-ui/src/presentation/rich-presentation.ts");
+    if let Ok(source) = std::fs::read_to_string(desktop) {
+        assert!(
+            source.contains("const MAX_DOCUMENT_BYTES = 512 * 1024;"),
+            "the desktop document cap must stay 512 KiB to match storage"
+        );
+        for kind in [
+            "\"TEXT_SLICE\"",
+            "\"LAYOUT\"",
+            "\"CARD\"",
+            "\"CALLOUT\"",
+            "\"TABLE\"",
+        ] {
+            assert!(
+                source.contains(kind),
+                "the desktop allowlist must keep {kind}"
+            );
+        }
+        assert!(
+            source.contains("value.kind === \"CALLOUT\"")
+                && source.contains("value.kind === \"TABLE\""),
+            "the desktop must keep validating CALLOUT and TABLE"
+        );
+    }
+    let schema =
+        std::fs::read_to_string(format!("{root}/docs/schemas/operator-stream.schema.json"))
+            .expect("the operator stream schema is part of this repository");
+    assert!(
+        schema.contains(
+            "\"document_size_bytes\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 524288}"
+        ),
+        "the served wire schema must cap the presentation document at the same 512 KiB"
+    );
+}
+#[test]
+fn rich_publication_accepts_card_callout_and_table_which_the_desktop_renders() {
+    let (_dir, store, mut request) = fixture();
+    set_blocks(
+        &mut request,
+        json!([
+            {"kind":"CARD","title":"Summary","children":[hello_slice()]},
+            {"kind":"CALLOUT","tone":"INFO","accessible_summary":"Summary","source":{"start_utf8_byte":0,"end_utf8_byte_exclusive":10,"slice_digest":digest("Hello 🌍".as_bytes())}},
+            {"kind":"TABLE","headers":["Metric","Value"],"rows":[["Cost",12]],"accessible_summary":"Summary"}
+        ]),
+        &["/0", "/0/children/0", "/1", "/2"],
+    );
+    let committed = adapter(&store)
+        .publish_rich_presentation(request.clone())
+        .expect("the V1 allowlist the desktop renders must be publishable");
+    assert_eq!(committed.presentation, request.presentation);
+    let read = adapter(&store)
+        .read_rich_presentation("owner-local", "workspace-rich", "presentation-rich")
+        .unwrap()
+        .unwrap();
+    assert_eq!(read.canonical_document, request.canonical_document);
+}
+#[test]
+fn rich_publication_refuses_a_card_summary_or_table_that_invents_a_fact() {
+    let (_dir, store, request) = fixture();
+    for (blocks, paths) in [
+        (
+            json!([{"kind":"CARD","title":"Guaranteed savings","children":[]}]),
+            vec!["/0"],
+        ),
+        (
+            json!([{"kind":"CARD","title":"   ","children":[]}]),
+            vec!["/0"],
+        ),
+        (
+            json!([{"kind":"CALLOUT","tone":"WARNING","accessible_summary":"Invented warning","source":{"start_utf8_byte":0,"end_utf8_byte_exclusive":10,"slice_digest":digest("Hello 🌍".as_bytes())}}]),
+            vec!["/0"],
+        ),
+        (
+            json!([{"kind":"TABLE","headers":["Metric","Value"],"rows":[["Cost",13]]}]),
+            vec!["/0"],
+        ),
+        (
+            json!([{"kind":"TABLE","headers":["Metric","Total"],"rows":[["Cost",12]]}]),
+            vec!["/0"],
+        ),
+        (
+            json!([{"kind":"TABLE","headers":["Metric","Value"],"rows":[["Cost",12]],"accessible_summary":"Invented summary"}]),
+            vec!["/0"],
+        ),
+    ] {
+        let mut bad = request.clone();
+        set_blocks(&mut bad, blocks, &paths);
+        assert!(
+            adapter(&store).publish_rich_presentation(bad).is_err(),
+            "a presentation must not introduce a fact the semantic answer lacks"
+        );
+    }
+    // A document-level accessibility summary is held to the same rule as a block summary.
+    let mut bad = request;
+    update_document(&mut bad, |doc| {
+        doc["accessibility_summary"] = json!("Invented accessibility summary")
+    });
+    assert!(adapter(&store).publish_rich_presentation(bad).is_err());
+}
+#[test]
+fn rich_publication_refuses_malformed_card_callout_and_table_shapes() {
+    let (_dir, store, request) = fixture();
+    for (blocks, paths) in [
+        // CARD does not carry width, and its children are capped at 20.
+        (
+            json!([{"kind":"CARD","title":"Summary","width":"WIDE","children":[]}]),
+            vec!["/0"],
+        ),
+        (
+            json!([{
+                "kind":"CARD",
+                "title":"Summary",
+                "children":(0..21).map(|_| hello_slice()).collect::<Vec<_>>()
+            }]),
+            vec!["/0"],
+        ),
+        // CALLOUT tone is closed.
+        (
+            json!([{"kind":"CALLOUT","tone":"LOUD","accessible_summary":"Summary","source":{"start_utf8_byte":0,"end_utf8_byte_exclusive":10,"slice_digest":digest("Hello 🌍".as_bytes())}}]),
+            vec!["/0"],
+        ),
+        // TABLE needs at least one header, row width must match, cells are scalar-only.
+        (json!([{"kind":"TABLE","headers":[],"rows":[]}]), vec!["/0"]),
+        (
+            json!([{"kind":"TABLE","headers":["Metric","Value"],"rows":[["Cost"]]}]),
+            vec!["/0"],
+        ),
+        (
+            json!([{"kind":"TABLE","headers":["Metric","Value"],"rows":[["Cost",["x"]]]}]),
+            vec!["/0"],
+        ),
+    ] {
+        let mut bad = request.clone();
+        set_blocks(&mut bad, blocks, &paths);
+        assert!(adapter(&store).publish_rich_presentation(bad).is_err());
+    }
 }
 fn assert_no_publication(dir: &tempfile::TempDir) {
     let c = Connection::open(state_database(dir)).unwrap();

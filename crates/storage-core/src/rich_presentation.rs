@@ -3,7 +3,13 @@ use crate::{BlobRef, DomainEvent, EventDraft, StoreError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const MAX_RICH_PRESENTATION_BYTES: u64 = 1_048_576;
+/// The single document cap for a RichPresentation, in bytes (512 KiB).
+///
+/// The desktop validator in `apps/litecowork-ui/src/presentation/rich-presentation.ts`
+/// (`MAX_DOCUMENT_BYTES`) enforces the same value. They must not diverge: a document this
+/// storage accepts but the desktop refuses publishes and then always falls back to the
+/// semantic text, with no error on either side (016 AC-001).
+pub const MAX_RICH_PRESENTATION_BYTES: u64 = 524_288;
 pub const RICH_PRESENTATION_MEDIA_TYPE: &str = "application/vnd.litecowork.rich-presentation+json";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -87,8 +93,12 @@ pub struct ConversationPresentationRead {
     pub after_message_id: Option<String>,
 }
 
-/// This initial qualified adapter accepts semantic TEXT_SLICE, LAYOUT and DIVIDER
-/// blocks only. All source-bearing/host-bound blocks require future owning binders.
+/// This initial qualified adapter accepts the closed V1 allowlist of TEXT_SLICE, LAYOUT,
+/// CARD, CALLOUT and TABLE blocks, each of which either carries its own semantic
+/// text-slice or must exactly match a line/table of the committed semantic message, so a
+/// presentation can never introduce a fact the semantic answer does not contain. CHART
+/// and SAFE_CALCULATOR are renderer contract version 2 and every host-bound or
+/// source-bearing block still requires an owning binder.
 /// Read failure never modifies or makes the underlying semantic message unavailable.
 pub trait RichPresentationStore: Send + Sync {
     fn publish_rich_presentation(

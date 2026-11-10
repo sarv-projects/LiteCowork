@@ -12,7 +12,7 @@ Answers can show tables, a chart with an equivalent data table, and one accessib
 
 ## Current truth
 
-The desktop validator (`apps/litecowork-ui/src/presentation/rich-presentation.ts`, 512 KiB, 200 blocks, depth 8) accepts five block kinds; the Rust storage validator (`crates/storage-sqlite/src/rich_presentations.rs`, 1 MiB cap) accepts two. Nothing in production publishes a RichPresentation. There is no chart, image or Intelligent UI renderer, no media ingestion, no disable preference and no Interactive Artifact Runtime code. The read route and the semantic fallback view exist.
+The desktop validator (`apps/litecowork-ui/src/presentation/rich-presentation.ts`, 512 KiB, 200 blocks, depth 8) and the Rust storage validator (`crates/storage-sqlite/src/rich_presentations.rs`) accept the same five V1 block kinds (TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE) under the same 512 KiB cap, and the served wire schema carries that cap too. Nothing in production publishes a RichPresentation. There is no chart, image or Intelligent UI renderer, no media ingestion, no disable preference and no Interactive Artifact Runtime code. The read route and the semantic fallback view exist.
 
 Under this package's IN_REVIEW status, proposed task P-03 is folded in as 016-T18: per-block Markdown degradation with GFM tables, horizontal rules and nested lists; code blocks with a language label, copy button and lazy highlighting; TEXT_SLICE rendered through the same renderer; and a golden corpus of real agent answers that renders with no whole-message raw fallback and no HTML strings. Source: [docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md](../../docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md) section 9.
 
