@@ -262,7 +262,7 @@ pub(crate) mod tests {
 
         fn current_agent_control_descriptor(
             &self,
-            _gate: &AgentDescriptorGate,
+            gate: &AgentDescriptorGate,
             now: &str,
         ) -> Result<Option<AgentControlDescriptorRecord>, StoreError> {
             Ok(self
@@ -270,7 +270,10 @@ pub(crate) mod tests {
                 .lock()
                 .unwrap()
                 .last()
-                .filter(|row| row.expires_at.as_str() > now)
+                .filter(|row| {
+                    row.expires_at.as_str() > now
+                        && row.runtime_incarnation_id == gate.runtime_incarnation_id
+                })
                 .cloned())
         }
     }
@@ -386,5 +389,55 @@ pub(crate) mod tests {
                 .current(&store, &manifest, "rt", "rti", &rfc(1))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn agent_lifecycle_recovery_restart_revalidates_the_descriptor_until_reprobed() {
+        let service = service(Some("2.0.32"));
+        let store = MemoryStore::default();
+        let manifest = service.module_for_provider("OPENCODE").unwrap().clone();
+        service
+            .refresh(&store, &manifest, "rt", "incarnation-1", at(0))
+            .unwrap();
+        // A new RuntimeIncarnation never inherits the previous incarnation's descriptor.
+        assert!(
+            service
+                .current(&store, &manifest, "rt", "incarnation-2", &rfc(1))
+                .unwrap()
+                .is_none()
+        );
+        service
+            .refresh(&store, &manifest, "rt", "incarnation-2", at(2))
+            .unwrap();
+        assert!(
+            service
+                .current(&store, &manifest, "rt", "incarnation-2", &rfc(3))
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn agent_lifecycle_recovery_failed_probe_leaves_the_prior_descriptor_intact() {
+        let good = service(Some("2.0.32"));
+        let store = MemoryStore::default();
+        let manifest = good.module_for_provider("OPENCODE").unwrap().clone();
+        let prior = good
+            .refresh(&store, &manifest, "rt", "rti", at(0))
+            .unwrap();
+        // The probe observes nothing usable (crash, timeout or unpinned version).
+        let failing = service(None);
+        assert_eq!(
+            failing
+                .refresh(&store, &manifest, "rt", "rti", at(5))
+                .unwrap_err(),
+            RefreshError::Unavailable
+        );
+        assert_eq!(store.rows.lock().unwrap().len(), 1, "no partial row");
+        let current = good
+            .current(&store, &manifest, "rt", "rti", &rfc(6))
+            .unwrap()
+            .unwrap();
+        assert_eq!(current.descriptor_digest, prior.descriptor_digest);
     }
 }

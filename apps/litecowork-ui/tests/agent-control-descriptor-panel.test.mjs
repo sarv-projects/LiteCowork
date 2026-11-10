@@ -14,7 +14,7 @@ const vite = await createServer({
   optimizeDeps: { noDiscovery: true, include: [] },
   appType: "custom",
 });
-const { AgentControlDescriptorPanel, UnavailableControlsNotice } = await vite.ssrLoadModule("/src/agents/AgentControlDescriptorPanel.tsx");
+const { AgentControlDescriptorPanel, UnavailableControlsNotice, DescriptorSummary } = await vite.ssrLoadModule("/src/agents/AgentControlDescriptorPanel.tsx");
 const { parseAgentControlDescriptor, parseAgentControlReadError } = await vite.ssrLoadModule("/src/agents/agent-control-api.ts");
 after(async () => vite.close());
 
@@ -113,4 +113,24 @@ test("typed unavailable state is visible without exposing daemon details", () =>
   assert.match(html, /LiteCowork has not verified this agent’s commands and input options/);
   assert.match(html, /safe-ref-123/);
   assert.doesNotMatch(html, /secret|native config|\/home\//i);
+});
+
+test("sign-in and native config controls render only when the descriptor declares them", () => {
+  const none = renderToStaticMarkup(createElement(DescriptorSummary, { descriptor: descriptor() }));
+  assert.match(none, /No sign-in method is declared by this agent module/);
+  assert.match(none, /Open native config is unavailable/);
+  assert.doesNotMatch(none, /Sign in:/);
+  assert.match(none, /native harness state/);
+  for (const axis of ["Detection", "Installation", "Configuration", "Authentication", "Readiness"]) {
+    assert.match(none, new RegExp(`<b>${axis}</b>`));
+  }
+  const declared = descriptor();
+  declared.auth = { state: "AUTHENTICATING", account_label: null, credential_slots: [], methods: [
+    { auth_method_id: "native-login", display_name: "Native login", kind: "NATIVE_FLOW", requires_restart: false },
+  ] };
+  declared.configuration.native_config_targets = [{ target_id: "settings", display_name: "Settings", kind: "FILE" }];
+  const html = renderToStaticMarkup(createElement(DescriptorSummary, { descriptor: declared, actions: { onBeginAuth() {}, onOpenNativeConfig() {} } }));
+  assert.match(html, /Authenticating/);
+  assert.match(html, /<button[^>]*disabled[^>]*>Authenticating/);
+  assert.match(html, /Open native config: Settings/);
 });

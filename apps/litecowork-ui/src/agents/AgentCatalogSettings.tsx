@@ -654,6 +654,7 @@ export function AgentCatalogSettings(props: AgentCatalogSettingsProps) {
           <li><b>Workspace binding</b> records whether LiteCowork may use it and whether it is lead-eligible.</li>
         </ol>
         <p>The local installation inventory covers all 15 curated candidates, using bounded version-only probes or Cline package metadata. These observations do not prove sign-in, session readiness, or agent support.</p>
+        <p className="agent-catalog__install-status" data-testid="agent-install-unavailable"><strong>Install and Update are unavailable in this version.</strong> No qualified installer for this module in V1. Install an agent yourself, then run the local inventory; nothing here executes a registry-provided command.</p>
         <p>None of these starts a Task. Lead eligibility is not worker-profile enablement, and enabling a binding only permits future admission.</p>
         <p className="agent-catalog__authoring-status"><strong>Worker profiles can be saved, but cannot be enabled for execution.</strong> Create a disabled profile for an enabled Workspace binding and revise its instructions. Model/session options stay empty until an adapter negotiates and validates them. Trust admission, isolated execution, Task delegation, and worker runs remain unavailable.</p>
       </div>
