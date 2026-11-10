@@ -8,13 +8,15 @@
 
 use super::*;
 use storage_core::conversation::{
-    CONVERSATION_SESSION_ADMISSION_UNAVAILABLE, CONVERSATION_TURN_IN_PROGRESS, ConversationTurn,
-    ConversationTurnStatus, PresentationPreference, TurnCommand, request_payload_value,
+    CONVERSATION_ARCHIVED, CONVERSATION_DELETED, CONVERSATION_NOT_QUIESCENT,
+    CONVERSATION_SESSION_ADMISSION_UNAVAILABLE, CONVERSATION_TURN_IN_PROGRESS, ConversationStatus,
+    ConversationTurn, ConversationTurnStatus, PresentationPreference, RenameConversation,
+    SetConversationArchived, TurnCommand, request_payload_value,
 };
 use storage_core::{
-    ConversationMessageRecord, ConversationRecord, ConversationStore, ConversationTurnReceipt,
-    ConversationTurnStore, CreateConversationCommit, CreateConversationTurnCommit, EventDraft,
-    SetConversationAgentBinding, WorkspaceCreateRequest,
+    CommittedConversation, ConversationHistoryStore, ConversationMessageRecord, ConversationRecord,
+    ConversationStore, ConversationTurnReceipt, ConversationTurnStore, CreateConversationCommit,
+    CreateConversationTurnCommit, EventDraft, SetConversationAgentBinding, WorkspaceCreateRequest,
 };
 use storage_sqlite::SqliteConversationStore;
 
@@ -33,9 +35,19 @@ struct SetConversationAgentBindingBody {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct RenameConversationBody {
+    /// Contract shape is `{ "title": string or null }`. `null` is accepted and then
+    /// refused: a durable Conversation title is never empty, so V1 has no un-rename.
+    title: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ListQuery {
     cursor: Option<String>,
     limit: Option<usize>,
+    /// `ACTIVE` (default) or `ARCHIVED` (014 contract row 14).
+    status: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -142,7 +154,18 @@ where
             "/v1/conversations/{conversation_id}/agent-binding",
             axum::routing::patch(set_conversation_agent_binding),
         )
-        .route("/v1/conversations/{conversation_id}", get(get_conversation))
+        .route(
+            "/v1/conversations/{conversation_id}/archive",
+            post(archive_conversation),
+        )
+        .route(
+            "/v1/conversations/{conversation_id}/unarchive",
+            post(unarchive_conversation),
+        )
+        .route(
+            "/v1/conversations/{conversation_id}",
+            get(get_conversation).patch(rename_conversation),
+        )
 }
 
 #[cfg(test)]
@@ -366,6 +389,206 @@ async fn get_conversation(
     .map_err(|_| internal())?
     .map_err(map_store_error)?;
     record.map(Json).ok_or_else(not_found)
+}
+
+/// `PATCH /v1/conversations/{conversation_id}` (014 contract row 16): version-fenced,
+/// idempotent rename. The committed event carries `title_digest` only, never the title.
+async fn rename_conversation(
+    State(state): State<ConversationApiState>,
+    Path(conversation_id): Path<String>,
+    headers: HeaderMap,
+    Json(body): Json<RenameConversationBody>,
+) -> Result<Response, Response> {
+    let workspace_id = selected_workspace(&headers)?;
+    if !valid_task_query_id(&conversation_id) {
+        return Err(error(
+            StatusCode::BAD_REQUEST,
+            "INVALID_ARGUMENT",
+            "Conversation ID is invalid",
+        ));
+    }
+    let title = match body.title {
+        Value::String(title) => title.trim().to_owned(),
+        // The contract shape admits `null`; a Conversation title is never empty, so
+        // clearing it is refused rather than silently accepted as a no-op.
+        Value::Null => {
+            return Err(error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "A Conversation title cannot be cleared",
+            ));
+        }
+        _ => return Err(invalid_conversation_title()),
+    };
+    if title.is_empty() || title.chars().count() > 160 || title.chars().any(char::is_control) {
+        return Err(invalid_conversation_title());
+    }
+    let expected_version = super::parse_if_match(&headers)?;
+    let request_id = idempotency_key(&headers)?;
+    let request_payload = json!({
+        "operation": "conversation.rename.v1",
+        "workspace_id": workspace_id,
+        "conversation_id": conversation_id,
+        "expected_version": expected_version,
+        "title": title,
+    });
+    let correlation_id = idempotent_id(
+        "cor",
+        &state.principal_id,
+        &request_id,
+        "conversation-rename",
+    );
+    let context = event_context(&state.runtime_id, &correlation_id).map_err(|_| internal())?;
+    let commit = RenameConversation {
+        request: WorkspaceCreateRequest {
+            principal_id: state.principal_id.clone(),
+            request_id,
+            request_payload,
+        },
+        principal_id: state.principal_id.clone(),
+        workspace_id: workspace_id.clone(),
+        conversation_id: conversation_id.clone(),
+        expected_version,
+        title,
+        event: EventDraft {
+            event_id: context.event_id,
+            workspace_id,
+            entity_type: "Conversation".to_owned(),
+            entity_id: conversation_id,
+            origin_runtime_id: context.origin_runtime_id,
+            entity_revision: expected_version.checked_add(1).ok_or_else(internal)?,
+            hlc_timestamp: context.hlc_timestamp,
+            correlation_id: context.correlation_id,
+            causation_id: context.causation_id,
+            schema_version: 1,
+            event_type: "conversation.renamed.v1".to_owned(),
+            payload: json!({}),
+            recorded_at: context.recorded_at,
+        },
+    };
+    let committed = tokio::task::spawn_blocking(move || {
+        SqliteConversationStore::new(state.store.clone()).rename_conversation(commit)
+    })
+    .await
+    .map_err(|_| internal())?
+    .map_err(map_history_store_error)?;
+    conversation_history_response(committed)
+}
+
+/// `POST /v1/conversations/{conversation_id}/archive` (014 contract row 17).
+async fn archive_conversation(
+    State(state): State<ConversationApiState>,
+    Path(conversation_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Response, Response> {
+    set_conversation_archived_state(state, conversation_id, headers, true).await
+}
+
+/// `POST /v1/conversations/{conversation_id}/unarchive` (014 contract row 18).
+async fn unarchive_conversation(
+    State(state): State<ConversationApiState>,
+    Path(conversation_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Response, Response> {
+    set_conversation_archived_state(state, conversation_id, headers, false).await
+}
+
+/// Version-fenced, idempotent archive or unarchive of one Conversation. Archiving is
+/// refused while a turn is still nonterminal, and only the storage transaction decides
+/// that so the check cannot race a concurrent turn.
+async fn set_conversation_archived_state(
+    state: ConversationApiState,
+    conversation_id: String,
+    headers: HeaderMap,
+    archived: bool,
+) -> Result<Response, Response> {
+    let workspace_id = selected_workspace(&headers)?;
+    if !valid_task_query_id(&conversation_id) {
+        return Err(error(
+            StatusCode::BAD_REQUEST,
+            "INVALID_ARGUMENT",
+            "Conversation ID is invalid",
+        ));
+    }
+    let expected_version = super::parse_if_match(&headers)?;
+    let request_id = idempotency_key(&headers)?;
+    let operation = if archived {
+        "conversation.archive.v1"
+    } else {
+        "conversation.unarchive.v1"
+    };
+    let event_type = if archived {
+        "conversation.archived.v1"
+    } else {
+        "conversation.unarchived.v1"
+    };
+    let request_payload = json!({
+        "operation": operation,
+        "workspace_id": workspace_id,
+        "conversation_id": conversation_id,
+        "expected_version": expected_version,
+    });
+    let correlation_id = idempotent_id(
+        "cor",
+        &state.principal_id,
+        &request_id,
+        "conversation-archive",
+    );
+    let context = event_context(&state.runtime_id, &correlation_id).map_err(|_| internal())?;
+    let commit = SetConversationArchived {
+        request: WorkspaceCreateRequest {
+            principal_id: state.principal_id.clone(),
+            request_id,
+            request_payload,
+        },
+        principal_id: state.principal_id.clone(),
+        workspace_id: workspace_id.clone(),
+        conversation_id: conversation_id.clone(),
+        expected_version,
+        archived,
+        event: EventDraft {
+            event_id: context.event_id,
+            workspace_id,
+            entity_type: "Conversation".to_owned(),
+            entity_id: conversation_id,
+            origin_runtime_id: context.origin_runtime_id,
+            entity_revision: expected_version.checked_add(1).ok_or_else(internal)?,
+            hlc_timestamp: context.hlc_timestamp,
+            correlation_id: context.correlation_id,
+            causation_id: context.causation_id,
+            schema_version: 1,
+            event_type: event_type.to_owned(),
+            payload: json!({}),
+            recorded_at: context.recorded_at,
+        },
+    };
+    let committed = tokio::task::spawn_blocking(move || {
+        SqliteConversationStore::new(state.store.clone()).set_conversation_archived(commit)
+    })
+    .await
+    .map_err(|_| internal())?
+    .map_err(map_history_store_error)?;
+    conversation_history_response(committed)
+}
+
+/// 200 Conversation plus the correlation id of the committed history event.
+fn conversation_history_response(committed: CommittedConversation) -> Result<Response, Response> {
+    let correlation =
+        header::HeaderValue::from_str(&committed.event.correlation_id).map_err(|_| internal())?;
+    let mut response = Json(committed.conversation).into_response();
+    response.headers_mut().insert(
+        header::HeaderName::from_static("x-correlation-id"),
+        correlation,
+    );
+    Ok(response)
+}
+
+fn invalid_conversation_title() -> Response {
+    error(
+        StatusCode::BAD_REQUEST,
+        "INVALID_ARGUMENT",
+        "Conversation title must contain 1 to 160 printable characters",
+    )
 }
 
 #[derive(Deserialize)]
@@ -1386,10 +1609,25 @@ async fn list_conversations(
         .as_deref()
         .map(|value| decode_cursor(value, &workspace_id))
         .transpose()?;
+    // 014 contract row 14: the history list is filtered by status, ACTIVE by default.
+    // Archived Conversations can only exist once this feature writes one, so the
+    // default changes nothing for rows this build can have created.
+    let status = match query.status.as_deref() {
+        None | Some("ACTIVE") => ConversationStatus::Active,
+        Some("ARCHIVED") => ConversationStatus::Archived,
+        Some(_) => {
+            return Err(error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "Conversation status filter must be ACTIVE or ARCHIVED",
+            ));
+        }
+    };
     let rows = tokio::task::spawn_blocking(move || {
-        SqliteConversationStore::new(state.store.clone()).list_conversations(
+        SqliteConversationStore::new(state.store.clone()).list_conversations_by_status(
             &state.principal_id,
             &workspace_id,
+            status,
             cursor.as_ref().map(|c| c.created_at.as_str()),
             cursor.as_ref().map(|c| c.conversation_id.as_str()),
             limit + 1,
@@ -1474,6 +1712,19 @@ fn map_store_error(error_value: StoreError) -> Response {
             "AGENT_NOT_LEAD_ELIGIBLE",
             "Choose an enabled AgentBinding that is allowed to lead work",
         ),
+        // 014 contract rows 17-18: once a Conversation can be archived or tombstoned,
+        // the pre-existing create, submit, retry and binding-change routes must report
+        // the history codes instead of collapsing them into INVALID_ARGUMENT.
+        StoreError::Invalid(message) if message == CONVERSATION_ARCHIVED => error(
+            StatusCode::CONFLICT,
+            CONVERSATION_ARCHIVED,
+            "Archived Conversations cannot be changed; unarchive it first",
+        ),
+        StoreError::Invalid(message) if message == CONVERSATION_DELETED => error(
+            StatusCode::GONE,
+            CONVERSATION_DELETED,
+            "This Conversation was deleted",
+        ),
         StoreError::Invalid(message) if message == "WORKSPACE_ARCHIVED" => error(
             StatusCode::UNPROCESSABLE_ENTITY,
             "WORKSPACE_ARCHIVED",
@@ -1487,6 +1738,56 @@ fn map_store_error(error_value: StoreError) -> Response {
         _ => internal(),
     }
 }
+/// Store-error mapping for the Conversation history mutations (014 rows 16-18). These
+/// routes own their own mapper so the accepted 014 codes are returned without changing
+/// the codes the pre-existing create, agent-binding and turn routes already report.
+fn map_history_store_error(error_value: StoreError) -> Response {
+    match error_value {
+        StoreError::NotFound => not_found(),
+        StoreError::Conflict {
+            expected: None,
+            actual: None,
+        } => error(
+            StatusCode::CONFLICT,
+            "IDEMPOTENCY_CONFLICT",
+            "Idempotency key was already used for another Conversation request",
+        ),
+        StoreError::Conflict { .. } => error(
+            StatusCode::PRECONDITION_FAILED,
+            "STALE_VERSION",
+            "Conversation changed; refresh before saving",
+        ),
+        StoreError::Invalid(message) if message == CONVERSATION_ARCHIVED => error(
+            StatusCode::CONFLICT,
+            CONVERSATION_ARCHIVED,
+            "Archived Conversations cannot be changed; unarchive it first",
+        ),
+        // The storage refuses an archive while any turn of the Conversation is still
+        // nonterminal; the wire code for that case is CONVERSATION_TURN_IN_PROGRESS.
+        StoreError::Invalid(message) if message == CONVERSATION_NOT_QUIESCENT => error(
+            StatusCode::CONFLICT,
+            CONVERSATION_TURN_IN_PROGRESS,
+            "This Conversation still has a turn in progress; wait for it to finish or stop it",
+        ),
+        StoreError::Invalid(message) if message == CONVERSATION_DELETED => error(
+            StatusCode::GONE,
+            CONVERSATION_DELETED,
+            "This Conversation was deleted",
+        ),
+        StoreError::Invalid(message) if message == "WORKSPACE_ARCHIVED" => error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "WORKSPACE_ARCHIVED",
+            "Archived Workspaces cannot be changed",
+        ),
+        StoreError::Invalid(_) => error(
+            StatusCode::BAD_REQUEST,
+            "INVALID_ARGUMENT",
+            "Conversation request is invalid",
+        ),
+        _ => internal(),
+    }
+}
+
 fn error(status: StatusCode, code: &'static str, message: &'static str) -> Response {
     operator_error(status, code, message)
 }

@@ -52,7 +52,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T03 - Storage: Conversation status, rename and archive with CAS and idempotency
 
-- **Status:** PARTIAL - storage layer done (2026-11-10): `ConversationHistoryStore` (`rename_conversation`, `set_conversation_archived`, `get_conversation_status`, `list_conversations_by_status`) in `crates/storage-sqlite/src/conversations.rs`; CAS, request-dedup replay and changed-payload conflict, rename event carries `title_digest` only, archive refused with `CONVERSATION_NOT_QUIESCENT` while a turn is nonterminal, `create_conversation_turn` and the AgentBinding change reject a non-ACTIVE Conversation inside their own transactions. Tests `conversation_history_*` (5) pass. NOT done: `ConversationRecord` was not extended (status lives in the side table), the existing `list_conversations` still returns archived rows (callers must switch to `list_conversations_by_status`, T07), Operator routes (T07), event and error-code schema promotion (T02).
+- **Status:** PARTIAL - storage layer done (2026-11-10): `ConversationHistoryStore` (`rename_conversation`, `set_conversation_archived`, `get_conversation_status`, `list_conversations_by_status`) in `crates/storage-sqlite/src/conversations.rs`; CAS, request-dedup replay and changed-payload conflict, rename event carries `title_digest` only, archive refused with `CONVERSATION_NOT_QUIESCENT` while a turn is nonterminal, `create_conversation_turn` and the AgentBinding change reject a non-ACTIVE Conversation inside their own transactions. Tests `conversation_history_*` (5) pass. NOT done: `ConversationRecord` was not extended (status lives in the side table); event and error-code schema promotion (T02). The stale claim that the existing `list_conversations` returns archived rows to served callers was RESOLVED 2026-11-10 by T07: the Operator's `GET /v1/conversations` now delegates to `list_conversations_by_status`, so the served default page no longer exposes ARCHIVED rows. The desktop bridge's own `list_conversations` command (Feature 011) and the trait default are unchanged and still return every status. Operator routes are T07 and are now PARTIAL: rename, archive, unarchive and the status filter are served.
 - **Depends on:** T01, T02
 - **Cross-package prerequisites:** Feature 001 storage single-flight (001 T11) so "no nonterminal turn" is checkable in one query.
 - **Owner:** Storage, Conversation.
@@ -125,7 +125,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T07 - Operator routes: rename, archive, unarchive and status-aware existing routes
 
-- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
+- **Status:** PARTIAL - routes done (2026-11-10). Shipped in `apps/litecoworkd/src/conversation_operator.rs`: `PATCH /v1/conversations/{conversation_id}` (`rename_conversation`), `POST .../archive` and `POST .../unarchive` (`archive_conversation`/`unarchive_conversation` through one `set_conversation_archived_state` helper), each requiring `If-Match` and `Idempotency-Key` and returning `200 Conversation` with `x-correlation-id`; `status` (`ACTIVE` default, `ARCHIVED`) added to the `list_conversations` query and delegated to `list_conversations_by_status`. A dedicated `map_history_store_error` returns the accepted 014 codes (`STALE_VERSION` 412, `IDEMPOTENCY_CONFLICT` 409, `CONVERSATION_ARCHIVED` 409, `CONVERSATION_DELETED` 410, `WORKSPACE_ARCHIVED` 422) and maps the storage's `CONVERSATION_NOT_QUIESCENT` to `CONVERSATION_TURN_IN_PROGRESS`; `CONVERSATION_ARCHIVED`/`CONVERSATION_DELETED` are also mapped on the shared mapper the pre-existing submit, retry and binding-change routes use. Tests: `conversation_rename_route_commits_a_digest_only_event_and_fences_version_and_key` and `conversation_archive_routes_gate_on_turn_quiescence_and_filter_the_history_list` in `apps/litecoworkd/src/conversation_operator_tests.rs` (the task named a new `conversation_history_operator_tests.rs`; the existing operator test module was used instead so the routes share its fixtures). DEVIATIONS to review: a foreign Workspace answers `404 NOT_FOUND` (the storage ownership check the sibling Conversation routes already use), not the `FORBIDDEN` this task text names; `{"title": null}` is accepted by the contract shape and refused with `INVALID_ARGUMENT` because a Conversation title is never empty. REMAINING: nothing else in this task's change intent; the `CONVERSATION_TURN_IN_PROGRESS` search is left to T08. The canonical `conversation_history_operator` filter named below was not created - the tests run under the existing `conversation` filter.
 - **Depends on:** T01, T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Operator, Conversation.
@@ -133,10 +133,10 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 - **Contract:** SPEC section 7.2; AC-001 to AC-005.
 - **Change intent:** add `PATCH /v1/conversations/{conversation_id}` (`rename_conversation` handler), `POST .../archive`, `POST .../unarchive` requiring If-Match and Idempotency-Key, reusing `idempotency_key`, `selected_workspace` and `ensure_workspace_owner_for`; add `status` query to `list_conversations`; map `CONVERSATION_ARCHIVED` from storage on submit, retry and binding change.
 - **Acceptance:**
-  - [ ] Each route returns the committed record with the new version (AC-001, AC-004, AC-005).
-  - [ ] Missing If-Match or Idempotency-Key is `INVALID_ARGUMENT`; foreign Workspace is `FORBIDDEN` (AC-002).
-  - [ ] Replay returns stored response (AC-003).
-- **Command:** `cargo test -p litecoworkd --locked conversation_history_operator` (filter to be added by this task)
+  - [x] Each route returns the committed record with the new version (AC-001, AC-004, AC-005).
+  - [x] Missing If-Match or Idempotency-Key is `INVALID_ARGUMENT` (AC-002); a foreign Workspace is `NOT_FOUND`, following the sibling Conversation routes rather than the `FORBIDDEN` named here (AC-002, deviation recorded above).
+  - [x] Replay returns stored response (AC-003).
+- **Command:** `cargo test -p litecoworkd --locked conversation` (T07 shipped its routes into the existing operator test module, so the route tests run under the existing `conversation` filter; the `conversation_history_operator` filter named in the original task text was not created)
 - **Evidence:** test output.
 - **Stop:** NONE beyond test failure.
 

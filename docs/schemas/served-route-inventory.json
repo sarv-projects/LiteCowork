@@ -1251,6 +1251,21 @@
   ],
   "served_outside_openapi": [
     {
+      "method": "PATCH",
+      "path": "/v1/conversations/{conversation_id}",
+      "source": "apps/litecoworkd/src/conversation_operator.rs"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/conversations/{conversation_id}/archive",
+      "source": "apps/litecoworkd/src/conversation_operator.rs"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/conversations/{conversation_id}/unarchive",
+      "source": "apps/litecoworkd/src/conversation_operator.rs"
+    },
+    {
       "method": "POST",
       "path": "/v1/stream",
       "source": "apps/litecoworkd/src/presentation_operator.rs"

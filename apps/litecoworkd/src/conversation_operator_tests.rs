@@ -2125,3 +2125,451 @@ fn conversation_routes_project_the_operators_single_native_session_supervisor() 
     // nothing to signal: the route must report that honestly rather than claim a Stop.
     assert!(!first.request_cancel("turn-not-dispatched", 0));
 }
+
+async fn rename_request(
+    router: &Router,
+    workspace_id: &str,
+    conversation_id: &str,
+    expected_version: u64,
+    request_id: &str,
+    title: serde_json::Value,
+) -> Response {
+    let mut request = Request::patch(format!("/v1/conversations/{conversation_id}"))
+        .header("x-workspace-id", workspace_id)
+        .header("if-match", format!("\"{expected_version}\""))
+        .header("idempotency-key", request_id)
+        .header("content-type", "application/json")
+        .body(Body::from(
+            serde_json::json!({ "title": title }).to_string(),
+        ))
+        .expect("Conversation rename request is valid");
+    request.extensions_mut().insert(AuthenticatedLocalPeer);
+    router
+        .clone()
+        .oneshot(request)
+        .await
+        .expect("authenticated Conversation rename route responds")
+}
+
+/// POSTs one of the bodyless Conversation history commands (`archive`/`unarchive`).
+async fn history_command_request(
+    router: &Router,
+    workspace_id: &str,
+    conversation_id: &str,
+    action: &str,
+    expected_version: u64,
+    request_id: &str,
+) -> Response {
+    let mut request = Request::post(format!("/v1/conversations/{conversation_id}/{action}"))
+        .header("x-workspace-id", workspace_id)
+        .header("if-match", format!("\"{expected_version}\""))
+        .header("idempotency-key", request_id)
+        .body(Body::empty())
+        .expect("Conversation history command request is valid");
+    request.extensions_mut().insert(AuthenticatedLocalPeer);
+    router
+        .clone()
+        .oneshot(request)
+        .await
+        .expect("authenticated Conversation history route responds")
+}
+
+async fn history_list_page(router: &Router, workspace_id: &str, status: &str) -> Response {
+    let mut request = Request::get(format!("/v1/conversations?status={status}"))
+        .header("x-workspace-id", workspace_id)
+        .body(Body::empty())
+        .expect("Conversation history list request is valid");
+    request.extensions_mut().insert(AuthenticatedLocalPeer);
+    router
+        .clone()
+        .oneshot(request)
+        .await
+        .expect("authenticated Conversation list responds")
+}
+
+/// Reads the durable history state row the archive routes own.
+fn history_state(database: &std::path::Path, conversation_id: &str) -> Option<String> {
+    rusqlite::Connection::open(database)
+        .expect("inspect Conversation history state")
+        .query_row(
+            "SELECT status FROM conversation_history_state WHERE conversation_id=?1",
+            [conversation_id],
+            |row| row.get(0),
+        )
+        .ok()
+}
+
+fn history_events(database: &std::path::Path, conversation_id: &str) -> Vec<(String, String)> {
+    let connection =
+        rusqlite::Connection::open(database).expect("inspect Conversation history events");
+    connection
+        .prepare(
+            "SELECT type,payload_json FROM domain_events WHERE entity_type='Conversation' AND entity_id=?1 ORDER BY origin_sequence",
+        )
+        .expect("prepare history event read")
+        .query_map([conversation_id], |row| Ok((row.get(0)?, row.get(1)?)))
+        .expect("read history events")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("collect history events")
+}
+
+/// Seeds one nonterminal turn directly so the archive gate can be exercised without a
+/// live dispatch: only a turn row makes the Conversation non-quiescent.
+fn seed_nonterminal_turn(database: &std::path::Path, conversation_id: &str) {
+    let connection = rusqlite::Connection::open(database).expect("seed nonterminal turn");
+    connection
+        .execute_batch("PRAGMA foreign_keys=ON;")
+        .expect("enable seed foreign keys");
+    connection
+        .execute(
+            "INSERT INTO conversation_messages(message_id,conversation_id,author_json,role,agent_session_id,agent_binding_id,turn_id,content_json,resource_refs_json,source_channel_ref_json,created_at) VALUES('history-seeded-message',?1,'{\"kind\":\"USER\"}','USER',NULL,NULL,NULL,'[]','[]',NULL,'2026-10-15T12:00:01Z')",
+            [conversation_id],
+        )
+        .expect("seed the in-flight turn message");
+    connection
+        .execute(
+            "INSERT INTO conversation_turns(turn_id,conversation_id,user_message_id,agent_session_id,status,retry_ordinal,created_at,settled_at,version) VALUES('history-seeded-turn',?1,'history-seeded-message',NULL,'WAITING_USER',0,'2026-10-15T12:00:01Z',NULL,1)",
+            [conversation_id],
+        )
+        .expect("seed the in-flight turn");
+}
+
+#[tokio::test]
+async fn conversation_rename_route_commits_a_digest_only_event_and_fences_version_and_key() {
+    let directory = tempfile::tempdir().expect("temporary Conversation rename directory");
+    #[cfg(unix)]
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+        .expect("private Conversation rename directory");
+    let database = directory.path().join("state.sqlite3");
+    let store = SqliteWorkspaceStore::open(
+        &database,
+        Arc::new(FileBlobStore::new(
+            directory.path().join("blobs"),
+            PaginationTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("real temporary SQLite store opens");
+    create_workspace(&store, WORKSPACE_A, "rename-a");
+    seed_conversation(
+        &store,
+        WORKSPACE_A,
+        "conversation-rename-route",
+        "Original title",
+        "2026-10-15T12:00:00.000000000Z",
+    );
+    let router = test_router(store.clone(), OWNER.to_owned(), RUNTIME.to_owned());
+    let request_id = "conversation-rename-request-1";
+
+    let renamed = read_updated_conversation(
+        rename_request(
+            &router,
+            WORKSPACE_A,
+            "conversation-rename-route",
+            1,
+            request_id,
+            serde_json::json!("Renamed title"),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(renamed.title.as_deref(), Some("Renamed title"));
+    assert_eq!(renamed.version, 2);
+
+    // An exact retry replays the original commit and writes no second event.
+    let replay = read_updated_conversation(
+        rename_request(
+            &router,
+            WORKSPACE_A,
+            "conversation-rename-route",
+            1,
+            request_id,
+            serde_json::json!("Renamed title"),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        replay, renamed,
+        "an exact retry returns the original commit"
+    );
+
+    // One key cannot describe two titles.
+    let reused = rename_request(
+        &router,
+        WORKSPACE_A,
+        "conversation-rename-route",
+        1,
+        request_id,
+        serde_json::json!("A different title"),
+    )
+    .await;
+    let (status, error) = read_operator_error(reused).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(error["code"], "IDEMPOTENCY_CONFLICT");
+
+    // A stale If-Match with a new key is refused with the 014 code.
+    let stale = rename_request(
+        &router,
+        WORKSPACE_A,
+        "conversation-rename-route",
+        1,
+        "conversation-rename-request-2",
+        serde_json::json!("Stale title"),
+    )
+    .await;
+    let (status, error) = read_operator_error(stale).await;
+    assert_eq!(status, StatusCode::PRECONDITION_FAILED);
+    assert_eq!(error["code"], "STALE_VERSION");
+
+    // An empty, over-long or control-character title is refused before any write.
+    for (value, label) in [
+        (serde_json::json!("   "), "blank"),
+        (serde_json::json!("x".repeat(161)), "over-long"),
+        (serde_json::json!("bad\u{7}title"), "control"),
+        (serde_json::Value::Null, "null"),
+        (serde_json::json!(7), "non-string"),
+    ] {
+        let refused = rename_request(
+            &router,
+            WORKSPACE_A,
+            "conversation-rename-route",
+            2,
+            &format!("conversation-rename-invalid-{label}"),
+            value,
+        )
+        .await;
+        let (status, error) = read_operator_error(refused).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{label}");
+        assert_eq!(error["code"], "INVALID_ARGUMENT", "{label}");
+    }
+
+    // Exactly one rename event is durable, and it carries the digest, never the title.
+    let events = history_events(&database, "conversation-rename-route");
+    let renamed_events: Vec<_> = events
+        .iter()
+        .filter(|(kind, _)| kind == "conversation.renamed.v1")
+        .collect();
+    assert_eq!(
+        renamed_events.len(),
+        1,
+        "retries and refusals emit no event"
+    );
+    assert!(renamed_events[0].1.contains("title_digest"));
+    assert!(!renamed_events[0].1.contains("Renamed title"));
+
+    let final_record = SqliteConversationStore::new(store)
+        .get_conversation(OWNER, WORKSPACE_A, "conversation-rename-route")
+        .expect("read Conversation")
+        .expect("Conversation remains present");
+    assert_eq!(final_record, renamed);
+}
+
+#[tokio::test]
+async fn conversation_archive_routes_gate_on_turn_quiescence_and_filter_the_history_list() {
+    let directory = tempfile::tempdir().expect("temporary Conversation archive directory");
+    #[cfg(unix)]
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+        .expect("private Conversation archive directory");
+    let database = directory.path().join("state.sqlite3");
+    let store = SqliteWorkspaceStore::open(
+        &database,
+        Arc::new(FileBlobStore::new(
+            directory.path().join("blobs"),
+            PaginationTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("real temporary SQLite store opens");
+    create_workspace(&store, WORKSPACE_A, "archive-a");
+    seed_conversation(
+        &store,
+        WORKSPACE_A,
+        "conversation-archive-route",
+        "Archive me",
+        "2026-10-15T12:00:00.000000000Z",
+    );
+    seed_conversation(
+        &store,
+        WORKSPACE_A,
+        "conversation-archive-blocked",
+        "Still working",
+        "2026-10-15T12:00:01.000000000Z",
+    );
+    seed_nonterminal_turn(&database, "conversation-archive-blocked");
+    let router = test_router(store.clone(), OWNER.to_owned(), RUNTIME.to_owned());
+
+    // A Conversation with a nonterminal turn cannot be archived. The keys below avoid
+    // the fixture's own `{conversation_id}-request` creation key: reusing it would be
+    // answered from the creation receipt instead of reaching the archive check.
+    let blocked = history_command_request(
+        &router,
+        WORKSPACE_A,
+        "conversation-archive-blocked",
+        "archive",
+        1,
+        "a06-history-archive-blocked-key",
+    )
+    .await;
+    let (status, error) = read_operator_error(blocked).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(error["code"], "CONVERSATION_TURN_IN_PROGRESS");
+    assert_eq!(
+        history_state(&database, "conversation-archive-blocked"),
+        None
+    );
+
+    let archived = read_updated_conversation(
+        history_command_request(
+            &router,
+            WORKSPACE_A,
+            "conversation-archive-route",
+            "archive",
+            1,
+            "a06-history-archive-key-1",
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(archived.version, 2);
+    assert_eq!(
+        history_state(&database, "conversation-archive-route").as_deref(),
+        Some("ARCHIVED")
+    );
+
+    // Archiving again is a stale version: the row already moved past If-Match 1.
+    let archived_again = history_command_request(
+        &router,
+        WORKSPACE_A,
+        "conversation-archive-route",
+        "archive",
+        1,
+        "a06-history-archive-key-2",
+    )
+    .await;
+    let (status, error) = read_operator_error(archived_again).await;
+    assert_eq!(status, StatusCode::PRECONDITION_FAILED);
+    assert_eq!(error["code"], "STALE_VERSION");
+
+    // An archived Conversation refuses a rename with the 014 code.
+    let rename_on_archived = rename_request(
+        &router,
+        WORKSPACE_A,
+        "conversation-archive-route",
+        2,
+        "a06-history-rename-on-archived-key",
+        serde_json::json!("Cannot rename while archived"),
+    )
+    .await;
+    let (status, error) = read_operator_error(rename_on_archived).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(error["code"], "CONVERSATION_ARCHIVED");
+
+    // The pre-existing AgentBinding route reports the same history code, not
+    // INVALID_ARGUMENT: an archived Conversation refuses every domain mutation.
+    let binding_on_archived = set_conversation_agent_binding_request(
+        &router,
+        WORKSPACE_A,
+        "conversation-archive-route",
+        2,
+        "a06-history-binding-on-archived-key",
+        serde_json::Value::Null,
+    )
+    .await;
+    let (status, error) = read_operator_error(binding_on_archived).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(error["code"], "CONVERSATION_ARCHIVED");
+
+    // The history list is filtered: the archived row leaves the default page.
+    let active = read_page(history_list_page(&router, WORKSPACE_A, "ACTIVE").await).await;
+    let active_ids: Vec<_> = active
+        .items
+        .iter()
+        .map(|item| item.conversation_id.as_str())
+        .collect();
+    assert!(
+        !active_ids.contains(&"conversation-archive-route"),
+        "an archived Conversation is not on the ACTIVE page"
+    );
+    assert!(active_ids.contains(&"conversation-archive-blocked"));
+    let archived_page = read_page(history_list_page(&router, WORKSPACE_A, "ARCHIVED").await).await;
+    assert_eq!(
+        archived_page
+            .items
+            .iter()
+            .map(|item| item.conversation_id.as_str())
+            .collect::<Vec<_>>(),
+        ["conversation-archive-route"]
+    );
+    let unsupported = history_list_page(&router, WORKSPACE_A, "DELETED").await;
+    assert_eq!(unsupported.status(), StatusCode::BAD_REQUEST);
+
+    // Unarchive returns the Conversation to ACTIVE on the next version.
+    let unarchived = read_updated_conversation(
+        history_command_request(
+            &router,
+            WORKSPACE_A,
+            "conversation-archive-route",
+            "unarchive",
+            2,
+            "a06-history-unarchive-key-1",
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(unarchived.version, 3);
+    assert_eq!(
+        history_state(&database, "conversation-archive-route").as_deref(),
+        Some("ACTIVE")
+    );
+
+    // Unarchiving an ACTIVE Conversation is refused: the storage answers a version
+    // conflict rather than a silent no-op, and a foreign owner never reaches storage.
+    let active_unarchive = history_command_request(
+        &router,
+        WORKSPACE_A,
+        "conversation-archive-blocked",
+        "unarchive",
+        1,
+        "a06-history-unarchive-active-key",
+    )
+    .await;
+    let (status, error) = read_operator_error(active_unarchive).await;
+    assert_eq!(status, StatusCode::PRECONDITION_FAILED);
+    assert_eq!(error["code"], "STALE_VERSION");
+    let foreign = test_router(
+        store,
+        "a06-pagination-foreign-owner".to_owned(),
+        RUNTIME.to_owned(),
+    );
+    let foreign_unarchive = history_command_request(
+        &foreign,
+        WORKSPACE_A,
+        "conversation-archive-route",
+        "unarchive",
+        3,
+        "a06-history-unarchive-foreign-key",
+    )
+    .await;
+    assert_eq!(foreign_unarchive.status(), StatusCode::NOT_FOUND);
+
+    let events = history_events(&database, "conversation-archive-route");
+    let kinds: Vec<&str> = events
+        .iter()
+        .map(|(kind, _)| kind.as_str())
+        // `conversation.unarchived.v1` does not share the `archiv` prefix of
+        // `conversation.archived.v1`, so match on the stem instead.
+        .filter(|kind| kind.contains("archiv"))
+        .collect();
+    assert_eq!(
+        kinds,
+        ["conversation.archived.v1", "conversation.unarchived.v1"],
+        "the refused and replayed commands emit no history event"
+    );
+}
