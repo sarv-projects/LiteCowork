@@ -1899,3 +1899,68 @@ async fn conversation_cancel_commits_only_the_request_and_never_fabricates_cance
     assert_eq!((status.as_str(), version), ("CANCEL_REQUESTED", 3));
     assert_eq!(fixture.intents("turn-running"), vec![(0, "CLAIMED".to_owned())]);
 }
+
+#[test]
+fn conversation_session_recovery_settles_prior_incarnation_attempts_idempotently() {
+    let fixture = turn_command_fixture("turn-recovery-workspace");
+    let store = SqliteWorkspaceStore::open(
+        fixture.database.clone(),
+        Arc::new(FileBlobStore::new(
+            fixture._directory.path().join("blobs"),
+            PaginationTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("reopen the store as a restarted daemon would");
+    // Single-flight admission allows one nonterminal turn per Conversation, so each
+    // crash window is seeded and swept in turn.
+    fixture.seed_turn("turn-recover-completed", "COMPLETED", 4, 0);
+    let recover = || {
+        crate::agents::conversation_recovery::recover_conversation_sessions(&store, RUNTIME, OWNER)
+    };
+    for (turn, status, version) in [
+        ("turn-recover-running", "RUNNING", 2),
+        ("turn-recover-cancel", "CANCEL_REQUESTED", 3),
+        ("turn-recover-open", "OPEN", 1),
+    ] {
+        fixture.seed_turn(turn, status, version, 0);
+        if status == "OPEN" {
+            // Admitted but never claimed: the intent is UNCLAIMED.
+            fixture
+                .connection()
+                .execute(
+                    "UPDATE conversation_dispatch_intents SET state='UNCLAIMED',claimed_by_runtime_incarnation=NULL,claimed_at=NULL WHERE turn_id=?1",
+                    [turn],
+                )
+                .expect("mark intent unclaimed");
+        }
+        let report = recover();
+        assert_eq!((report.failures, report.intents_settled), (0, 1), "{turn}");
+        assert_eq!(fixture.turn_row(turn).0, "FAILED", "{turn} must be FAILED");
+        assert_eq!(fixture.intents(turn), vec![(0, "SETTLED".to_owned())]);
+    }
+    // A completed answer is never rewritten.
+    assert_eq!(fixture.turn_row("turn-recover-completed").0, "COMPLETED");
+    let sessions: i64 = fixture
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM agent_sessions WHERE status NOT IN ('LOST','CLOSED')",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count live sessions");
+    assert_eq!(sessions, 0);
+    let messages: i64 = fixture
+        .connection()
+        .query_row("SELECT COUNT(*) FROM conversation_messages WHERE role='AGENT'", [], |row| row.get(0))
+        .expect("count agent messages");
+    assert_eq!(messages, 0, "recovery never invents an answer");
+
+    // Running the sweep again changes nothing, and Retry is then offered.
+    let again = recover();
+    assert_eq!(again.intents_settled, 0);
+    assert_eq!(again.failures, 0);
+}

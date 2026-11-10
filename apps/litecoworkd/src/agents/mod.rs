@@ -11,6 +11,7 @@ mod codex;
 mod codex_app_server;
 mod codex_profile_probe;
 pub(crate) mod control_descriptor;
+pub(crate) mod conversation_recovery;
 mod conversation_prompt;
 pub(crate) mod module_registry;
 mod native_cli;

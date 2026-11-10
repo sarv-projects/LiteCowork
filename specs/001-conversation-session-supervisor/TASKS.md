@@ -152,7 +152,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T08 - Implement daemon restart and orphan recovery sweep
 
-- **Status:** NOT STARTED - `list_starting_conversation_agent_sessions` and `mark_starting_conversation_agent_session_lost` exist with tests but no caller in `recover_and_persist_startup_blockers` (`apps/litecoworkd/src/runtime.rs`) or elsewhere at startup.
+- **Status:** DONE (restart sweep; crash windows covered with seeded rows, no live agent kill) - `agents/conversation_recovery.rs` runs from `recover_and_persist_startup_blockers` before the Operator accepts commands. It settles every UNCLAIMED or CLAIMED dispatch intent's turn FAILED with reason `RUNTIME_RESTARTED` (RUNNING, CANCEL_REQUESTED and never-claimed OPEN turns alike; no same-incarnation resume in V1, so unknown native state is never reported completed and Retry is offered), ends the AgentSession LOST, and releases any STARTING session no intent explains. A failing row raises the `CONVERSATION_SESSION_RECOVERY_FAILED` startup blocker. Legacy turns from before the v29 outbox are only reached through their STARTING session. Evidence: `conversation_session_recovery_settles_prior_incarnation_attempts_idempotently` (RUNNING, CANCEL_REQUESTED, OPEN/UNCLAIMED, a COMPLETED turn untouched, no AGENT message invented, second sweep a no-op). Not exercised: a real process kill mid-turn.
 - **Depends on:** T03, T06, T07, T10
 - **Cross-package prerequisites:** Feature 011 Runtime incarnation and startup-blocker reporting.
 - **Owner:** Agent Runtime, Storage, Conversation.

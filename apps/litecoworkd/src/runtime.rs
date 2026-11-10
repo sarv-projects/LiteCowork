@@ -638,6 +638,17 @@ fn recover_and_persist_startup_blockers(
             created_at: timestamp_now()?,
         });
     }
+    let conversation_recovery = crate::agents::conversation_recovery::recover_conversation_sessions(
+        store,
+        &state.runtime_id,
+        owner_principal_id,
+    );
+    if conversation_recovery.failures > 0 {
+        blockers.push(RuntimeLifecycleBlocker {
+            code: "CONVERSATION_SESSION_RECOVERY_FAILED".to_owned(),
+            created_at: timestamp_now()?,
+        });
+    }
     persist_final_recovery_blockers(data_directory, state, &blockers)?;
     Ok(blockers)
 }

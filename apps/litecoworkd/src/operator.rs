@@ -2117,6 +2117,11 @@ fn runtime_lifecycle_blocker_copy(code: &str) -> (&'static str, &'static str, &'
             "Expired execution lease recovery did not complete.",
             "Keep work stopped until the local Runtime has reconciled expired leases.",
         ),
+        "CONVERSATION_SESSION_RECOVERY_FAILED" => (
+            "RUNTIME_UNAVAILABLE",
+            "Conversation turn recovery did not complete.",
+            "Review interrupted Conversation turns before sending new messages.",
+        ),
         _ => (
             "RUNTIME_UNAVAILABLE",
             "Runtime recovery has unresolved requirements.",
