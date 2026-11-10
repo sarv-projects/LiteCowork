@@ -2,6 +2,7 @@
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 **Revision:** 1.0 | **Updated:** 2026-11-09 | **Owner acceptance:** B-34 accepted (scoped) 2026-11-09 via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md); implementation waits on Feature 001 effective Stop/quiescence.
+**Implementation state (2026-11-10):** Storage layer only. T05 PARTIAL: migration v32 (`conversation_control_events`, `conversation_owner_side_notes`) with `ConversationCoeditStore`-level tests in `conversation_coedit_tests.rs`; T01 PARTIAL (contract promotion). T02, T03, T04 and T06 to T11 are unblocked (001 T07 and T11 are DONE) but NOT STARTED: no route, service or UI.
 **Owners:** Conversation, Agent Runtime, Product.
 
 ## User outcome

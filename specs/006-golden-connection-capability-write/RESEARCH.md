@@ -84,3 +84,15 @@ Content was rephrased for compliance with licensing restrictions.
 - OAuth recipe after the client-secret finding (TASKS T02, owner).
 - Whether the Task-scoped golden write needs an admitted Environment (SPEC §18; affects the Windows row through 005 B-35).
 - Confirmation of the golden read operation (proposed: list issue comments), recorded in T01.
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+Research note, not a decision. Source: [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159) at the pinned SHA (MIT, Copyright (c) 2026 DeepSeek). Local read-only clone `repo_take/deepseek-harness` is gitignored and never staged. Upstream paths below were checked to exist at that SHA on 2026-11-10.
+
+Read-depth limits from the study (do not over-trust): `scripts/` about 58% read, tests about 5% read, installer UI text partly unread. See [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 0 and 15 before turning any item into a design.
+
+
+Plugin-architecture lessons (see [plugin study](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) Section 8):
+  - Fail-closed reachability probe before network operations: [packages/boot/plugin-manager/src/git-transport.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/git-transport.ts). Class **ADAPT**. Probe before a golden connection write. Reuse: pattern only, reimplement; no upstream code imported.
+  - Credential refusal in approvals and install specs: [packages/boot/plugin-manager/src/install-spec.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/install-spec.ts). Class **ADOPT (small rule)**. Tokens never appear in config, specs or prompts. Rule only, reimplement; MIT notice if text is carried over. Reuse: pattern only, reimplement; no upstream code imported.
+

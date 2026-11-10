@@ -13,6 +13,13 @@ pub use execution::{
     StepAttemptAdmissionSnapshot, StepAttemptStore,
 };
 
+mod agent_descriptor;
+pub use agent_descriptor::{
+    AGENT_CONTROL_DESCRIPTOR_MAX_BYTES, AGENT_CONTROL_DESCRIPTOR_TTL_SECONDS,
+    AGENT_DESCRIPTOR_PROBES_PER_MINUTE, AgentControlDescriptorRecord, AgentDescriptorGate,
+    AgentDescriptorStore, validate_agent_control_descriptor_record,
+};
+
 mod agent_registry_cache;
 pub use agent_registry_cache::{
     AGENT_REGISTRY_CACHE_MAX_ENTRIES, AGENT_REGISTRY_CACHE_MAX_SNAPSHOT_BYTES,
@@ -92,8 +99,10 @@ pub mod conversation;
 pub use conversation::{
     CommittedConversation, CommittedConversationTurn, ConversationMessageRecord, ConversationPage,
     ConversationRecord, ConversationStore, ConversationTurnReceipt, ConversationTurnStore,
-    CreateConversationCommit, CreateConversationTurnCommit, ResolvedConversationHost,
-    SetConversationAgentBinding,
+    AppendOwnerSideNote, ConversationCoeditStore, ConversationHistoryStore, ConversationStatus,
+    OwnerControlEventInsert, OwnerSideNoteRecord, CreateConversationCommit,
+    CreateConversationTurnCommit, RenameConversation, ResolvedConversationHost,
+    SetConversationAgentBinding, SetConversationArchived,
 };
 
 mod effect_evidence;
@@ -591,6 +600,22 @@ pub struct LocalRuntimeLifecycleSnapshot {
     pub incarnation: RuntimeIncarnationRecord,
 }
 
+/// Durable owner records that block a safe Runtime stop, read for one exact current
+/// incarnation. This is only what SQLite records show: live processes, provider
+/// sessions and terminal or browser sessions are NOT in this observation, so an empty
+/// observation never proves quiescence by itself.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeStopObservation {
+    pub admitted_turn_ids: Vec<String>,
+    pub admitted_attempt_ids: Vec<String>,
+    pub dependent_task_ids: Vec<String>,
+    pub unresolved_effect_ids: Vec<String>,
+    pub execution_lease_ids: Vec<String>,
+    pub environment_control_lease_ids: Vec<String>,
+    pub pending_cleanup_ids: Vec<String>,
+}
+
 /// Local Runtime lifecycle persistence. Registration commits the Runtime descriptor,
 /// one fresh incarnation, and its local observation atomically. It does not enroll a
 /// Workspace or publish Mesh presence.
@@ -614,6 +639,13 @@ pub trait RuntimeLifecycleStore: Send + Sync {
         runtime_id: &str,
         expected_incarnation_id: &str,
     ) -> Result<Option<LocalRuntimeLifecycleSnapshot>, StoreError>;
+
+    /// Reads the durable stop blockers only when `expected_incarnation_id` is current.
+    fn read_runtime_stop_observation(
+        &self,
+        runtime_id: &str,
+        expected_incarnation_id: &str,
+    ) -> Result<Option<RuntimeStopObservation>, StoreError>;
 }
 
 /// Explicit authorization for one Runtime installation to act within one Workspace.
@@ -901,6 +933,13 @@ pub struct AgentBindingEnableRequest {
     pub expected_version: u64,
     pub now: String,
     pub event: EventDraft,
+    /// When set, the profile's module declares an AgentControlDescriptor, so enable
+    /// needs `descriptor_revision` to equal the latest fresh descriptor digest of this
+    /// stream, checked in the same transaction (specs/002 T06).
+    #[serde(default)]
+    pub require_descriptor: Option<AgentDescriptorGate>,
+    #[serde(default)]
+    pub descriptor_revision: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

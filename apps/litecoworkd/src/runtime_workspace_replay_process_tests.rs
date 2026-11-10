@@ -1,5 +1,5 @@
 use super::{
-    RuntimeState, STATE_FILE, read_state, runtime_process_tests::assert_degraded_lifecycle,
+    RuntimeState, STATE_FILE, read_state, runtime_process_tests::assert_ready_lifecycle,
 };
 use base64::Engine;
 use operator_ipc::{
@@ -240,7 +240,7 @@ fn spawned_daemon_replays_workspace_create_after_lost_ack_and_restart() {
         "workspace-replay-lifecycle-before-create",
     )
     .expect("authenticated lifecycle projection is available after readiness");
-    assert_degraded_lifecycle(&first_lifecycle, &runtime_id, &first_incarnation);
+    assert_ready_lifecycle(&first_lifecycle, &runtime_id, &first_incarnation);
     let local_principal_id = read_state(&directory.path().join(STATE_FILE))
         .expect("read first Runtime state")
         .expect("first Runtime state exists")
@@ -313,7 +313,7 @@ fn spawned_daemon_replays_workspace_create_after_lost_ack_and_restart() {
         "workspace-replay-lifecycle-after-restart",
     )
     .expect("authenticated lifecycle projection is available after restarted readiness");
-    assert_degraded_lifecycle(&restarted_lifecycle, &runtime_id, restarted_incarnation);
+    assert_ready_lifecycle(&restarted_lifecycle, &runtime_id, restarted_incarnation);
 
     let replay = send_workspace_create(
         directory.path(),

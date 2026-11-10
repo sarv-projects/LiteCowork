@@ -358,6 +358,8 @@ fn setup() -> Fixture {
             agent_binding_id: BINDING_ID.to_owned(),
             expected_version: 1,
             now: NOW.to_owned(),
+            require_descriptor: None,
+            descriptor_revision: None,
             event: draft(
                 "event-agent-binding-enable",
                 WORKSPACE_ID,
@@ -536,6 +538,8 @@ fn enable_request(
         agent_binding_id: binding.agent_binding_id.clone(),
         expected_version,
         now: NOW.to_owned(),
+        require_descriptor: None,
+        descriptor_revision: None,
         event: draft(
             &format!("event-{request_id}"),
             &binding.workspace_id,
@@ -1010,8 +1014,8 @@ fn seed_running_task_and_planner(fixture: &Fixture, session_status: &str) {
     )
     .expect("Task with the admitted lead is present");
     tx.execute(
-        "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,lead_failover_policy_json,placement_preference,preferred_lead_agent_binding_id,authored_by_json,created_at)
-         VALUES('task-pinned-planner',?1,1,'Keep planning session pinned',?2,'{}',?3,?4,?5)",
+        "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,lead_failover_policy_json,placement_preference,preferred_lead_agent_binding_id,authored_by_json,created_at,delegation_policy_snapshot_json)
+         VALUES('task-pinned-planner',?1,1,'Keep planning session pinned',?2,'{}',?3,?4,?5,'{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}')",
         params![
             WORKSPACE_ID,
             r#"{"mode":"DISABLED","triggers":[],"fallback_agent_binding_ids":[],"max_lead_changes":0}"#,
@@ -2263,6 +2267,14 @@ fn conversation_agent_response_commit_settles_turn_and_session_atomically() {
             agent_session_id: session_id.clone(),
             expected_turn_version: expected_turn_v,
             expected_session_version: expected_sess_v,
+            retry_ordinal: 0,
+            provider_response_id: "provider-response-1".to_owned(),
+            usage: Some(storage_core::conversation::ConversationTurnUsage {
+                attribution_source:
+                    storage_core::conversation::UsageAttributionSource::ProviderReported,
+                input_tokens: 11,
+                output_tokens: 7,
+            }),
             turn_status: ConversationTurnStatus::Completed,
             message: ConversationMessageRecord {
                 message_id: msg_id.to_owned(),
@@ -2405,6 +2417,60 @@ fn conversation_agent_response_commit_settles_turn_and_session_atomically() {
     assert_eq!(replay.message.message_id, "msg-agent-1");
     assert_eq!(replay.turn.version, 3);
     assert_eq!(replay.session.status, "CLOSED");
+
+    // The same response identity under a fresh request id replays the stored receipt
+    // (AC-026) even though the turn and session have moved on.
+    let same_identity = conv_store
+        .commit_conversation_agent_response(make_commit(
+            "req-ok-retried",
+            "msg-agent-other-id",
+            2,
+            2,
+            OWNER_ID,
+        ))
+        .expect("same provider response identity replays the stored receipt");
+    assert_eq!(same_identity.message.message_id, "msg-agent-1");
+
+    // A different provider response for the same turn and retry ordinal is rejected
+    // and writes nothing.
+    let mut different = make_commit("req-different", "msg-agent-2", 2, 2, OWNER_ID);
+    different.provider_response_id = "provider-response-2".to_owned();
+    assert!(
+        conv_store
+            .commit_conversation_agent_response(different)
+            .is_err()
+    );
+    let conn = Connection::open(database_path(&fixture.directory)).expect("open db");
+    let (messages, identities, usage): (i64, i64, (String, i64, i64)) = (
+        conn.query_row(
+            "SELECT COUNT(*) FROM conversation_messages WHERE role='AGENT' AND turn_id=?1",
+            params![turn_id],
+            |row| row.get(0),
+        )
+        .expect("count agent messages"),
+        conn.query_row(
+            "SELECT COUNT(*) FROM conversation_response_commits WHERE turn_id=?1",
+            params![turn_id],
+            |row| row.get(0),
+        )
+        .expect("count commit identities"),
+        conn.query_row(
+            "SELECT attribution_source,input_tokens,output_tokens FROM conversation_turn_usage_records WHERE turn_id=?1",
+            params![turn_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("usage record"),
+    );
+    assert_eq!((messages, identities), (1, 1));
+    assert_eq!(usage, ("PROVIDER_REPORTED".to_owned(), 11, 7));
+    let intent_state: String = conn
+        .query_row(
+            "SELECT state FROM conversation_dispatch_intents WHERE turn_id=?1 AND retry_ordinal=0",
+            params![turn_id],
+            |row| row.get(0),
+        )
+        .expect("dispatch intent");
+    assert_eq!(intent_state, "SETTLED");
 }
 
 #[test]
@@ -3275,4 +3341,187 @@ fn conversation_host_resolution_uses_turn_pinned_binding_after_selection_changes
             .start_conversation_agent_session(candidate_for("missing-creation-event")),
         Err(StoreError::Integrity(_))
     ));
+}
+
+#[path = "conversation_durable_turn_tests.rs"]
+mod conversation_durable_turn_tests;
+
+fn descriptor_gate() -> storage_core::AgentDescriptorGate {
+    storage_core::AgentDescriptorGate {
+        registry_agent_id: "opencode".to_owned(),
+        runtime_id: RUNTIME_ID.to_owned(),
+        runtime_incarnation_id: INCARNATION_ID.to_owned(),
+        module_version: "2.0.32".to_owned(),
+    }
+}
+
+fn sample_descriptor_record(
+    digest_char: char,
+    observed_at: &str,
+    expires_at: &str,
+) -> storage_core::AgentControlDescriptorRecord {
+    storage_core::AgentControlDescriptorRecord {
+        registry_agent_id: "opencode".to_owned(),
+        runtime_id: RUNTIME_ID.to_owned(),
+        runtime_incarnation_id: INCARNATION_ID.to_owned(),
+        module_id: "opencode".to_owned(),
+        module_version: "2.0.32".to_owned(),
+        descriptor_api_version: 1,
+        descriptor_digest: format!("sha256:{}", digest_char.to_string().repeat(64)),
+        descriptor_json: "{\"module_id\":\"opencode\"}".to_owned(),
+        observed_at: observed_at.to_owned(),
+        expires_at: expires_at.to_owned(),
+    }
+}
+
+#[test]
+fn enable_requires_the_current_fresh_descriptor_revision_when_the_module_declares_one() {
+    use storage_core::AgentDescriptorStore;
+    let fixture = setup();
+    let disabled = fixture
+        .store
+        .disable_agent_binding(disable_request(
+            &fixture.binding,
+            fixture.binding.version,
+            "request-disable-before-descriptor-gate",
+        ))
+        .expect("clear the current enablement state")
+        .binding;
+    let record = sample_descriptor_record('a', "2026-10-15T10:00:00Z", "2026-10-15T10:15:00Z");
+    let digest = record.descriptor_digest.clone();
+    let before = durable_counts(&fixture.directory);
+
+    // Missing descriptor: no state change.
+    let mut request = enable_request(&disabled, disabled.version, "request-enable-no-descriptor");
+    request.require_descriptor = Some(descriptor_gate());
+    request.descriptor_revision = Some(digest.clone());
+    let error = fixture
+        .store
+        .enable_agent_binding(request)
+        .expect_err("missing descriptor");
+    assert!(matches!(error, StoreError::Invalid(ref m) if m.starts_with("DESCRIPTOR_STALE")));
+    assert_eq!(durable_counts(&fixture.directory), before);
+
+    fixture
+        .store
+        .put_agent_control_descriptor(record, None)
+        .expect("store descriptor");
+
+    // A caller-supplied revision that is not the current digest is stale.
+    let mut request = enable_request(&disabled, disabled.version, "request-enable-wrong-revision");
+    request.require_descriptor = Some(descriptor_gate());
+    request.descriptor_revision = Some(format!("sha256:{}", "b".repeat(64)));
+    assert!(fixture.store.enable_agent_binding(request).is_err());
+
+    // No revision at all is stale too.
+    let mut request = enable_request(&disabled, disabled.version, "request-enable-none");
+    request.require_descriptor = Some(descriptor_gate());
+    assert!(fixture.store.enable_agent_binding(request).is_err());
+    assert_eq!(durable_counts(&fixture.directory), before);
+
+    // The exact current revision enables, and an exact replay returns the receipt.
+    let mut request = enable_request(&disabled, disabled.version, "request-enable-fresh");
+    request.require_descriptor = Some(descriptor_gate());
+    request.descriptor_revision = Some(digest);
+    let committed = fixture
+        .store
+        .enable_agent_binding(request.clone())
+        .expect("enable");
+    assert!(committed.binding.enabled);
+    let replay = fixture.store.enable_agent_binding(request).expect("replay");
+    assert_eq!(replay.binding.version, committed.binding.version);
+}
+
+#[test]
+fn descriptor_refresh_between_read_and_enable_fails_enable_against_the_older_revision() {
+    use storage_core::AgentDescriptorStore;
+    let fixture = setup();
+    let disabled = fixture
+        .store
+        .disable_agent_binding(disable_request(
+            &fixture.binding,
+            fixture.binding.version,
+            "request-disable-before-descriptor-gate",
+        ))
+        .expect("clear the current enablement state")
+        .binding;
+    let first = sample_descriptor_record('a', "2026-10-15T10:00:00Z", "2026-10-15T10:15:00Z");
+    fixture
+        .store
+        .put_agent_control_descriptor(first.clone(), None)
+        .expect("first");
+    let second = sample_descriptor_record('c', "2026-10-15T10:01:00Z", "2026-10-15T10:16:00Z");
+    fixture
+        .store
+        .put_agent_control_descriptor(second, Some(first.descriptor_digest.clone()))
+        .expect("refresh");
+    let mut request = enable_request(&disabled, disabled.version, "request-enable-older");
+    request.require_descriptor = Some(descriptor_gate());
+    request.descriptor_revision = Some(first.descriptor_digest);
+    assert!(fixture.store.enable_agent_binding(request).is_err());
+}
+
+#[test]
+fn descriptor_is_fresh_one_second_before_expiry_and_stale_at_expiry() {
+    use storage_core::AgentDescriptorStore;
+    let fixture = setup();
+    let record = sample_descriptor_record('a', "2026-10-15T10:00:00Z", "2026-10-15T10:15:00Z");
+    fixture
+        .store
+        .put_agent_control_descriptor(record, None)
+        .expect("store");
+    let gate = descriptor_gate();
+    assert!(
+        fixture
+            .store
+            .current_agent_control_descriptor(&gate, "2026-10-15T10:14:59Z")
+            .expect("read")
+            .is_some()
+    );
+    assert!(
+        fixture
+            .store
+            .current_agent_control_descriptor(&gate, "2026-10-15T10:15:00Z")
+            .expect("read")
+            .is_none()
+    );
+}
+
+#[test]
+fn descriptor_put_is_compare_and_swap_and_rejects_invalid_bodies() {
+    use storage_core::AgentDescriptorStore;
+    let fixture = setup();
+    let first = sample_descriptor_record('a', "2026-10-15T10:00:00Z", "2026-10-15T10:15:00Z");
+    fixture
+        .store
+        .put_agent_control_descriptor(first.clone(), None)
+        .expect("first");
+    // A second writer that still believes there is no prior descriptor loses.
+    let rival = sample_descriptor_record('d', "2026-10-15T10:01:00Z", "2026-10-15T10:16:00Z");
+    assert!(matches!(
+        fixture
+            .store
+            .put_agent_control_descriptor(rival.clone(), None),
+        Err(StoreError::Conflict { .. })
+    ));
+    fixture
+        .store
+        .put_agent_control_descriptor(rival, Some(first.descriptor_digest))
+        .expect("correct prior digest wins");
+    let mut oversize =
+        sample_descriptor_record('e', "2026-10-15T10:02:00Z", "2026-10-15T10:17:00Z");
+    oversize.descriptor_json = format!("{{\"pad\":\"{}\"}}", "x".repeat(300 * 1024));
+    assert!(matches!(
+        fixture.store.put_agent_control_descriptor(oversize, None),
+        Err(StoreError::Invalid(_))
+    ));
+    let mut not_object =
+        sample_descriptor_record('e', "2026-10-15T10:02:00Z", "2026-10-15T10:17:00Z");
+    not_object.descriptor_json = "[1]".to_owned();
+    assert!(
+        fixture
+            .store
+            .put_agent_control_descriptor(not_object, None)
+            .is_err()
+    );
 }

@@ -21,16 +21,16 @@ Gaps: create (B-30), Markdown adapter (B-21), export receipt (B-31), declared ca
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 001 committed-message identity (message id used by `ConversationOrigin`); orchestrator assigns the next free migration number.
 - **Owner:** Artifacts, Storage, Product (B-31 caveat)
-- **Allowed paths:** `docs/ARTIFACTS-EVIDENCE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/domain-event.schema.json`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-vNN.sql` (new, next free number after `sqlite-v28.sql`), `crates/storage-sqlite/src/lib.rs` (migration registration only), `apps/litecoworkd/Cargo.toml` (Markdown engine dependency pin), this package
+- **Allowed paths:** `docs/ARTIFACTS-EVIDENCE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/domain-event.schema.json`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-v37.sql` (new, allocated in docs/LITECOWORK-BUILD-TASKS.md; v32 is the highest present), `crates/storage-sqlite/src/lib.rs` (migration registration only), `apps/litecoworkd/Cargo.toml` (Markdown engine dependency pin), this package
 - **Contract:** SPEC §5 B-21, B-30, B-31, capability matrix; §7.2; AC-010, AC-006, AC-016, AC-017, AC-019
 - **Change intent:** Promote `CreateArtifact` (with `ConversationOrigin`), `ArtifactFormatAdapter`, `CommitArtifactExport`, `FormatCapability`, `FormatError` and `ArtifactError` into ARTIFACTS-EVIDENCE; add `POST /v1/artifacts`, the Markdown publish route, `POST /v1/artifacts/{artifact_id}/exports`, the capability read route and the `conversation_id` list filter to OpenAPI; register `artifact.exported.v1`; reconcile `UNSUPPORTED_FORMAT` (SPEC B-21 text) with the canonical `UNSUPPORTED_MEDIA_TYPE`; add `artifact_export_receipts` and nullable `source_conversation_id`/`source_message_id` columns; pin the Markdown engine (RESEARCH candidates) with exact version and license.
 - **Acceptance:**
   - [ ] Owner prose and machine schemas change in one reviewed change; one error code for unsupported media.
-  - [ ] Product records the local-export receipt destination class (B-31 caveat) before T06 starts.
+  - [x] Product recorded the local-export receipt destination class (B-31 caveat): `LOCAL_OWNER_SELECTED_FILE` (sarv-projects, 2026-11-10).
   - [ ] Migration is additive and immutable; upgrade from v28 test passes.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py` and `python3 scripts/audit_v1_contracts.py` and `cargo test -p storage-sqlite --locked migration` (filter to be added by this task)
 - **Evidence:** promoted doc diffs; dependency pin in RESEARCH.md; migration test in CURRENT-RUN.md
-- **Stop:** no Product confirmation of the export destination class leaves T06 BLOCKED (owner: Product).
+- **Stop:** the destination class is confirmed (2026-11-10); T06 stays blocked only by its task dependencies.
 
 ## 007-T02 - Atomic Artifact create store (B-30)
 
@@ -106,7 +106,7 @@ Gaps: create (B-30), Markdown adapter (B-21), export receipt (B-31), declared ca
 
 ## 007-T06 - Export command and ArtifactExportReceipt (B-31)
 
-- **Status:** BLOCKED (needs the T01 Product confirmation of the local-export destination class; owner: Product). No export record, route or event exists.
+- **Status:** NOT STARTED. The Product gate is closed: destination class `LOCAL_OWNER_SELECTED_FILE` confirmed 2026-11-10. Still depends on T01, T03 and T05. No export record, route or event exists.
 - **Depends on:** T01, T03, T05
 - **Cross-package prerequisites:** NONE
 - **Owner:** Artifacts, Storage, Security
@@ -215,6 +215,7 @@ Gaps: create (B-30), Markdown adapter (B-21), export receipt (B-31), declared ca
 ## 007-T12 - Imported and Task-generated source classes
 
 - **Status:** BLOCKED for the Task-generated class (Feature 005 produces no Task output today; owner: Task); NOT STARTED for Imported
+- **DEFERRED/BLOCKED note:** Why: the Task-generated class needs Feature 005 Task output, which does not exist; the Imported class is plain work. Unblocks when: Feature 005 Task execution producing output. Test later at: native Linux after Feature 005 qualifies, then the owner's native Windows x64 laptop (release matrix row 1); WSL2 and containers never count.
 - **Depends on:** T02, T07
 - **Cross-package prerequisites:** Feature 003 Resource admission (pinned revisions); Feature 005 Task output producer for the Task-generated class.
 - **Owner:** Artifacts, Resource

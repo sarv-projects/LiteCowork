@@ -1,11 +1,14 @@
-//! Authenticated local Conversation catalog lifecycle. Turn dispatch is intentionally
-//! absent here until the native AgentSession/runtime admission path is integrated.
+//! Authenticated local Conversation catalog lifecycle and turn routes (submit, retry,
+//! cancel). Submit commits the USER message, OPEN turn and dispatch intent atomically and
+//! returns 202; native work (today the OpenCode v2.0.32 adapter path only) starts through
+//! `AgentTurnCoordinator`, never directly from a handler. Without a supervisor the turn is
+//! settled FAILED and the Operator reports the dependency as unavailable.
 // Route handlers intentionally return full Axum Responses to preserve status, body, and headers.
 #![allow(clippy::result_large_err)]
 
 use super::*;
 use storage_core::conversation::{
-    CONVERSATION_SESSION_ADMISSION_UNAVAILABLE, ConversationTurn, ConversationTurnStatus,
+    CONVERSATION_SESSION_ADMISSION_UNAVAILABLE, CONVERSATION_TURN_IN_PROGRESS, ConversationTurn, ConversationTurnStatus,
     PresentationPreference, TurnCommand, request_payload_value,
 };
 use storage_core::{
@@ -123,6 +126,10 @@ where
         .route(
             "/v1/conversations/{conversation_id}/turns",
             post(submit_conversation_turn),
+        )
+        .route(
+            "/v1/conversations/{conversation_id}/turns/{turn_id}/activity",
+            get(list_conversation_turn_activity),
         )
         .route(
             "/v1/conversations/{conversation_id}/turns/{turn_id}/retry",
@@ -362,6 +369,64 @@ async fn get_conversation(
     record.map(Json).ok_or_else(not_found)
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TurnActivityQuery {
+    retry_ordinal: Option<u32>,
+}
+
+#[derive(Serialize)]
+struct TurnActivityPage {
+    turn_id: String,
+    retry_ordinal: u32,
+    /// Always `REPORTED`: these are the native agent's own statements, never Effects.
+    attribution: &'static str,
+    items: Vec<storage_core::conversation::ConversationActivityRecord>,
+}
+
+/// Read-only, bounded, ordered REPORTED activity observations for one turn attempt
+/// (001-T25, AC-029). The records let the UI rebuild activity cards after a restart.
+async fn list_conversation_turn_activity(
+    State(state): State<ConversationApiState>,
+    Path((conversation_id, turn_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Query(query): Query<TurnActivityQuery>,
+) -> Result<Response, Response> {
+    let workspace_id = selected_workspace(&headers)?;
+    if !valid_task_query_id(&turn_id) {
+        return Err(error(
+            StatusCode::BAD_REQUEST,
+            "INVALID_ARGUMENT",
+            "Turn ID is invalid",
+        ));
+    }
+    load_authorized_conversation(&state, &workspace_id, &conversation_id).await?;
+    let retry_ordinal = query.retry_ordinal.unwrap_or(0);
+    let store = state.store.clone();
+    let turn_for_read = turn_id.clone();
+    let items = tokio::task::spawn_blocking(move || {
+        SqliteConversationStore::new(store).list_conversation_turn_activity(
+            &workspace_id,
+            &conversation_id,
+            &turn_for_read,
+            retry_ordinal,
+            storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT,
+        )
+    })
+    .await
+    .map_err(|_| internal())?
+    .map_err(map_store_error)?;
+    Ok(no_store(
+        Json(TurnActivityPage {
+            turn_id,
+            retry_ordinal,
+            attribution: "REPORTED",
+            items,
+        })
+        .into_response(),
+    ))
+}
+
 async fn submit_conversation_turn(
     State(state): State<ConversationApiState>,
     Path(conversation_id): Path<String>,
@@ -375,6 +440,7 @@ async fn submit_conversation_turn(
         load_authorized_conversation(&state, &workspace_id, &conversation_id).await?;
     let presentation_preference =
         parse_presentation_preference(body.presentation_preference.as_deref())?;
+    check_turn_resources(&state, &workspace_id, &body).await?;
     let content = serde_json::to_value(&body.content).map_err(|_| invalid_turn_request())?;
     let resource_refs =
         serde_json::to_value(&body.resource_refs).map_err(|_| invalid_turn_request())?;
@@ -559,24 +625,11 @@ async fn submit_conversation_turn(
     .map_err(map_store_error)?;
 
     if let Some(ref supervisor) = state.supervisor {
-        let supervisor = supervisor.clone();
         let turn = committed.turn.clone();
-        let pid = principal_id.clone();
-        let wid = workspace_id.clone();
-        let cid = conversation_id.clone();
         let tid = turn.turn_id.clone();
-        let tid_spawn = tid.clone();
         let cor = correlation_id.clone();
-        let cor_dispatch = cor.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = supervisor
-                .dispatch_turn(&pid, &wid, &cid, turn, &cor_dispatch)
-                .await
-            {
-                eprintln!("Supervisor dispatch_turn failed for turn {tid_spawn}: {e}");
-            }
-        });
+        crate::agents::turn_coordinator::AgentTurnCoordinator::new(supervisor.clone())
+            .dispatch_admitted_turn(&principal_id, &workspace_id, &conversation_id, turn, &cor);
 
         let receipt = ConversationTurnReceipt {
             turn_id: tid,
@@ -717,6 +770,15 @@ async fn retry_conversation_turn(
             )
         })?;
 
+    // An exact repeat of an already applied Retry key replays its receipt (no second
+    // attempt, no second intent) even though the turn version has moved on.
+    if let Some(replayed) = conv_store
+        .find_conversation_turn_command_replay(&workspace_id, &conversation_id, &turn_id, &request_id)
+        .map_err(map_store_error)?
+    {
+        return Ok(turn_command_receipt(replayed, correlation_id));
+    }
+
     if turn.version != expected_version {
         return Err(error(
             StatusCode::PRECONDITION_FAILED,
@@ -733,7 +795,6 @@ async fn retry_conversation_turn(
         ));
     }
 
-    let new_session_id = new_id("ses").map_err(|_| internal())?;
     let next_version = turn.version + 1;
     let next_retry_ordinal = turn.retry_ordinal + 1;
     let ctx = event_context(&state.runtime_id, &correlation_id).map_err(|_| internal())?;
@@ -750,13 +811,7 @@ async fn retry_conversation_turn(
         causation_id: Some(request_id),
         schema_version: 1,
         event_type: "conversation.turn.retried.v1".to_owned(),
-        payload: json!({
-            "turn_id": turn_id,
-            "agent_session_id": new_session_id,
-            "prior_agent_session_id": turn.agent_session_id,
-            "retry_ordinal": next_retry_ordinal,
-            "aggregate_version": next_version,
-        }),
+        payload: retry_event_payload(&turn_id, turn.agent_session_id.as_deref(), next_retry_ordinal, next_version),
         recorded_at: ctx.recorded_at.clone(),
     };
 
@@ -767,31 +822,21 @@ async fn retry_conversation_turn(
         conversation_id.clone(),
         turn_id.clone(),
         turn.version,
-        TurnCommand::Retry {
-            agent_session_id: new_session_id,
-        },
+        TurnCommand::Retry,
         event,
     )
     .await
     .map_err(map_store_error)?;
 
     if let Some(ref supervisor) = state.supervisor {
-        let supervisor = supervisor.clone();
-        let turn_to_dispatch = updated_turn.clone();
-        let pid = state.principal_id.clone();
-        let wid = workspace_id.clone();
-        let cid = conversation_id.clone();
-        let tid = turn_id.clone();
-        let cor_dispatch = correlation_id.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = supervisor
-                .dispatch_turn(&pid, &wid, &cid, turn_to_dispatch, &cor_dispatch)
-                .await
-            {
-                eprintln!("Supervisor retry dispatch_turn failed for turn {tid}: {e}");
-            }
-        });
+        crate::agents::turn_coordinator::AgentTurnCoordinator::new(supervisor.clone())
+            .dispatch_admitted_turn(
+                &state.principal_id,
+                &workspace_id,
+                &conversation_id,
+                updated_turn.clone(),
+                &correlation_id,
+            );
     }
 
     let receipt = ConversationTurnReceipt {
@@ -836,6 +881,22 @@ async fn cancel_conversation_turn(
                 "Conversation turn not found",
             )
         })?;
+
+    if let Some(replayed) = conv_store
+        .find_conversation_turn_command_replay(&workspace_id, &conversation_id, &turn_id, &request_id)
+        .map_err(map_store_error)?
+    {
+        return Ok(turn_command_receipt(replayed, correlation_id));
+    }
+
+    if turn.status == ConversationTurnStatus::CancelRequested {
+        // A Stop is already in flight. Repeating it never settles the turn: only the
+        // supervisor's observed quiescence commits CANCELLED. Re-signal and report.
+        if let Some(ref supervisor) = state.supervisor {
+            supervisor.request_cancel(&turn_id, turn.retry_ordinal);
+        }
+        return Ok(turn_command_receipt(turn, correlation_id));
+    }
 
     if turn.version != expected_version {
         return Err(error(
@@ -885,7 +946,9 @@ async fn cancel_conversation_turn(
                 recorded_at: ctx.recorded_at.clone(),
             };
 
-            let req_turn = run_turn_transition(
+            // Only the request is committed here. CANCELLED is committed by the
+            // supervisor after it observes the native session quiescent (AC-010).
+            let requested = run_turn_transition(
                 state.store.clone(),
                 state.principal_id.clone(),
                 workspace_id.clone(),
@@ -897,81 +960,10 @@ async fn cancel_conversation_turn(
             )
             .await
             .map_err(map_store_error)?;
-
-            let settle_ctx =
-                event_context(&state.runtime_id, &correlation_id).map_err(|_| internal())?;
-            let settle_event = EventDraft {
-                event_id: settle_ctx.event_id,
-                workspace_id: workspace_id.clone(),
-                entity_type: "ConversationTurn".to_owned(),
-                entity_id: turn_id.clone(),
-                origin_runtime_id: state.runtime_id.clone(),
-                entity_revision: req_turn.version + 1,
-                hlc_timestamp: settle_ctx.hlc_timestamp,
-                correlation_id: settle_ctx.correlation_id,
-                causation_id: Some(request_id),
-                schema_version: 1,
-                event_type: "conversation.turn.settled.v1".to_owned(),
-                payload: json!({
-                    "turn_id": turn_id,
-                    "from": "CANCEL_REQUESTED",
-                    "to": "CANCELLED",
-                    "aggregate_version": req_turn.version + 1,
-                }),
-                recorded_at: settle_ctx.recorded_at.clone(),
-            };
-
-            run_turn_transition(
-                state.store.clone(),
-                state.principal_id.clone(),
-                workspace_id.clone(),
-                conversation_id.clone(),
-                turn_id.clone(),
-                req_turn.version,
-                TurnCommand::SettleCancelled {
-                    settled_at: settle_ctx.recorded_at,
-                },
-                settle_event,
-            )
-            .await
-            .map_err(map_store_error)?
-        }
-        ConversationTurnStatus::CancelRequested => {
-            let settle_event = EventDraft {
-                event_id: ctx.event_id,
-                workspace_id: workspace_id.clone(),
-                entity_type: "ConversationTurn".to_owned(),
-                entity_id: turn_id.clone(),
-                origin_runtime_id: state.runtime_id.clone(),
-                entity_revision: turn.version + 1,
-                hlc_timestamp: ctx.hlc_timestamp,
-                correlation_id: ctx.correlation_id,
-                causation_id: Some(request_id),
-                schema_version: 1,
-                event_type: "conversation.turn.settled.v1".to_owned(),
-                payload: json!({
-                    "turn_id": turn_id,
-                    "from": "CANCEL_REQUESTED",
-                    "to": "CANCELLED",
-                    "aggregate_version": turn.version + 1,
-                }),
-                recorded_at: ctx.recorded_at.clone(),
-            };
-
-            run_turn_transition(
-                state.store.clone(),
-                state.principal_id.clone(),
-                workspace_id.clone(),
-                conversation_id.clone(),
-                turn_id.clone(),
-                turn.version,
-                TurnCommand::SettleCancelled {
-                    settled_at: ctx.recorded_at.clone(),
-                },
-                settle_event,
-            )
-            .await
-            .map_err(map_store_error)?
+            if let Some(ref supervisor) = state.supervisor {
+                supervisor.request_cancel(&turn_id, requested.retry_ordinal);
+            }
+            requested
         }
         ConversationTurnStatus::Open => {
             let fail_event = EventDraft {
@@ -1025,6 +1017,37 @@ async fn cancel_conversation_turn(
     };
 
     Ok((StatusCode::ACCEPTED, Json(receipt)).into_response())
+}
+
+fn retry_event_payload(
+    turn_id: &str,
+    prior_agent_session_id: Option<&str>,
+    retry_ordinal: u32,
+    aggregate_version: u64,
+) -> Value {
+    let mut payload = json!({
+        "turn_id": turn_id,
+        "retry_ordinal": retry_ordinal,
+        "aggregate_version": aggregate_version,
+    });
+    if let Some(prior) = prior_agent_session_id {
+        payload["prior_agent_session_id"] = json!(prior);
+    }
+    payload
+}
+
+/// 202 receipt for a Retry or Cancel command that was already applied or is in flight.
+fn turn_command_receipt(turn: ConversationTurn, correlation_id: String) -> Response {
+    let receipt = ConversationTurnReceipt {
+        accepted_at: turn.settled_at.clone().unwrap_or_else(|| turn.created_at.clone()),
+        turn_id: turn.turn_id,
+        conversation_id: turn.conversation_id,
+        user_message_id: turn.user_message_id,
+        status: turn.status,
+        correlation_id,
+        presentation_preference: turn.presentation_preference,
+    };
+    (StatusCode::ACCEPTED, Json(receipt)).into_response()
 }
 
 async fn ensure_conversation_available(
@@ -1108,6 +1131,44 @@ async fn load_authorized_conversation(
     .map_err(|_| internal())?
     .map_err(map_store_error)?;
     conversation.ok_or_else(not_found)
+}
+
+/// Refuses a bad attachment while the draft and chips are still on screen (001-T14, B-08).
+/// The same rules run again at dispatch; this only moves the refusal earlier.
+async fn check_turn_resources(
+    state: &ConversationApiState,
+    workspace_id: &str,
+    body: &SubmitConversationTurnBody,
+) -> Result<(), Response> {
+    use crate::agents::resource_materializer::{MaterializeError, check_resource_refs};
+    let mut refs: Vec<Value> = Vec::new();
+    for resource_ref in &body.resource_refs {
+        refs.push(serde_json::to_value(resource_ref).map_err(|_| invalid_turn_request())?);
+    }
+    for block in &body.content {
+        if let ConversationTurnContentBlock::Resource { resource_ref, .. } = block {
+            refs.push(serde_json::to_value(resource_ref).map_err(|_| invalid_turn_request())?);
+        }
+    }
+    if refs.is_empty() {
+        return Ok(());
+    }
+    let store = state.store.clone();
+    let workspace_id = workspace_id.to_owned();
+    let outcome = tokio::task::spawn_blocking(move || check_resource_refs(&store, &workspace_id, &refs))
+        .await
+        .map_err(|_| internal())?;
+    outcome.map_err(|refusal| match refusal {
+        MaterializeError::NotFound => error(StatusCode::NOT_FOUND, "NOT_FOUND", "An attached Resource was not found in this Workspace"),
+        MaterializeError::StaleRevision => error(StatusCode::CONFLICT, "RESOURCE_STALE", "An attached Resource changed; reattach its current revision"),
+        MaterializeError::StoreUnavailable => error(StatusCode::SERVICE_UNAVAILABLE, "RESOURCE_UNAVAILABLE", "Attached Resources could not be read"),
+        MaterializeError::BinaryUnavailable => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "Only text Resources can be attached to a Conversation turn"),
+        MaterializeError::TooLarge => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "An attached Resource is too large"),
+        MaterializeError::NotText => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "An attached Resource is not valid text"),
+        MaterializeError::Restricted => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "A restricted Resource cannot be attached to a Conversation turn"),
+        MaterializeError::TooMany => error(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_RESOURCE_REF", "Too many Resources are attached"),
+        MaterializeError::NotAuthorized => error(StatusCode::BAD_REQUEST, "INVALID_RESOURCE_REF", "An attached Resource reference is not valid for this Workspace"),
+    })
 }
 
 fn validate_turn_request(
@@ -1347,6 +1408,11 @@ fn map_store_error(error_value: StoreError) -> Response {
             StatusCode::CONFLICT,
             "STALE_CONVERSATION_VERSION",
             "Conversation changed; refresh before saving",
+        ),
+        StoreError::Invalid(message) if message == CONVERSATION_TURN_IN_PROGRESS => error(
+            StatusCode::CONFLICT,
+            CONVERSATION_TURN_IN_PROGRESS,
+            "Another message in this Conversation is still being answered; wait for it to finish or stop it",
         ),
         StoreError::Invalid(message) if message == "AGENT_UNAVAILABLE" => agent_unavailable(),
         StoreError::Invalid(message) if message == "AGENT_NOT_LEAD_ELIGIBLE" => error(

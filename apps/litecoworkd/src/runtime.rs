@@ -416,7 +416,20 @@ fn run_with_identity_providers(
     // This is currently reachable only from the process-supervisor signal handler.
     // Do not wire an Operator route to this receiver until RuntimeLifecycleService
     // can prove Task/Attempt, Effect, lease, and local service-reference settlement.
-    operator.wait_for_shutdown_signal_or_endpoint_failure(&shutdown_receiver)?;
+    if let Err(error) = operator.wait_for_shutdown_signal_or_endpoint_failure(&shutdown_receiver)
+    {
+        // The Operator endpoint is gone while the Runtime still reports READY. Publish
+        // DEGRADED to the durable catalog and the private status before exiting
+        // nonzero, so the next start observes an unclean prior incarnation.
+        return fail_registered_startup(
+            data_directory,
+            &storage.store,
+            &mut state,
+            &mut incarnation_version,
+            "OPERATOR_ENDPOINT_FAILED",
+            &error,
+        );
+    }
 
     let shutdown_blockers = state.blockers.clone();
     // Stop accepting new Operator commands before publishing DRAINING. Existing
@@ -622,6 +635,17 @@ fn recover_and_persist_startup_blockers(
     {
         blockers.push(RuntimeLifecycleBlocker {
             code: "EXPIRED_EXECUTION_LEASE_RECOVERY_FAILED".to_owned(),
+            created_at: timestamp_now()?,
+        });
+    }
+    let conversation_recovery = crate::agents::conversation_recovery::recover_conversation_sessions(
+        store,
+        &state.runtime_id,
+        owner_principal_id,
+    );
+    if conversation_recovery.failures > 0 {
+        blockers.push(RuntimeLifecycleBlocker {
+            code: "CONVERSATION_SESSION_RECOVERY_FAILED".to_owned(),
             created_at: timestamp_now()?,
         });
     }
@@ -1795,6 +1819,14 @@ mod tests {
             Err(StoreError::Io(
                 "registration is outside this test".to_owned(),
             ))
+        }
+
+        fn read_runtime_stop_observation(
+            &self,
+            _runtime_id: &str,
+            _expected_incarnation_id: &str,
+        ) -> Result<Option<storage_core::RuntimeStopObservation>, StoreError> {
+            Ok(None)
         }
 
         fn transition_local_incarnation(

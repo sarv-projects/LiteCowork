@@ -200,7 +200,7 @@ fn seed_task_and_artifact(
     )
     .expect("seed task");
     tx.execute(
-        "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,placement_preference,authored_by_json,lead_failover_policy_json,created_at) VALUES (?1,?2,1,'Demonstrated workflow','{}','{}','{\"mode\":\"DISABLED\",\"triggers\":[],\"fallback_agent_binding_ids\":[],\"max_lead_changes\":0}','2026-10-20T10:00:00Z')",
+        "INSERT INTO task_spec_revisions(task_id,workspace_id,revision,objective,placement_preference,authored_by_json,lead_failover_policy_json,created_at,delegation_policy_snapshot_json) VALUES (?1,?2,1,'Demonstrated workflow','{}','{}','{\"mode\":\"DISABLED\",\"triggers\":[],\"fallback_agent_binding_ids\":[],\"max_lead_changes\":0}','2026-10-20T10:00:00Z','{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}')",
         params![task_id, workspace_id],
     )
     .expect("seed task spec revision");

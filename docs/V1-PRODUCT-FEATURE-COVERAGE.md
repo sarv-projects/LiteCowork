@@ -60,6 +60,8 @@ Two discussion ideas are recorded as future direction only and are not in locked
 - LiteCowork-MCP as an external-control surface (letting another client drive LiteCowork), to be revisited after the ACP spine qualifies.
 - A direct-API fallback adapter for providers without a native harness, to be revisited only if an owner decision adds it; the ACP client remains the V1 spine.
 
+Owner deferrals recorded 2026-11-10 (register A-62): all LiteSPM parts (Feature 013, so capability 7 is design-covered but its implementation is DEFERRED), every Windows-only row (tested later on the owner's Windows laptop) and release-dependent rows (B-43 signing and update channel, B-44 licensing and packaging, installers, release-matrix qualification). A COVERED verdict here means the capability is owned and planned, not that it is implemented; implementation status is in [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).
+
 Computer use (B-32), the Windows Environment provider for safe Task execution (B-35) and the DOCX/XLSX/Office format engine (beyond Markdown, B-21) are deferred from the first V1 milestone and tracked at their owners.
 
 ## Part IV: the 12 qualification journeys

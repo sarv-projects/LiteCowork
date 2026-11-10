@@ -26,7 +26,7 @@ Allowed implementation paths are listed per task. The active source tree is in a
 
 ## Migration, rollout, rollback
 
-No migration has shipped for this package yet; the chain ends at `docs/schemas/sqlite-v28.sql`. Each accepted schema change (Conversation Coworker origin, capability assignment, responsibility proposals) lands as the next immutable `sqlite-vNN.sql` in the task that needs it. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
+No migration has shipped for this package yet; the chain ends at `docs/schemas/sqlite-v32.sql`. The Conversation Coworker origin and memory fields are allocated v38 in docs/LITECOWORK-BUILD-TASKS.md; each further accepted schema change (capability assignment, responsibility proposals) lands as the next free immutable `sqlite-vNN.sql` in the task that needs it. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
 
 ## Risks
 

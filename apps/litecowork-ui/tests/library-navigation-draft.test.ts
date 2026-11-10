@@ -45,5 +45,5 @@ test("a pending Library guard makes the production main area inert", () => {
   assert.equal(isMainInert(true, false), true);
   assert.equal(isMainInert(false, true), true);
   assert.match(appSource, /libraryNavigationMainIsInert\(navigationOpen, pendingLibraryNavigation !== null\)/);
-  assert.match(appSource, /<main className="main-area" inert=\{mainAreaInert\} aria-hidden=\{mainAreaInert \|\| undefined\}>/);
+  assert.match(appSource, /<main id="main-content" tabIndex=\{-1\} className="main-area" inert=\{mainAreaInert\} aria-hidden=\{mainAreaInert \|\| undefined\}>/);
 });

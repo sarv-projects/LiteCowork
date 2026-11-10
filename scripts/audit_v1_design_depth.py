@@ -107,7 +107,7 @@ def main() -> int:
         errors.append(
             f"OpenAPI/served inventory mismatch: {openapi_count} != {served_count}+{target_count}"
         )
-    if (served_count, outside_count, target_count) != (173, 1, 56):
+    if (served_count, outside_count, target_count) != (178, 1, 53):
         errors.append(
             f"Composed route count drift: {(served_count, outside_count, target_count)}"
         )

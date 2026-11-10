@@ -20,6 +20,14 @@ pub const CONVERSATION_SESSION_ADMISSION_UNAVAILABLE: &str =
 pub const CONVERSATION_TURN_EVENT_REVISION_MISMATCH: &str =
     "ConversationTurn event revision mismatch";
 
+/// Strict single-flight lane (B-01): another turn of the Conversation is OPEN, RUNNING,
+/// WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED. Surfaces as HTTP 409.
+pub const CONVERSATION_TURN_IN_PROGRESS: &str = "CONVERSATION_TURN_IN_PROGRESS";
+
+/// Another response with a different provider identity, content or author was already
+/// committed for this turn and retry ordinal (B-04).
+pub const CONVERSATION_RESPONSE_IDENTITY_CONFLICT: &str = "CONVERSATION_RESPONSE_IDENTITY_CONFLICT";
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConversationRecord {
@@ -92,6 +100,144 @@ pub trait ConversationStore: Send + Sync {
     ) -> Result<Vec<ConversationRecord>, StoreError>;
 }
 
+/// Lifecycle status of a Conversation in the history list (spec 014). A Conversation
+/// with no `conversation_history_state` row is `Active`.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ConversationStatus {
+    Active,
+    Archived,
+    DeletionPending,
+    Deleted,
+}
+
+impl ConversationStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "ACTIVE",
+            Self::Archived => "ARCHIVED",
+            Self::DeletionPending => "DELETION_PENDING",
+            Self::Deleted => "DELETED",
+        }
+    }
+}
+
+/// Stable codes for history-management refusals (014 T03). Surface as HTTP 409.
+pub const CONVERSATION_ARCHIVED: &str = "CONVERSATION_ARCHIVED";
+pub const CONVERSATION_DELETED: &str = "CONVERSATION_DELETED";
+pub const CONVERSATION_NOT_QUIESCENT: &str = "CONVERSATION_NOT_QUIESCENT";
+
+/// Version-fenced, idempotent Conversation rename. The event carries `title_digest`
+/// only, never the title.
+#[derive(Clone, Debug)]
+pub struct RenameConversation {
+    pub request: WorkspaceCreateRequest,
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub expected_version: u64,
+    pub title: String,
+    pub event: EventDraft,
+}
+
+/// Version-fenced, idempotent archive (`archived = true`) or unarchive.
+#[derive(Clone, Debug)]
+pub struct SetConversationArchived {
+    pub request: WorkspaceCreateRequest,
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub expected_version: u64,
+    pub archived: bool,
+    pub event: EventDraft,
+}
+
+pub trait ConversationHistoryStore: Send + Sync {
+    fn rename_conversation(
+        &self,
+        commit: RenameConversation,
+    ) -> Result<CommittedConversation, StoreError>;
+
+    fn set_conversation_archived(
+        &self,
+        commit: SetConversationArchived,
+    ) -> Result<CommittedConversation, StoreError>;
+
+    fn get_conversation_status(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        conversation_id: &str,
+    ) -> Result<Option<ConversationStatus>, StoreError>;
+
+    /// Lists Conversations with exactly the requested status, newest first, using the
+    /// same `(created_at, conversation_id)` cursor as `list_conversations`.
+    fn list_conversations_by_status(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        status: ConversationStatus,
+        after_created_at: Option<&str>,
+        after_conversation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ConversationRecord>, StoreError>;
+}
+
+/// Maximum characters of an owner side note body (012 AC-006).
+pub const OWNER_SIDE_NOTE_MAX_CHARS: usize = 4_000;
+/// Side note refused because its correlated turn is already terminal (012 AC-005).
+pub const SIDE_NOTE_TURN_TERMINAL: &str = "SIDE_NOTE_TURN_TERMINAL";
+/// Side note body is empty or over the character limit (012 AC-006).
+pub const SIDE_NOTE_OVER_BUDGET: &str = "SIDE_NOTE_OVER_BUDGET";
+
+/// Immutable provenance row appended in the same transaction that settles a turn
+/// CANCELLED after an owner take-over.
+#[derive(Clone, Debug)]
+pub struct OwnerControlEventInsert {
+    pub control_event_id: String,
+    pub occurred_at: String,
+}
+
+/// A bounded owner side note correlated to a non-terminal turn. Never a
+/// `conversation_messages` row, so it can never enter a native prompt.
+#[derive(Clone, Debug)]
+pub struct AppendOwnerSideNote {
+    pub request: WorkspaceCreateRequest,
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub correlated_turn_id: String,
+    pub side_note_id: String,
+    pub body: String,
+    pub created_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct OwnerSideNoteRecord {
+    pub side_note_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub correlated_turn_id: String,
+    pub body: String,
+    pub created_at: String,
+}
+
+pub trait ConversationCoeditStore: Send + Sync {
+    /// Idempotent. Fails with `SIDE_NOTE_TURN_TERMINAL`, `SIDE_NOTE_OVER_BUDGET` or
+    /// `NotFound` (foreign owner, Workspace or cross-Conversation turn) and writes nothing.
+    fn append_owner_side_note(
+        &self,
+        commit: AppendOwnerSideNote,
+    ) -> Result<OwnerSideNoteRecord, StoreError>;
+
+    fn list_owner_side_notes(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        conversation_id: &str,
+        correlated_turn_id: &str,
+    ) -> Result<Vec<OwnerSideNoteRecord>, StoreError>;
+}
+
 /// A USER message committed with its OPEN turn. JSON values retain the public
 /// PrincipalRef, MessageContentBlock, ResourceRef, and channel reference shapes.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -151,11 +297,34 @@ pub struct CommitConversationAgentResponse {
     pub agent_session_id: String,
     pub expected_turn_version: u64,
     pub expected_session_version: u64,
+    /// Retry ordinal of the turn this response answers (B-04). Must equal the turn's
+    /// current ordinal inside the commit transaction.
+    pub retry_ordinal: u32,
+    /// Provider-side identity of the final response. Together with the turn id and
+    /// retry ordinal it is the commit identity: an exact repeat replays the stored
+    /// receipt, any differing repeat is rejected without a partial write.
+    pub provider_response_id: String,
     pub turn_status: ConversationTurnStatus,
     pub message: ConversationMessageRecord,
+    /// Token usage reported for this turn (B-10); `None` records an UNKNOWN attribution.
+    pub usage: Option<ConversationTurnUsage>,
     pub message_event: EventDraft,
     pub turn_event: EventDraft,
     pub session_event: EventDraft,
+}
+
+/// Token usage attributed to one settled turn (B-10).
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum UsageAttributionSource {
+    ProviderReported,
+    EstimatedLocal,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ConversationTurnUsage {
+    pub attribution_source: UsageAttributionSource,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -233,6 +402,168 @@ pub trait ConversationTurnStore: Send + Sync {
         command: TurnCommand,
         event: EventDraft,
     ) -> Result<ConversationTurn, StoreError>;
+
+    /// Settles a turn without a final answer together with its AgentSession; see
+    /// [`SettleConversationTurn`]. Stale turn or session versions fail with no write.
+    fn settle_conversation_turn(
+        &self,
+        settlement: SettleConversationTurn,
+    ) -> Result<SettledConversationTurn, StoreError>;
+
+    /// Returns the turn that an earlier command with this idempotency key already
+    /// produced (the `causation_id` of its canonical turn event), so an exact repeat of
+    /// a Retry or Cancel request replays instead of failing on the moved version.
+    fn find_conversation_turn_command_replay(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        request_id: &str,
+    ) -> Result<Option<ConversationTurn>, StoreError>;
+
+    /// Compare-and-swap claim of the durable dispatch intent for one admitted turn
+    /// attempt (UNCLAIMED to CLAIMED). Returns `false` when another dispatcher already
+    /// holds the claim or the intent is SETTLED. Must precede the STARTING reservation.
+    fn claim_conversation_dispatch_intent(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+        runtime_incarnation_id: &str,
+        claimed_at: &str,
+    ) -> Result<bool, StoreError>;
+
+    /// Returns a CLAIMED intent to UNCLAIMED when the claiming incarnation is gone and no
+    /// AgentSession was reserved for it. Returns `false` when the intent is not CLAIMED.
+    fn release_conversation_dispatch_intent(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+    ) -> Result<bool, StoreError>;
+
+    /// Bounded, ordered read of dispatch intents in one state (oldest first). Used by the
+    /// startup sweep and the dispatcher; never exposes provider-private handles.
+    fn list_conversation_dispatch_intents(
+        &self,
+        state: ConversationDispatchState,
+        limit: usize,
+    ) -> Result<Vec<ConversationDispatchIntent>, StoreError>;
+
+    /// Appends one REPORTED activity observation for a turn attempt (T25). Idempotent on
+    /// `(turn_id, retry_ordinal, sequence)`: an exact repeat is a no-op. The row records
+    /// what the native agent said it did; it is never an Effect, receipt or grant.
+    fn append_conversation_turn_activity(
+        &self,
+        record: ConversationActivityRecord,
+    ) -> Result<(), StoreError>;
+
+    /// Bounded, ordered read (sequence ascending) of one turn's activity observations,
+    /// scoped to the Workspace and Conversation. `retry_ordinal` selects one attempt.
+    fn list_conversation_turn_activity(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        retry_ordinal: u32,
+        limit: usize,
+    ) -> Result<Vec<ConversationActivityRecord>, StoreError>;
+}
+
+/// Maximum activity observations kept per turn attempt.
+pub const CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT: usize = 200;
+
+/// A REPORTED activity observation. `label` is a bounded, sanitized display word (a tool
+/// name or fixed phrase), never a path, argument, output or reasoning text.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConversationActivityRecord {
+    pub turn_id: String,
+    pub retry_ordinal: u32,
+    pub conversation_id: String,
+    pub sequence: u32,
+    /// `TOOL`, `FILE`, `PERMISSION`, `TODO`, `STEP` or `CONTEXT`.
+    pub kind: String,
+    /// `STARTED`, `PROGRESS`, `SUCCEEDED`, `FAILED`, `ASKED`, `UPDATED`, `ENDED` or `REDUCED`.
+    pub status: String,
+    pub call_ref: Option<String>,
+    pub label: Option<String>,
+    pub created_at: String,
+}
+
+/// Terminal state the settled turn's AgentSession reaches (no final answer is committed).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConversationSessionEnd {
+    /// Observed native quiescence: the session ends CLOSED.
+    Closed,
+    /// The native session is unknown or gone: the session ends LOST.
+    Lost,
+}
+
+/// The AgentSession ended together with a turn settlement.
+#[derive(Clone, Debug)]
+pub struct SettleConversationSession {
+    pub agent_session_id: String,
+    pub expected_session_version: u64,
+    pub end: ConversationSessionEnd,
+    pub occurred_at: String,
+    pub session_event: EventDraft,
+}
+
+/// Atomically settles a turn that produced no final answer (FAILED, or CANCELLED after
+/// observed quiescence), ends its AgentSession, releases the ephemeral host binding and
+/// settles the dispatch intent. No AGENT message is ever written by this operation.
+#[derive(Clone, Debug)]
+pub struct SettleConversationTurn {
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub turn_id: String,
+    pub expected_turn_version: u64,
+    /// `TurnCommand::Fail` or `TurnCommand::SettleCancelled`.
+    pub command: TurnCommand,
+    pub turn_event: EventDraft,
+    pub session: Option<SettleConversationSession>,
+    /// Whatever usage was observed for this attempt (B-10); `None` records UNKNOWN. A
+    /// missing or rejected usage row never blocks the settlement.
+    pub usage: Option<ConversationTurnUsage>,
+    /// When set (take-control), an `OWNER_TOOK_CONTROL` event is appended in the same
+    /// transaction. Only valid with `TurnCommand::SettleCancelled`.
+    pub control_event: Option<OwnerControlEventInsert>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SettledConversationTurn {
+    pub turn: ConversationTurn,
+    pub session: Option<AgentSessionRecord>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ConversationDispatchState {
+    Unclaimed,
+    Claimed,
+    Settled,
+}
+
+impl ConversationDispatchState {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Unclaimed => "UNCLAIMED",
+            Self::Claimed => "CLAIMED",
+            Self::Settled => "SETTLED",
+        }
+    }
+}
+
+/// Durable record that dispatch is owed for one admitted turn attempt.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ConversationDispatchIntent {
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub turn_id: String,
+    pub retry_ordinal: u32,
+    pub state: ConversationDispatchState,
+    pub claimed_by_runtime_incarnation: Option<String>,
+    pub created_at: String,
 }
 
 /// The live host a Conversation-scoped session must use, resolved authoritatively.
@@ -298,6 +629,11 @@ pub struct ConversationContextPackage {
     pub target_agent_binding_id: String,
     pub through_message_id: String,
     pub messages: Vec<ConversationContextMessage>,
+    /// Count of older committed messages that precede `messages` and were left out by
+    /// the B-07 window (message count or byte bound). `0` means the full committed
+    /// prefix is present. The oldest omitted message is message 1 of the Conversation.
+    #[serde(default)]
+    pub omitted_message_count: u32,
 }
 
 /// A committed message paired with its immutable Conversation aggregate revision.
@@ -335,12 +671,6 @@ pub fn build_conversation_context_package(
             "Conversation context identity is invalid".to_owned(),
         ));
     }
-    if messages.len() > CONVERSATION_CONTEXT_MAX_MESSAGES {
-        return Err(StoreError::Invalid(
-            "CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned(),
-        ));
-    }
-
     let mut ordered = messages.iter().collect::<Vec<_>>();
     ordered.sort_by_key(|source| source.conversation_revision);
     if ordered.windows(2).any(|pair| {
@@ -360,7 +690,7 @@ pub fn build_conversation_context_package(
         })?;
 
     let mut projected = Vec::new();
-    let mut projected_bytes =
+    let base_bytes =
         conversation_id.len() + target_agent_binding_id.len() + through_message_id.len() + 64;
     for source in ordered {
         if source.conversation_revision > boundary_revision {
@@ -390,25 +720,43 @@ pub fn build_conversation_context_package(
             let encoded_len = serde_json::to_vec(&context_message)
                 .map_err(|_| StoreError::Invalid("Conversation context is invalid".to_owned()))?
                 .len();
-            projected_bytes = projected_bytes
-                .checked_add(encoded_len + 1)
-                .ok_or_else(|| {
-                    StoreError::Invalid("CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned())
-                })?;
-            if projected_bytes > CONVERSATION_CONTEXT_MAX_BYTES {
-                return Err(StoreError::Invalid(
-                    "CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned(),
-                ));
-            }
-            projected.push(context_message);
+            projected.push((context_message, encoded_len + 1));
         }
     }
+
+    // B-07 window: keep the most recent contiguous messages, ending at the boundary,
+    // that fit the message-count and byte bounds. Older messages are counted, never
+    // silently dropped. The boundary message itself must fit or the turn is refused.
+    let mut kept_bytes = base_bytes;
+    let mut keep_from = projected.len();
+    while keep_from > 0 {
+        let (_, size) = &projected[keep_from - 1];
+        if projected.len() - keep_from >= CONVERSATION_CONTEXT_MAX_MESSAGES
+            || kept_bytes + size > CONVERSATION_CONTEXT_MAX_BYTES
+        {
+            break;
+        }
+        kept_bytes += size;
+        keep_from -= 1;
+    }
+    if keep_from == projected.len() {
+        return Err(StoreError::Invalid(
+            "CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned(),
+        ));
+    }
+    let omitted_message_count = u32::try_from(keep_from).unwrap_or(u32::MAX);
+    let messages = projected
+        .into_iter()
+        .skip(keep_from)
+        .map(|(message, _)| message)
+        .collect();
 
     Ok(ConversationContextPackage {
         conversation_id: conversation_id.to_owned(),
         target_agent_binding_id: target_agent_binding_id.to_owned(),
         through_message_id: through_message_id.to_owned(),
-        messages: projected,
+        messages,
+        omitted_message_count,
     })
 }
 
@@ -597,5 +945,66 @@ mod conversation_context_tests {
             build_conversation_context_package("conversation-a", "agent-a", "m-large", &sources,)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn context_window_boundary_at_1024_and_1025_messages_omits_only_the_oldest() {
+        let build = |count: usize| {
+            let messages = (0..count)
+                .map(|index| {
+                    message(
+                        &format!("m{index:05}"),
+                        "c",
+                        if index % 2 == 0 { "USER" } else { "AGENT" },
+                        "x",
+                        "2026-01-01T00:00:01Z",
+                        (index % 2 == 1).then_some("agent-a"),
+                        None,
+                    )
+                })
+                .collect::<Vec<_>>();
+            let through = format!("m{:05}", count - 1);
+            build_conversation_context_package("c", "agent-b", &through, &ordered(&messages))
+        };
+        // The boundary message must be a USER message for dispatch; here only the
+        // window arithmetic is under test.
+        let exact = build(1_024).expect("exactly the bound");
+        assert_eq!((exact.messages.len(), exact.omitted_message_count), (1_024, 0));
+        let over = build(1_025).expect("one over is windowed, not refused");
+        assert_eq!((over.messages.len(), over.omitted_message_count), (1_024, 1));
+        assert_eq!(over.messages[0].message_id, "m00001");
+        assert_eq!(over.messages.last().expect("boundary").message_id, "m01024");
+    }
+
+    #[test]
+    fn context_window_byte_bound_keeps_the_boundary_and_refuses_when_it_alone_is_too_large() {
+        let big = "x".repeat(1024 * 1024);
+        let messages = [
+            message("m-1", "c", "USER", &big, "2026-01-01T00:00:01Z", None, None),
+            message("m-2", "c", "AGENT", &big, "2026-01-01T00:00:02Z", Some("a"), None),
+            message("m-3", "c", "USER", &big, "2026-01-01T00:00:03Z", None, None),
+            message("m-4", "c", "AGENT", &big, "2026-01-01T00:00:04Z", Some("a"), None),
+            message("m-5", "c", "USER", &big, "2026-01-01T00:00:05Z", None, None),
+        ];
+        let windowed = build_conversation_context_package("c", "b", "m-5", &ordered(&messages))
+            .expect("older messages are windowed out");
+        assert_eq!(windowed.messages.len(), 3);
+        assert_eq!(windowed.omitted_message_count, 2);
+        assert_eq!(windowed.messages[0].message_id, "m-3");
+
+        let too_big = [message(
+            "m-only",
+            "c",
+            "USER",
+            &"x".repeat(4 * 1024 * 1024),
+            "2026-01-01T00:00:01Z",
+            None,
+            None,
+        )];
+        let refused = build_conversation_context_package("c", "b", "m-only", &ordered(&too_big));
+        assert!(matches!(
+            refused,
+            Err(crate::StoreError::Invalid(ref code)) if code == "CONVERSATION_CONTEXT_LIMIT_EXCEEDED"
+        ));
     }
 }

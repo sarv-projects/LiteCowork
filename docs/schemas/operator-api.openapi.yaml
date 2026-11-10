@@ -183,6 +183,24 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/Workspace'}
         default: {$ref: '#/components/responses/Error'}
+  /workspaces/{workspaceId}/name:
+    put:
+      tags: [workspaces]
+      operationId: renameWorkspace
+      description: Renames an ACTIVE Workspace over the existing workspaces.name column; bumps Workspace.version and emits workspace.renamed.v1. Archived Workspaces are read-only.
+      parameters: [{$ref: '#/components/parameters/WorkspaceId'}, {$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RenameWorkspaceRequest'}
+      responses:
+        '200':
+          description: Workspace renamed; the response carries the new version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Workspace'}
+        default: {$ref: '#/components/responses/Error'}
   /workspaces/{workspaceId}/delegation-settings:
     get:
       tags: [delegation]
@@ -533,6 +551,25 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ConversationTurnReceipt'}
+        default: {$ref: '#/components/responses/Error'}
+  /conversations/{conversationId}/turns/{turnId}/activity:
+    get:
+      tags: [conversations]
+      operationId: listConversationTurnActivity
+      description: Served (read-only). Returns the bounded, ordered REPORTED activity observations (tool, file, permission, todo and step events the native agent said it performed) for one turn attempt so the UI can rebuild activity cards after a restart. Records carry only a bounded display word, never a path, argument, output or reasoning text, and are never Effects, receipts or grants.
+      parameters:
+      - {$ref: '#/components/parameters/ConversationId'}
+      - name: turnId
+        in: path
+        required: true
+        schema: {type: string}
+      - {name: retry_ordinal, in: query, required: false, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200':
+          description: REPORTED activity for the attempt in sequence order
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConversationTurnActivityPage'}
         default: {$ref: '#/components/responses/Error'}
   /conversations/{conversationId}/turns/{turnId}/retry:
     post:
@@ -1699,6 +1736,7 @@ paths:
     get:
       tags: [runtime-lifecycle]
       operationId: previewLocalRuntimeStop
+      description: Served (read-only). Lists durable owner records that block a safe stop (admitted turns, non-terminal Attempts, unresolved Effects, held leases, pending cleanup). The verdict is UNKNOWN, never QUIESCENT, while no live-work observer exists for agent sessions, child processes and terminal or browser sessions; provider_reference_ids stays empty until that observer exists.
       security: [{operatorAuth: []}]
       responses:
         '200':
@@ -1711,8 +1749,9 @@ paths:
     post:
       tags: [runtime-lifecycle]
       operationId: requestLocalRuntimeStop
+      description: Target-only until Task/Attempt, Effect, lease and local service-reference settlement is proven. Authenticated, idempotent, If-Match on the current incarnation version. Admission is fenced before DRAINING; STOPPED is never reported while any settlement item is unsettled or UNKNOWN.
       security: [{operatorAuth: []}]
-      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
       requestBody:
         required: true
         content:
@@ -1852,7 +1891,7 @@ paths:
             schema: {$ref: '#/components/schemas/ProbeLocalAgentProfileRequest'}
       responses:
         '200':
-          description: Explicit owner-triggered, bounded local adapter observation. Each request performs a new probe and records a refreshed expiring Runtime offer; it is not an idempotent domain mutation. Requires the selected Workspace owner and an active local RuntimeWorkspaceBinding. Codex and OpenCode are accepted. OpenCode accepts only the exactly qualified CLI versions 2.0.26 and 2.0.28 and reads /api/provider plus /api/model. Version 2.0.26 readiness uses /api/health with healthy=true and username litecowork; version 2.0.28 uses /api/info with exact version and owned child PID matching, and username opencode. It returns bounded sanitized catalog IDs and display names, never native provider/model objects, options, headers, keys, URLs, raw responses, or location paths. Catalog provider IDs are not connected-provider or authentication evidence. Unsupported versions fail closed without route fallback. OpenCode session-model selection is NOT_QUALIFIED and its offer is always incompatible, so the profile cannot be bound or enabled. Raw native messages, endpoint locators, account identifiers, and private configuration are omitted.
+          description: Explicit owner-triggered, bounded local adapter observation. Each request performs a new probe and records a refreshed expiring Runtime offer; it is not an idempotent domain mutation. Requires the selected Workspace owner and an active local RuntimeWorkspaceBinding. Codex and OpenCode are accepted. OpenCode accepts the observation-only CLI versions 2.0.26 and 2.0.28 and the accepted CLI version 2.0.32, and reads /api/provider plus /api/model. Version 2.0.26 readiness uses /api/health with healthy=true and username litecowork; version 2.0.28 uses /api/info with exact version and owned child PID matching, and username opencode. It returns bounded sanitized catalog IDs and display names, never native provider/model objects, options, headers, keys, URLs, raw responses, or location paths. Catalog provider IDs are not connected-provider or authentication evidence. Unsupported versions fail closed without route fallback. OpenCode session-model selection is NOT_QUALIFIED. The offer is compatible (and profile_admission_supported is true, Conversation admission only) only for CLI 2.0.32 with a complete probe and an observed host stop; every other outcome keeps the offer incompatible so the profile cannot be bound or enabled. Raw native messages, endpoint locators, account identifiers, and private configuration are omitted.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AgentProfileView'}
@@ -2015,6 +2054,11 @@ paths:
         schema: {type: string}
       - {$ref: '#/components/parameters/IdempotencyKey'}
       - {$ref: '#/components/parameters/IfMatch'}
+      - name: X-Agent-Descriptor-Revision
+        in: header
+        required: false
+        description: "Digest of the AgentControlDescriptor the caller read. Required in effect when the bound profile's provider has a trusted AgentModule (OpenCode). Enable then succeeds only against the latest unexpired descriptor revision and otherwise fails with RESOURCE_STALE and no state change. Providers without a module ignore it."
+        schema: {type: string, pattern: '^sha256:[0-9a-f]{64}$'}
       responses:
         '200':
           description: Binding enabled for new Conversation session and Task planning/Attempt admission. Exact owner-scoped receipt replay returns the original response before active-only binding reads, including after Workspace archival; fresh mutations remain blocked after archival.
@@ -4763,6 +4807,12 @@ components:
           type: array
           description: Required and non-empty when replication_policy is SELECTED_FOLDERS; every ID must be an active root in this Workspace.
           items: {type: string, minLength: 1}
+    RenameWorkspaceRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 200, description: Trimmed, non-empty display name; control characters are rejected.}
     SetWorkspaceDefaultAgentBindingRequest:
       type: object
       additionalProperties: false
@@ -5651,7 +5701,7 @@ components:
         inference_access_verified: {const: false}
         host_process_stopped: {type: boolean}
         writer_quiescence_proven: {const: false}
-        profile_admission_supported: {const: false}
+        profile_admission_supported: {type: boolean}
     OpenCodeProviderOption:
       type: object
       additionalProperties: false
@@ -6223,6 +6273,16 @@ components:
         blockers: {type: array, items: {$ref: '#/components/schemas/Blocker'}}
         dependent_tasks: {type: array, items: {$ref: '#/components/schemas/TaskSummary'}}
         dependent_automations: {type: array, items: {$ref: '#/components/schemas/AutomationSummary'}}
+        power_assertion: {$ref: '#/components/schemas/PowerAssertion'}
+    PowerAssertion:
+      type: object
+      additionalProperties: false
+      description: Keep-awake observation held by the daemon process and read from the OS; HELD is reported only after the OS confirms the assertion, and it is released on drain.
+      required: [mode, os_state, observed_at]
+      properties:
+        mode: {type: string, enum: [OFF, WHILE_WORK_RUNS, WHILE_WORK_RUNS_ON_POWER]}
+        os_state: {type: string, enum: [HELD, RELEASED, UNSUPPORTED, UNKNOWN]}
+        observed_at: {type: string, format: date-time}
     LocalOperatorReadiness:
       type: object
       additionalProperties: false
@@ -6241,11 +6301,19 @@ components:
     RuntimeStopPreview:
       type: object
       additionalProperties: false
-      required: [runtime_id, runtime_incarnation_id, observed_at, dependent_task_ids, dependent_automation_ids, workspace_root_ids, shared_service_refs, eligible_handoff_task_ids, blockers]
+      required: [runtime_id, runtime_incarnation_id, observed_at, dependent_task_ids, dependent_automation_ids, workspace_root_ids, shared_service_refs, eligible_handoff_task_ids, blockers, admitted_turn_ids, admitted_attempt_ids, unresolved_effect_ids, execution_lease_ids, environment_control_lease_ids, provider_reference_ids, pending_cleanup_ids, verdict]
       properties:
         runtime_id: {type: string}
         runtime_incarnation_id: {type: string}
         observed_at: {type: string, format: date-time}
+        admitted_turn_ids: {type: array, items: {type: string}}
+        admitted_attempt_ids: {type: array, items: {type: string}}
+        unresolved_effect_ids: {type: array, items: {type: string}}
+        execution_lease_ids: {type: array, items: {type: string}}
+        environment_control_lease_ids: {type: array, items: {type: string}}
+        provider_reference_ids: {type: array, items: {type: string}}
+        pending_cleanup_ids: {type: array, items: {type: string}}
+        verdict: {type: string, enum: [QUIESCENT, BLOCKED, UNKNOWN], description: QUIESCENT only when every list above is empty and observed; any unobservable item makes the verdict UNKNOWN, never QUIESCENT.}
         dependent_task_ids: {type: array, items: {type: string}}
         dependent_automation_ids: {type: array, items: {type: string}}
         workspace_root_ids: {type: array, items: {type: string}}
@@ -6933,7 +7001,7 @@ components:
     ConversationPresentationSnapshot:
       type: object
       additionalProperties: false
-      required: [workspace_id, conversation_id, projection_revision, stream_cursor, origin_sequence, items, active_turn]
+      required: [workspace_id, conversation_id, projection_revision, stream_cursor, origin_sequence, items, active_turn, retryable_turn]
       properties:
         workspace_id: {type: string, minLength: 1}
         conversation_id: {type: string, minLength: 1}
@@ -6946,12 +7014,23 @@ components:
           items: {$ref: '#/components/schemas/ConversationPresentationMessage'}
         next_cursor: {type: [string, 'null'], description: 'Conversation message pagination cursor.'}
         active_turn: {oneOf: [{$ref: '#/components/schemas/ConversationTurnPresentation'}, {type: 'null'}]}
+        retryable_turn: {oneOf: [{$ref: '#/components/schemas/ConversationRetryableTurn'}, {type: 'null'}], description: 'The latest turn when it is FAILED; carries the aggregate version Retry must send as If-Match and the typed settlement reason.'}
+    ConversationRetryableTurn:
+      type: object
+      additionalProperties: false
+      required: [turn_id, version, retry_ordinal, reason_code]
+      properties:
+        turn_id: {type: string, minLength: 1}
+        version: {type: integer, minimum: 1, maximum: 9007199254740991}
+        retry_ordinal: {type: integer, minimum: 0}
+        reason_code: {type: [string, 'null'], maxLength: 128}
     ConversationTurnPresentation:
       type: object
       additionalProperties: false
-      required: [turn_id, status, retry_ordinal, presentation_preference]
+      required: [turn_id, version, status, retry_ordinal, presentation_preference]
       properties:
         turn_id: {type: string, minLength: 1}
+        version: {type: integer, minimum: 1, maximum: 9007199254740991, description: 'ConversationTurn aggregate version; Stop sends it as If-Match.'}
         status: {type: string, enum: [OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY, CANCEL_REQUESTED]}
         retry_ordinal: {type: integer, minimum: 0}
         presentation_preference: {type: string, enum: [AUTO, SIMPLE, RICH]}
@@ -7404,6 +7483,30 @@ components:
         accepted_at: {type: string, format: date-time}
         correlation_id: {type: string}
         presentation_preference: {type: string, enum: [AUTO, SIMPLE, RICH]}
+    ConversationTurnActivityPage:
+      type: object
+      required: [turn_id, retry_ordinal, attribution, items]
+      properties:
+        turn_id: {type: string}
+        retry_ordinal: {type: integer, minimum: 0}
+        attribution: {type: string, enum: [REPORTED]}
+        items:
+          type: array
+          maxItems: 200
+          items: {$ref: '#/components/schemas/ConversationTurnActivityRecord'}
+    ConversationTurnActivityRecord:
+      type: object
+      required: [turn_id, retry_ordinal, conversation_id, sequence, kind, status, call_ref, label, created_at]
+      properties:
+        turn_id: {type: string}
+        retry_ordinal: {type: integer, minimum: 0}
+        conversation_id: {type: string}
+        sequence: {type: integer, minimum: 1}
+        kind: {type: string, enum: [TOOL, FILE, PERMISSION, TODO, STEP, CONTEXT]}
+        status: {type: string, enum: [STARTED, PROGRESS, SUCCEEDED, FAILED, ASKED, UPDATED, ENDED, REDUCED]}
+        call_ref: {type: [string, 'null'], maxLength: 128}
+        label: {type: [string, 'null'], maxLength: 128}
+        created_at: {type: string}
     TimelinePage:
       type: object
       required: [items]

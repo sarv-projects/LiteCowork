@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
     }
   },
   "bundle": {
@@ -30,6 +30,15 @@
     "targets": "all",
     "category": "Productivity",
     "shortDescription": "A workspace for getting work done",
-    "longDescription": "LiteCowork desktop workspace"
+    "longDescription": "LiteCowork desktop workspace",
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"],
+        "section": "utils",
+        "files": {
+          "/usr/lib/systemd/system/litecoworkd.service": "../../../scripts/packaging/systemd/litecoworkd.service"
+        }
+      }
+    }
   }
 }

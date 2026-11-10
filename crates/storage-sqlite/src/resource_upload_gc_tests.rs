@@ -1454,6 +1454,9 @@ fn downgrade_resource_content_schema_to_v16(connection: &Connection) {
 }
 
 fn downgrade_resource_index_schema_to_v18(connection: &Connection) {
+    connection
+        .execute_batch(super::DOWNGRADE_V29_TO_V27_SQL)
+        .expect("restore the v27 migration boundary");
     // Version 27 adds Task test-run provenance; remove it before the v26 boundary.
     connection
         .execute_batch(

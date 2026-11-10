@@ -2757,21 +2757,29 @@ async fn enable_agent_binding(
     agent_binding_id: String,
     expected_version: u64,
     request_id: String,
+    descriptor_revision: Option<String>,
 ) -> Result<AgentBindingView, String> {
     tauri::async_runtime::spawn_blocking(move || {
         if workspace_id.trim().is_empty()
             || agent_binding_id.trim().is_empty()
             || !valid_idempotency_key(&request_id)
+            || descriptor_revision.as_deref().is_some_and(|revision| {
+                revision.len() != 71 || !revision.starts_with("sha256:")
+            })
         {
             return Err("Agent binding enable request is invalid".to_owned());
         }
         let (client, workspace_url) = operator_client(&app)?;
         let base = workspace_url.replace("/v1/workspaces", "/v1/agent-bindings");
-        let response = client
+        let mut request = client
             .post(format!("{base}/{agent_binding_id}/enable"))
             .header("X-Workspace-ID", &workspace_id)
             .header("If-Match", expected_version.to_string())
-            .header("Idempotency-Key", request_id)
+            .header("Idempotency-Key", request_id);
+        if let Some(revision) = descriptor_revision {
+            request = request.header("X-Agent-Descriptor-Revision", revision);
+        }
+        let response = request
             .send()
             .map_err(|_| "Workspace agent binding could not be enabled".to_owned())?;
         let body = read_bounded_response(response)?;
@@ -3001,6 +3009,62 @@ async fn archive_workspace(
     })
     .await
     .map_err(|_| "Workspace archive request did not complete".to_owned())?
+}
+
+fn validate_workspace_rename_request(
+    workspace_id: &str,
+    name: &str,
+    request_id: &str,
+) -> Result<(), String> {
+    let trimmed = name.trim();
+    if workspace_id.is_empty()
+        || workspace_id.len() > 256
+        || !workspace_id
+            .bytes()
+            .all(|byte| byte.is_ascii_graphic() && !matches!(byte, b'/' | b'?' | b'#'))
+        || !valid_idempotency_key(request_id)
+        || trimmed.is_empty()
+        || trimmed.chars().count() > 200
+        || trimmed.chars().any(char::is_control)
+    {
+        return Err("Workspace rename request is invalid".to_owned());
+    }
+    Ok(())
+}
+
+/// Renames a Workspace through the authenticated Operator. Refusals surface as
+/// `message [CODE; ...]` strings so the shell can branch on STALE_WORKSPACE_VERSION,
+/// WORKSPACE_ARCHIVED and WORKSPACE_NAME_INVALID.
+#[tauri::command]
+async fn rename_workspace(
+    app: AppHandle,
+    workspace_id: String,
+    name: String,
+    expected_version: u64,
+    request_id: String,
+) -> Result<WorkspaceView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        validate_workspace_rename_request(&workspace_id, &name, &request_id)?;
+        let (client, workspace_url) = operator_client(&app)?;
+        let response = client
+            .put(format!(
+                "{}/{workspace_id}/name",
+                workspace_url.trim_end_matches("/workspaces")
+            ))
+            .header("X-Workspace-ID", &workspace_id)
+            .header("If-Match", expected_version.to_string())
+            .header("Idempotency-Key", request_id)
+            .json(&serde_json::json!({ "name": name.trim() }))
+            .send()
+            .map_err(|_| "Workspace rename request did not complete".to_owned())?;
+        let body = read_bounded_response(response)?;
+        let workspace: WorkspaceWire = serde_json::from_slice(&body).map_err(|_| {
+            "Local Operator API returned an unsupported Workspace response".to_owned()
+        })?;
+        Ok(WorkspaceView::from(workspace))
+    })
+    .await
+    .map_err(|_| "Workspace rename request did not complete".to_owned())?
 }
 
 #[tauri::command]
@@ -5374,6 +5438,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_runtime_status,
             runtime_lifecycle_bridge::get_runtime_lifecycle,
+            runtime_lifecycle_bridge::get_runtime_stop_preview,
+            runtime_lifecycle_bridge::check_update_quiescence,
             list_agent_installations,
             agent_control_bridge::get_agent_control_descriptor,
             agent_control_bridge::refresh_agent_control_descriptor,
@@ -5412,6 +5478,7 @@ pub fn run() {
             create_workspace,
             update_workspace_policy,
             archive_workspace,
+            rename_workspace,
             set_workspace_default_agent_binding,
             list_workspace_instructions,
             create_workspace_instruction_revision,
@@ -5444,6 +5511,7 @@ pub fn run() {
             conversation_bridge::submit_conversation_turn,
             conversation_bridge::retry_conversation_turn,
             conversation_bridge::cancel_conversation_turn,
+            conversation_bridge::list_conversation_turn_activity,
             conversation_bridge::get_conversation_presentation,
             conversation_bridge::get_rich_presentation,
             conversation_stream_bridge::subscribe_conversation_stream,

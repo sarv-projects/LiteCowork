@@ -55,7 +55,7 @@ fn schema_pins_evidence_to_its_verification_run() {
         .expect("verify historical v24 migration receipt");
     verify_migration_record(&connection, 26, V26_MIGRATION_NAME, SQLITE_V26_DDL, false)
         .expect("verify latest migration receipt");
-    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, true)
+    verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, false)
         .expect("verify latest v27 migration receipt");
 }
 

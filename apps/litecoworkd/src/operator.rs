@@ -29,9 +29,10 @@ use domain_workspace::AddWorkspaceRoot;
 use domain_workspace::{
     ArchiveWorkspace, BeginContextDocumentPurge, ChangeReplicationPolicy,
     ChangeWorkspaceRootStatus, CreateResourceRevisionUploadSession, CreateResourceUploadSession,
-    CreateWorkspace, CreateWorkspaceInstructionRevision, EventContext, ResourceService,
-    ResourceUploadService, SetContextDocumentStatus as SetContextDocumentStatusCommand,
-    SetWorkspaceDefaultAgentBinding, WorkspaceRootService, WorkspaceService,
+    CreateWorkspace, CreateWorkspaceInstructionRevision, EventContext, RenameWorkspace,
+    ResourceService, ResourceUploadService,
+    SetContextDocumentStatus as SetContextDocumentStatusCommand, SetWorkspaceDefaultAgentBinding,
+    WorkspaceRootService, WorkspaceService,
 };
 use http_body::Body as HttpBody;
 #[cfg(unix)]
@@ -86,10 +87,14 @@ use tokio::sync::oneshot as tokio_oneshot;
 use tokio::{task::JoinSet, time::timeout};
 use tower::ServiceExt;
 
+#[path = "agent_auth_operator.rs"]
+mod agent_auth_operator;
 #[path = "agent_control_operator.rs"]
 mod agent_control_operator;
 #[path = "agent_credentials_routes.rs"]
 mod agent_credentials_routes;
+#[path = "agent_native_config_operator.rs"]
+mod agent_native_config_operator;
 #[path = "agent_quota_observation_operator.rs"]
 mod agent_quota_observation_operator;
 #[path = "agent_registry_operator.rs"]
@@ -939,6 +944,12 @@ struct CreateWorkspaceBody {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct RenameWorkspaceBody {
+    name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct UpdateWorkspacePolicyBody {
     replication_policy: ReplicationPolicy,
     #[serde(default)]
@@ -1460,7 +1471,12 @@ async fn wait_for_test_operator_failure(marker: Option<&FsPath>) {
 }
 
 fn runtime_lifecycle_routes() -> Router<RuntimeLifecycleApiState> {
-    Router::new().route("/v1/runtime-lifecycle", get(get_runtime_lifecycle))
+    Router::new()
+        .route("/v1/runtime-lifecycle", get(get_runtime_lifecycle))
+        .route(
+            "/v1/runtime-lifecycle/stop-preview",
+            get(preview_local_runtime_stop),
+        )
 }
 
 fn runtime_workspace_bindings_routes() -> Router<RuntimeWorkspaceBindingsApiState> {
@@ -1491,10 +1507,12 @@ fn workspace_policy_routes() -> Router<WorkspacePolicyApiState> {
 }
 
 fn workspace_archive_routes() -> Router<WorkspaceArchiveApiState> {
-    Router::new().route(
-        "/v1/workspaces/{workspace_id}/archive",
-        post(archive_workspace),
-    )
+    Router::new()
+        .route(
+            "/v1/workspaces/{workspace_id}/archive",
+            post(archive_workspace),
+        )
+        .route("/v1/workspaces/{workspace_id}/name", put(rename_workspace))
 }
 
 #[cfg(test)]
@@ -1532,6 +1550,8 @@ fn build_operator_router(state: ApiState) -> Router {
         .merge(capability_invocations_operator::routes())
         .merge(agent_quota_observation_operator::routes())
         .merge(agent_control_operator::routes())
+        .merge(agent_auth_operator::routes())
+        .merge(agent_native_config_operator::routes())
         .merge(agent_credentials_routes::routes())
         .merge(approval_operator::routes())
         .merge(agent_registry_operator::routes())
@@ -1966,6 +1986,51 @@ async fn get_runtime_lifecycle(
     )
 }
 
+/// Read-only stop preview. It never begins a drain and never reports QUIESCENT while the
+/// live-work observer is absent (see `runtime_stop_operator`).
+async fn preview_local_runtime_stop(
+    State(state): State<RuntimeLifecycleApiState>,
+) -> Result<Response, Response> {
+    let observation = state
+        .store
+        .read_runtime_stop_observation(&state.runtime_id, &state.local_incarnation_id)
+        .map_err(|_| {
+            operator_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL",
+                "Runtime stop preview is unavailable",
+            )
+        })?
+        .ok_or_else(|| {
+            operator_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "RUNTIME_UNAVAILABLE",
+                "Current Runtime incarnation could not be verified",
+            )
+        })?;
+    let observed_at = time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .map_err(|_| {
+            operator_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL",
+                "Runtime stop preview is unavailable",
+            )
+        })?;
+    let view = crate::runtime_stop_operator::build_stop_preview(
+        &state.runtime_id,
+        &state.local_incarnation_id,
+        &observed_at,
+        observation,
+        crate::runtime_stop_operator::LiveWorkObservation::Unobserved,
+    );
+    let mut response = Json(view).into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
 fn runtime_lifecycle_response(
     snapshot: storage_core::LocalRuntimeLifecycleSnapshot,
     expected_runtime_id: &str,
@@ -2057,6 +2122,11 @@ fn runtime_lifecycle_blocker_copy(code: &str) -> (&'static str, &'static str, &'
             "RUNTIME_UNAVAILABLE",
             "Expired execution lease recovery did not complete.",
             "Keep work stopped until the local Runtime has reconciled expired leases.",
+        ),
+        "CONVERSATION_SESSION_RECOVERY_FAILED" => (
+            "RUNTIME_UNAVAILABLE",
+            "Conversation turn recovery did not complete.",
+            "Review interrupted Conversation turns before sending new messages.",
         ),
         _ => (
             "RUNTIME_UNAVAILABLE",
@@ -7279,7 +7349,9 @@ async fn probe_local_opencode_profile(
 ) -> Result<Json<AgentProfileResponse>, Response> {
     // This explicit owner action is the only code path that resolves and records
     // the private OpenCode executable locator. Inventory alone never probes it.
-    let executable = resolve_local_executable("opencode").ok_or_else(|| {
+    // The shared resolver applies the Windows `.exe`/`.cmd`/npm/bun rules and
+    // canonicalizes, so the probe and the supervisor bind the same executable.
+    let executable = crate::agents::resolve_opencode_executable().ok_or_else(|| {
         operator_error(
             StatusCode::NOT_FOUND,
             "AGENT_UNAVAILABLE",
@@ -7308,31 +7380,9 @@ async fn probe_local_opencode_profile(
             display_name: "OpenCode".to_owned(),
             discovered_at: observed_at.clone(),
         };
-        let endpoint = AgentEndpointRecord {
-            endpoint_id: endpoint_id.clone(),
-            agent_profile_id: profile_id.clone(),
-            protocol: "API".to_owned(),
-            topology: "PROCESS_ADAPTER".to_owned(),
-            protocol_version: None,
-            capabilities: opencode_endpoint_capabilities(),
-        };
-        let existing = state_for_probe
-            .store
-            .list_agent_profiles(
-                &state_for_probe.principal_id,
-                &scoped_workspace,
-                &observed_at,
-            )
-            .map_err(|error| map_agent_store_error(error, "Agent profile could not be read"))?
-            .into_iter()
-            .find(|entry| entry.profile.agent_profile_id == profile_id);
-        let stable_profile = existing.map_or(profile, |entry| entry.profile);
-        state_for_probe
-            .store
-            .put_agent_profile(stable_profile, vec![endpoint])
-            .map_err(|error| {
-                map_agent_store_error(error, "OpenCode profile identity could not be recorded")
-            })?;
+        // Register the Runtime-local endpoint locator the supervisor will
+        // dispatch before the probe. It is re-validated as the same canonical
+        // path at dispatch time, so probe/dispatch executable drift fails closed.
         let locator = executable.to_string_lossy().into_owned();
         state_for_probe
             .store
@@ -7359,16 +7409,44 @@ async fn probe_local_opencode_profile(
                 "Probe time could not be recorded",
             )
         })?;
-        let readiness = if probe.host_process_stopped
-            && probe.probe_readiness == crate::agents::OpenCodeProbeReadiness::Complete
-        {
-            // Catalog observation is useful for display, but no compatible
-            // session/model-selection semantics have been qualified. This
-            // deliberately cannot admit or enable an AgentBinding.
-            "DEGRADED"
-        } else {
-            "UNAVAILABLE"
+
+        // Write the endpoint after the probe so its declared capabilities and
+        // protocol version reflect the exact observed CLI version.
+        let endpoint = AgentEndpointRecord {
+            endpoint_id: endpoint_id.clone(),
+            agent_profile_id: profile_id.clone(),
+            protocol: "API".to_owned(),
+            topology: "PROCESS_ADAPTER".to_owned(),
+            protocol_version: probe.protocol_version.clone(),
+            capabilities: opencode_endpoint_capabilities(probe.protocol_version.as_deref()),
         };
+        let existing = state_for_probe
+            .store
+            .list_agent_profiles(
+                &state_for_probe.principal_id,
+                &scoped_workspace,
+                &observed_at,
+            )
+            .map_err(|error| map_agent_store_error(error, "Agent profile could not be read"))?
+            .into_iter()
+            .find(|entry| entry.profile.agent_profile_id == profile_id);
+        let stable_profile = existing.map_or(profile, |entry| entry.profile);
+        state_for_probe
+            .store
+            .put_agent_profile(stable_profile, vec![endpoint])
+            .map_err(|error| {
+                map_agent_store_error(error, "OpenCode profile identity could not be recorded")
+            })?;
+
+        // Offer compatibility is computed, never hard-coded. Only the exact
+        // accepted route (2.0.32, a complete probe and an observed host stop)
+        // publishes a compatible STARTABLE offer; every negative keeps
+        // compatible=false, so the unchanged storage gate rejects the binding.
+        let crate::agents::OfferAdmission {
+            compatible,
+            readiness,
+            reason: _,
+        } = crate::agents::opencode_offer_admission(&probe);
         let constraints = serde_json::to_value(&probe).map_err(|_| {
             operator_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -7384,7 +7462,7 @@ async fn probe_local_opencode_profile(
                 runtime_incarnation_id: incarnation_id.clone(),
                 offer_kind: "AGENT_ENDPOINT".to_owned(),
                 offer_ref: endpoint_id,
-                compatible: false,
+                compatible,
                 readiness: readiness.to_owned(),
                 constraints,
                 observed_at: observed_at.clone(),
@@ -7426,12 +7504,15 @@ async fn probe_local_opencode_profile(
     Ok(result)
 }
 
-fn opencode_endpoint_capabilities() -> serde_json::Value {
+fn opencode_endpoint_capabilities(protocol_version: Option<&str>) -> serde_json::Value {
+    // Record the observed protocol version and declare only `input.text`, the
+    // single input the Conversation supervisor path sends. Every other capability
+    // stays false until it is implemented and qualified.
     json!({
         "protocol": "OPENCODE_SERVER",
-        "protocol_version": null,
+        "protocol_version": protocol_version,
         "session": {"resume":false,"steer":false,"interrupt":false,"cancel":false,"fork":false},
-        "input": {"text":false,"image":false,"file":false,"resources":false},
+        "input": {"text":true,"image":false,"file":false,"resources":false},
         "extension": {"mcp_stdio":false,"mcp_http":false,"skills":false,"plugins":false,"dynamic_attach":false},
         "reporting": {"tool_calls":false,"plan":false,"usage":false,"native_subagents":false,"approvals":false},
         "environment": {"cwd":false,"extra_directories":false},
@@ -7592,6 +7673,27 @@ async fn create_agent_binding(
     Ok((StatusCode::CREATED, Json(committed.binding)).into_response())
 }
 
+/// Optional `X-Agent-Descriptor-Revision` header: the descriptor digest the caller read.
+fn parse_descriptor_revision(headers: &HeaderMap) -> Result<Option<String>, Response> {
+    let Some(value) = headers.get("x-agent-descriptor-revision") else {
+        return Ok(None);
+    };
+    let text = value.to_str().ok().filter(|text| {
+        text.len() == 71
+            && text.strip_prefix("sha256:").is_some_and(|hex| {
+                hex.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            })
+    });
+    text.map(|text| Some(text.to_owned())).ok_or_else(|| {
+        operator_error(
+            StatusCode::BAD_REQUEST,
+            "INVALID_ARGUMENT",
+            "X-Agent-Descriptor-Revision must be a sha256 digest",
+        )
+    })
+}
+
 async fn enable_agent_binding(
     State(state): State<ApiState>,
     headers: HeaderMap,
@@ -7601,7 +7703,12 @@ async fn enable_agent_binding(
     ensure_workspace_owner(&state, &workspace_id)?;
     let expected_version = parse_if_match(&headers)?;
     let request_id = idempotency_key(&headers)?;
-    let request_payload = json!({"operation":"agent.binding.enable.v1", "workspace_id":workspace_id, "agent_binding_id":agent_binding_id, "expected_version":expected_version});
+    let descriptor_revision = parse_descriptor_revision(&headers)?;
+    let mut request_payload = json!({"operation":"agent.binding.enable.v1", "workspace_id":workspace_id, "agent_binding_id":agent_binding_id, "expected_version":expected_version});
+    if let Some(revision) = &descriptor_revision {
+        // Bound into the receipt digest so reusing a key with another revision conflicts.
+        request_payload["descriptor_revision"] = json!(revision);
+    }
     if let Some(replay) = state
         .store
         .get_agent_binding_mutation_receipt(&state.principal_id, &request_id, &request_payload)
@@ -7630,6 +7737,26 @@ async fn enable_agent_binding(
                 "Workspace agent binding is unavailable",
             )
         })?;
+    // A profile whose provider selects a trusted AgentModule may be enabled only against
+    // the latest fresh descriptor revision; module-less providers keep their existing gate.
+    let descriptor_service = crate::agents::descriptor_service::AgentDescriptorService::shared();
+    let require_descriptor = state
+        .store
+        .list_agent_profiles(&state.principal_id, &workspace_id, &now)
+        .map_err(|error| map_agent_store_error(error, "Agent profiles are unavailable"))?
+        .into_iter()
+        .find(|view| view.profile.agent_profile_id == binding.agent_profile_id)
+        .and_then(|view| {
+            descriptor_service
+                .module_for_provider(&view.profile.provider_key)
+                .map(|module| {
+                    crate::agents::descriptor_service::AgentDescriptorService::gate(
+                        module,
+                        &state.runtime_id,
+                        &state.local_incarnation_id,
+                    )
+                })
+        });
     let correlation_id = new_id("cor").map_err(|_| {
         operator_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -7684,8 +7811,19 @@ async fn enable_agent_binding(
             expected_version,
             now,
             event,
+            require_descriptor,
+            descriptor_revision,
         })
-        .map_err(|error| map_agent_store_error(error, "Agent binding could not be enabled"))?;
+        .map_err(|error| {
+            if matches!(&error, storage_core::StoreError::Invalid(message) if message.starts_with("DESCRIPTOR_STALE")) {
+                return operator_error(
+                    StatusCode::CONFLICT,
+                    "RESOURCE_STALE",
+                    "The agent control descriptor is missing, stale or changed; refresh it and try again",
+                );
+            }
+            map_agent_store_error(error, "Agent binding could not be enabled")
+        })?;
     Ok(Json(committed.binding))
 }
 
@@ -8054,6 +8192,151 @@ async fn archive_workspace(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "INTERNAL",
                 "Workspace could not be archived",
+            ),
+        })?;
+    let mut response = Json(committed.workspace).into_response();
+    if let Ok(value) = header::HeaderValue::from_str(&committed.event.correlation_id) {
+        response
+            .headers_mut()
+            .insert(header::HeaderName::from_static("x-correlation-id"), value);
+    }
+    Ok(response)
+}
+
+async fn rename_workspace(
+    State(state): State<WorkspaceArchiveApiState>,
+    headers: HeaderMap,
+    Path(workspace_id): Path<String>,
+    Json(body): Json<RenameWorkspaceBody>,
+) -> Result<Response, Response> {
+    if selected_workspace(&headers)? != workspace_id {
+        return Err(operator_error(
+            StatusCode::FORBIDDEN,
+            "FORBIDDEN",
+            "Workspace access is unavailable",
+        ));
+    }
+    let workspace = ensure_workspace_owner_for(&state.store, &state.principal_id, &workspace_id)?;
+    let expected_version = headers
+        .get(header::IF_MATCH)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.trim().trim_matches('"').parse::<u64>())
+        .transpose()
+        .map_err(|_| {
+            operator_error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "If-Match must contain a Workspace version",
+            )
+        })?
+        .ok_or_else(|| {
+            operator_error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "If-Match is required",
+            )
+        })?;
+    let request_id = headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| {
+            !value.is_empty()
+                && value.len() <= 200
+                && value.bytes().all(|byte| byte.is_ascii_graphic())
+        })
+        .ok_or_else(|| {
+            operator_error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "A valid Idempotency-Key is required",
+            )
+        })?;
+    let correlation_id = new_id("cor").map_err(|_| {
+        operator_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL",
+            "Workspace request could not be initialized",
+        )
+    })?;
+    let context = event_context(&state.runtime_id, &correlation_id).map_err(|_| {
+        operator_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL",
+            "Workspace request could not be initialized",
+        )
+    })?;
+    let name = body.name.trim().to_owned();
+    let request_payload = json!({
+        "operation": "workspace.rename.v1",
+        "workspace_id": workspace_id,
+        "expected_version": expected_version,
+        "name": name,
+    });
+    let committed = WorkspaceService::new(state.store.clone())
+        .rename_idempotent(
+            RenameWorkspace {
+                workspace_id: workspace.workspace_id.clone(),
+                expected_version,
+                name,
+                principal_id: state.principal_id.clone(),
+                event: context,
+            },
+            request_id.to_owned(),
+            request_payload,
+        )
+        .map_err(|error| match error {
+            StoreError::Invalid(message) if message == "an archived Workspace is read-only" => {
+                operator_error(
+                    StatusCode::CONFLICT,
+                    "WORKSPACE_ARCHIVED",
+                    "Archived Workspaces are read-only",
+                )
+            }
+            StoreError::Invalid(message)
+                if message == domain_workspace::WORKSPACE_NAME_INVALID_MESSAGE =>
+            {
+                operator_error(
+                    StatusCode::BAD_REQUEST,
+                    "WORKSPACE_NAME_INVALID",
+                    "Workspace name must be 1 to 200 characters without control characters",
+                )
+            }
+            StoreError::Invalid(_) => operator_error(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                "Workspace rename is invalid",
+            ),
+            StoreError::Conflict {
+                expected: None,
+                actual: None,
+            } => operator_error(
+                StatusCode::CONFLICT,
+                "CONFLICT",
+                "Idempotency key was already used for a different Workspace rename request",
+            ),
+            StoreError::Conflict { .. } => {
+                let current = state
+                    .store
+                    .get_workspace(&workspace_id)
+                    .ok()
+                    .flatten()
+                    .map(|latest| json!({"current_name": latest.name, "current_version": latest.version}));
+                operator_error_with_details(
+                    StatusCode::CONFLICT,
+                    "STALE_WORKSPACE_VERSION",
+                    "Workspace changed; refresh before renaming",
+                    current,
+                )
+            }
+            StoreError::NotFound => operator_error(
+                StatusCode::NOT_FOUND,
+                "NOT_FOUND",
+                "Workspace is unavailable",
+            ),
+            _ => operator_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL",
+                "Workspace could not be renamed",
             ),
         })?;
     let mut response = Json(committed.workspace).into_response();

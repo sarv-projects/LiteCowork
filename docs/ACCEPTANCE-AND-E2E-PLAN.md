@@ -53,12 +53,12 @@ Never translate a unit pass, mocked UI, schema, catalog row, successful process 
 | E2E-10 | Scheduled and event Automation → occurrence → Task → notification | Exactly-once occurrence identity, timezone/misfire handling, recovery and truthful delivery |
 | E2E-11 | Rich UI response with presentation disabled | Semantic message remains complete; rendered controls cannot forge or settle host state |
 | E2E-12 | Backup/export → restore/import → inspect provenance | Data integrity, secret exclusion, tombstone and evidence preservation |
-| E2E-14 (proposed, Feature 014) | Search Conversations → rename → archive → unarchive → delete one Conversation → restart | Search hits only ACTIVE/ARCHIVED rows; delete tombstones then purges under a fence; retrieval, context and memory fences exclude the deleted Conversation after restart |
-| E2E-15 (proposed, Feature 015) | Running Task → steer → pause → resume → OpenCode lead delegates one Step to Claude Code → independent verification → cancel fan-out | Typed control requests and receipts; child Attempt admitted under allowlist and budget; late results fenced; Linux row first, Windows after B-35 |
-| E2E-16 (proposed, Feature 018) | Turn settles → Usage shows provider-reported or ESTIMATED_LOCAL counts → crash daemon → write support bundle from preview | No fabricated zero usage; crash record present after restart; bundle contains only allowlisted, redacted categories |
-| E2E-17 (proposed, Feature 020) | Coworker chat → "Remember this" → Remembered notice → correct → revoke → restart | Candidate lifecycle follows LearningCandidate; only eligible CONFIRMED private memories auto-commit; revoked memory excluded from retrieval after restart |
+| E2E-14 (adopted 2026-11-10, Feature 014) | Search Conversations → rename → archive → unarchive → delete one Conversation → restart | Search hits only ACTIVE/ARCHIVED rows; delete tombstones then purges under a fence; retrieval, context and memory fences exclude the deleted Conversation after restart |
+| E2E-15 (adopted 2026-11-10, Feature 015) | Running Task → steer → pause → resume → OpenCode lead delegates one Step to Claude Code → independent verification → cancel fan-out | Typed control requests and receipts; child Attempt admitted under allowlist and budget; late results fenced; Linux row first, Windows after B-35 |
+| E2E-16 (adopted 2026-11-10, Feature 018) | Turn settles → Usage shows provider-reported or ESTIMATED_LOCAL counts → crash daemon → write support bundle from preview | No fabricated zero usage; crash record present after restart; bundle contains only allowlisted, redacted categories |
+| E2E-17 (adopted 2026-11-10, Feature 020) | Coworker chat → "Remember this" → Remembered notice → correct → revoke → restart | Candidate lifecycle follows LearningCandidate; only eligible CONFIRMED private memories auto-commit; revoked memory excluded from retrieval after restart |
 
-E2E-14..E2E-17 were proposed on 2026-11-09 with packages 014, 015, 018 and 020. They stay proposed until those packages are accepted.
+E2E-14..E2E-17 were proposed on 2026-11-09 with packages 014, 015, 018 and 020 and adopted as journey ids by the owner on 2026-11-10 (register A-62). Adoption fixes the ids and journeys only: each stays unqualified until its package is accepted and implemented, E2E-16 also waits on B-42 (open), and the Windows legs wait for later laptop testing.
 
 The send/stream/stop adapter exercised by E2E-01 (and the relay in E2E-02) is the owner-accepted Agent Client Protocol (ACP) client with a per-provider launch catalog (Feature 002 task 002-T17, consumed by Feature 001; register [A-54](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)/[A-55](CONTRADICTION-AND-ALIGNMENT-REGISTER.md)), with OpenCode v2 HTTP kept as one non-ACP adapter until its ACP route qualifies. E2E-01 must also confirm the OpenCode event mapping against the captured v2.0.32 fixture (Feature 001 task 001-T23) rather than top-level key guessing, and render the activity, plan and inline-FAILED cards and autoscroll from the folded rendering tasks (001-T24..T26). Deterministic provider fixtures remain acceptable only for provider output control, never as a replacement for the daemon, IPC, session lifecycle, persistence or UI.
 
@@ -128,6 +128,19 @@ Do not store credentials, access tokens, raw SecretLease bytes, private prompts 
 A release row moves to QUALIFIED only when the full chain is linked and reproducible on the declared target. Qualification is scoped to the exact OS/build, agent version, provider route, auth mode, protocol and feature set. Other rows remain unsupported or blocked. WSL2 is not native Windows or native Linux desktop evidence.
 
 The historical c7e9c05 acceptance matrix in docs/archive/legacy-implementation-c7e9c05 records all ten core product journeys as BLOCKED. Re-run the inventories from the new live implementation before updating any release status.
+
+### Declared V1 release rows and the NOT_COUNTED rule
+
+*Accepted target interface (not yet in source) until Feature 019 tasks T14 and T15 land; the owner is Feature 019 (see `docs/release/README.md`).*
+
+V1 declares exactly two release rows. Nothing else is a V1 row.
+
+| Row id | Priority | Target |
+|---|---|---|
+| `windows-x64-opencode-v2.0.32` | 1 | Windows 10 22H2 and Windows 11 x64, native, WebView2, OpenCode v2.0.32 |
+| `linux-x64-opencode-v2.0.32` | 2 | Ubuntu 24.04 x64 native desktop, WebKitGTK 4.1, OpenCode v2.0.32 |
+
+A run under WSL2, inside a container, or on a CI image is NOT_COUNTED for every row: it can supply CODE evidence only and never marks a cell PASSED or a journey QUALIFIED. Hosted CI runners are CODE/SYSTEM evidence, never USER. macOS is UNSUPPORTED. Evidence bundles and rows validate against `docs/schemas/release-evidence-bundle.schema.json` and `docs/schemas/release-matrix-row.schema.json`.
 
 
 ## Desktop stop/update qualification gate - future and currently blocked

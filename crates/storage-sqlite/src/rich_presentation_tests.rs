@@ -141,6 +141,43 @@ fn conversation_presentation_snapshot_is_bounded_paged_and_keeps_semantic_truth(
         first.active_turn.as_ref().unwrap()["presentation_preference"],
         "RICH"
     );
+    assert_eq!(first.active_turn.as_ref().unwrap()["version"], 3);
+    assert!(first.retryable_turn.is_none(), "a running turn is not retryable");
+
+    // Once that turn FAILS and is the latest, the snapshot exposes it for Retry with its
+    // aggregate version and typed settlement reason.
+    let c = Connection::open(state_database(&dir)).unwrap();
+    c.execute(
+        "UPDATE conversation_turns SET status='FAILED',settled_at='2026-10-09T12:00:02.000000000Z',version=4 WHERE turn_id='turn-active'",
+        [],
+    )
+    .unwrap();
+    c.execute(
+        "INSERT INTO domain_events(event_id,workspace_id,entity_type,entity_id,origin_runtime_id,origin_sequence,entity_revision,hlc_timestamp,correlation_id,causation_id,schema_version,type,payload_json,aggregate_state_ref_json,recorded_at,payload_digest) VALUES('event-turn-failed','workspace-rich','ConversationTurn','turn-active','runtime-local',(SELECT COALESCE(MAX(origin_sequence),0)+1 FROM domain_events WHERE workspace_id='workspace-rich'),4,'2026-10-09T12:00:02.000000000Z','correlation-fail',NULL,1,'conversation.turn.settled.v1','{\"turn_id\":\"turn-active\",\"from\":\"RUNNING\",\"to\":\"FAILED\",\"reason_code\":\"AGENT_TURN_TIMEOUT\",\"aggregate_version\":4}','{}','2026-10-09T12:00:02.000000000Z','sha256:0000000000000000000000000000000000000000000000000000000000000000')",
+        [],
+    )
+    .unwrap();
+    c.execute(
+        "UPDATE workspace_origin_sequences SET last_sequence=last_sequence+1 WHERE workspace_id='workspace-rich' AND origin_runtime_id='runtime-local'",
+        [],
+    )
+    .unwrap();
+    drop(c);
+    let failed = adapter
+        .read_conversation_presentation(
+            "owner-local",
+            "workspace-rich",
+            "conversation-rich",
+            "runtime-local",
+            None,
+            1,
+        )
+        .unwrap();
+    assert!(failed.active_turn.is_none());
+    let retryable = failed.retryable_turn.expect("latest FAILED turn is retryable");
+    assert_eq!(retryable["turn_id"], "turn-active");
+    assert_eq!(retryable["version"], 4);
+    assert_eq!(retryable["reason_code"], "AGENT_TURN_TIMEOUT");
 
     let second = adapter
         .read_conversation_presentation(

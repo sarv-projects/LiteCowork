@@ -4,20 +4,31 @@
 //! evidence of authentication or session readiness. Protocol adapters fill those
 //! fields only after a scoped, side-effect-bounded handshake.
 
+pub(crate) mod acp_client;
 pub(crate) mod acp_registry;
+pub(crate) mod adapter;
+pub(crate) mod auth_service;
 mod cline;
 mod codex;
 mod codex_app_server;
 mod codex_profile_probe;
 pub(crate) mod control_descriptor;
 mod conversation_prompt;
+pub(crate) mod conversation_recovery;
+pub(crate) mod descriptor_service;
+pub(crate) mod matchmaker;
 pub(crate) mod module_registry;
+pub(crate) mod modules;
 mod native_cli;
+pub(crate) mod native_provider;
+pub(crate) mod normalizer;
 mod opencode;
 mod opencode_profile_probe;
 mod opencode_server;
 mod planning;
+pub(crate) mod resource_materializer;
 pub(crate) mod supervisor;
+pub(crate) mod turn_coordinator;
 
 pub(crate) use supervisor::AgentSessionSupervisor;
 
@@ -28,9 +39,10 @@ pub(crate) use codex_app_server::NativeEnvironment;
 pub(crate) use codex_profile_probe::{
     RuntimeOfferAssessment, codex_runtime_offer_assessment, probe_codex_profile,
 };
-pub(crate) use opencode_profile_probe::{
-    OpenCodeProbeReadiness, opencode_native_environment, probe_opencode_profile,
+pub(crate) use native_provider::{
+    OfferAdmission, opencode_offer_admission, resolve_opencode_executable,
 };
+pub(crate) use opencode_profile_probe::{opencode_native_environment, probe_opencode_profile};
 pub(crate) use opencode_server::{
     OpenCodeEnvironment, OpenCodeError, OpenCodeProcessState, OpenCodeServer, OpenCodeServerConfig,
     OpenCodeServerProtocol,

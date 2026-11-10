@@ -235,6 +235,7 @@ impl ConversationStore for SqliteConversationStore {
             let Some((title, actual_version, created_at, previous_binding_id)) = current else {
                 return Err(StoreError::NotFound);
             };
+            require_conversation_active(&tx, &commit.conversation_id)?;
             let actual_version = u64::try_from(actual_version)
                 .map_err(|_| StoreError::Integrity("Conversation version is invalid".to_owned()))?;
             if actual_version != commit.expected_version {
@@ -454,6 +455,19 @@ impl ConversationTurnStore for SqliteConversationStore {
             let Some((title, version, created_at, conversation_binding)) = conversation else {
                 return Err(StoreError::NotFound);
             };
+            require_conversation_active(&tx, &commit.turn.conversation_id)?;
+            // Strict single-flight lane (B-01): the receipt lookup above already replayed an
+            // exact repeat, so any nonterminal turn here belongs to a different request.
+            let turn_in_flight: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversation_turns WHERE conversation_id=?1 AND status IN ('OPEN','RUNNING','WAITING_USER','WAITING_DEPENDENCY','CANCEL_REQUESTED'))",
+                    params![commit.turn.conversation_id],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if turn_in_flight {
+                return Err(StoreError::Invalid(CONVERSATION_TURN_IN_PROGRESS.to_owned()));
+            }
             // The Conversation's admitted AgentBinding selection is resolved inside
             // this authoritative transaction: the explicit Conversation override
             // first, then the Workspace default. The first configured selection is
@@ -519,6 +533,13 @@ impl ConversationTurnStore for SqliteConversationStore {
                         .and_then(|v| v.as_str().map(str::to_owned))
                         .ok_or_else(|| StoreError::Invalid("invalid presentation preference".to_owned()))?
                 ],
+            )
+            .map_err(map_database_error)?;
+            // The dispatch intent commits atomically with the turn so a crash between
+            // admission and dispatch leaves a durable UNCLAIMED row for the startup sweep.
+            tx.execute(
+                "INSERT INTO conversation_dispatch_intents(turn_id,retry_ordinal,conversation_id,state,created_at) VALUES(?1,0,?2,'UNCLAIMED',?3)",
+                params![commit.turn.turn_id, commit.turn.conversation_id, commit.turn.created_at],
             )
             .map_err(map_database_error)?;
             tx.execute(
@@ -595,6 +616,373 @@ impl ConversationTurnStore for SqliteConversationStore {
         })
     }
 
+    fn settle_conversation_turn(
+        &self,
+        settlement: SettleConversationTurn,
+    ) -> Result<SettledConversationTurn, StoreError> {
+        let valid_identity = |value: &str| {
+            !value.trim().is_empty() && value.len() <= 256 && !value.chars().any(char::is_control)
+        };
+        if !valid_identity(&settlement.principal_id)
+            || !valid_identity(&settlement.workspace_id)
+            || !valid_identity(&settlement.conversation_id)
+            || !valid_identity(&settlement.turn_id)
+            || settlement.expected_turn_version == 0
+            || !matches!(
+                settlement.command,
+                TurnCommand::Fail { .. } | TurnCommand::SettleCancelled { .. }
+            )
+            || settlement.session.as_ref().is_some_and(|session| {
+                !valid_identity(&session.agent_session_id) || session.expected_session_version == 0
+            })
+        {
+            return Err(StoreError::Invalid(
+                "Conversation turn settlement identity is invalid".to_owned(),
+            ));
+        }
+        let mut settlement = settlement;
+        if let Some(session) = settlement.session.as_mut() {
+            session.occurred_at = canonicalize_utc_timestamp(&session.occurred_at)?;
+        }
+        let blobs = Arc::clone(&self.store.inner.blobs);
+        self.run(move |connection| {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(map_database_error)?;
+            let allowed: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2 AND status='ACTIVE')",
+                params![settlement.workspace_id, settlement.principal_id], |row| row.get(0),
+            ).map_err(map_database_error)?;
+            if !allowed { return Err(StoreError::NotFound); }
+            let current = load_turn(&tx, &settlement.workspace_id, &settlement.conversation_id, &settlement.turn_id)?
+                .ok_or(StoreError::NotFound)?;
+            if current.version != settlement.expected_turn_version {
+                return Err(StoreError::Conflict { expected: Some(settlement.expected_turn_version), actual: Some(current.version) });
+            }
+            let next = domain_conversation::transition(&current, settlement.expected_turn_version, settlement.command.clone())
+                .map_err(|error| match error {
+                    domain_conversation::TurnTransitionError::StaleVersion => StoreError::Conflict { expected: Some(settlement.expected_turn_version), actual: Some(current.version) },
+                    other => StoreError::Invalid(format!("Conversation turn transition rejected: {other:?}")),
+                })?;
+            validate_turn_transition_event(&settlement.turn_event, &current, &next, &settlement.command)?;
+            if settlement.turn_event.workspace_id != settlement.workspace_id {
+                return Err(StoreError::Invalid("ConversationTurn event Workspace mismatch".to_owned()));
+            }
+
+            let mut ended_session = None;
+            if let Some(end) = settlement.session.as_ref() {
+                let mut session = load_agent_session(&tx, &settlement.workspace_id, &end.agent_session_id)?
+                    .ok_or(StoreError::NotFound)?;
+                if session.scope_kind != "CONVERSATION"
+                    || session.conversation_id.as_deref() != Some(settlement.conversation_id.as_str())
+                    || session.conversation_turn_id.as_deref() != Some(settlement.turn_id.as_str())
+                {
+                    return Err(StoreError::Invalid("AgentSession scope does not match the settled turn".to_owned()));
+                }
+                if session.version != end.expected_session_version {
+                    return Err(StoreError::Conflict { expected: Some(end.expected_session_version), actual: Some(session.version) });
+                }
+                let (target_status, expected_event_type) = match end.end {
+                    ConversationSessionEnd::Closed => ("CLOSED", "agent.session.closed.v1"),
+                    ConversationSessionEnd::Lost => ("LOST", "agent.session.lost.v1"),
+                };
+                let status_ok = match end.end {
+                    ConversationSessionEnd::Closed => matches!(session.status.as_str(), "ACTIVE" | "INTERRUPTING" | "CLOSING"),
+                    ConversationSessionEnd::Lost => matches!(session.status.as_str(), "STARTING" | "ACTIVE" | "INTERRUPTING" | "CLOSING"),
+                };
+                if !status_ok {
+                    return Err(StoreError::Invalid(format!("AgentSession cannot end {target_status} from {}", session.status)));
+                }
+                let next_session_version = session.version.checked_add(1)
+                    .ok_or_else(|| StoreError::Invalid("AgentSession version exhausted".to_owned()))?;
+                if end.session_event.workspace_id != settlement.workspace_id
+                    || end.session_event.entity_type != "AgentSession"
+                    || end.session_event.entity_id != session.agent_session_id
+                    || end.session_event.event_type != expected_event_type
+                    || end.session_event.entity_revision != next_session_version
+                {
+                    return Err(StoreError::Invalid("AgentSession settlement event is inconsistent".to_owned()));
+                }
+                let updated = tx.execute(
+                    "UPDATE agent_sessions SET status=?1, closed_at=?2, last_event_at=?2, version=?3 WHERE workspace_id=?4 AND agent_session_id=?5 AND version=?6",
+                    params![target_status, end.occurred_at, to_sql_i64(next_session_version, "AgentSession version")?, settlement.workspace_id, session.agent_session_id, to_sql_i64(end.expected_session_version, "AgentSession version")?],
+                ).map_err(map_database_error)?;
+                if updated != 1 {
+                    return Err(StoreError::Conflict { expected: Some(end.expected_session_version), actual: None });
+                }
+                if end.end == ConversationSessionEnd::Closed {
+                    tx.execute(
+                        "UPDATE agent_host_instances SET state='READY', last_used_at=?1, idle_since=?1 WHERE host_instance_id=(SELECT host_instance_id FROM agent_session_host_bindings WHERE agent_session_id=?2)",
+                        params![end.occurred_at, session.agent_session_id],
+                    ).map_err(map_database_error)?;
+                }
+                tx.execute(
+                    "DELETE FROM agent_session_host_bindings WHERE agent_session_id=?1",
+                    params![session.agent_session_id],
+                ).map_err(map_database_error)?;
+                session.status = target_status.to_owned();
+                session.closed_at = Some(end.occurred_at.clone());
+                session.last_event_at = Some(end.occurred_at.clone());
+                session.version = next_session_version;
+                ended_session = Some(session);
+            }
+
+            let state_bytes = canonical_json(&next)?;
+            let blob = blobs.put(&settlement.workspace_id, BlobPurpose::AggregateState, &state_bytes, super::STATE_MEDIA_TYPE)?;
+            let state_ref = AggregateStateRef { blob, entity_revision: next.version, record_schema_version: 1 };
+            let next_version = i64::try_from(next.version).map_err(|_| StoreError::Invalid("ConversationTurn version exhausted".to_owned()))?;
+            let updated = tx.execute(
+                "UPDATE conversation_turns SET status=?1,settled_at=?2,version=?3 WHERE turn_id=?4 AND conversation_id=?5 AND version=?6",
+                params![status_string(next.status)?, next.settled_at, next_version, settlement.turn_id, settlement.conversation_id, i64::try_from(settlement.expected_turn_version).unwrap_or(-1)],
+            ).map_err(map_database_error)?;
+            if updated != 1 {
+                return Err(StoreError::Conflict { expected: Some(settlement.expected_turn_version), actual: None });
+            }
+            tx.execute(
+                "UPDATE conversation_dispatch_intents SET state='SETTLED', settled_at=?1, version=version+1 WHERE turn_id=?2 AND retry_ordinal=?3 AND state<>'SETTLED'",
+                params![next.settled_at, settlement.turn_id, i64::from(current.retry_ordinal)],
+            ).map_err(map_database_error)?;
+            // B-10: one usage row per attempt. ON CONFLICT DO NOTHING keeps a replay or an
+            // earlier row from failing the settlement.
+            let (attribution, input_tokens, output_tokens) = match settlement.usage {
+                Some(usage) => (
+                    match usage.attribution_source {
+                        storage_core::conversation::UsageAttributionSource::ProviderReported => "PROVIDER_REPORTED",
+                        storage_core::conversation::UsageAttributionSource::EstimatedLocal => "ESTIMATED_LOCAL",
+                    },
+                    Some(to_sql_i64(usage.input_tokens, "input tokens")?),
+                    Some(to_sql_i64(usage.output_tokens, "output tokens")?),
+                ),
+                None => ("UNKNOWN", None, None),
+            };
+            tx.execute(
+                "INSERT INTO conversation_turn_usage_records(usage_id,turn_id,retry_ordinal,conversation_id,attribution_source,input_tokens,output_tokens,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT DO NOTHING",
+                params![
+                    format!("usage-{}-{}", settlement.turn_id, current.retry_ordinal),
+                    settlement.turn_id,
+                    i64::from(current.retry_ordinal),
+                    settlement.conversation_id,
+                    attribution,
+                    input_tokens,
+                    output_tokens,
+                    next.settled_at,
+                ],
+            ).map_err(map_database_error)?;
+            if let Some(control) = settlement.control_event.as_ref() {
+                if !matches!(settlement.command, TurnCommand::SettleCancelled { .. }) {
+                    return Err(StoreError::Invalid(
+                        "a control event requires a CANCELLED settlement".to_owned(),
+                    ));
+                }
+                tx.execute(
+                    "INSERT INTO conversation_control_events(control_event_id,workspace_id,conversation_id,turn_id,kind,occurred_at) VALUES(?1,?2,?3,?4,'OWNER_TOOK_CONTROL',?5)",
+                    params![
+                        control.control_event_id,
+                        settlement.workspace_id,
+                        settlement.conversation_id,
+                        settlement.turn_id,
+                        control.occurred_at,
+                    ],
+                )
+                .map_err(map_database_error)?;
+            }
+            insert_domain_event(&tx, &settlement.turn_event, &state_ref)?;
+            if let (Some(end), Some(session)) = (settlement.session.as_ref(), ended_session.as_ref()) {
+                let session_bytes = canonical_json(session)?;
+                let session_blob = blobs.put(&settlement.workspace_id, BlobPurpose::AggregateState, &session_bytes, "application/vnd.litecowork.agent-session+json")?;
+                let session_ref = AggregateStateRef { blob: session_blob, entity_revision: session.version, record_schema_version: 1 };
+                insert_domain_event(&tx, &end.session_event, &session_ref)?;
+            }
+            tx.commit().map_err(map_database_error)?;
+            Ok(SettledConversationTurn { turn: next, session: ended_session })
+        })
+    }
+
+    fn find_conversation_turn_command_replay(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        request_id: &str,
+    ) -> Result<Option<ConversationTurn>, StoreError> {
+        if workspace_id.trim().is_empty() || turn_id.trim().is_empty() || request_id.trim().is_empty() {
+            return Err(StoreError::Invalid("Conversation command replay identity is invalid".to_owned()));
+        }
+        let (workspace, conversation, turn, request) = (workspace_id.to_owned(), conversation_id.to_owned(), turn_id.to_owned(), request_id.to_owned());
+        self.run(move |connection| {
+            let replayed: bool = connection.query_row(
+                "SELECT EXISTS(SELECT 1 FROM domain_events WHERE workspace_id=?1 AND entity_type='ConversationTurn' AND entity_id=?2 AND causation_id=?3)",
+                params![workspace, turn, request], |row| row.get(0),
+            ).map_err(map_database_error)?;
+            if !replayed { return Ok(None); }
+            load_turn(connection, &workspace, &conversation, &turn)
+        })
+    }
+
+    fn claim_conversation_dispatch_intent(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+        runtime_incarnation_id: &str,
+        claimed_at: &str,
+    ) -> Result<bool, StoreError> {
+        if turn_id.trim().is_empty() || runtime_incarnation_id.trim().is_empty() {
+            return Err(StoreError::Invalid(
+                "Conversation dispatch claim identity is invalid".to_owned(),
+            ));
+        }
+        let claimed_at = canonicalize_utc_timestamp(claimed_at)?;
+        let (turn_id, incarnation) = (turn_id.to_owned(), runtime_incarnation_id.to_owned());
+        self.run(move |connection| {
+            let changed = connection
+                .execute(
+                    "UPDATE conversation_dispatch_intents SET state='CLAIMED', claimed_by_runtime_incarnation=?1, claimed_at=?2, version=version+1 WHERE turn_id=?3 AND retry_ordinal=?4 AND state='UNCLAIMED'",
+                    params![incarnation, claimed_at, turn_id, i64::from(retry_ordinal)],
+                )
+                .map_err(map_database_error)?;
+            Ok(changed == 1)
+        })
+    }
+
+    fn release_conversation_dispatch_intent(
+        &self,
+        turn_id: &str,
+        retry_ordinal: u32,
+    ) -> Result<bool, StoreError> {
+        if turn_id.trim().is_empty() {
+            return Err(StoreError::Invalid(
+                "Conversation dispatch release identity is invalid".to_owned(),
+            ));
+        }
+        let turn_id = turn_id.to_owned();
+        self.run(move |connection| {
+            let changed = connection
+                .execute(
+                    "UPDATE conversation_dispatch_intents SET state='UNCLAIMED', claimed_by_runtime_incarnation=NULL, claimed_at=NULL, version=version+1 WHERE turn_id=?1 AND retry_ordinal=?2 AND state='CLAIMED'",
+                    params![turn_id, i64::from(retry_ordinal)],
+                )
+                .map_err(map_database_error)?;
+            Ok(changed == 1)
+        })
+    }
+
+    fn list_conversation_dispatch_intents(
+        &self,
+        state: ConversationDispatchState,
+        limit: usize,
+    ) -> Result<Vec<ConversationDispatchIntent>, StoreError> {
+        if !(1..=1024).contains(&limit) {
+            return Err(StoreError::Invalid(
+                "Conversation dispatch intent page size is invalid".to_owned(),
+            ));
+        }
+        self.run(move |connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT c.workspace_id,i.conversation_id,i.turn_id,i.retry_ordinal,i.state,i.claimed_by_runtime_incarnation,i.created_at FROM conversation_dispatch_intents i JOIN conversations c ON c.conversation_id=i.conversation_id WHERE i.state=?1 ORDER BY i.created_at,i.turn_id,i.retry_ordinal LIMIT ?2",
+                )
+                .map_err(map_database_error)?;
+            let rows = statement
+                .query_map(params![state.as_str(), limit as i64], |row| {
+                    Ok(ConversationDispatchIntent {
+                        workspace_id: row.get(0)?,
+                        conversation_id: row.get(1)?,
+                        turn_id: row.get(2)?,
+                        retry_ordinal: u32::try_from(row.get::<_, i64>(3)?).unwrap_or(u32::MAX),
+                        state,
+                        claimed_by_runtime_incarnation: row.get(5)?,
+                        created_at: row.get(6)?,
+                    })
+                })
+                .map_err(map_database_error)?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(map_database_error)
+        })
+    }
+
+    fn append_conversation_turn_activity(
+        &self,
+        record: storage_core::conversation::ConversationActivityRecord,
+    ) -> Result<(), StoreError> {
+        let valid = |value: &str| {
+            !value.trim().is_empty() && value.len() <= 256 && !value.chars().any(char::is_control)
+        };
+        if !valid(&record.turn_id)
+            || !valid(&record.conversation_id)
+            || record.sequence == 0
+            || record.sequence as usize > storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT
+            || record.call_ref.as_deref().is_some_and(|v| !valid(v) || v.len() > 128)
+            || record.label.as_deref().is_some_and(|v| v.len() > 128 || v.chars().any(char::is_control))
+        {
+            return Err(StoreError::Invalid(
+                "Conversation activity record is invalid".to_owned(),
+            ));
+        }
+        self.run(move |connection| {
+            connection
+                .execute(
+                    "INSERT INTO conversation_turn_activity_records(activity_id,turn_id,retry_ordinal,conversation_id,sequence,kind,status,call_ref,label,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT DO NOTHING",
+                    params![
+                        format!("activity-{}-{}-{}", record.turn_id, record.retry_ordinal, record.sequence),
+                        record.turn_id,
+                        i64::from(record.retry_ordinal),
+                        record.conversation_id,
+                        i64::from(record.sequence),
+                        record.kind,
+                        record.status,
+                        record.call_ref,
+                        record.label,
+                        record.created_at,
+                    ],
+                )
+                .map_err(map_database_error)?;
+            Ok(())
+        })
+    }
+
+    fn list_conversation_turn_activity(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        retry_ordinal: u32,
+        limit: usize,
+    ) -> Result<Vec<storage_core::conversation::ConversationActivityRecord>, StoreError> {
+        if !(1..=storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT).contains(&limit) {
+            return Err(StoreError::Invalid(
+                "Conversation activity page size is invalid".to_owned(),
+            ));
+        }
+        let workspace = workspace_id.to_owned();
+        let conversation = conversation_id.to_owned();
+        let turn = turn_id.to_owned();
+        self.run(move |connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT a.turn_id,a.retry_ordinal,a.conversation_id,a.sequence,a.kind,a.status,a.call_ref,a.label,a.created_at FROM conversation_turn_activity_records a JOIN conversations c ON c.conversation_id=a.conversation_id WHERE c.workspace_id=?1 AND a.conversation_id=?2 AND a.turn_id=?3 AND a.retry_ordinal=?4 ORDER BY a.sequence LIMIT ?5",
+                )
+                .map_err(map_database_error)?;
+            let rows = statement
+                .query_map(
+                    params![workspace, conversation, turn, i64::from(retry_ordinal), limit as i64],
+                    |row| {
+                        Ok(storage_core::conversation::ConversationActivityRecord {
+                            turn_id: row.get(0)?,
+                            retry_ordinal: u32::try_from(row.get::<_, i64>(1)?).unwrap_or(u32::MAX),
+                            conversation_id: row.get(2)?,
+                            sequence: u32::try_from(row.get::<_, i64>(3)?).unwrap_or(u32::MAX),
+                            kind: row.get(4)?,
+                            status: row.get(5)?,
+                            call_ref: row.get(6)?,
+                            label: row.get(7)?,
+                            created_at: row.get(8)?,
+                        })
+                    },
+                )
+                .map_err(map_database_error)?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(map_database_error)
+        })
+    }
+
     fn commit_conversation_agent_response(
         &self,
         mut commit: CommitConversationAgentResponse,
@@ -608,6 +996,7 @@ impl ConversationTurnStore for SqliteConversationStore {
             || !valid_identity(&commit.turn_id)
             || !valid_identity(&commit.agent_session_id)
             || !valid_identity(&commit.message.message_id)
+            || !valid_identity(&commit.provider_response_id)
             || commit.expected_turn_version == 0
             || commit.expected_session_version == 0
         {
@@ -689,6 +1078,39 @@ impl ConversationTurnStore for SqliteConversationStore {
                 return Err(StoreError::NotFound);
             };
 
+            // 2b. Final-response identity (B-04): (turn, retry ordinal, provider response).
+            // An exact repeat replays the stored receipt even after the turn has moved on;
+            // any other repeat of the same (turn, retry ordinal) is rejected before any write.
+            let content_digest = digest(&canonical_json(&commit.message.content)?);
+            let stored_identity: Option<(String, String, String)> = tx
+                .query_row(
+                    "SELECT provider_response_id,content_digest,receipt_request_id FROM conversation_response_commits WHERE turn_id=?1 AND retry_ordinal=?2",
+                    params![commit.turn_id, i64::from(commit.retry_ordinal)],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .optional()
+                .map_err(map_database_error)?;
+            if let Some((stored_response_id, stored_digest, stored_request_id)) = stored_identity {
+                if stored_response_id != commit.provider_response_id || stored_digest != content_digest {
+                    return Err(StoreError::Invalid(CONVERSATION_RESPONSE_IDENTITY_CONFLICT.to_owned()));
+                }
+                let stored: Option<String> = tx
+                    .query_row(
+                        "SELECT response_json FROM request_dedup WHERE principal_id=?1 AND request_id=?2",
+                        params![principal, stored_request_id],
+                        |row| row.get(0),
+                    )
+                    .optional()
+                    .map_err(map_database_error)?;
+                let stored = stored.ok_or_else(|| {
+                    StoreError::Integrity("Conversation response commit has no stored receipt".to_owned())
+                })?;
+                let replay: CommittedConversationAgentResponse = serde_json::from_str(&stored)
+                    .map_err(|error| StoreError::Integrity(error.to_string()))?;
+                tx.commit().map_err(map_database_error)?;
+                return Ok(replay);
+            }
+
             // 3. Verify turn exists and is RUNNING with expected_turn_version
             let current_turn = load_turn(&tx, &commit.workspace_id, &commit.conversation_id, &commit.turn_id)?
                 .ok_or(StoreError::NotFound)?;
@@ -698,9 +1120,20 @@ impl ConversationTurnStore for SqliteConversationStore {
                     actual: Some(current_turn.version),
                 });
             }
-            if current_turn.status != ConversationTurnStatus::Running {
+            // A completion that raced a Stop request stays COMPLETED with its message
+            // (AC-010); every other status, and any non-Completed settlement of a
+            // CANCEL_REQUESTED turn, is rejected.
+            let status_allows_commit = current_turn.status == ConversationTurnStatus::Running
+                || (current_turn.status == ConversationTurnStatus::CancelRequested
+                    && commit.turn_status == ConversationTurnStatus::Completed);
+            if !status_allows_commit {
                 return Err(StoreError::Invalid(
                     format!("ConversationTurn is not RUNNING (status: {:?})", current_turn.status),
+                ));
+            }
+            if current_turn.retry_ordinal != commit.retry_ordinal {
+                return Err(StoreError::Invalid(
+                    "ConversationTurn retry ordinal does not match commit".to_owned(),
                 ));
             }
             if current_turn.agent_session_id.as_deref() != Some(commit.agent_session_id.as_str()) {
@@ -729,6 +1162,20 @@ impl ConversationTurnStore for SqliteConversationStore {
             {
                 return Err(StoreError::Invalid(
                     "AgentSession scope does not match committed turn".to_owned(),
+                ));
+            }
+
+            // 4b. The final message must be authored by the AgentBinding this session
+            // was pinned to, in this Conversation; the caller cannot attribute it elsewhere.
+            let expected_author = serde_json::json!({
+                "kind": "AGENT",
+                "agent_binding_id": current_session.agent_binding_id,
+            });
+            if commit.message.author != expected_author
+                || commit.message.conversation_id != commit.conversation_id
+            {
+                return Err(StoreError::Invalid(
+                    "Conversation response author does not match the turn-pinned AgentBinding".to_owned(),
                 ));
             }
 
@@ -772,6 +1219,20 @@ impl ConversationTurnStore for SqliteConversationStore {
             )
             .map_err(map_database_error)?;
 
+            tx.execute(
+                "INSERT INTO conversation_response_commits(turn_id,retry_ordinal,provider_response_id,content_digest,message_id,receipt_request_id,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+                params![
+                    commit.turn_id,
+                    i64::from(commit.retry_ordinal),
+                    commit.provider_response_id,
+                    content_digest,
+                    commit.message.message_id,
+                    commit.request.request_id,
+                    commit.message.created_at,
+                ],
+            )
+            .map_err(map_database_error)?;
+
             // 8. Settle conversation turn
             let turn_status_db_str = match commit.turn_status {
                 ConversationTurnStatus::Completed => "COMPLETED",
@@ -782,7 +1243,7 @@ impl ConversationTurnStore for SqliteConversationStore {
                 _ => return Err(StoreError::Invalid("Unsupported terminal turn status".to_owned())),
             };
             let turn_settled = tx.execute(
-                "UPDATE conversation_turns SET status=?1, settled_at=?2, version=?3 WHERE turn_id=?4 AND conversation_id=?5 AND status='RUNNING' AND version=?6",
+                "UPDATE conversation_turns SET status=?1, settled_at=?2, version=?3 WHERE turn_id=?4 AND conversation_id=?5 AND status IN ('RUNNING','CANCEL_REQUESTED') AND version=?6",
                 params![
                     turn_status_db_str,
                     commit.message.created_at,
@@ -799,6 +1260,38 @@ impl ConversationTurnStore for SqliteConversationStore {
                     actual: None,
                 });
             }
+
+            // 8b. Settle the dispatch intent and record the turn usage (B-10).
+            tx.execute(
+                "UPDATE conversation_dispatch_intents SET state='SETTLED', settled_at=?1, version=version+1 WHERE turn_id=?2 AND retry_ordinal=?3 AND state<>'SETTLED'",
+                params![commit.message.created_at, commit.turn_id, i64::from(commit.retry_ordinal)],
+            )
+            .map_err(map_database_error)?;
+            let (attribution, input_tokens, output_tokens) = match commit.usage {
+                Some(usage) => (
+                    match usage.attribution_source {
+                        storage_core::conversation::UsageAttributionSource::ProviderReported => "PROVIDER_REPORTED",
+                        storage_core::conversation::UsageAttributionSource::EstimatedLocal => "ESTIMATED_LOCAL",
+                    },
+                    Some(to_sql_i64(usage.input_tokens, "input tokens")?),
+                    Some(to_sql_i64(usage.output_tokens, "output tokens")?),
+                ),
+                None => ("UNKNOWN", None, None),
+            };
+            tx.execute(
+                "INSERT INTO conversation_turn_usage_records(usage_id,turn_id,retry_ordinal,conversation_id,attribution_source,input_tokens,output_tokens,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+                params![
+                    format!("usage-{}-{}", commit.turn_id, commit.retry_ordinal),
+                    commit.turn_id,
+                    i64::from(commit.retry_ordinal),
+                    commit.conversation_id,
+                    attribution,
+                    input_tokens,
+                    output_tokens,
+                    commit.message.created_at,
+                ],
+            )
+            .map_err(map_database_error)?;
 
             // 9. Close agent session
             let session_closed = tx.execute(
@@ -1032,24 +1525,28 @@ impl ConversationTurnStore for SqliteConversationStore {
                     "Conversation message has duplicate append revisions".to_owned(),
                 ));
             }
-            if message_count < 0
-                || message_count as usize > CONVERSATION_CONTEXT_MAX_MESSAGES
-                || context_bytes < 0
-                || context_bytes as usize > CONVERSATION_CONTEXT_MAX_BYTES
-            {
-                return Err(StoreError::Invalid(
-                    "CONVERSATION_CONTEXT_LIMIT_EXCEEDED".to_owned(),
+            // The B-07 window applies after this read: only the most recent
+            // CONVERSATION_CONTEXT_MAX_MESSAGES committed messages are loaded and the
+            // package builder reduces further by bytes, counting what it omits.
+            if message_count < 0 || context_bytes < 0 {
+                return Err(StoreError::Integrity(
+                    "Conversation context size is invalid".to_owned(),
                 ));
             }
 
             let mut statement = transaction
                 .prepare(
-                    "SELECT m.message_id,m.conversation_id,m.author_json,m.role,m.agent_session_id,m.agent_binding_id,m.turn_id,m.content_json,m.resource_refs_json,m.source_channel_ref_json,m.created_at,e.entity_revision FROM conversation_messages m JOIN domain_events e ON e.workspace_id=?2 AND e.entity_type='Conversation' AND e.entity_id=m.conversation_id AND e.type='conversation.message.added.v1' AND json_extract(e.payload_json,'$.message_id')=m.message_id WHERE m.conversation_id=?1 AND e.entity_revision<=?3 ORDER BY e.entity_revision,m.message_id",
+                    "SELECT m.message_id,m.conversation_id,m.author_json,m.role,m.agent_session_id,m.agent_binding_id,m.turn_id,m.content_json,m.resource_refs_json,m.source_channel_ref_json,m.created_at,e.entity_revision FROM conversation_messages m JOIN domain_events e ON e.workspace_id=?2 AND e.entity_type='Conversation' AND e.entity_id=m.conversation_id AND e.type='conversation.message.added.v1' AND json_extract(e.payload_json,'$.message_id')=m.message_id WHERE m.conversation_id=?1 AND e.entity_revision<=?3 ORDER BY e.entity_revision DESC,m.message_id DESC LIMIT ?4",
                 )
                 .map_err(map_database_error)?;
-            let rows = statement
+            let mut rows = statement
                 .query_map(
-                    params![conversation, workspace, through_revision],
+                    params![
+                        conversation,
+                        workspace,
+                        through_revision,
+                        CONVERSATION_CONTEXT_MAX_MESSAGES as i64
+                    ],
                     |row| {
                         Ok((
                             row.get::<_, String>(0)?,
@@ -1071,6 +1568,8 @@ impl ConversationTurnStore for SqliteConversationStore {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(map_database_error)?;
             drop(statement);
+            rows.reverse();
+            let oldest_loaded_revision = rows.first().map(|row| row.11);
             let messages = rows
                 .into_iter()
                 .map(|row| {
@@ -1108,12 +1607,27 @@ impl ConversationTurnStore for SqliteConversationStore {
                 })
                 .collect::<Result<Vec<_>, StoreError>>()?;
 
-            let context = build_conversation_context_package(
+            let mut context = build_conversation_context_package(
                 &conversation,
                 target_agent_binding_id,
                 &through_message_id,
                 &messages,
             )?;
+            if let (true, Some(oldest)) = (
+                message_count as usize > CONVERSATION_CONTEXT_MAX_MESSAGES,
+                oldest_loaded_revision,
+            ) {
+                let older: i64 = transaction
+                    .query_row(
+                        "SELECT COUNT(DISTINCT m.message_id) FROM conversation_messages m JOIN domain_events e ON e.workspace_id=?2 AND e.entity_type='Conversation' AND e.entity_id=m.conversation_id AND e.type='conversation.message.added.v1' AND json_extract(e.payload_json,'$.message_id')=m.message_id WHERE m.conversation_id=?1 AND e.entity_revision<?3 AND m.role<>'SYSTEM_NOTICE'",
+                        params![conversation, workspace, oldest],
+                        |row| row.get(0),
+                    )
+                    .map_err(map_database_error)?;
+                context.omitted_message_count = context
+                    .omitted_message_count
+                    .saturating_add(u32::try_from(older).unwrap_or(u32::MAX));
+            }
             transaction.commit().map_err(map_database_error)?;
             Ok(context)
         })
@@ -1160,7 +1674,7 @@ impl ConversationTurnStore for SqliteConversationStore {
             if event.workspace_id != workspace {
                 return Err(StoreError::Invalid("ConversationTurn event Workspace mismatch".to_owned()));
             }
-            if matches!(command, TurnCommand::Retry { .. } | TurnCommand::Resume { .. }) {
+            if matches!(command, TurnCommand::Resume { .. }) {
                 let Some(session_id) = next.agent_session_id.as_deref() else {
                     return Err(StoreError::Invalid("Conversation session is not ready".to_owned()));
                 };
@@ -1183,6 +1697,28 @@ impl ConversationTurnStore for SqliteConversationStore {
             ).map_err(map_database_error)?;
             if updated != 1 {
                 return Err(StoreError::Conflict { expected: Some(expected_version), actual: None });
+            }
+            if matches!(command, TurnCommand::Retry) {
+                let other_in_flight: bool = tx.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversation_turns WHERE conversation_id=?1 AND turn_id<>?2 AND status IN ('OPEN','RUNNING','WAITING_USER','WAITING_DEPENDENCY','CANCEL_REQUESTED'))",
+                    params![conversation, id], |row| row.get(0),
+                ).map_err(map_database_error)?;
+                if other_in_flight {
+                    return Err(StoreError::Invalid(CONVERSATION_TURN_IN_PROGRESS.to_owned()));
+                }
+                // The new attempt owes a dispatch; the same transaction that reopens the
+                // turn records it so a crash cannot strand an OPEN turn without an intent.
+                tx.execute(
+                    "INSERT INTO conversation_dispatch_intents(turn_id,retry_ordinal,conversation_id,state,created_at) VALUES(?1,?2,?3,'UNCLAIMED',?4)",
+                    params![id, i64::from(next.retry_ordinal), conversation, event.recorded_at],
+                ).map_err(map_database_error)?;
+            }
+            if next.status.is_terminal() {
+                // A settled attempt owes no further dispatch (outbox state SETTLED).
+                tx.execute(
+                    "UPDATE conversation_dispatch_intents SET state='SETTLED', settled_at=?1, version=version+1 WHERE turn_id=?2 AND retry_ordinal=?3 AND state<>'SETTLED'",
+                    params![next.settled_at, id, i64::from(current.retry_ordinal)],
+                ).map_err(map_database_error)?;
             }
             insert_domain_event(&tx, &event, &state_ref)?;
             tx.commit().map_err(map_database_error)?;
@@ -1592,7 +2128,7 @@ fn validate_turn_transition_event(
     command: &TurnCommand,
 ) -> Result<(), StoreError> {
     let expected_type = match command {
-        TurnCommand::Retry { .. } => "conversation.turn.retried.v1",
+        TurnCommand::Retry => "conversation.turn.retried.v1",
         TurnCommand::Resume { .. } => "conversation.turn.resumed.v1",
         TurnCommand::Complete { .. }
         | TurnCommand::Fail { .. }
@@ -1605,10 +2141,9 @@ fn validate_turn_transition_event(
         _ => "conversation.turn.status.changed.v1",
     };
     let allowed_payload_keys: &[&str] = match command {
-        TurnCommand::Retry { .. } => &[
+        TurnCommand::Retry => &[
             "turn_id",
             "prior_agent_session_id",
-            "agent_session_id",
             "retry_ordinal",
             "aggregate_version",
         ],
@@ -1640,12 +2175,7 @@ fn validate_turn_transition_event(
         ],
     };
     let required_payload_keys: &[&str] = match command {
-        TurnCommand::Retry { .. } => &[
-            "turn_id",
-            "agent_session_id",
-            "retry_ordinal",
-            "aggregate_version",
-        ],
+        TurnCommand::Retry => &["turn_id", "retry_ordinal", "aggregate_version"],
         TurnCommand::Resume { .. } => &[
             "turn_id",
             "user_request_id",
@@ -1661,14 +2191,9 @@ fn validate_turn_transition_event(
     let payload_matches =
         payload_has_exact_keys(&event.payload, required_payload_keys, allowed_payload_keys)
             && match command {
-                TurnCommand::Retry { .. } => {
+                TurnCommand::Retry => {
                     event.payload.get("turn_id").and_then(Value::as_str)
                         == Some(current.turn_id.as_str())
-                        && event
-                            .payload
-                            .get("agent_session_id")
-                            .and_then(Value::as_str)
-                            == next.agent_session_id.as_deref()
                         && optional_event_string_matches(
                             &event.payload,
                             "prior_agent_session_id",
@@ -1853,4 +2378,611 @@ pub(super) fn load_turn(
         },
     )
     .transpose()
+}
+
+impl ConversationHistoryStore for SqliteConversationStore {
+    fn rename_conversation(
+        &self,
+        commit: RenameConversation,
+    ) -> Result<CommittedConversation, StoreError> {
+        let title = commit.title.clone();
+        let payload = commit.request.request_payload.clone();
+        if title.trim().is_empty()
+            || title.chars().count() > 160
+            || title.chars().any(char::is_control)
+            || payload.get("operation").and_then(Value::as_str)
+                != Some("conversation.rename.v1")
+            || payload.get("title").and_then(Value::as_str) != Some(title.as_str())
+            || commit.event.event_type != "conversation.renamed.v1"
+        {
+            return Err(StoreError::Invalid(
+                "Conversation rename is inconsistent".to_owned(),
+            ));
+        }
+        let title_digest = digest(title.as_bytes());
+        history_mutation(
+            self,
+            &commit.request,
+            &commit.principal_id,
+            &commit.workspace_id,
+            &commit.conversation_id,
+            commit.expected_version,
+            commit.event,
+            HistoryMutation::Rename { title, title_digest },
+        )
+    }
+
+    fn set_conversation_archived(
+        &self,
+        commit: SetConversationArchived,
+    ) -> Result<CommittedConversation, StoreError> {
+        let expected_event = if commit.archived {
+            "conversation.archived.v1"
+        } else {
+            "conversation.unarchived.v1"
+        };
+        let expected_operation = if commit.archived {
+            "conversation.archive.v1"
+        } else {
+            "conversation.unarchive.v1"
+        };
+        if commit.request.request_payload.get("operation").and_then(Value::as_str)
+            != Some(expected_operation)
+            || commit.event.event_type != expected_event
+        {
+            return Err(StoreError::Invalid(
+                "Conversation archive mutation is inconsistent".to_owned(),
+            ));
+        }
+        history_mutation(
+            self,
+            &commit.request,
+            &commit.principal_id,
+            &commit.workspace_id,
+            &commit.conversation_id,
+            commit.expected_version,
+            commit.event,
+            HistoryMutation::Archive(commit.archived),
+        )
+    }
+
+    fn get_conversation_status(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        conversation_id: &str,
+    ) -> Result<Option<ConversationStatus>, StoreError> {
+        if principal_id.trim().is_empty()
+            || workspace_id.trim().is_empty()
+            || conversation_id.trim().is_empty()
+        {
+            return Err(StoreError::Invalid(
+                "Conversation lookup is invalid".to_owned(),
+            ));
+        }
+        let (principal, workspace, id) = (
+            principal_id.to_owned(),
+            workspace_id.to_owned(),
+            conversation_id.to_owned(),
+        );
+        self.run(move |connection| {
+            let allowed: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2)",
+                    params![workspace, principal],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !allowed {
+                return Err(StoreError::NotFound);
+            }
+            let exists: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversations WHERE workspace_id=?1 AND conversation_id=?2)",
+                    params![workspace, id],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !exists {
+                return Ok(None);
+            }
+            Ok(Some(read_conversation_status(connection, &id)?))
+        })
+    }
+
+    fn list_conversations_by_status(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        status: ConversationStatus,
+        after_created_at: Option<&str>,
+        after_conversation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ConversationRecord>, StoreError> {
+        if principal_id.trim().is_empty()
+            || workspace_id.trim().is_empty()
+            || !(1..=101).contains(&limit)
+            || after_created_at.is_some() != after_conversation_id.is_some()
+        {
+            return Err(StoreError::Invalid(
+                "Conversation page query is invalid".to_owned(),
+            ));
+        }
+        let principal = principal_id.to_owned();
+        let workspace = workspace_id.to_owned();
+        let after_at = after_created_at.map(str::to_owned);
+        let after_id = after_conversation_id.map(str::to_owned);
+        let status = status.as_str();
+        self.run(move |connection| {
+            let allowed: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2)",
+                    params![workspace, principal],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !allowed {
+                return Err(StoreError::NotFound);
+            }
+            let mut statement = connection
+                .prepare(
+                    "SELECT c.conversation_id,c.workspace_id,c.title,c.active_agent_binding_id,c.version,c.created_at \
+                     FROM conversations c LEFT JOIN conversation_history_state h ON h.conversation_id=c.conversation_id \
+                     WHERE c.workspace_id=?1 AND COALESCE(h.status,'ACTIVE')=?5 \
+                     AND (?2 IS NULL OR (c.created_at,c.conversation_id)<(?2,?3)) \
+                     ORDER BY c.created_at DESC,c.conversation_id DESC LIMIT ?4",
+                )
+                .map_err(map_database_error)?;
+            statement
+                .query_map(params![workspace, after_at, after_id, limit as i64, status], |row| {
+                    Ok(ConversationRecord {
+                        conversation_id: row.get(0)?,
+                        workspace_id: row.get(1)?,
+                        title: row.get(2)?,
+                        active_agent_binding_id: row.get(3)?,
+                        version: row.get::<_, i64>(4)? as u64,
+                        created_at: row.get(5)?,
+                    })
+                })
+                .map_err(map_database_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(map_database_error)
+        })
+    }
+}
+
+enum HistoryMutation {
+    Rename { title: String, title_digest: String },
+    Archive(bool),
+}
+
+fn read_conversation_status(
+    connection: &Connection,
+    conversation_id: &str,
+) -> Result<ConversationStatus, StoreError> {
+    let status: Option<String> = connection
+        .query_row(
+            "SELECT status FROM conversation_history_state WHERE conversation_id=?1",
+            [conversation_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(map_database_error)?;
+    match status.as_deref() {
+        None | Some("ACTIVE") => Ok(ConversationStatus::Active),
+        Some("ARCHIVED") => Ok(ConversationStatus::Archived),
+        Some("DELETION_PENDING") => Ok(ConversationStatus::DeletionPending),
+        Some("DELETED") => Ok(ConversationStatus::Deleted),
+        Some(_) => Err(StoreError::Integrity(
+            "Conversation history status is invalid".to_owned(),
+        )),
+    }
+}
+
+/// Rejects a write against a Conversation that is not ACTIVE. Called inside the
+/// caller's own IMMEDIATE transaction so the check cannot race an archive.
+fn require_conversation_active(
+    connection: &Connection,
+    conversation_id: &str,
+) -> Result<(), StoreError> {
+    match read_conversation_status(connection, conversation_id)? {
+        ConversationStatus::Active => Ok(()),
+        ConversationStatus::Archived => {
+            Err(StoreError::Invalid(CONVERSATION_ARCHIVED.to_owned()))
+        }
+        ConversationStatus::DeletionPending | ConversationStatus::Deleted => {
+            Err(StoreError::Invalid(CONVERSATION_DELETED.to_owned()))
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn history_mutation(
+    store: &SqliteConversationStore,
+    request: &WorkspaceCreateRequest,
+    principal_id: &str,
+    workspace_id: &str,
+    conversation_id: &str,
+    expected_version: u64,
+    event: EventDraft,
+    mutation: HistoryMutation,
+) -> Result<CommittedConversation, StoreError> {
+    let next_version = expected_version
+        .checked_add(1)
+        .filter(|version| *version <= i64::MAX as u64)
+        .ok_or_else(|| StoreError::Invalid("Conversation version exhausted".to_owned()))?;
+    let payload = &request.request_payload;
+    if principal_id.trim().is_empty()
+        || request.principal_id != principal_id
+        || !super::valid_shared_idempotency_key(&request.request_id)
+        || workspace_id.trim().is_empty()
+        || conversation_id.trim().is_empty()
+        || expected_version == 0
+        || payload.get("workspace_id").and_then(Value::as_str) != Some(workspace_id)
+        || payload.get("conversation_id").and_then(Value::as_str) != Some(conversation_id)
+        || payload.get("expected_version").and_then(Value::as_u64) != Some(expected_version)
+        || event.workspace_id != workspace_id
+        || event.entity_type != "Conversation"
+        || event.entity_id != conversation_id
+        || event.entity_revision != next_version
+        || event.schema_version != 1
+    {
+        return Err(StoreError::Invalid(
+            "Conversation history mutation is inconsistent".to_owned(),
+        ));
+    }
+    let request_digest = digest(&canonical_json(payload)?);
+    let blobs = Arc::clone(&store.store.inner.blobs);
+    let principal_id = principal_id.to_owned();
+    let workspace_id = workspace_id.to_owned();
+    let conversation_id = conversation_id.to_owned();
+    let request_id = request.request_id.clone();
+    store.run(move |connection| {
+        let tx = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(map_database_error)?;
+        if let Some(replay) = verify_request_receipt::<CommittedConversation>(
+            &tx,
+            &principal_id,
+            &request_id,
+            &request_digest,
+        )? {
+            tx.commit().map_err(map_database_error)?;
+            return Ok(replay);
+        }
+        let workspace_status: Option<String> = tx
+            .query_row(
+                "SELECT status FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2",
+                params![workspace_id, principal_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(map_database_error)?;
+        match workspace_status.as_deref() {
+            None => return Err(StoreError::NotFound),
+            Some("ACTIVE") => {}
+            Some(_) => return Err(StoreError::Invalid("WORKSPACE_ARCHIVED".to_owned())),
+        }
+        let current: Option<(Option<String>, i64, String, Option<String>)> = tx
+            .query_row(
+                "SELECT title,version,created_at,active_agent_binding_id FROM conversations WHERE workspace_id=?1 AND conversation_id=?2",
+                params![workspace_id, conversation_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .optional()
+            .map_err(map_database_error)?;
+        let Some((title, actual_version, created_at, binding)) = current else {
+            return Err(StoreError::NotFound);
+        };
+        let actual_version = u64::try_from(actual_version)
+            .map_err(|_| StoreError::Integrity("Conversation version is invalid".to_owned()))?;
+        if actual_version != expected_version {
+            return Err(StoreError::Conflict {
+                expected: Some(expected_version),
+                actual: Some(actual_version),
+            });
+        }
+        let status = read_conversation_status(&tx, &conversation_id)?;
+        let mut event_draft = event;
+        let mut new_title = title.clone();
+        match &mutation {
+            HistoryMutation::Rename { title, title_digest } => {
+                require_conversation_active(&tx, &conversation_id)?;
+                new_title = Some(title.clone());
+                event_draft.payload = serde_json::json!({
+                    "workspace_id": workspace_id,
+                    "conversation_id": conversation_id,
+                    "title_digest": title_digest,
+                    "changed_by": {"kind":"USER","principal_id":principal_id},
+                    "aggregate_version": next_version,
+                });
+            }
+            HistoryMutation::Archive(true) => {
+                require_conversation_active(&tx, &conversation_id)?;
+                let in_flight: bool = tx
+                    .query_row(
+                        "SELECT EXISTS(SELECT 1 FROM conversation_turns WHERE conversation_id=?1 AND status IN ('OPEN','RUNNING','WAITING_USER','WAITING_DEPENDENCY','CANCEL_REQUESTED'))",
+                        params![conversation_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(map_database_error)?;
+                if in_flight {
+                    return Err(StoreError::Invalid(CONVERSATION_NOT_QUIESCENT.to_owned()));
+                }
+                event_draft.payload = serde_json::json!({
+                    "workspace_id": workspace_id,
+                    "conversation_id": conversation_id,
+                    "changed_by": {"kind":"USER","principal_id":principal_id},
+                    "aggregate_version": next_version,
+                });
+            }
+            HistoryMutation::Archive(false) => {
+                match status {
+                    ConversationStatus::Archived => {}
+                    ConversationStatus::Active => {
+                        return Err(StoreError::Conflict {
+                            expected: Some(expected_version),
+                            actual: Some(actual_version),
+                        });
+                    }
+                    _ => return Err(StoreError::Invalid(CONVERSATION_DELETED.to_owned())),
+                }
+                event_draft.payload = serde_json::json!({
+                    "workspace_id": workspace_id,
+                    "conversation_id": conversation_id,
+                    "changed_by": {"kind":"USER","principal_id":principal_id},
+                    "aggregate_version": next_version,
+                });
+            }
+        }
+        let conversation = ConversationRecord {
+            conversation_id: conversation_id.clone(),
+            workspace_id: workspace_id.clone(),
+            title: new_title,
+            active_agent_binding_id: binding,
+            version: next_version,
+            created_at,
+        };
+        validate_conversation_record(&conversation)?;
+        let changed = tx
+            .execute(
+                "UPDATE conversations SET title=?1,version=?2 WHERE workspace_id=?3 AND conversation_id=?4 AND version=?5",
+                params![conversation.title, next_version as i64, workspace_id, conversation_id, expected_version as i64],
+            )
+            .map_err(map_database_error)?;
+        if changed != 1 {
+            return Err(StoreError::Conflict {
+                expected: Some(expected_version),
+                actual: None,
+            });
+        }
+        if let HistoryMutation::Archive(archived) = &mutation {
+            let at = event_draft.recorded_at.clone();
+            if *archived {
+                tx.execute(
+                    "INSERT INTO conversation_history_state(conversation_id,workspace_id,status,archived_at,deleted_at,updated_at) VALUES(?1,?2,'ARCHIVED',?3,NULL,?3) ON CONFLICT(conversation_id) DO UPDATE SET status='ARCHIVED',archived_at=?3,updated_at=?3",
+                    params![conversation_id, workspace_id, at],
+                )
+            } else {
+                tx.execute(
+                    "UPDATE conversation_history_state SET status='ACTIVE',archived_at=NULL,updated_at=?2 WHERE conversation_id=?1",
+                    params![conversation_id, at],
+                )
+            }
+            .map_err(map_database_error)?;
+        }
+        let state_bytes = canonical_json(&conversation)?;
+        let state_blob = blobs.put(
+            &workspace_id,
+            BlobPurpose::AggregateState,
+            &state_bytes,
+            super::STATE_MEDIA_TYPE,
+        )?;
+        if state_blob.size_bytes != state_bytes.len() as u64
+            || blobs.get(&workspace_id, BlobPurpose::AggregateState, &state_blob)? != state_bytes
+        {
+            return Err(StoreError::Integrity(
+                "Conversation aggregate state failed BlobStore verification".to_owned(),
+            ));
+        }
+        let state_ref = AggregateStateRef {
+            blob: state_blob,
+            entity_revision: next_version,
+            record_schema_version: 1,
+        };
+        let event = insert_domain_event(&tx, &event_draft, &state_ref)?;
+        let accepted = CommittedConversation { conversation, event };
+        let response_json = String::from_utf8(canonical_json(&accepted)?)
+            .map_err(|error| StoreError::Invalid(error.to_string()))?;
+        tx.execute(
+            "INSERT INTO request_dedup(principal_id,request_id,request_digest,response_json,response_digest,created_at,expires_at) VALUES(?1,?2,?3,?4,?5,?6,NULL)",
+            params![
+                principal_id,
+                request_id,
+                request_digest,
+                response_json,
+                digest(response_json.as_bytes()),
+                accepted.event.recorded_at,
+            ],
+        )
+        .map_err(map_database_error)?;
+        tx.commit().map_err(map_database_error)?;
+        Ok(accepted)
+    })
+}
+
+impl ConversationCoeditStore for SqliteConversationStore {
+    fn append_owner_side_note(
+        &self,
+        commit: AppendOwnerSideNote,
+    ) -> Result<OwnerSideNoteRecord, StoreError> {
+        let valid = |value: &str| {
+            !value.trim().is_empty() && value.len() <= 256 && !value.chars().any(char::is_control)
+        };
+        let payload = &commit.request.request_payload;
+        if !valid(&commit.principal_id)
+            || commit.request.principal_id != commit.principal_id
+            || !super::valid_shared_idempotency_key(&commit.request.request_id)
+            || !valid(&commit.workspace_id)
+            || !valid(&commit.conversation_id)
+            || !valid(&commit.correlated_turn_id)
+            || !valid(&commit.side_note_id)
+            || payload.get("operation").and_then(Value::as_str)
+                != Some("conversation.side_note.append.v1")
+            || payload.get("workspace_id").and_then(Value::as_str)
+                != Some(commit.workspace_id.as_str())
+            || payload.get("conversation_id").and_then(Value::as_str)
+                != Some(commit.conversation_id.as_str())
+            || payload.get("correlated_turn_id").and_then(Value::as_str)
+                != Some(commit.correlated_turn_id.as_str())
+            || payload.get("body").and_then(Value::as_str) != Some(commit.body.as_str())
+        {
+            return Err(StoreError::Invalid(
+                "owner side note request is inconsistent".to_owned(),
+            ));
+        }
+        if commit.body.trim().is_empty()
+            || commit.body.chars().count() > OWNER_SIDE_NOTE_MAX_CHARS
+        {
+            return Err(StoreError::Invalid(SIDE_NOTE_OVER_BUDGET.to_owned()));
+        }
+        let created_at = canonicalize_utc_timestamp(&commit.created_at)?;
+        let request_digest = digest(&canonical_json(payload)?);
+        self.run(move |connection| {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(map_database_error)?;
+            if let Some(replay) = verify_request_receipt::<OwnerSideNoteRecord>(
+                &tx,
+                &commit.principal_id,
+                &commit.request.request_id,
+                &request_digest,
+            )? {
+                tx.commit().map_err(map_database_error)?;
+                return Ok(replay);
+            }
+            let allowed: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2 AND status='ACTIVE')",
+                    params![commit.workspace_id, commit.principal_id],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !allowed {
+                return Err(StoreError::NotFound);
+            }
+            let conversation_exists: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversations WHERE workspace_id=?1 AND conversation_id=?2)",
+                    params![commit.workspace_id, commit.conversation_id],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !conversation_exists {
+                return Err(StoreError::NotFound);
+            }
+            require_conversation_active(&tx, &commit.conversation_id)?;
+            let turn = load_turn(
+                &tx,
+                &commit.workspace_id,
+                &commit.conversation_id,
+                &commit.correlated_turn_id,
+            )?
+            .ok_or(StoreError::NotFound)?;
+            if turn.status.is_terminal() {
+                return Err(StoreError::Invalid(SIDE_NOTE_TURN_TERMINAL.to_owned()));
+            }
+            tx.execute(
+                "INSERT INTO conversation_owner_side_notes(side_note_id,workspace_id,conversation_id,correlated_turn_id,body,created_at) VALUES(?1,?2,?3,?4,?5,?6)",
+                params![
+                    commit.side_note_id,
+                    commit.workspace_id,
+                    commit.conversation_id,
+                    commit.correlated_turn_id,
+                    commit.body,
+                    created_at,
+                ],
+            )
+            .map_err(map_database_error)?;
+            let record = OwnerSideNoteRecord {
+                side_note_id: commit.side_note_id,
+                workspace_id: commit.workspace_id,
+                conversation_id: commit.conversation_id,
+                correlated_turn_id: commit.correlated_turn_id,
+                body: commit.body,
+                created_at: created_at.clone(),
+            };
+            let response_json = String::from_utf8(canonical_json(&record)?)
+                .map_err(|error| StoreError::Invalid(error.to_string()))?;
+            tx.execute(
+                "INSERT INTO request_dedup(principal_id,request_id,request_digest,response_json,response_digest,created_at,expires_at) VALUES(?1,?2,?3,?4,?5,?6,NULL)",
+                params![
+                    commit.principal_id,
+                    commit.request.request_id,
+                    request_digest,
+                    response_json,
+                    digest(response_json.as_bytes()),
+                    created_at,
+                ],
+            )
+            .map_err(map_database_error)?;
+            tx.commit().map_err(map_database_error)?;
+            Ok(record)
+        })
+    }
+
+    fn list_owner_side_notes(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        conversation_id: &str,
+        correlated_turn_id: &str,
+    ) -> Result<Vec<OwnerSideNoteRecord>, StoreError> {
+        if principal_id.trim().is_empty()
+            || workspace_id.trim().is_empty()
+            || conversation_id.trim().is_empty()
+            || correlated_turn_id.trim().is_empty()
+        {
+            return Err(StoreError::Invalid(
+                "owner side note lookup is invalid".to_owned(),
+            ));
+        }
+        let (principal, workspace, conversation, turn) = (
+            principal_id.to_owned(),
+            workspace_id.to_owned(),
+            conversation_id.to_owned(),
+            correlated_turn_id.to_owned(),
+        );
+        self.run(move |connection| {
+            let allowed: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2)",
+                    params![workspace, principal],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !allowed {
+                return Err(StoreError::NotFound);
+            }
+            let mut statement = connection
+                .prepare(
+                    "SELECT side_note_id,workspace_id,conversation_id,correlated_turn_id,body,created_at FROM conversation_owner_side_notes WHERE workspace_id=?1 AND conversation_id=?2 AND correlated_turn_id=?3 ORDER BY created_at,side_note_id",
+                )
+                .map_err(map_database_error)?;
+            statement
+                .query_map(params![workspace, conversation, turn], |row| {
+                    Ok(OwnerSideNoteRecord {
+                        side_note_id: row.get(0)?,
+                        workspace_id: row.get(1)?,
+                        conversation_id: row.get(2)?,
+                        correlated_turn_id: row.get(3)?,
+                        body: row.get(4)?,
+                        created_at: row.get(5)?,
+                    })
+                })
+                .map_err(map_database_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(map_database_error)
+        })
+    }
 }

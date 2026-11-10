@@ -477,6 +477,39 @@ pub(crate) async fn cancel_conversation_turn(
 }
 
 #[tauri::command]
+pub(crate) async fn list_conversation_turn_activity(
+    app: AppHandle,
+    workspace_id: String,
+    conversation_id: String,
+    turn_id: String,
+    retry_ordinal: u32,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if !valid_id(&workspace_id) || !valid_id(&conversation_id) || !valid_id(&turn_id) {
+            return Err("Turn activity selection is invalid".to_owned());
+        }
+        let (client, _) = operator_client(&app)?;
+        let value = read_json(
+            client
+                .get(format!("/v1/conversations/{conversation_id}/turns/{turn_id}/activity"))
+                .header("X-Workspace-ID", &workspace_id)
+                .query(&[("retry_ordinal", retry_ordinal.to_string())])
+                .send()
+                .map_err(|_| "Local turn activity is unavailable".to_owned())?,
+        )?;
+        if value.get("turn_id").and_then(serde_json::Value::as_str) != Some(turn_id.as_str())
+            || value.get("attribution").and_then(serde_json::Value::as_str) != Some("REPORTED")
+            || !value.get("items").is_some_and(serde_json::Value::is_array)
+        {
+            return Err("Local Runtime returned activity outside the selected turn".to_owned());
+        }
+        Ok(value)
+    })
+    .await
+    .map_err(|_| "Turn activity request did not complete".to_owned())?
+}
+
+#[tauri::command]
 pub(crate) async fn get_conversation_presentation(
     app: AppHandle,
     workspace_id: String,

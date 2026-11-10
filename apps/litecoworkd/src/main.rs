@@ -28,7 +28,11 @@ mod environment_office_qualification;
 mod environment_provider;
 mod local_filesystem;
 mod operator;
+#[cfg_attr(not(test), allow(dead_code))]
+mod power_assertion;
 mod runtime;
+mod runtime_stop_operator;
+mod transient_frames;
 mod workspace_root_cleanup_worker;
 // The evaluator is intentionally compiled but not wired until the atomic
 // CapabilityBroker admission transaction and audit persistence exist.

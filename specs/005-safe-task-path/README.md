@@ -2,6 +2,7 @@
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 **Revision:** 1.0 | **Updated:** 2026-11-09
+**Implementation state (2026-11-10):** Not implemented. T16 (B-35), T17, T18 BLOCKED and Windows-only; migration v36 allocated. Pre-existing partial foundations are listed in TASKS.md.
 **Owners:** Task Runtime, Environments, Trust, Storage, Desktop UI. Accepted by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
 
 ## User outcome

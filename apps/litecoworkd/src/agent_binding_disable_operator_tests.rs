@@ -749,7 +749,7 @@ fn seed_active_pinned_session(database: &PathBuf) {
     )
     .expect("seed Task pinned to the AgentBinding");
     tx.execute(
-        "INSERT INTO task_spec_revisions(task_id, workspace_id, revision, objective, lead_failover_policy_json, placement_preference, preferred_lead_agent_binding_id, authored_by_json, created_at) VALUES ('agent-disable-session-task', ?1, 1, 'Keep this admitted session pinned', '{\"mode\":\"DISABLED\",\"triggers\":[],\"fallback_agent_binding_ids\":[],\"max_lead_changes\":0}', '{}', ?2, ?3, ?4)",
+        "INSERT INTO task_spec_revisions(task_id, workspace_id, revision, objective, lead_failover_policy_json, placement_preference, preferred_lead_agent_binding_id, authored_by_json, created_at, delegation_policy_snapshot_json) VALUES ('agent-disable-session-task', ?1, 1, 'Keep this admitted session pinned', '{\"mode\":\"DISABLED\",\"triggers\":[],\"fallback_agent_binding_ids\":[],\"max_lead_changes\":0}', '{}', ?2, ?3, ?4, '{\"source\":\"WORKSPACE_DEFAULT\",\"strategy\":\"NATIVE_DEFAULT\",\"native_child_model_policy\":\"AGENT_DEFAULT\",\"worker_profiles\":[],\"workspace_settings_revision\":1}')",
         rusqlite::params![WORKSPACE, BINDING, json!({"kind":"USER","principal_id":OWNER}).to_string(), NOW],
     )
     .expect("seed immutable TaskSpec revision");

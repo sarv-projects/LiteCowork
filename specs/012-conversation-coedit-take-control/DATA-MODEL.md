@@ -28,7 +28,7 @@ Follow the owner retention rules. Purge removes future visibility of side-note p
 
 ## Migration
 
-None in source. B-34 is accepted; the migration is designed by TASKS T05 after the Feature 001 Stop/quiescence fix (A-25) lands, as the next immutable `sqlite-vNN.sql`.
+Storage layer shipped on 2026-11-10 (012-T05 partial): migration v32, `docs/schemas/sqlite-v32.sql`, adds `conversation_control_events` (append-only, UPDATE and DELETE triggers abort, `UNIQUE(turn_id, kind)`, kinds `OWNER_TOOK_CONTROL` and `OWNER_RELEASED_CONTROL`) and `conversation_owner_side_notes` (body 1 to 4000 characters, correlated to a turn, never a `conversation_messages` row). The `sqlite-v32.sql` number replaces the v30 that earlier text named. There is still no served route, no domain service wiring and no UI, so the current-source-boundary notes below about routes and UI remain true. See specs/012 TASKS.md T05.
 
 ## Current source boundary (2026-11-08)
 

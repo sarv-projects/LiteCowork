@@ -37,7 +37,7 @@ Use existing event names in [docs/EVENTS.md](../../docs/EVENTS.md). A new event 
 
 ## Retention and migration
 
-Follow owner retention rules. Purge removes future visibility of payload bytes; receipts may remain. Revision 1.0 authorizes two Runtime-local stores, created only by their tasks: the AgentControlDescriptor record (digest, module version, issued/expires time, probe-budget counter; 002-T04) and the redacted auth observation (002-T07). Neither carries a Workspace id or secret bytes. Each uses the next unused immutable `docs/schemas/sqlite-vNN.sql` with its canonical model owner, event/schema and tests in the same reviewed change. No migration exists yet.
+Follow owner retention rules. Purge removes future visibility of payload bytes; receipts may remain. Revision 1.0 authorizes two Runtime-local stores, created only by their tasks: the AgentControlDescriptor record (digest, module version, issued/expires time, probe-budget counter; 002-T04) and the redacted auth observation (002-T07). Neither carries a Workspace id or secret bytes. The descriptor store is allocated `docs/schemas/sqlite-v33.sql` (002-T04) and the auth observation `docs/schemas/sqlite-v34.sql` (002-T07), renumbered on 2026-11-10 from v30/v31 because 001-T25 (v30), 014-T03 (v31) and 012-T05 (v32) took those numbers first; if another package merges first take the next free number and update the allocation table. Each ships with its canonical model owner, event/schema and tests in the same reviewed change. No 002 migration is wired yet; the Runtime-local descriptor table that exists today was created by migration 16.
 
 ## Provider identity (002-T01)
 

@@ -62,7 +62,7 @@ flowchart LR
 
 ## 5. Persistence, migration, rollout
 
-One forward-only migration after `sqlite-v28.sql` (number taken at implementation time) adds `task_control_requests` and `task_resume_packets` and stores `on_exhaustion` with the escalation policy. No existing column changes type; `tasks.status` stays text and is parsed by the new enum. Rollout is behind the Task projection's `allowed_commands`: a control is invisible to the UI until its route and owner path are served.
+One forward-only migration (allocated v42 in docs/LITECOWORK-BUILD-TASKS.md; chain ends at `sqlite-v32.sql`) adds `task_control_requests` and `task_resume_packets` and stores `on_exhaustion` with the escalation policy. No existing column changes type; `tasks.status` stays text and is parsed by the new enum. Rollout is behind the Task projection's `allowed_commands`: a control is invisible to the UI until its route and owner path are served.
 
 ## 6. Operational risks
 

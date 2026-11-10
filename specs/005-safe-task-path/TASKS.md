@@ -299,6 +299,7 @@ Gaps to V1: Conversation promotion, planning dispatch, plan acceptance route, a 
 ## 005-T16 - Owner decision on B-35 Windows Environment provider
 
 - **Status:** BLOCKED (B-35 PROPOSED; owner: repository owner, with Environments and Security)
+- **DEFERRED/BLOCKED note:** Why: B-35 (Windows Environment provider) is PROPOSED and not owner-accepted. Unblocks when: owner decision on B-35. Test later at: decision only; no test.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Repository owner; Environments; Security
@@ -315,6 +316,7 @@ Gaps to V1: Conversation promotion, planning dispatch, plan acceptance route, a 
 ## 005-T17 - Windows Environment provider: AppContainer, restricted token, Job Object, WFP egress (Rust)
 
 - **Status:** BLOCKED (needs T16 acceptance; `spawn_kill_on_drop_job` and `replace_file_write_through` exist in `crates/windows-local-security/src/lib.rs`, nothing else)
+- **DEFERRED/BLOCKED note:** Why: needs T16 acceptance and is Windows-only (AppContainer, restricted token, Job Object, WFP egress). Unblocks when: T16 accepted, then Windows implementation. Test later at: the owner's Windows laptop.
 - **Depends on:** T02, T15, T16
 - **Cross-package prerequisites:** 011 Windows named-pipe IPC and Runtime incarnation on the Windows row
 - **Owner:** Environments, Security
@@ -333,6 +335,7 @@ Gaps to V1: Conversation promotion, planning dispatch, plan acceptance route, a 
 ## 005-T18 - Windows-row qualification of Task execution (E2E-04)
 
 - **Status:** BLOCKED (needs T17; B-35 pending owner)
+- **DEFERRED/BLOCKED note:** Why: Windows row of Task execution (E2E-04) depends on T17. Unblocks when: T17 done. Test later at: the owner's Windows laptop.
 - **Depends on:** T17
 - **Cross-package prerequisites:** 019 Windows installer and evidence bundle process; 001 Windows OpenCode v2.0.32 route qualified
 - **Owner:** Task Runtime, QA, repository owner (USER evidence)
@@ -408,6 +411,25 @@ Parallel lanes after T01: storage/plan (T03), provider (T02, T04), write primiti
 | T20 | 019 gate G | Release qualification |
 
 Downstream consumers (they depend on this package): 006 golden write admission reuses T07/T08 Trust and Attempt wiring; 008 terminal needs an admitted Environment from T04/T17; 010 Task execution claims; 015 control and delegation; 020 accept-task.
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+Status: PROPOSED. None of the items below is an accepted task. They come from the DeepSeek Harness studies ([desktop deep-dive](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) register A-63, proposals P-31 to P-46; [plugin deep-dive](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) register A-58). Owner review is required before any item becomes a numbered task in this package. They are labelled `PROP-Pnn` so they do not collide with the stable task IDs that `.specify/scripts/validate_feature_package.py` checks. On acceptance: assign the next free task ID in this file, copy the upstream permalink, class and reuse statement into the task, and update the [reuse map](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md). Upstream pin `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` (MIT, Copyright (c) 2026 DeepSeek). No upstream code is imported (AGENTS.md section 7).
+
+### Proposals owned elsewhere that touch this package (pointer only)
+
+- **PROP-P38 (P-38) Login-shell PATH-class capture for agents launched from a Linux desktop entry** [PROPOSED, not accepted, owner review required]: row owned by package 002; class **OWNER (open; not ADOPT, ADAPT or REJECT yet)**; would touch here: T07 and T13 of package 002; package 005 Environment admission. Upstream permalinks: [src/login-shell-environment.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/login-shell-environment.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Section 14 (row P-38 and the conflict note). Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React). No reuse is allowed before the owner decision.
+
+### Plugin-architecture proposal (P-27)
+
+- **PROP-P27 (P-27) Durable run record plus process-group liveness fence for recovery** [PROPOSED, not accepted, owner review required]
+  - Class: **ADAPT** (the liveness check itself is an **ADOPT** candidate, algorithm only).
+  - Upstream permalinks: [operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts) (`activeRecordedRun`), [run-tree.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/run-tree.ts) (`treeAlive`, `awaitTreeGone`).
+  - Study: [plugin study](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) Sections 2, 3 and 8.
+  - Why: it is the reference design for durable dispatch intent, atomic rollback and liveness-fenced restart recovery. The restart sweep in package 001 (T08) is already done independently; this is a cross-check for package 005 Attempt recovery and later package 013 apply recovery.
+  - Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React). For the liveness probe only: If any text or structure is carried over, MIT applies (upstream LICENSE, "Copyright (c) 2026 DeepSeek"): keep that copyright line and the MIT permission notice in the third-party notices produced by task T13 of package 019, and cite the upstream path and SHA `fcc0ad46` in the code comment.
+  - Deferral note: package 013 is DEFERRED, so the apply-recovery half waits; the Attempt-recovery half belongs to the package 005 owner review.
+
 
 ## Completion evidence
 

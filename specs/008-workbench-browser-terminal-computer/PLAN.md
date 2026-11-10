@@ -6,7 +6,7 @@
 ## Phases
 
 1. SPEC section 5 blockers B-22, B-23 and B-32 are ACCEPTED (2026-11-09). Workbench truthfulness baseline (A-51) is verified in source; finish Activity fallthrough and the Computer UNAVAILABLE surface.
-2. Promote accepted browser, terminal, Activity and Diff interfaces in the canonical owner docs and `docs/schemas/` (OpenAPI, events, error codes, next immutable `sqlite-vNN.sql`) in one reviewed change.
+2. Promote accepted browser, terminal, Activity and Diff interfaces in the canonical owner docs and `docs/schemas/` (OpenAPI, events, error codes, allocated immutable `sqlite-v41.sql`) in one reviewed change.
 3. Browser lane (Windows x64 row first): storage, managed Chromium provider, service/routes/bridge, UI, recovery.
 4. Terminal lane (Linux x64 row first, after Feature 005 admits a bubblewrap Environment): storage, discovery and PTY, service/routes/bridge, UI, recovery. Windows ConPTY waits on Feature 005 B-35.
 5. Activity and Diff lanes (independent of providers): read projection and exact-revision diff.
@@ -28,7 +28,7 @@ Allowed implementation paths are listed per task. The active source tree is in a
 
 ## Migration, rollout, rollback
 
-Browser session/lease/receipt and terminal session/receipt records need one new immutable SQLite migration (the next `docs/schemas/sqlite-vNN.sql` after the highest present at implementation time; `sqlite-v28.sql` is highest on 2026-11-09), promoted by T01 and implemented by T03/T08. Activity and Diff add no tables. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
+Browser session/lease/receipt and terminal session/receipt records need one new immutable SQLite migration (`docs/schemas/sqlite-v41.sql` per the Migration allocation in docs/LITECOWORK-BUILD-TASKS.md; `sqlite-v32.sql` is highest wired on 2026-11-10; take the next free number if another package merges first), promoted by T01 and implemented by T03/T08. Activity and Diff add no tables. Rollback is revert to the previous committed revision and refuse new admission that needs the new field.
 
 ## Risks
 
@@ -43,3 +43,10 @@ Browser session/lease/receipt and terminal session/receipt records need one new 
 - Owner acceptance recorded 2026-11-09
 - TASKS.md commands and denial, replay, restart and cancel cases
 - Packaged E2E-08 on each release-matrix row
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+PROPOSED only; see the matching section in [TASKS.md](TASKS.md). Nothing here changes the accepted design of this package. Owner review is required first.
+
+- **P-45 Default-deny webview and session permissions, including the main one, plus a guest network filter** (touches this package; row owned by package 019). Class **ADAPT**. Design impact if accepted: T06 of package 019; T04 and T06 of package 008. Deferral: Needs a packaged webview run on the Windows laptop and native Linux; DEFERRED with B-43. Upstream: [src/browser-guests.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/browser-guests.ts), [src/microphone-permissions.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/microphone-permissions.ts), [src/policy-test-auth.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/policy-test-auth.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 9 and 14 (row P-45).
+

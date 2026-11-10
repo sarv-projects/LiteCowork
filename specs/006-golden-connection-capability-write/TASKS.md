@@ -25,7 +25,7 @@ Gaps to V1: recipe decision, Connection aggregate and service, keystore custody 
 - **Depends on:** NONE
 - **Cross-package prerequisites:** 005 contract promotion (shared Trust/Effect wording); orchestrator assigns the migration number because several packages promote migrations in parallel
 - **Owner:** Connectors, Capability Fabric, schema owner
-- **Allowed paths:** `docs/CONNECTORS-WORKFLOWS.md`, `docs/CAPABILITY-INVOCATIONS.md`, `docs/CAPABILITY-FABRIC.md`, `docs/NETWORK-SECURITY.md`, `docs/TRUST.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/domain-event.schema.json`, `docs/schemas/sqlite-v29.sql` (new, or the next unused number at implementation time), `specs/006-golden-connection-capability-write/`
+- **Allowed paths:** `docs/CONNECTORS-WORKFLOWS.md`, `docs/CAPABILITY-INVOCATIONS.md`, `docs/CAPABILITY-FABRIC.md`, `docs/NETWORK-SECURITY.md`, `docs/TRUST.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/domain-event.schema.json`, `docs/schemas/sqlite-v40.sql` (new, allocated in docs/LITECOWORK-BUILD-TASKS.md; v29 is already taken by Feature 001), `specs/006-golden-connection-capability-write/`
 - **Contract:** SPEC §5 B-19/B-20, §7.2, §7a, §13; AC-006, AC-013, AC-014, AC-015
 - **Change intent:** Add `REVOKED` to the OpenAPI Connection status enum and the `connections` table CHECK (SQLite needs a table rebuild migration that preserves rows). Add Connection begin, callback-complete (internal), cancel and list/get/disconnect bodies; the golden read operation (proposed: list issue comments, `GET /repos/{owner}/{repo}/issues/{number}/comments`, recorded for owner confirmation) and the golden write operationId for "create issue comment"; an `auth_attempts` table (state, expiry, PKCE/state digests only, never the verifier in clear after use); `remote_revocation` status on Connection (`CONFIRMED | OWNER_ACTION_REQUIRED | NOT_ATTEMPTED`). Reuse `connection.state.changed.v1`; add events only if missing. The recipe-specific fields wait for T02.
 - **Acceptance:**
@@ -39,6 +39,7 @@ Gaps to V1: recipe decision, Connection aggregate and service, keystore custody 
 ## 006-T02 - Owner decision on the GitHub OAuth recipe (client-secret finding)
 
 - **Status:** BLOCKED (GitHub docs require `client_secret` for web-flow exchange and revocation; B-19 stop clause applies; owner: repository owner with Connectors and Security)
+- **DEFERRED/BLOCKED note:** Why: GitHub web-flow exchange and revocation require a client_secret, which a desktop app cannot hold; the B-19 stop clause applies and the B-19 follow-up is open. Unblocks when: owner decision on the OAuth recipe (device flow, PKCE-only app, or other). Test later at: decision only; then a real GitHub account on any native machine.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Repository owner; Connectors; Security
@@ -91,6 +92,7 @@ Gaps to V1: recipe decision, Connection aggregate and service, keystore custody 
 ## 006-T05 - ConnectionService: AuthAttempt, OAuth flow per T02, Connection commit after keystore write
 
 - **Status:** BLOCKED (needs T02 recipe decision; no ConnectionService exists)
+- **DEFERRED/BLOCKED note:** Why: depends on the T02 recipe decision; no ConnectionService exists. Unblocks when: T02 decided. Test later at: a real GitHub account on native Linux then the owner's native Windows x64 laptop (release matrix row 1); WSL2 and containers never count.
 - **Depends on:** T01, T02, T03, T04
 - **Cross-package prerequisites:** 011 system-browser open via Tauri and Runtime readiness
 - **Owner:** Connectors
@@ -130,7 +132,7 @@ Gaps to V1: recipe decision, Connection aggregate and service, keystore custody 
 - **Depends on:** T01
 - **Cross-package prerequisites:** 005 Trust wiring (removal of `trust` dead code) and Attempt admission, because Invocation dispatch rechecks lease and Trust decision
 - **Owner:** Storage, Capability Fabric
-- **Allowed paths:** `docs/schemas/sqlite-v29.sql` (same migration as T01 or the next one), `crates/storage-sqlite/src/capability_dispatch.rs`, `crates/storage-sqlite/src/invocations.rs`, `crates/storage-sqlite/src/invocation_dispatch_migration_tests.rs`, `crates/storage-core/src/capability_invocation.rs`
+- **Allowed paths:** `docs/schemas/sqlite-v40.sql` (same migration as T01), `crates/storage-sqlite/src/capability_dispatch.rs`, `crates/storage-sqlite/src/invocations.rs`, `crates/storage-sqlite/src/invocation_dispatch_migration_tests.rs`, `crates/storage-core/src/capability_invocation.rs`
 - **Contract:** CAPABILITY-INVOCATIONS; SPEC §6 ("External dispatch waits until one transaction rechecks owner, lease, grant, activation, Trust decision, and exact ApprovalUse"); AC-004, AC-005, AC-007
 - **Change intent:** Replace the two v15 triggers with guards that allow INSERT and the `CREATED -> DISPATCHED` transition only when the same transaction writes the matching ApprovalUse/Effect rows (for example a trigger that checks a per-transaction admission marker row written by `admit_transaction`). Direct `transition` to DISPATCHED through `SqliteCapabilityInvocationStore` stays refused with `INVOCATION_DISPATCH_ADMISSION_UNAVAILABLE`.
 - **Acceptance:**

@@ -98,5 +98,19 @@ These are source-level UI findings, not a browser USER test. They require UI/API
 | R-07 | Usage | Native usage signals and trust label; no Conversation cross-agent usage writer is currently wired | Usage owner |
 | R-08 | Desktop stop/retry interaction | Add authoritative turn version to the safe active-turn projection; bind Stop to that turn and a real supervisor stop request; add failed-turn retry action with idempotency/version handling; enforce all nonterminal statuses in composer admission; add rendered tests for no-stream, stale-version, repeated-send and racing settlement cases | Desktop UI / Operator / Conversation |
 
+### 8.1 Finding for 001-T12 (2026-11-10): provider input requests
+
+The OpenCode v2.0.32 normalizer (`normalizer.rs`) recognizes `permission.asked` and `permission.updated` but no question or input-request event, and neither the captured fixture (`opencode_v2_0_32_turn.jsonl`) nor any source in this repository shows the pinned server emitting one. No OpenCode binary exists in this environment, so the absence cannot be confirmed against the live server (R-01 stays open). Until a live capture shows an input request with a correlatable key, a Conversation-scoped UserRequest cannot be produced from this route, and the continuation path is recorded as unavailable (the T12 Stop rule). A `permission.asked` event is a native permission (T27), not a UserRequest.
+
 No web research has been used to claim current upstream API behavior. Version-pinned native protocol research is a prerequisite task, not filled by assumptions.
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+Research note, not a decision. Source: [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159) at the pinned SHA (MIT, Copyright (c) 2026 DeepSeek). Local read-only clone `repo_take/deepseek-harness` is gitignored and never staged. Upstream paths below were checked to exist at that SHA on 2026-11-10.
+
+Read-depth limits from the study (do not over-trust): `scripts/` about 58% read, tests about 5% read, installer UI text partly unread. See [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 0 and 15 before turning any item into a design.
+
+
+Plugin-architecture lessons (see [plugin study](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) Section 8):
+  - Durable run record plus process-group liveness fence (P-27): [packages/boot/plugin-manager/src/operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts). Class **ADAPT**. The restart sweep (T08) is already done independently; use as a cross-check only. Reuse: pattern only, reimplement; no upstream code imported.
 

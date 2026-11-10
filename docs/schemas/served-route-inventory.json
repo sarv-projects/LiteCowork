@@ -186,6 +186,13 @@
     },
     {
       "method": "GET",
+      "path": "/v1/conversations/{conversation_id}/turns/{turn_id}/activity",
+      "openapi_path": "/conversations/{conversationId}/turns/{turnId}/activity",
+      "operation_id": "listConversationTurnActivity",
+      "source": "apps/litecoworkd/src/conversation_operator.rs"
+    },
+    {
+      "method": "GET",
       "path": "/v1/coworkers",
       "openapi_path": "/coworkers",
       "operation_id": "listCoworkers",
@@ -420,6 +427,13 @@
       "path": "/v1/runtime-lifecycle",
       "openapi_path": "/runtime-lifecycle",
       "operation_id": "getLocalRuntimeLifecycle",
+      "source": "apps/litecoworkd/src/operator.rs"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runtime-lifecycle/stop-preview",
+      "openapi_path": "/runtime-lifecycle/stop-preview",
+      "operation_id": "previewLocalRuntimeStop",
       "source": "apps/litecoworkd/src/operator.rs"
     },
     {
@@ -676,10 +690,24 @@
     },
     {
       "method": "POST",
+      "path": "/v1/agent-profiles/{agent_profile_id}/auth/{auth_method_id}/begin",
+      "openapi_path": "/agent-profiles/{agentProfileId}/auth/{authMethodId}/begin",
+      "operation_id": "beginAgentAuthentication",
+      "source": "apps/litecoworkd/src/agent_auth_operator.rs"
+    },
+    {
+      "method": "POST",
       "path": "/v1/agent-profiles/{agent_profile_id}/credentials/{credential_slot_id}",
       "openapi_path": "/agent-profiles/{agentProfileId}/credentials/{credentialSlotId}",
       "operation_id": "submitAgentCredential",
       "source": "apps/litecoworkd/src/agent_credentials_routes.rs"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent-profiles/{agent_profile_id}/native-config/{target_id}/open",
+      "openapi_path": "/agent-profiles/{agentProfileId}/native-config/{targetId}/open",
+      "operation_id": "openAgentNativeConfiguration",
+      "source": "apps/litecoworkd/src/agent_native_config_operator.rs"
     },
     {
       "method": "POST",
@@ -1208,6 +1236,13 @@
     },
     {
       "method": "PUT",
+      "path": "/v1/workspaces/{workspace_id}/name",
+      "openapi_path": "/workspaces/{workspaceId}/name",
+      "operation_id": "renameWorkspace",
+      "source": "apps/litecoworkd/src/operator.rs"
+    },
+    {
+      "method": "PUT",
       "path": "/v1/workspaces/{workspace_id}/suggestion-preferences/{kind}",
       "openapi_path": "/workspaces/{workspaceId}/suggestion-preferences/{kind}",
       "operation_id": "setSuggestionPreference",
@@ -1261,11 +1296,6 @@
       "method": "GET",
       "path": "/conversations/{conversationId}/usage",
       "operation_id": "getConversationUsage"
-    },
-    {
-      "method": "GET",
-      "path": "/runtime-lifecycle/stop-preview",
-      "operation_id": "previewLocalRuntimeStop"
     },
     {
       "method": "GET",
@@ -1341,16 +1371,6 @@
       "method": "PATCH",
       "path": "/workspace-roots/{rootId}",
       "operation_id": "updateWorkspaceRoot"
-    },
-    {
-      "method": "POST",
-      "path": "/agent-profiles/{agentProfileId}/auth/{authMethodId}/begin",
-      "operation_id": "beginAgentAuthentication"
-    },
-    {
-      "method": "POST",
-      "path": "/agent-profiles/{agentProfileId}/native-config/{targetId}/open",
-      "operation_id": "openAgentNativeConfiguration"
     },
     {
       "method": "POST",

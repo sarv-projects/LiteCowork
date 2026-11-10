@@ -64,14 +64,14 @@ The current desktop surface is `AgentCatalogSettings`:
 - Codex App Server observations exist; OpenCode probe records incompatible offer/capabilities false.
 - Observed profiles show Runtime-offer compatibility/readiness, expiry, diagnostics and Workspace binding state.
 - Workspace bindings can be created disabled and enabled/disabled through versioned actions; Workspace default lead and worker-profile controls exist.
-- Descriptor panel calls routes that currently return 503 DEPENDENCY_UNAVAILABLE.
-- No install/update action, native sign-in flow or usage projection is served here.
+- Descriptor panel reads served routes: the OpenCode module returns a validated descriptor; module-less profiles still return 503 DEPENDENCY_UNAVAILABLE.
+- No install/update action or usage projection is served here; Install and Update are shown as unavailable in V1. Sign-in and native-config routes are served but fail closed (see the trace below).
 
 Source/UI mismatches:
 - OpenCode is blocked from new binding by its incompatible profile offer even though Feature 001 contains an OpenCode dispatch path.
 - Codex can be bound despite the current Conversation supervisor not dispatching Codex. A binding is not proof Send works.
 - Backend enable currently checks a fresh compatible Runtime offer but not the AC-004 fresh AgentControlDescriptor.
-- Credential submission validates then returns 503; auth-begin and native-config-open are target-only.
+- Credential submission validates then returns 503 (no durable replay receipt); auth-begin and native-config-open are served but refuse every method or target because no V1 module declares one.
 - ACP registry entries are metadata and do not become install or execution authority.
 
 ## Failure and accessibility contract
@@ -89,3 +89,19 @@ Empty, stale, offline, denied, unsupported OS, unsupported version, cancelled au
 - On stale/unavailable descriptor or model removal, disable the stale choice, preserve the previous committed choice and current draft, and offer only a real refresh action.
 - Task composer selection remains separate: choose Coworker/eligible AgentBinding first; model/effort selection is subordinate to that binding.
 - Current descriptor reads/refresh return 503 and provider send routes remain unqualified. Therefore the model picker is a target design and must not be presented as active until the exact end-to-end path works.
+
+## Cross-layer trace for every 002 user-visible operation (T14)
+
+Chain: control -> Tauri command -> Operator route -> authorization -> service -> transaction/CAS -> record/event/receipt -> projection -> restart behavior -> evidence test. Every step names a symbol in source at the 2026-11-10 revision. A step that does not exist is stated as such; it is never inferred.
+
+| Operation | Control (`AgentCatalogSettings` / `AgentControlDescriptorPanel`) | Tauri command (`src-tauri/src/lib.rs`) | Operator route and handler | Service and transaction | Record, receipt or projection | Restart behavior | Evidence test |
+|---|---|---|---|---|---|---|---|
+| Probe profile | "Probe OpenCode" / "Probe Codex" | `probe_agent_profile` | `POST /v1/agent-profiles/probe`, `probe_local_agent_profile` (`operator.rs`) | bounded `probe_opencode_profile` outside any transaction, then the profile/endpoint/offer write | `AgentProfile`, `AgentEndpoint`, RuntimeOffer (120 s expiry) | offer expires; probe is repeated | `opencode_profile`, `native_provider_key` (litecoworkd) |
+| Create binding | "Create binding" | `create_agent_binding` | `POST /v1/agent-bindings`, `create_agent_binding` | `create_agent_binding_transaction` (fresh compatible offer gate) | disabled `AgentBinding` plus idempotency receipt | binding row is durable; offer must be fresh again to enable | `agent_binding_tests` (storage-sqlite) |
+| Enable or disable binding | "Enable" / "Disable" | `enable_agent_binding`, `disable_agent_binding` | `enableAgentBinding` (`enable_agent_binding`), `disableAgentBinding` | `enable_agent_binding_transaction` with `X-Agent-Descriptor-Revision` CAS inside the same transaction | binding version, audit record, receipt | stale descriptor fails `RESOURCE_STALE` with no write | `enable_requires_the_current_fresh_descriptor_revision_when_the_module_declares_one` |
+| Refresh descriptor | "Refresh controls" | `refresh_agent_control_descriptor` | `POST /v1/agent-profiles/{id}/refresh`, `refresh_control_descriptor` (`agent_control_operator.rs`) | `AgentDescriptorService::refresh` (budget 3 per minute, probe outside transaction, CAS append) | `agent_control_descriptors` row, digest | new RuntimeIncarnation never inherits a descriptor | `agent_lifecycle_recovery_restart_revalidates_the_descriptor_until_reprobed`, `agent_lifecycle_recovery_failed_probe_leaves_the_prior_descriptor_intact` |
+| Sign in | "Sign in: <method>" rendered by `DescriptorSummary` only for a declared `NATIVE_FLOW` method | none yet (the control stays disabled because no `onBeginAuth` is supplied by the desktop build) | `POST /v1/agent-profiles/{id}/auth/{authMethodId}/begin`, `begin_agent_authentication` (`agent_auth_operator.rs`) | `AgentAuthService::begin` behind the `NativeLoginLauncher` boundary (V1: `UnqualifiedLauncher`) | in-memory `AuthObservation`, resealed into the next descriptor | observation is Runtime-local; a restart returns `UNKNOWN` | `agent_auth_*` (litecoworkd), `agent_auth_begin_*` route tests |
+| Select model or effort | model popover view-model `deriveModelPicker` | none yet | `getAgentSessionOptions` is still target-only | none: no daemon admission consumes `{optionId, providerModelId, descriptorRevision}` yet | none | not applicable | `conversation-model-picker.test.ts` (view-model only) |
+| Open native config | "Open native config: <target>" only for a declared target | none yet | `POST /v1/agent-profiles/{id}/native-config/{targetId}/open`, `open_native_configuration` (`agent_native_config_operator.rs`) | declared-target check, then `NativeConfigOpener` (V1: `UnqualifiedOpener`) | `NativeConfigOpenReceipt` | stateless | `native_config_open_rejects_undeclared_targets_and_caller_paths` |
+
+Breaks found by this trace, left open in the owning task: (1) Sign in, Open native config and the model picker have no Tauri command, so the UI cannot call a served route (T07, T10); (2) `getAgentSessionOptions` and `getAgentHarnessCapabilities` are still target-only (T05, T09); (3) no qualified launcher or opener exists, so the served routes refuse every declared method (T07, T10). Served routes with no UI path by design in V1: none other than these two.

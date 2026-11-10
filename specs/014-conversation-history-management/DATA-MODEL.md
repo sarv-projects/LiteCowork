@@ -3,13 +3,13 @@
 **Status:** IN_REVIEW - not owner-accepted; does not authorize implementation; not a claim of implementation or qualification.
 **Feature:** 014 | **Authority:** DATA-MODEL.md, STATE-MACHINES.md, STORAGE.md, EVENTS.md, SCHEMAS.md.
 
-This feature extends the canonical Conversation record. It must not create a second Conversation catalog or a second deletion framework. Nothing below exists in source today; the migration chain ends at `sqlite-v28.sql`.
+This feature extends the canonical Conversation record. It must not create a second Conversation catalog or a second deletion framework. Only the `conversation_history_state` side table exists in source (migration v31, `docs/schemas/sqlite-v31.sql`, 014-T03 storage layer, 2026-11-10); every other record below (search index, purge plans, purge receipts) is still target and takes a later number than v32. The migration chain ends at `sqlite-v32.sql`.
 
 ## 1. Existing records
 
 | Record | Source | Feature use |
 |---|---|---|
-| Conversation | `conversations` (`sqlite-v1.sql`); `ConversationRecord` | Gains status and timestamps |
+| Conversation | `conversations` (`sqlite-v1.sql`); `ConversationRecord` | Unchanged; status and timestamps live in the `conversation_history_state` side table (v31) |
 | ConversationMessage | `conversation_messages` (plaintext `content_json`) | Search source; purge target |
 | ConversationTurn | `conversation_turns` | Active-turn check; purge of content-bearing fields |
 | UserRequest / UserRequestResponse | `user_requests`, `user_request_responses` | Quiescence check; purge targets |
@@ -20,17 +20,17 @@ This feature extends the canonical Conversation record. It must not create a sec
 | Task | `tasks.conversation_id` | Retained; origin shown as deleted conversation |
 | Capability grants/activations/invocations | `capability_*` with `conversation_id` | Quiescence check; Evidence retention per O-02 |
 
-## 2. Proposed fields and records (not yet in source)
+## 2. Side table (shipped, v31) and proposed records (not yet in source)
 
 | Record | Fields | Notes |
 |---|---|---|
-| Conversation (extended) | `status` (`ACTIVE`, `ARCHIVED`, `DELETION_PENDING`, `DELETED`), `archived_at`, `deleted_at` | Title cleared at tombstone |
+| ConversationHistoryState (side table, SHIPPED in migration v31 as `conversation_history_state`) | `conversation_id` (primary key), `workspace_id`, `status` (`ACTIVE`, `ARCHIVED`, `DELETION_PENDING`, `DELETED`), `archived_at`, `deleted_at`, `updated_at` | Replaces the earlier plan to add status columns to `conversations`: released migrations are immutable, so a Conversation with no row here is ACTIVE and `conversations` is unchanged. Title is never copied into the side table; clearing the title at tombstone writes only the `conversations` row (target, not yet implemented). Rust: `crates/storage-core/src/conversation.rs`, `crates/storage-sqlite/src/conversations.rs`, tests in `conversation_history_tests.rs` |
 | ConversationSearchTerm | `workspace_id`, `conversation_id`, `message_id` (null for title), `term_token`, `key_version` | F-01 option (a): HMAC tokens, no plaintext |
 | ConversationSearchIndexState | `workspace_id`, `state` (`BUILDING`, `READY`), `watermark` | Backfill progress |
 | ConversationPurgePlan | `plan_id`, `workspace_id`, `conversation_id`, `sealed_at`, `target_count` | Immutable once sealed |
 | ConversationPurgeReceipt | `plan_id`, `target_id`, `target_kind`, `target_ref`, `state` (`PENDING`, `ACKNOWLEDGED`), `acknowledged_at` | One per target |
 
-List index: `(workspace_id, status, created_at DESC, conversation_id DESC)`.
+List index (target): `(workspace_id, status, created_at DESC, conversation_id DESC)`. Shipped today: `idx_conversation_history_state_workspace_status` on `(workspace_id, status)` in v31 only; the ordered list index is not built yet.
 
 ## 3. Lifecycle
 

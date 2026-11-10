@@ -75,28 +75,29 @@ Each resolution's full text is in the named `specs/NNN §5`. Accept to let that 
 
 ---
 
-## Part 4: decisions raised after the 2026-11-09 acceptance (open)
+## Part 4: decisions raised after the 2026-11-09 acceptance (decided 2026-11-10 where marked)
 
-These came out of the V1 task planning on 2026-11-09. None is accepted. The new packages 013-020 stay IN_REVIEW until their rows here are decided.
+These came out of the V1 task planning on 2026-11-09. On 2026-11-10 the owner (sarv-projects) accepted the rows marked ACCEPT as proposed, deferred the LiteSPM rows (B-36, B-37 and all Feature 013 tasks including 013-T20), the Windows rows (B-35 and the Windows-only task rows, for later laptop testing) and the release-dependent rows (B-43, B-44), and left B-42 and the B-19 follow-up open and BLOCKED. Recorded as register [A-62](CONTRADICTION-AND-ALIGNMENT-REGISTER.md). The packages 013-020 stay IN_REVIEW: accepting a decision row does not accept the package SPEC as a whole.
 
 | ID | Pkg | Decision needed | Proposed resolution (summary) | Decision |
 |---|---|---|---|---|
-| B-35 | 005 | Windows Environment provider | AppContainer + restricted token + Job Object + WFP egress filtering; until it qualifies, Windows Task execution and terminal stay UNAVAILABLE | |
-| B-36 | 013 | LiteSPM bridge pin, transport, peer auth | Pin one LiteSPM release; reconcile the three conflicting pins (9f42b25d, 111fd9b8, f77a3a3) | |
-| B-37 | 013 | First package kind and host for plan/apply | `skill` installed by copy, runtime-verified listings only | |
-| B-38 | 014 | Conversation delete semantics | Tombstone with immediate fenced purge, no V1 restore window | |
-| B-39 | 015 | First delegation pair | OpenCode v2.0.32 lead, Claude Code CLI worker; Environment sharing rule | |
-| B-40 | 016 | First Intelligent UI component | `SAFE_CALCULATOR`; Interactive Artifact Runtime stays PREVIEW_ONLY | |
-| B-41 | 017 | Backup scope, encryption, restore-over-live | One Workspace per container with a complete table map | |
-| B-42 | 018 | Support-bundle contents | Deny by default; previewed allowlisted categories | |
-| B-43 | 019 | Signing identity and update channel | Authenticode-signed installers and binaries; signed Linux checksums | |
-| B-44 | 019 | Licensing and packaging | Record as an ADR before any release build | |
-| B-45 | 020 | First learning source and auto-commit policy | Owner messages and feedback in Coworker-owned Conversations; gate fix first | |
-| D-01 | 020 | First Suggestion producers | Deterministic GOAL_NEXT_STEP and REPEATED_TASK, no model call | |
-| B-19 follow-up | 006 | GitHub OAuth recipe after the `client_secret` finding | Choose device flow, an embedded non-confidential secret, or another provider | |
-| B-31 follow-up | 007 | Local-export receipt class | Confirm the destination class for the first export receipt | |
-| 010 event kind | 010 | Event-trigger kind after cron | Confirm CONNECTOR_EVENT (010-T09) | |
-| E2E ids | 014, 015, 018, 020 | New golden journeys | Adopt proposed E2E-14..E2E-17 in ACCEPTANCE-AND-E2E-PLAN.md | |
+| B-35 | 005 | Windows Environment provider | AppContainer + restricted token + Job Object + WFP egress filtering; until it qualifies, Windows Task execution and terminal stay UNAVAILABLE | **DEFERRED** (2026-11-10): Windows parts wait for later laptop testing; Windows Task execution and terminal stay UNAVAILABLE |
+| B-36 | 013 | LiteSPM bridge pin, transport, peer auth | Pin one LiteSPM release; reconcile the three conflicting pins (9f42b25d, 111fd9b8, f77a3a3) | **DEFERRED** (2026-11-10): LiteSPM parts are deferred by the owner; not decided |
+| B-37 | 013 | First package kind and host for plan/apply | `skill` installed by copy, runtime-verified listings only | **DEFERRED** (2026-11-10): LiteSPM parts are deferred by the owner; not decided |
+| B-38 | 014 | Conversation delete semantics | Tombstone with immediate fenced purge, no V1 restore window | **ACCEPT as proposed** (2026-11-10) |
+| B-39 | 015 | First delegation pair | OpenCode v2.0.32 lead, Claude Code CLI worker; Environment sharing rule | **ACCEPT as proposed** (2026-11-10) |
+| B-40 | 016 | First Intelligent UI component | `SAFE_CALCULATOR`; Interactive Artifact Runtime stays PREVIEW_ONLY | **ACCEPT as proposed** (2026-11-10) |
+| B-41 | 017 | Backup scope, encryption, restore-over-live | One Workspace per container with a complete table map | **ACCEPT as proposed** (2026-11-10) |
+| B-42 | 018 | Support-bundle contents | Deny by default; previewed allowlisted categories | **OPEN, BLOCKED:** not decided in this pass |
+| B-43 | 019 | Signing identity and update channel | Authenticode-signed installers and binaries; signed Linux checksums | **DEFERRED** (2026-11-10): release dependent |
+| B-44 | 019 | Licensing and packaging | Record as an ADR before any release build | **DEFERRED** (2026-11-10): release dependent |
+| B-45 | 020 | First learning source and auto-commit policy | Owner messages and feedback in Coworker-owned Conversations; gate fix first | **ACCEPT as proposed** (2026-11-10) |
+| D-01 | 020 | First Suggestion producers | Deterministic GOAL_NEXT_STEP and REPEATED_TASK, no model call | **ACCEPT as proposed** (2026-11-10) |
+| B-19 follow-up | 006 | GitHub OAuth recipe after the `client_secret` finding | Choose device flow, an embedded non-confidential secret, or another provider | **OPEN, BLOCKED:** not decided in this pass; 006-T02 stays blocked |
+| B-31 follow-up | 007 | Local-export receipt class | Confirm the destination class for the first export receipt | **ACCEPT as proposed** (2026-11-10): the class is the owner-selected local file destination chosen through the native picker, recorded as class only with no raw path, enum value `LOCAL_OWNER_SELECTED_FILE`; 007-T06 Product gate closed |
+| 010 event kind | 010 | Event-trigger kind after cron | Confirm CONNECTOR_EVENT (010-T09) | **ACCEPT as proposed** (2026-11-10): CONNECTOR_EVENT over LOCAL_POLL; 010-T09 stays BLOCKED on a qualified Feature 006 Connection |
+| 010-T19 | 010 | Direct provider-graph authoring evaluation | Keep deferred and out of V1; needs an ADR later | **ACCEPT as proposed** (2026-11-10): stays deferred, out of V1, ADR later |
+| E2E ids | 014, 015, 018, 020 | New golden journeys | Adopt proposed E2E-14..E2E-17 in ACCEPTANCE-AND-E2E-PLAN.md | **ACCEPT as proposed** (2026-11-10): E2E-14..E2E-17 adopted; E2E-16 qualification still waits on B-42 |
 
 Accepting 013-020 also needs the owner to accept each package SPEC as a whole (each package's T01).
 
@@ -132,5 +133,5 @@ The renumbered "Package VERIFIED for V1" tasks are 001-T28, 002-T19, 003-T18, 00
 ## Summary
 
 - Accepted 2026-11-09: Parts 1-3 in full, with the riders in the Decision cells; and Part 5 (fold the proposed P-tasks P-00..P-09 and P-11..P-19 into their owning packages under the ACP direction, register A-55).
-- Open: Part 4. The highest-impact items are B-35 (Windows Task execution), the B-19 OAuth recipe (blocks 006-T02) and B-36 (blocks all of 013).
+- Part 4 decided 2026-11-10 (A-62): B-38, B-39, B-40, B-41, B-45, D-01, the B-31 class, CONNECTOR_EVENT, E2E-14..E2E-17 and the 010-T19 deferral are accepted as proposed. Deferred: LiteSPM (B-36, B-37, all of 013), Windows rows (B-35 and Windows-only tasks, for later laptop testing) and B-43/B-44 (release dependent). Still open and BLOCKED: B-42 and the B-19 OAuth recipe (blocks 006-T02).
 - The delivery order is in [LITECOWORK-BUILD-TASKS.md](LITECOWORK-BUILD-TASKS.md) "V1 release waves".

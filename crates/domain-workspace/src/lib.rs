@@ -46,6 +46,22 @@ pub struct ChangeReplicationPolicy {
     pub event: EventContext,
 }
 
+/// Renames one ACTIVE Workspace over the existing `workspaces.name` column.
+/// The name is trimmed and bounded; archived Workspaces are read-only.
+#[derive(Clone, Debug)]
+pub struct RenameWorkspace {
+    pub workspace_id: String,
+    pub expected_version: u64,
+    pub name: String,
+    pub principal_id: String,
+    pub event: EventContext,
+}
+
+pub const MAX_WORKSPACE_NAME_CHARS: usize = 200;
+
+/// Message carried by `StoreError::Invalid` when a rename name fails validation.
+pub const WORKSPACE_NAME_INVALID_MESSAGE: &str = "Workspace name is invalid";
+
 #[derive(Clone, Debug)]
 pub struct ArchiveWorkspace {
     pub workspace_id: String,
@@ -1590,6 +1606,125 @@ impl<S: WorkspaceStore> WorkspaceService<S> {
                 "workspace_id": workspace.workspace_id,
                 "archived_by": {"kind": "USER", "principal_id": command.principal_id},
                 "aggregate_version": archived_version,
+            }),
+            recorded_at: command.event.recorded_at,
+        };
+        self.store.commit_workspace_idempotent(
+            WorkspaceCreateRequest {
+                principal_id: command.principal_id,
+                request_id,
+                request_payload,
+            },
+            command.expected_version,
+            workspace,
+            event,
+        )
+    }
+
+    /// Renames an owned ACTIVE Workspace with an exact receipt lookup first, so a
+    /// retried request replays its original result and a reused key with a
+    /// different payload conflicts. The version CAS and the renamed event commit in
+    /// one storage transaction.
+    pub fn rename_idempotent(
+        &self,
+        command: RenameWorkspace,
+        request_id: String,
+        request_payload: serde_json::Value,
+    ) -> Result<CommittedWorkspace, StoreError>
+    where
+        S: IdempotentWorkspaceStore,
+    {
+        require_non_empty("workspace_id", &command.workspace_id)?;
+        require_non_empty("principal_id", &command.principal_id)?;
+        require_non_empty("request_id", &request_id)?;
+        if command.expected_version == 0 {
+            return Err(StoreError::Invalid(
+                "expected Workspace version must be positive".to_owned(),
+            ));
+        }
+        let name = command.name.trim().to_owned();
+        if name.is_empty()
+            || name.chars().count() > MAX_WORKSPACE_NAME_CHARS
+            || name.chars().any(char::is_control)
+        {
+            return Err(StoreError::Invalid(
+                WORKSPACE_NAME_INVALID_MESSAGE.to_owned(),
+            ));
+        }
+        if request_payload
+            .get("operation")
+            .and_then(serde_json::Value::as_str)
+            != Some("workspace.rename.v1")
+            || request_payload
+                .get("workspace_id")
+                .and_then(serde_json::Value::as_str)
+                != Some(command.workspace_id.as_str())
+            || request_payload
+                .get("expected_version")
+                .and_then(serde_json::Value::as_u64)
+                != Some(command.expected_version)
+            || request_payload
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                != Some(name.as_str())
+        {
+            return Err(StoreError::Invalid(
+                "Workspace rename request payload does not match the command".to_owned(),
+            ));
+        }
+        validate_event_context(&command.event)?;
+        if let Some(committed) = self.store.get_workspace_commit_receipt(
+            &command.principal_id,
+            &request_id,
+            &request_payload,
+        )? {
+            return Ok(committed);
+        }
+
+        let mut workspace = self
+            .store
+            .get_workspace(&command.workspace_id)?
+            .ok_or(StoreError::NotFound)?;
+        if workspace.owner_principal_id != command.principal_id {
+            return Err(StoreError::NotFound);
+        }
+        if workspace.version != command.expected_version {
+            return Err(StoreError::Conflict {
+                expected: Some(command.expected_version),
+                actual: Some(workspace.version),
+            });
+        }
+        if workspace.status != "ACTIVE" {
+            return Err(StoreError::Invalid(
+                "an archived Workspace is read-only".to_owned(),
+            ));
+        }
+        let previous_name = workspace.name.clone();
+        let next_version = command
+            .expected_version
+            .checked_add(1)
+            .ok_or_else(|| StoreError::Invalid("Workspace version is exhausted".to_owned()))?;
+        workspace.name = name.clone();
+        workspace.version = next_version;
+        workspace.updated_at = command.event.recorded_at.clone();
+        let event = EventDraft {
+            event_id: command.event.event_id,
+            workspace_id: workspace.workspace_id.clone(),
+            entity_type: "Workspace".to_owned(),
+            entity_id: workspace.workspace_id.clone(),
+            origin_runtime_id: command.event.origin_runtime_id,
+            entity_revision: next_version,
+            hlc_timestamp: command.event.hlc_timestamp,
+            correlation_id: command.event.correlation_id,
+            causation_id: command.event.causation_id,
+            schema_version: 1,
+            event_type: "workspace.renamed.v1".to_owned(),
+            payload: json!({
+                "workspace_id": workspace.workspace_id,
+                "from_name": previous_name,
+                "to_name": name,
+                "changed_by": {"kind": "USER", "principal_id": command.principal_id},
+                "aggregate_version": next_version,
             }),
             recorded_at: command.event.recorded_at,
         };

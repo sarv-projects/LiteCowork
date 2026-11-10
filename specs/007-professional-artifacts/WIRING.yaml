@@ -25,7 +25,7 @@ nodes:
     owner: format editor engine
     kind: external
   - id: "savefs"
-    owner: owner-selected local destination (native picker)
+    owner: owner-selected local destination (native picker; class LOCAL_OWNER_SELECTED_FILE)
     kind: external
 edges:
   - id: "e-ui-op"

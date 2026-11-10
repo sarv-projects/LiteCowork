@@ -10,7 +10,7 @@ Identities and lifecycles stay in the canonical owner documents. This file lists
 - Immutable version and content digest (`ArtifactVersionRecord`).
 - Provenance links and dependency edges.
 - Conversation origin (accepted target interface, not yet in source): nullable `source_conversation_id` and `source_message_id` on the Artifact, written only by the create transaction.
-- Export receipt (accepted target interface, not yet in source): `export_receipt_id`, `workspace_id`, `artifact_id`, `artifact_version`, `export_format`, `transformer_version`, `destination_class`, `exported_digest`, `actor`, `created_at`, idempotency key. No local path.
+- Export receipt (accepted target interface, not yet in source): `export_receipt_id`, `workspace_id`, `artifact_id`, `artifact_version`, `export_format`, `transformer_version`, `destination_class` (V1 value `LOCAL_OWNER_SELECTED_FILE`), `exported_digest`, `actor`, `created_at`, idempotency key. No local path.
 - Format capability matrix (accepted target interface, not yet in source): daemon-owned static table per media type (SPEC §5); not persisted per Artifact.
 
 ## Relations
@@ -31,7 +31,7 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-One additive migration in the next free immutable `docs/schemas/sqlite-vNN.sql` (TASKS T01). No migration exists today.
+One additive migration, allocated `docs/schemas/sqlite-v37.sql` (TASKS T01; see the Migration allocation in docs/LITECOWORK-BUILD-TASKS.md). No migration exists today.
 
 ## Current implementation boundary (2026-11-06, re-checked 2026-11-09)
 

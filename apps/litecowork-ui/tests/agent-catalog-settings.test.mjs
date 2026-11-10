@@ -92,6 +92,81 @@ function renderOpenCodeCatalog(bindings = [], selectedDefaultLeadBindingId = nul
   }));
 }
 
+function renderCompatibleOpenCodeCatalog(bindings = []) {
+  return renderToStaticMarkup(createElement(AgentCatalogSettings, {
+    workspaceId: "workspace-1",
+    workspaceName: "Workspace One",
+    workspaceActive: true,
+    runtimeReady: true,
+    runtimeEnrolled: true,
+    selectedDefaultLeadBindingId: null,
+    installations: [{
+      agentId: "opencode",
+      displayName: "OpenCode",
+      protocolCandidate: "OPENCODE_SERVER",
+      installation: "INSTALLED",
+      version: "2.0.32",
+      authentication: "UNKNOWN",
+      sessionReadiness: "NOT_PROBED",
+    }],
+    profiles: [{
+      agentProfileId: "profile-opencode",
+      providerKey: "OPENCODE",
+      displayName: "OpenCode",
+      endpoints: [{
+        endpointId: "endpoint-opencode",
+        agentProfileId: "profile-opencode",
+        protocol: "OPENCODE_SERVER",
+        topology: "LOCAL",
+        protocolVersion: "2.0.32",
+        capabilities: {},
+      }],
+      discoveredAt: "2026-10-15T00:00:00Z",
+      observations: [{
+        endpointId: "endpoint-opencode",
+        runtimeId: "runtime-1",
+        runtimeIncarnationId: "incarnation-1",
+        compatible: true,
+        readiness: "STARTABLE",
+        observedAt: "2026-10-15T00:00:00Z",
+        offerExpiresAt: "2099-01-01T00:00:00Z",
+        constraints: {
+          agent_id: "opencode",
+          protocol: "OPENCODE_SERVER",
+          protocol_version: "2.0.32",
+          probe_readiness: "COMPLETE",
+          failure: null,
+          reported_provider_status: "OBSERVED",
+          reported_connected_provider_ids: [],
+          reported_connected_provider_ids_truncated: false,
+          reported_provider_ids: ["openai"],
+          reported_provider_ids_truncated: false,
+          reported_model_catalog: "OBSERVED",
+          configured_providers: [{
+            id: "openai",
+            display_name: "OpenAI",
+            models: [{ id: "gpt-safe", display_name: "GPT Safe" }],
+          }],
+          catalog_truncated: false,
+          authentication_observation: "UNKNOWN",
+          session_model_selection: "NOT_QUALIFIED",
+          inference_access_verified: false,
+          host_process_stopped: true,
+          writer_quiescence_proven: false,
+          profile_admission_supported: true,
+        },
+      }],
+    }],
+    bindings,
+    onRefresh() {},
+    onProbeCodex() {},
+    onProbeOpenCode() {},
+    onCreateBinding() {},
+    onEnableBinding() {},
+    onSetDefaultLead() {},
+  }));
+}
+
 function renderCodexCatalog() {
   return renderToStaticMarkup(createElement(AgentCatalogSettings, {
     workspaceId: "workspace-1",
@@ -224,6 +299,24 @@ test("an incompatible profile explains why binding is unavailable instead of ask
   assert.match(html, /This profile cannot be bound while its Runtime offer is incompatible\./);
   assert.match(html, /Binding unavailable/);
   assert.doesNotMatch(html, /Refresh the offer first/);
+});
+
+test("a fresh compatible OpenCode 2.0.32 offer enables Create binding and shows it can be bound", () => {
+  const html = renderCompatibleOpenCodeCatalog();
+
+  assert.match(html, /Runtime offer compatibility[\s\S]*?Compatible for Workspace binding/);
+  assert.match(html, /Add disabled Workspace binding/, "Create binding is offered for a fresh compatible offer");
+  assert.doesNotMatch(html, /Binding unavailable/);
+  assert.doesNotMatch(html, /cannot be bound for use/);
+  assert.match(html, /a disabled Workspace binding can be created below/);
+});
+
+test("an incompatible OpenCode offer keeps Create binding disabled and explains why", () => {
+  const html = renderOpenCodeCatalog();
+
+  assert.match(html, /Binding unavailable/, "an incompatible offer disables Create binding");
+  assert.match(html, /it cannot be bound for use yet/);
+  assert.doesNotMatch(html, /a disabled Workspace binding can be created below/);
 });
 
 test("a saved default lead is a preference, not a claim that work can start now", () => {

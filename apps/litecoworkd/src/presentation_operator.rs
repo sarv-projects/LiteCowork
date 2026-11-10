@@ -98,6 +98,13 @@ impl axum::extract::FromRef<ApiState> for StreamApiState {
     }
 }
 
+/// Holds the stream admission permit together with this subscription's transient frame
+/// receiver, so both live and die with the response body (001-T13).
+struct StreamHold {
+    _permit: tokio::sync::OwnedSemaphorePermit,
+    transient: tokio::sync::broadcast::Receiver<crate::transient_frames::TransientFrame>,
+}
+
 const STREAM_PROJECTION_VERSION: u32 = 1;
 const STREAM_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
 
@@ -311,6 +318,10 @@ pub(super) async fn subscribe_stream(
                 "The local stream session limit has been reached",
             )
         })?;
+    let stream_permit = StreamHold {
+        _permit: stream_permit,
+        transient: crate::transient_frames::transient_bus().subscribe(),
+    };
 
     let snapshot = tokio::task::spawn_blocking({
         let store = state.store.clone();
@@ -442,7 +453,7 @@ pub(super) async fn subscribe_stream(
             initial,
         ),
         move |(
-            permit,
+            mut permit,
             mut shutdown,
             store,
             principal_id,
@@ -620,9 +631,44 @@ pub(super) async fn subscribe_stream(
                 ));
             }
             loop {
-                tokio::select! {
-                    _ = shutdown.changed() => return None,
-                    _ = tokio::time::sleep(STREAM_POLL_INTERVAL) => {}
+                // Wait for the next poll tick, forwarding matching transient frames
+                // (`turn.delta`, `turn.settled`) as they arrive. The ring is bounded,
+                // so a slow reader loses old frames and sees a sequence gap instead
+                // of blocking the producer.
+                let tick = tokio::time::sleep(STREAM_POLL_INTERVAL);
+                tokio::pin!(tick);
+                loop {
+                    tokio::select! {
+                        _ = shutdown.changed() => return None,
+                        _ = &mut tick => break,
+                        received = permit.transient.recv() => match received {
+                            Ok(frame) if frame.workspace_id == workspace_id
+                                && frame.conversation_id == conversation_id =>
+                            {
+                                return Some((
+                                    Ok(Bytes::from(frame.bytes)),
+                                    (
+                                        permit,
+                                        shutdown,
+                                        store,
+                                        principal_id,
+                                        runtime_id,
+                                        workspace_id,
+                                        conversation_id,
+                                        sequence,
+                                        message_cursor,
+                                        catch_up,
+                                        initial,
+                                    ),
+                                ));
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                (&mut tick).await;
+                                break;
+                            }
+                            _ => {}
+                        },
+                    }
                 }
                 let store_for_page = store.clone();
                 let workspace_for_page = workspace_id.clone();
@@ -3389,6 +3435,7 @@ mod tests {
                 items: Vec::new(),
                 next_cursor: None,
                 active_turn: Some(json!({"turn_id": "turn-1", "status": "RUNNING"})),
+                retryable_turn: None,
             },
             ConversationPresentationSnapshot {
                 workspace_id: "workspace-1".to_owned(),
@@ -3400,6 +3447,7 @@ mod tests {
                 items: Vec::new(),
                 next_cursor: None,
                 active_turn: None,
+                retryable_turn: None,
             },
         ];
         let filter_digest = "a".repeat(64);
@@ -3455,6 +3503,7 @@ mod tests {
                 items: vec![json!({"message":{"message_id":"message-1"}})],
                 next_cursor: Some("message-1".to_owned()),
                 active_turn: None,
+                retryable_turn: None,
             },
             ConversationPresentationSnapshot {
                 workspace_id: "workspace-1".to_owned(),
@@ -3466,6 +3515,7 @@ mod tests {
                 items: vec![json!({"message":{"message_id":"message-b"}})],
                 next_cursor: None,
                 active_turn: None,
+                retryable_turn: None,
             },
         ];
 

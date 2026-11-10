@@ -30,7 +30,7 @@ Follow the owner retention rules. Purge removes future visibility of payload byt
 
 ## Migration
 
-None planned. B-15 and B-16 are accepted; the portable package is derived and producer fields already exist. A durable truncation receipt, if 004-T01 promotes one, uses the next unused immutable `docs/schemas/sqlite-vNN.sql`.
+None planned. B-15 and B-16 are accepted; the portable package is derived and producer fields already exist. A durable truncation receipt, if 004-T01 promotes one, takes the next free `docs/schemas/sqlite-vNN.sql` after the highest wired file (`sqlite-v32.sql` today; v33 to v46 are allocated to other packages in docs/LITECOWORK-BUILD-TASKS.md, so 004 would take v47 or the next free number at that time).
 
 ## Current source boundary (2026-11-06)
 

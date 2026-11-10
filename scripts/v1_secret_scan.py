@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -130,6 +131,54 @@ class ScanResult:
         self.findings.append(finding)
 
 
+EXCEPTIONS_FILE = REPOSITORY_ROOT / "scripts" / "secret-scan-exceptions.json"
+
+
+def apply_exceptions(
+    findings: list[Finding],
+    exceptions: list[dict[str, Any]],
+    today: datetime.date,
+) -> tuple[list[Finding], list[str]]:
+    """Drops findings covered by an unexpired reviewed exception.
+
+    An exception names a path and a pattern with a reason, a reviewer and an expiry
+    date. An expired or incomplete exception covers nothing and is itself reported,
+    so a stale exception fails the gate instead of silently widening it.
+    """
+    problems: list[str] = []
+    active: list[dict[str, Any]] = []
+    for entry in exceptions:
+        missing = [key for key in ("id", "path", "pattern", "reason", "reviewer", "expires") if not entry.get(key)]
+        if missing:
+            problems.append(f"exception {entry.get('id', '?')} is missing {', '.join(missing)}")
+            continue
+        try:
+            expires = datetime.date.fromisoformat(str(entry["expires"]))
+        except ValueError:
+            problems.append(f"exception {entry['id']} has an invalid expiry date")
+            continue
+        if expires < today:
+            problems.append(f"exception {entry['id']} expired on {entry['expires']}")
+            continue
+        active.append(entry)
+    remaining = [
+        finding
+        for finding in findings
+        if not any(
+            entry["path"] == finding.path and entry["pattern"] == finding.pattern
+            for entry in active
+        )
+    ]
+    return remaining, problems
+
+
+def load_exceptions(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        return []
+    document = json.loads(path.read_text(encoding="utf-8"))
+    return list(document.get("exceptions", []))
+
+
 def redact(line: bytes) -> str:
     text = line.decode("utf-8", errors="replace").strip()
     if len(text) > 120:
@@ -175,7 +224,13 @@ def scan_file(path: Path, relative_to: Path, result: ScanResult) -> None:
             line_end = data.find(b"\n", start)
             if line_end == -1:
                 line_end = len(data)
-            preview = redact(data[line_start:line_end])
+            # Mask the matched bytes so the report never carries the secret itself.
+            masked = (
+                data[line_start:start]
+                + b"[REDACTED:" + name.encode("ascii") + b"]"
+                + data[end:line_end]
+            )
+            preview = redact(masked)
             result.add(
                 Finding(
                     pattern=name,
@@ -285,12 +340,19 @@ def main() -> int:
                 relative = path
             scan_file(path, relative, result)
 
+    result.findings, exception_problems = apply_exceptions(
+        result.findings,
+        load_exceptions(EXCEPTIONS_FILE),
+        datetime.date.today(),
+    )
+
     if arguments.json:
         print(
             json.dumps(
                 {
                     "scanned_files": result.scanned_files,
                     "findings": [finding.as_dict() for finding in result.findings],
+                    "exception_problems": exception_problems,
                 },
                 indent=2,
                 sort_keys=True,
@@ -301,9 +363,11 @@ def main() -> int:
             print(
                 f"[FINDING] {finding.pattern} in {finding.path}:{finding.line}: {finding.preview}"
             )
+        for problem in exception_problems:
+            print(f"[EXCEPTION] {problem}")
         print(f"scanned {result.scanned_files} files, {len(result.findings)} findings")
 
-    return 1 if result.findings else 0
+    return 1 if result.findings or exception_problems else 0
 
 
 if __name__ == "__main__":

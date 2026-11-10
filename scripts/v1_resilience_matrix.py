@@ -22,11 +22,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import os
 import shutil
-import signal
 import sqlite3
 import subprocess
 import sys
@@ -40,6 +38,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import v1_store_probe as probe  # noqa: E402
+
+try:
+    import fcntl  # POSIX only
+except ImportError:  # Windows: the stale-lock case reports BLOCKED, never PASSED
+    fcntl = None  # type: ignore[assignment]
 
 
 @dataclass
@@ -137,7 +140,7 @@ def case_kill_during_drain(directory: Path) -> tuple[str, str]:
         stderr=subprocess.DEVNULL,
     )
     time.sleep(1.5)
-    child.send_signal(signal.SIGKILL)
+    child.kill()  # SIGKILL on POSIX, TerminateProcess on Windows
     child.wait(timeout=30)
 
     reopened = build_store(directory)
@@ -217,6 +220,8 @@ def case_corrupt_blob() -> tuple[str, str]:
 
 def case_stale_lock(directory: Path) -> tuple[str, str]:
     """A held single-instance lock must block a second owner."""
+    if fcntl is None:
+        return "BLOCKED", "fcntl is unavailable on this OS; run the daemon lock test natively instead"
     lock_path = directory / "runtime.lock"
     handle = open(lock_path, "w")
     fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -257,7 +262,9 @@ def run_matrix() -> Matrix:
                     state=state,
                     command=f"scripts/v1_resilience_matrix.py ({name})",
                     observation=observation,
-                    reason="" if state == "PASSED" else "the probe did not observe the expected truth",
+                    reason=""
+                    if state == "PASSED"
+                    else (observation if state == "BLOCKED" else "the probe did not observe the expected truth"),
                 )
             )
     finally:

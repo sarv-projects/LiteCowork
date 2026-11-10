@@ -1592,3 +1592,415 @@ async fn conversation_turn_submit_returns_accepted_receipt_with_active_session_s
     assert_eq!(replay_receipt.conversation_id, receipt.conversation_id);
     assert_eq!(replay_receipt.user_message_id, receipt.user_message_id);
 }
+
+fn single_flight_rows(connection: &rusqlite::Connection) -> (i64, i64, i64, i64) {
+    connection
+        .query_row(
+            "SELECT (SELECT COUNT(*) FROM conversation_messages),(SELECT COUNT(*) FROM conversation_turns),(SELECT COUNT(*) FROM domain_events),(SELECT COUNT(*) FROM request_dedup)",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .expect("read single-flight row counts")
+}
+
+#[tokio::test]
+async fn conversation_turn_submit_returns_409_while_another_turn_is_in_flight_and_writes_nothing() {
+    let directory = tempfile::tempdir().expect("temporary single-flight directory");
+    #[cfg(unix)]
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+        .expect("private test directory");
+    let database = directory.path().join("state.sqlite3");
+    let store = SqliteWorkspaceStore::open(
+        database.clone(),
+        Arc::new(FileBlobStore::new(
+            directory.path().join("blobs"),
+            PaginationTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("real temporary SQLite store opens");
+    create_workspace(&store, WORKSPACE_A, "turn-single-flight-workspace");
+    let conversation_id = "a06-conversation-single-flight";
+    let binding_id = "single-flight-binding";
+    seed_conversation(
+        &store,
+        WORKSPACE_A,
+        conversation_id,
+        "Single flight",
+        "2026-10-15T12:00:00.000000000Z",
+    );
+    bind_conversation_agent(&database, WORKSPACE_A, conversation_id, binding_id);
+    seed_ready_runtime_for_conversation(&database, WORKSPACE_A, binding_id);
+    let connection = rusqlite::Connection::open(&database).expect("open seeded database");
+    connection
+        .execute(
+            "INSERT INTO conversation_messages(message_id,conversation_id,author_json,role,agent_session_id,agent_binding_id,turn_id,content_json,resource_refs_json,source_channel_ref_json,created_at) VALUES('seeded-user-message',?1,'{\"kind\":\"USER\"}','USER',NULL,NULL,NULL,'[]','[]',NULL,'2026-10-15T12:00:01Z')",
+            [conversation_id],
+        )
+        .expect("seed the in-flight turn message");
+    connection
+        .execute(
+            "INSERT INTO conversation_turns(turn_id,conversation_id,user_message_id,agent_session_id,status,retry_ordinal,created_at,settled_at,version) VALUES('seeded-turn',?1,'seeded-user-message',NULL,'WAITING_USER',0,'2026-10-15T12:00:01Z',NULL,1)",
+            [conversation_id],
+        )
+        .expect("seed the in-flight turn");
+    let before = single_flight_rows(&connection);
+
+    let router = test_router(store.clone(), OWNER.to_owned(), RUNTIME.to_owned());
+    let response = submit_turn_body_with_key(
+        &router,
+        WORKSPACE_A,
+        conversation_id,
+        "single-flight-second-submit",
+        r#"{"content":[{"kind":"TEXT","text":"A second message while one is running."}],"resource_refs":[],"agent_binding_id":null,"presentation_preference":"AUTO"}"#,
+    )
+    .await;
+    let (status, error) = read_operator_error(response).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(error["code"], "CONVERSATION_TURN_IN_PROGRESS");
+    let after = single_flight_rows(&connection);
+    assert_eq!(after, before, "the rejected submit writes nothing");
+}
+
+struct TurnCommandFixture {
+    _directory: tempfile::TempDir,
+    database: std::path::PathBuf,
+    router: Router,
+    supervisor: Arc<crate::agents::AgentSessionSupervisor>,
+    conversation_id: &'static str,
+}
+
+fn turn_command_fixture(suffix: &str) -> TurnCommandFixture {
+    let directory = tempfile::tempdir().expect("temporary turn command directory");
+    #[cfg(unix)]
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+        .expect("private test directory");
+    let database = directory.path().join("state.sqlite3");
+    let store = SqliteWorkspaceStore::open(
+        database.clone(),
+        Arc::new(FileBlobStore::new(
+            directory.path().join("blobs"),
+            PaginationTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("real temporary SQLite store opens");
+    create_workspace(&store, WORKSPACE_A, suffix);
+    let conversation_id = "a06-conversation-turn-commands";
+    let binding_id = "turn-command-binding";
+    seed_conversation(
+        &store,
+        WORKSPACE_A,
+        conversation_id,
+        "Turn commands",
+        "2026-10-15T12:00:00.000000000Z",
+    );
+    bind_conversation_agent(&database, WORKSPACE_A, conversation_id, binding_id);
+    seed_ready_runtime_for_conversation(&database, WORKSPACE_A, binding_id);
+    let supervisor = Arc::new(crate::agents::AgentSessionSupervisor::new(
+        store.clone(),
+        RUNTIME.to_owned(),
+    ));
+    // No dispatch is spawned by the seeded turns; the router only needs the supervisor
+    // handle to signal Stop. Retry spawns a dispatch that fails closed without a host.
+    let router = test_router_with_supervisor(
+        store,
+        OWNER.to_owned(),
+        RUNTIME.to_owned(),
+        Arc::clone(&supervisor),
+    );
+    TurnCommandFixture {
+        _directory: directory,
+        database,
+        router,
+        supervisor,
+        conversation_id,
+    }
+}
+
+impl TurnCommandFixture {
+    fn connection(&self) -> rusqlite::Connection {
+        let connection = rusqlite::Connection::open(&self.database).expect("open fixture database");
+        connection
+            .execute_batch("PRAGMA foreign_keys=ON;")
+            .expect("enable foreign keys");
+        connection
+    }
+
+    /// Seeds a USER message and a turn directly in `status`; RUNNING and CANCEL_REQUESTED
+    /// turns also get an ACTIVE Conversation AgentSession.
+    fn seed_turn(&self, turn_id: &str, status: &str, version: i64, retry_ordinal: i64) {
+        let connection = self.connection();
+        let message_id = format!("{turn_id}-user-message");
+        connection
+            .execute(
+                "INSERT INTO conversation_messages(message_id,conversation_id,author_json,role,agent_session_id,agent_binding_id,turn_id,content_json,resource_refs_json,source_channel_ref_json,created_at) VALUES(?1,?2,'{\"kind\":\"USER\"}','USER',NULL,NULL,NULL,'[]','[]',NULL,'2026-10-15T12:00:01Z')",
+                rusqlite::params![message_id, self.conversation_id],
+            )
+            .expect("seed message");
+        connection
+            .execute(
+                "INSERT INTO conversation_turns(turn_id,conversation_id,user_message_id,agent_session_id,status,retry_ordinal,created_at,settled_at,version) VALUES(?1,?2,?3,NULL,'OPEN',?4,'2026-10-15T12:00:01Z',NULL,?5)",
+                rusqlite::params![turn_id, self.conversation_id, message_id, retry_ordinal, version],
+            )
+            .expect("seed turn");
+        let settled = matches!(status, "COMPLETED" | "FAILED" | "CANCELLED");
+        let session_id = format!("{turn_id}-session");
+        if matches!(status, "RUNNING" | "CANCEL_REQUESTED") {
+            connection
+                .execute(
+                    "INSERT INTO agent_sessions(agent_session_id,workspace_id,scope_kind,conversation_id,conversation_turn_id,agent_binding_id,endpoint_id,runtime_id,runtime_incarnation_id,status,started_at,last_event_at,version) VALUES(?1,?2,'CONVERSATION',?3,?4,'turn-command-binding','turn-command-binding-endpoint','turn-command-binding-runtime','turn-command-binding-incarnation','ACTIVE','2026-10-15T12:00:02Z','2026-10-15T12:00:02Z',2)",
+                    rusqlite::params![session_id, WORKSPACE_A, self.conversation_id, turn_id],
+                )
+                .expect("seed active session");
+            connection
+                .execute(
+                    "UPDATE conversation_turns SET agent_session_id=?1 WHERE turn_id=?2",
+                    rusqlite::params![session_id, turn_id],
+                )
+                .expect("point the turn at its session");
+        }
+        connection
+            .execute(
+                "UPDATE conversation_turns SET status=?1, settled_at=?2 WHERE turn_id=?3",
+                rusqlite::params![status, settled.then_some("2026-10-15T12:00:03Z"), turn_id],
+            )
+            .expect("move the turn to its status");
+        connection
+            .execute(
+                "INSERT INTO conversation_dispatch_intents(turn_id,retry_ordinal,conversation_id,state,claimed_by_runtime_incarnation,claimed_at,settled_at,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,'2026-10-15T12:00:01Z')",
+                rusqlite::params![
+                    turn_id,
+                    retry_ordinal,
+                    self.conversation_id,
+                    if settled { "SETTLED" } else { "CLAIMED" },
+                    if settled { None } else { Some("incarnation") },
+                    if settled { None } else { Some("2026-10-15T12:00:02Z") },
+                    settled.then_some("2026-10-15T12:00:03Z"),
+                ],
+            )
+            .expect("seed dispatch intent");
+    }
+
+    async fn command(&self, turn_id: &str, action: &str, key: &str, if_match: u64) -> Response {
+        let mut request = Request::post(format!(
+            "/v1/conversations/{}/turns/{turn_id}/{action}",
+            self.conversation_id
+        ))
+        .header("x-workspace-id", WORKSPACE_A)
+        .header("idempotency-key", key)
+        .header("if-match", format!("\"{if_match}\""))
+        .body(Body::empty())
+        .expect("turn command request");
+        request.extensions_mut().insert(AuthenticatedLocalPeer);
+        self.router
+            .clone()
+            .oneshot(request)
+            .await
+            .expect("turn command route responds")
+    }
+
+    fn turn_row(&self, turn_id: &str) -> (String, i64, i64, Option<String>) {
+        self.connection()
+            .query_row(
+                "SELECT status,retry_ordinal,version,agent_session_id FROM conversation_turns WHERE turn_id=?1",
+                [turn_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .expect("read turn row")
+    }
+
+    fn intents(&self, turn_id: &str) -> Vec<(i64, String)> {
+        let connection = self.connection();
+        let mut statement = connection
+            .prepare("SELECT retry_ordinal,state FROM conversation_dispatch_intents WHERE turn_id=?1 ORDER BY retry_ordinal")
+            .expect("prepare intents");
+        statement
+            .query_map([turn_id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .expect("query intents")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect intents")
+    }
+}
+
+#[tokio::test]
+async fn conversation_stop_and_retry_failed_turn_lifecycle() {
+    let fixture = turn_command_fixture("turn-retry-workspace");
+    fixture.seed_turn("turn-failed", "FAILED", 3, 0);
+
+    // Retry reopens the FAILED turn: OPEN, ordinal + 1, no session, one new UNCLAIMED
+    // intent, and no second USER message.
+    let response = fixture.command("turn-failed", "retry", "retry-key-1", 3).await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let bytes = to_bytes(response.into_body(), 64 * 1024).await.expect("receipt body");
+    let receipt: ConversationTurnReceipt = serde_json::from_slice(&bytes).expect("receipt");
+    assert_eq!(receipt.status, storage_core::conversation::ConversationTurnStatus::Open);
+    let (status, ordinal, version, session) = fixture.turn_row("turn-failed");
+    assert_eq!((status.as_str(), ordinal, version, session), ("OPEN", 1, 4, None));
+    let intents = fixture.intents("turn-failed");
+    assert_eq!(intents[0], (0, "SETTLED".to_owned()));
+    assert_eq!(intents[1].0, 1);
+    assert_eq!(intents.len(), 2);
+
+    // A duplicate retry key replays the receipt and creates no second attempt.
+    let replay = fixture.command("turn-failed", "retry", "retry-key-1", 3).await;
+    assert_eq!(replay.status(), StatusCode::ACCEPTED);
+    assert_eq!(fixture.turn_row("turn-failed").1, 1);
+    assert_eq!(fixture.intents("turn-failed").len(), 2);
+
+    // A stale If-Match with a new key returns 412; a non-FAILED turn returns 409.
+    let stale = fixture.command("turn-failed", "retry", "retry-key-2", 3).await;
+    assert_eq!(stale.status(), StatusCode::PRECONDITION_FAILED);
+    let not_failed = fixture.command("turn-failed", "retry", "retry-key-3", 4).await;
+    assert_eq!(not_failed.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn turn_activity_records_route_returns_reported_rows_scoped_to_the_turn_attempt() {
+    let fixture = turn_command_fixture("turn-activity-route-workspace");
+    fixture.seed_turn("turn-activity", "RUNNING", 2, 0);
+    for (sequence, kind, status, label) in [(2, "TOOL", "SUCCEEDED", None), (1, "TOOL", "STARTED", Some("bash"))] {
+        fixture
+            .connection()
+            .execute(
+                "INSERT INTO conversation_turn_activity_records(activity_id,turn_id,retry_ordinal,conversation_id,sequence,kind,status,call_ref,label,created_at) VALUES(?1,'turn-activity',0,?2,?3,?4,?5,'call-1',?6,'2026-10-15T12:00:04.000000000Z')",
+                rusqlite::params![format!("a-{sequence}"), fixture.conversation_id, sequence, kind, status, label],
+            )
+            .expect("seed activity");
+    }
+    let get = |workspace: &'static str, uri: String| {
+        let mut request = Request::get(uri)
+            .header("x-workspace-id", workspace)
+            .body(Body::empty())
+            .expect("activity request");
+        request.extensions_mut().insert(AuthenticatedLocalPeer);
+        let router = fixture.router.clone();
+        async move { router.oneshot(request).await.expect("activity route responds") }
+    };
+    let uri = format!("/v1/conversations/{}/turns/turn-activity/activity", fixture.conversation_id);
+    let response = get(WORKSPACE_A, uri.clone()).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = to_bytes(response.into_body(), 64 * 1024).await.expect("body");
+    let page: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
+    assert_eq!(page["attribution"], "REPORTED");
+    assert_eq!(page["items"].as_array().expect("items").len(), 2);
+    assert_eq!(page["items"][0]["sequence"], 1);
+    assert_eq!(page["items"][0]["label"], "bash");
+
+    // Another retry ordinal has no records, and another Workspace cannot read this one.
+    let other_attempt = get(WORKSPACE_A, format!("{uri}?retry_ordinal=1")).await;
+    let bytes = to_bytes(other_attempt.into_body(), 64 * 1024).await.expect("body");
+    assert!(serde_json::from_slice::<serde_json::Value>(&bytes).expect("json")["items"].as_array().expect("items").is_empty());
+    let foreign = get(WORKSPACE_B, uri).await;
+    assert_eq!(foreign.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn conversation_retry_is_refused_while_another_turn_is_in_flight() {
+    let fixture = turn_command_fixture("turn-retry-in-flight-workspace");
+    fixture.seed_turn("turn-old-failed", "FAILED", 3, 0);
+    fixture.seed_turn("turn-waiting", "WAITING_USER", 2, 0);
+    let response = fixture.command("turn-old-failed", "retry", "retry-blocked", 3).await;
+    let (status, error) = read_operator_error(response).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(error["code"], "CONVERSATION_TURN_IN_PROGRESS");
+    assert_eq!(fixture.turn_row("turn-old-failed").0, "FAILED");
+    assert_eq!(fixture.intents("turn-old-failed").len(), 1);
+}
+
+#[tokio::test]
+async fn conversation_cancel_commits_only_the_request_and_never_fabricates_cancelled() {
+    let fixture = turn_command_fixture("turn-cancel-workspace");
+    fixture.seed_turn("turn-running", "RUNNING", 2, 0);
+
+    // The route commits CANCEL_REQUESTED only; CANCELLED needs the supervisor's observed
+    // quiescence, and no live dispatch owns this seeded attempt.
+    assert!(!fixture.supervisor.request_cancel("turn-running", 0));
+    let response = fixture.command("turn-running", "cancel", "cancel-key-1", 2).await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let bytes = to_bytes(response.into_body(), 64 * 1024).await.expect("receipt body");
+    let receipt: ConversationTurnReceipt = serde_json::from_slice(&bytes).expect("receipt");
+    assert_eq!(receipt.status, storage_core::conversation::ConversationTurnStatus::CancelRequested);
+    let (status, _, version, _) = fixture.turn_row("turn-running");
+    assert_eq!((status.as_str(), version), ("CANCEL_REQUESTED", 3));
+
+    // An exact repeat replays; a repeat with a new key re-signals but never settles.
+    let replay = fixture.command("turn-running", "cancel", "cancel-key-1", 2).await;
+    assert_eq!(replay.status(), StatusCode::ACCEPTED);
+    let again = fixture.command("turn-running", "cancel", "cancel-key-2", 3).await;
+    assert_eq!(again.status(), StatusCode::ACCEPTED);
+    let (status, _, version, _) = fixture.turn_row("turn-running");
+    assert_eq!((status.as_str(), version), ("CANCEL_REQUESTED", 3));
+    assert_eq!(fixture.intents("turn-running"), vec![(0, "CLAIMED".to_owned())]);
+}
+
+#[test]
+fn conversation_session_recovery_settles_prior_incarnation_attempts_idempotently() {
+    let fixture = turn_command_fixture("turn-recovery-workspace");
+    let store = SqliteWorkspaceStore::open(
+        fixture.database.clone(),
+        Arc::new(FileBlobStore::new(
+            fixture._directory.path().join("blobs"),
+            PaginationTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("reopen the store as a restarted daemon would");
+    // Single-flight admission allows one nonterminal turn per Conversation, so each
+    // crash window is seeded and swept in turn.
+    fixture.seed_turn("turn-recover-completed", "COMPLETED", 4, 0);
+    let recover = || {
+        crate::agents::conversation_recovery::recover_conversation_sessions(&store, RUNTIME, OWNER)
+    };
+    for (turn, status, version) in [
+        ("turn-recover-running", "RUNNING", 2),
+        ("turn-recover-cancel", "CANCEL_REQUESTED", 3),
+        ("turn-recover-open", "OPEN", 1),
+    ] {
+        fixture.seed_turn(turn, status, version, 0);
+        if status == "OPEN" {
+            // Admitted but never claimed: the intent is UNCLAIMED.
+            fixture
+                .connection()
+                .execute(
+                    "UPDATE conversation_dispatch_intents SET state='UNCLAIMED',claimed_by_runtime_incarnation=NULL,claimed_at=NULL WHERE turn_id=?1",
+                    [turn],
+                )
+                .expect("mark intent unclaimed");
+        }
+        let report = recover();
+        assert_eq!((report.failures, report.intents_settled), (0, 1), "{turn}");
+        assert_eq!(fixture.turn_row(turn).0, "FAILED", "{turn} must be FAILED");
+        assert_eq!(fixture.intents(turn), vec![(0, "SETTLED".to_owned())]);
+    }
+    // A completed answer is never rewritten.
+    assert_eq!(fixture.turn_row("turn-recover-completed").0, "COMPLETED");
+    let sessions: i64 = fixture
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM agent_sessions WHERE status NOT IN ('LOST','CLOSED')",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count live sessions");
+    assert_eq!(sessions, 0);
+    let messages: i64 = fixture
+        .connection()
+        .query_row("SELECT COUNT(*) FROM conversation_messages WHERE role='AGENT'", [], |row| row.get(0))
+        .expect("count agent messages");
+    assert_eq!(messages, 0, "recovery never invents an answer");
+
+    // Running the sweep again changes nothing, and Retry is then offered.
+    let again = recover();
+    assert_eq!(again.intents_settled, 0);
+    assert_eq!(again.failures, 0);
+}

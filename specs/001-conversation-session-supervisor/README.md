@@ -2,6 +2,7 @@
 
 - **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 - **Revision:** 1.1 | **Updated:** 2026-11-09 | **Owner acceptance:** B-01 to B-10 accepted 2026-11-09 via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md); first route to qualify is OpenCode v2.0.32 on Windows x64 (B-02 rider).
+- **Implementation state (2026-11-10):** CODE and SERVED, no live agent run and no QUALIFIED row. DONE: T02, T06, T07, T08, T10, T11, T13, T15, T16, T17, T18, T19, T20, T24, T26. PARTIAL: T01, T03, T04, T05 (B-07 window; the real OpenCode input budget is unconfirmed, O-05), T14 (text attachments only), T21, T22, T23, T25 (REPORTED activity), T27 (permission display only). BLOCKED: T12 (no evidenced OpenCode input-request event). NOT STARTED: T09, T28 (need a live OpenCode run and release evidence). Migrations v28 to v30 are wired. Details: TASKS.md and docs/IMPLEMENTATION-STATUS.md.
 - **Owners:** Conversation, Agent Runtime, Storage, Operator/API, Desktop UI, Security/Trust and Product.
 
 ## User outcome

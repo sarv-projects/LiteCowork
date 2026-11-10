@@ -1,0 +1,5 @@
+# Shell scripts must keep LF endings: a CRLF shebang script fails on Linux runners.
+*.sh text eol=lf
+.uv-version text eol=lf
+.python-version text eol=lf
+rust-toolchain.toml text eol=lf

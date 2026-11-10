@@ -11,7 +11,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 - `apps/litecoworkd/src/conversation_operator.rs` `cancel_conversation_turn` is the only stop path: on RUNNING it commits `TurnCommand::RequestCancel` then immediately `TurnCommand::SettleCancelled` with no native interrupt; on OPEN it settles FAILED with `USER_CANCELLED`. `crates/domain-conversation/src/lib.rs` already models CANCEL_REQUESTED and keeps a racing completion (test `cancel_requires_provider_settlement_and_racing_completion_is_preserved`), but the Operator does not use that race window.
 - `apps/litecoworkd/src/agents/opencode_server.rs` has `abort_session` (`/api/session/{session_id}/interrupt`) with no caller; `apps/litecoworkd/src/agents/supervisor.rs` `AgentSessionSupervisor` has no cancellation handle.
 - `crates/storage-core/src/conversation.rs` `build_conversation_context_package` maps roles USER/AGENT/CHANNEL, drops `SYSTEM_NOTICE`, and rejects any other role with "unsupported message role". A new side-note role therefore needs an explicit exclusion arm, not a default.
-- `ConversationMessageRecord.role` is a free `String`; there is no control-event table, no side-note record and no migration after `docs/schemas/sqlite-v28.sql`.
+- `ConversationMessageRecord.role` is a free `String`; there is no control-event table, no side-note record and no migration after `docs/schemas/sqlite-v28.sql` when this baseline was written (2026-11-09). Migration v32 (`docs/schemas/sqlite-v32.sql`) now holds the control-event and side-note tables (T05 storage layer, 2026-11-10); the absence of routes, services and UI is unchanged.
 - Tauri `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs` exposes `cancel_conversation_turn` with `If-Match`; the UI `apps/litecowork-ui/src/conversations/ConversationsPage.tsx` `cancelTurn` targets transient turns only and sends `expectedVersion: 1`; `conversation-view.ts` `active_turn` has no version. There is no driver indicator, take-control control or side-chat composer.
 - Tests: none for this package. `apps/litecoworkd/tests/` contains only `cli.rs`.
 
@@ -35,11 +35,11 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T05 - Add control-event and side-note storage with CAS and idempotency
 
-- **Status:** BLOCKED - waits on Feature 001 effective Stop/quiescence (B-34 caveat; owner Agent Runtime); no record or table exists.
+- **Status:** PARTIAL - storage layer done (2026-11-10): `docs/schemas/sqlite-v32.sql` (`conversation_control_events` append-only, `conversation_owner_side_notes`), `ConversationCoeditStore::{append_owner_side_note, list_owner_side_notes}`, and `SettleConversationTurn.control_event` which appends `OWNER_TOOK_CONTROL` in the same transaction as the `SettleCancelled` settlement. Tests `conversation_coedit_*` (4) pass: replay, changed-payload refusal, `SIDE_NOTE_TURN_TERMINAL`, `SIDE_NOTE_OVER_BUDGET`, foreign owner NotFound, side note absent from the context package, atomic rollback when the control-event insert fails. NOT done: no new domain events for side notes or control events (so no EVENTS.md or `domain-event.schema.json` change yet), `CrossWorkspace` is returned as NotFound, no `OWNER_RELEASED_CONTROL` writer, T01 contract promotion.
 - **Depends on:** T01
 - **Cross-package prerequisites:** Feature 001 single-flight storage task (T11 in that package) and its migration.
 - **Owner:** Storage, Conversation.
-- **Allowed paths:** `docs/schemas/sqlite-v30.sql` (new; take the next free number after Feature 001 migrations), `crates/storage-core/src/conversation.rs`, `crates/storage-core/src/lib.rs`, `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/lib.rs`, `crates/storage-sqlite/src/conversation_coedit_tests.rs` (new).
+- **Allowed paths:** `docs/schemas/sqlite-v32.sql` (shipped), `crates/storage-core/src/conversation.rs`, `crates/storage-core/src/lib.rs`, `crates/storage-sqlite/src/conversations.rs`, `crates/storage-sqlite/src/lib.rs`, `crates/storage-sqlite/src/conversation_coedit_tests.rs` (new).
 - **Contract:** SPEC 7.2, DATA-MODEL; AC-002, AC-003, AC-005, AC-006, AC-009.
 - **Change intent:** add `conversation_control_events` (append-only, workspace and conversation scoped, turn id, kind, occurred_at); a store method that settles the turn CANCELLED (`TurnCommand::SettleCancelled`) and appends `OWNER_TOOK_CONTROL` in one IMMEDIATE transaction with receipt; a side-note insert that checks the correlated turn is nonterminal and the body is within the limit inside the same transaction; neither path creates a turn.
 - **Acceptance:**
@@ -54,7 +54,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T02 - Implement take-control over a running turn
 
-- **Status:** BLOCKED - waits on Feature 001 effective Stop with observed quiescence (A-25; owner Agent Runtime).
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: waits on Feature 001 effective Stop with observed quiescence (A-25; owner Agent Runtime).
 - **Depends on:** T01, T05
 - **Cross-package prerequisites:** Feature 001 task T07 (effective Stop and quiescence).
 - **Owner:** Agent Runtime, Conversation.
@@ -74,7 +74,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T03 - Implement correlated side-chat and exclude it from the native prompt
 
-- **Status:** BLOCKED - waits on Feature 001 effective Stop/quiescence (B-34 caveat; owner Agent Runtime).
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: waits on Feature 001 effective Stop/quiescence (B-34 caveat; owner Agent Runtime).
 - **Depends on:** T01, T05
 - **Cross-package prerequisites:** NONE beyond the package-level sequencing above.
 - **Owner:** Conversation.
@@ -92,7 +92,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T04 - Project and render the truthful driver indicator
 
-- **Status:** BLOCKED - depends on T02 and T03 (and therefore on Feature 001 Stop/quiescence).
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: depends on T02 and T03 (and therefore on Feature 001 Stop/quiescence).
 - **Depends on:** T02-T03
 - **Cross-package prerequisites:** Feature 001 projected active-turn version (its T16).
 - **Owner:** Presentation Operator, Desktop UI.
@@ -109,7 +109,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T06 - Add Tauri commands and the take-control and side-chat composer controls
 
-- **Status:** BLOCKED - depends on T02-T04.
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: depends on T02-T04.
 - **Depends on:** T02-T04
 - **Cross-package prerequisites:** Feature 001 composer fencing (its T18).
 - **Owner:** Desktop bridge, Desktop UI.
@@ -127,7 +127,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T07 - Prove crash, restart, replay and timeout recovery
 
-- **Status:** BLOCKED - depends on T02 and T03.
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: depends on T02 and T03.
 - **Depends on:** T02-T03
 - **Cross-package prerequisites:** Feature 001 restart and orphan recovery sweep (its T08).
 - **Owner:** Conversation, Agent Runtime.

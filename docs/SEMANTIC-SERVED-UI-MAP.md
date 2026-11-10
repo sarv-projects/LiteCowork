@@ -10,9 +10,9 @@ The machine inventory is docs/schemas/served-route-inventory.json, generated fro
 
 | Surface | Count | Meaning |
 |---|---:|---|
-| OpenAPI operations registered in the composed production Operator router | 173 | Method/path is registered by the composed router |
+| OpenAPI operations registered in the composed production Operator router | 178 | Method/path is registered by the composed router |
 | Authenticated local-only operation outside OpenAPI | 1 | POST /v1/stream; local Operator stream transport |
-| OpenAPI operations not registered in the composed production router | 56 | Target contract only; do not call as live operations |
+| OpenAPI operations not registered in the composed production router | 53 | Target contract only; do not call as live operations |
 
 A registered route is not proof that a handler performs a consequential operation. Some routes are read-only projections; some intentionally fail closed; some persist a definition but do not dispatch a provider. Assess three separate layers:
 
@@ -38,6 +38,7 @@ Do not convert route presence into “integrated” or “qualified”.
 | Stop / cancel | ConversationsPage | cancel_conversation_turn | POST /v1/conversations/{conversationId}/turns/{turnId}/cancel — cancelConversationTurn | The visible Stop handler searches only presentation-stream transient turns; the OpenCode path does not emit them. If a transient exists, the UI hardcodes If-Match version 1. The Operator route transitions RUNNING→CANCEL_REQUESTED→CANCELLED immediately without native interrupt/quiescence; the visible Stop control is not effective for OpenCode |
 | Retry | No active UI call site | retry_conversation_turn | POST /v1/conversations/{conversationId}/turns/{turnId}/retry — retryConversationTurn | Operator route exists, but no retry affordance/API call is wired. Backend moves FAILED to RUNNING with a new session pointer before dispatch; supervisor STARTING reservation requires OPEN/no session pointer, so retry is inconsistent |
 | Saved transcript/presentation | ConversationsPage / PresentationRuntime | get_conversation_presentation / get_rich_presentation | GET presentation — getConversationPresentation; GET rich presentation — getRichPresentation | Committed semantic messages are authoritative; rich presentation is optional and digest-bound |
+| Turn activity cards and plan line | ConversationsPage / TurnActivityView | list_conversation_turn_activity | GET turn activity - listConversationTurnActivity; transient `turn.activity` frames | REPORTED agent observations only (never Effects); plan is a count, not item text; re-read for the active or failed turn |
 | Linked Tasks | Conversation surface / Task navigation | list_conversation_tasks | GET /v1/conversations/{conversationId}/tasks — listConversationTasks | Read projection only; normal chat does not implicitly create Tasks |
 | Live stream | ConversationsPage / presentation stream | subscribe_conversation_stream / acknowledge_conversation_stream_frame / unsubscribe_conversation_stream | POST /v1/stream (local-only outside OpenAPI) | Rich-presentation/saved-history stream; not proof of a complete native token stream. The OpenCode dispatch path does not populate the transient-turn collection used by the Stop handler; reconnect must resync committed projections |
 

@@ -1,16 +1,16 @@
 # Current engineering handoff
 
 - **Repository:** LiteCowork
-- **Branch:** main
-- **Inspected revision:** 52269e4af6038ccc849e5c2fbef5376f3cdd2d8e
-- **Working-tree state at this handoff:** clean. The 197-entry pre-existing worktree recorded on 2026-11-06 has been committed in full across the audit-repair campaign; see the 2026-11-07 handoff below.
-- **Release posture:** pre-release; V1 is not release-qualified
+- **Branch:** docs/audit-competitor-superset (PR #1 and PR #2 are closed and merged; work after 23e9edb is in no open PR, see docs/HANDOFF-NEXT-AGENT-2026-11.md section 3)
+- **Inspected revision:** e9abe46 plus the uncommitted documentation sync of 2026-11-10 (handoff to another coding agent); V1 implementation began at e10d496, see "V1 implementation progress" below
+- **Working-tree state at this handoff:** code is committed through e9abe46; the documentation sync of this handoff is uncommitted until the final commit of the sync task. `.agents/` (task bookkeeping) and `repo_take/` (reference clones) are never staged. One labelled stash (`stash@{0}`, v28 delegation-snapshot fixture fixes for lead_failover and environment tests) still exists; v28 is now wired with its writer and every fixture supplies a snapshot, so the stash is probably obsolete, but do not drop it without checking that its two fixture files already contain the same fix.
+- **Release posture:** pre-release; V1 is not release-qualified. V1 implementation has started and is partial: Feature 001 (most tasks), Feature 002 (ACP client, descriptor store, auth observation, Matchmaker, model picker), Feature 011 shell tasks, Feature 019 CI/release machinery skeleton, and the storage layers of Features 014, 012 and 003-T02 are implemented at CODE or SERVED level. Nothing is INTEGRATED with a live agent run and nothing is QUALIFIED. Packages 004-010, 013, 015-018 and 020 have no implementation. See "Handoff status by package (2026-11-10)" below.
 
 This file is the current engineering handoff. It records the active repository state and the checks performed against it. It is not a chronological diary and must not preserve stale "previous/latest" status paragraphs. Update the current facts and validation results in place whenever the repository changes.
 
 ## Repository state
 
-The active checkout contains the Tauri/React desktop application, the Rust daemon and workspace crates, first-party docs and JSON contracts, 11 feature SDD packages, scripts and pinned reference repositories. The repository is not documentation-only.
+The active checkout contains the Tauri/React desktop application, the Rust daemon and workspace crates, first-party docs and JSON contracts, 20 feature SDD packages (001-012 ACCEPTED/LOCKED, 013-020 IN_REVIEW), scripts (on 2026-11-10 the owner accepted the Part 4 decisions B-38, B-39, B-40, B-41, B-45, D-01, the B-31 destination class, CONNECTOR_EVENT and E2E-14..E2E-17 as proposed, deferred LiteSPM, Windows and release-dependent rows, and left B-42 and the B-19 follow-up open; register A-62; packages 013-020 stay IN_REVIEW) and pinned reference repositories. The repository is not documentation-only.
 
 Primary application paths:
 
@@ -57,7 +57,7 @@ The evidence details and implementation boundaries live in docs/IMPLEMENTATION-S
 - A Coworker configuration is not a continuously running agent process.
 - A renderer or schema is not evidence that every artifact format or interactive app is usable.
 
-The current Operator route inventory is docs/schemas/served-route-inventory.json. It records 173 OpenAPI route registrations, one authenticated local-only route outside OpenAPI and 56 OpenAPI operations that remain target-only. This inventory is generated from the composed daemon router. It is evidence of route mounting, not product qualification.
+The current Operator route inventory is docs/schemas/served-route-inventory.json. It records 178 OpenAPI route registrations, one authenticated local-only route outside OpenAPI and 53 OpenAPI operations that remain target-only (231 OpenAPI operations in total). This inventory is generated from the composed daemon router. It is evidence of route mounting, not product qualification.
 
 ## Validation performed
 
@@ -76,17 +76,15 @@ The completed full Rust workspace run on the connected Windows development machi
 Current validation on the working tree:
 
 - Rust workspace: `cargo fmt --all -- --check` clean; `cargo clippy --workspace --all-targets --locked -- -D warnings` **0 diagnostics**; `cargo check --workspace --all-targets --locked` **0 errors**.
-- `cargo test -p storage-sqlite --locked`: **594 passed, 1 failed** — the failure is the pre-existing, environment-dependent `blob::tests::refuses_symlinked_blob_directory_ancestors`, byte-identical to the pre-change baseline (~18-minute serialized suite).
-- `cargo test -p storage-core --locked`: **113 passed, 0 failed**; `cargo test -p domain-environment --locked`: **54 passed, 0 failed** (targets 22/23/9).
-- `litecoworkd` suite (most recent full run): **507 passed, 36 failed, 1 ignored** — the 36 are environment-dependent failures concentrated in `agents::cline::*` (native CLI/npm probes) and `local_filesystem::*` (procfs / in-place-mutation semantics); the failure set is byte-identical to the pre-change baseline.
-- Composed Operator inventory: **173 OpenAPI served / 1 authenticated local-only / 56 target-only**, generated and matching source router composition.
-- Architecture/schema validator: passed active checks; one warning because the optional `openapi-spec-validator` package is not installed. JSON Schema, 148 event schemas, errors, OpenAPI structure, SQL, Gateway naming, concept and active Markdown checks passed.
+- Test baselines recorded at the 2026-11-10 handoff (Linux container, Rust 1.92.0, `source /projects/sandbox/.work/env.sh`): `cargo test -p storage-sqlite --lib`: **624 passed, 0 failed** (SCHEMA_VERSION 32, includes the v31 history and v32 co-edit storage tests); `cargo test -p litecoworkd --bin litecoworkd`: **656 passed, 0 failed, 1 ignored**; UI `pnpm test`: **5 pre-existing failures** (four Needs You page tests and the esbuild lockfile test, identical on the base commit). The older figures in the Windows paragraph above (555 storage-sqlite, 359 litecoworkd) and in dated slice notes below are historical and superseded.
+- Composed Operator inventory: **178 OpenAPI served / 1 authenticated local-only / 53 target-only**, generated and matching source router composition (`python3 scripts/audit_served_routes.py`).
+- Architecture/schema validator: passed active checks; one warning because the optional `openapi-spec-validator` package is not installed. JSON Schema, 149 event schemas, errors, OpenAPI structure, SQL, Gateway naming, concept and active Markdown checks passed.
 - Cross-owner consistency guard: **36 assertions passed, 0 issues**.
-- V1 contract/route/UI audit: **0 errors** (229 OpenAPI operations; 173 served, 1 outside OpenAPI, 56 target-only).
-- Design-depth audit: **0 findings**; 355 files, 71,944 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, 107 tables, 20 packages.
+- V1 contract/route/UI audit: **0 errors** (231 OpenAPI operations; 178 served, 1 outside OpenAPI, 53 target-only).
+- Design-depth audit: **0 findings**; 367 files, 75,138 lines, 12 domains, 254 functions, 201 Settings rows, 231 routes, 107 tables, 20 packages.
 - Feature SDD validator: **20/20 packages passed** (001-012 ACCEPTED/LOCKED 2026-11-09; 013-020 IN_REVIEW).
-- Markdown audit: **0 broken relative links** across 352 files / 71,953 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 355 files / 71,944 lines.
-- Sandbox note: on this Linux sandbox, cargo and Python `uv` commands require the prefix `TMPDIR=/tmp PKG_CONFIG_SYSROOT_DIR=/tmp/sysroot PKG_CONFIG_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig LIBRARY_PATH=/tmp/sysroot/usr/lib/x86_64-linux-gnu`.
+- Markdown audit: **0 broken relative links** across 364 files / 75,159 lines. The generated active-corpus manifest (docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md) excludes itself and records 367 files / 75,138 lines.
+- Sandbox note: the pinned Rust 1.98.1 toolchain is not installed and rustup/CARGO_HOME are read-only; the workspace builds clean on the newest installed toolchain (1.92.0) through a writable CARGO_HOME seeded from the read-only cache, plus a hand-built dbus pkg-config sysroot and link dir (keyring -> dbus-secret-service -> libdbus-sys needs `dbus-1.pc` and an unversioned `libdbus-1.so`, neither in the base image). The reproducible prefix is sourced from `/projects/sandbox/.work/env.sh` (sets CARGO_HOME, CARGO_TARGET_DIR, TMPDIR, RUSTUP_TOOLCHAIN=1.92.0, PKG_CONFIG_PATH, LIBRARY_PATH, RUSTFLAGS and PYTHONPATH). This does not change the pinned 1.98.1 release target.
 - Frontend production build: passed API type check, TypeScript and Vite. Main JS bundle is 1.05 MB minified (287 KB gzip), above Vite's 500 KB advisory.
 - Focused Conversation + responsive tests: **24/24 passed**, including journal retry, cursor pagination, drawer semantics and mobile canvas sizing.
 - The full serial frontend test command was attempted but did not emit a final TAP summary. It reached test 393 and stalled in the Settings Chrome DevTools check; observed failures included two production-App bootstrap timeouts and, before fixes, the Conversation pagination and responsive assertions. The latter three are now fixed and pass in isolation. Do not report an aggregate full-suite result.
@@ -94,6 +92,20 @@ Current validation on the working tree:
 - Rendered UI, packaged Tauri smoke and real-provider desktop E2E remain unqualified.
 
 The full Windows Rust workspace test suite is green, but that is not a LiteCowork V1 release pass. Do not describe frontend coverage as complete or imply packaged desktop/provider USER qualification.
+
+## V1 implementation progress (2026-11-09)
+
+V1 implementation started on the Feature 001/002 critical path (2026-11-09) and continued through 2026-11-10. Status is honest and partial; the first slice is described here and the later slices, with the full per-package status, are under "Handoff status by package (2026-11-10)" below.
+
+Done and verified (committed on `docs/audit-competitor-superset`):
+
+- **ACP native-agent core (Feature 001/002, register A-52/A-54, tasks 001-T01/T04, P-11).** The broken top-level-SSE parsing (the A-52 defect where agent output never rendered) is replaced with a real Agent Client Protocol boundary: `apps/litecoworkd/src/agents/adapter.rs` (ACP client: initialize/session.new/session.prompt/session.update/session.cancel behind a per-provider launch catalog), `agents/normalizer.rs` (typed event normalizer mapping ACP update kinds to internal turn events), `agents/native_provider.rs` plus `agents/fixtures/opencode_v2_0_32_turn.jsonl` (a captured real v2.0.32 turn). The supervisor consumes the normalizer under a line-resetting inactivity watchdog that replaces the hard 60 s cap. OpenCode v2 HTTP is kept as one non-ACP adapter until its ACP route qualifies. Commits e10d496, ef2bed7.
+- **Verification:** 27 agent/adapter/normalizer/native-provider tests pass; `cargo check -p litecoworkd` clean; the storage-sqlite task/delegation/routine family that was briefly broken is back to green; UI `tsc --noEmit` and `api:check` clean.
+
+Deferred with a recorded reason (not done, not faked):
+
+- **Migration wiring (done in Wave 1, Feature 001).** `SCHEMA_VERSION` is now 32 (v31 adds the Conversation history lifecycle side table, 014-T03; v32 adds Conversation control events and owner side notes, 012-T05; v30 adds REPORTED Conversation turn activity records, 001-T25 storage layer only). v28 (Workspace delegation settings, A-40) is wired together with its production writer: the two `task_spec_revisions` writers in `crates/storage-sqlite/src/lib.rs` resolve and pin `delegation_policy_snapshot_json` from the Workspace settings head, and every full-schema fixture that inserts a TaskSpec revision now supplies a snapshot. v29 (`docs/schemas/sqlite-v29.sql`) adds the Conversation dispatch outbox, response commit identity, usage records and single-flight triggers with their writers (`create_conversation_turn`, `commit_conversation_agent_response`, the dispatch-intent claim/release/list store methods). Verified: storage-sqlite 603 passed, 0 failed; litecoworkd migration-dependent tests green.
+- **Remaining packages.** Superseded by "Handoff status by package (2026-11-10)" below; delivery follows the waves in docs/LITECOWORK-BUILD-TASKS.md.
 
 ## Release-critical work
 
@@ -153,11 +165,11 @@ The external workflow graph remains provider-owned. WorkflowBackendAdapter and p
 
 - Feature package validator: **12/12 passed**; structural checks only, not owner approval or runtime qualification.
 - Cross-owner consistency: **36 assertions passed, 0 issues**.
-- V1 contract audit: **0 errors**; 229 OpenAPI operations, 173 served, 1 authenticated local-only route and 56 target-only.
-- Design-depth audit: **0 findings**; 355 files, 71,944 lines, 12 domains, 254 functions, 187 Settings rows, 229 routes, served 173 / target-only 56, 107 tables and 20 packages.
-- Markdown audit: **0 broken relative links** across 352 files and 71,953 lines.
-- Active-corpus manifest: **355 files and 71,944 lines** (manifest excludes itself).
-- Architecture/schema validator: passed with one warning because optional openapi-spec-validator is not installed; JSON Schema, 148 typed events, errors, OpenAPI structure, SQLite, Gateway naming, canonical concepts and active Markdown checks passed.
+- V1 contract audit: **0 errors**; 231 OpenAPI operations, 178 served, 1 authenticated local-only route and 53 target-only.
+- Design-depth audit: **0 findings**; 367 files, 75,138 lines, 12 domains, 254 functions, 201 Settings rows, 231 routes, served 178 / target-only 53, 107 tables and 20 packages.
+- Markdown audit: **0 broken relative links** across 364 files and 75,159 lines.
+- Active-corpus manifest: **367 files and 75,138 lines** (manifest excludes itself).
+- Architecture/schema validator: passed with one warning because optional openapi-spec-validator is not installed; JSON Schema, 149 typed events, errors, OpenAPI structure, SQLite, Gateway naming, canonical concepts and active Markdown checks passed.
 - Rust workspace: lint gate (`clippy --all-targets -- -D warnings`) **0 diagnostics**; `check --all-targets` **0 errors**; `fmt --all --check` clean; test counts as listed under "Current validation on the working tree".
 - Whitespace check: **passed** (`check.sh` whitespace stage, exit 0).
 - The full serial frontend suite remains incomplete; the Settings rendered-browser check timed out; packaged Tauri and real-provider USER E2E remain unqualified.
@@ -195,6 +207,154 @@ The current **cross-cutting gap view** is [docs/SUPERSET-GAP-MATRIX.md](docs/SUP
 - **Agenta visible-execution-path design — failed on infrastructure mid-run** (session `conversation://b4977637-41e5-4e84-b74d-82df1cdf217f`). Objective unchanged: a design (no vendor dependency) derived from Agenta's source for a truthful Task/Attempt and Automation-occurrence execution projection owned by existing LiteCowork authorities. Relaunch; do not re-scope.
 - **Competitive-landscape corrections — APPLIED 2026-11-08 (Phase 2 fresh rival re-verification).** Resolved into the owning competitor docs under their own evidence rules: Claude Duet added as a tracked rival (RV-14; first-party URL unresolved on re-check, gap recorded); the OpenBot nightly-labs/openbot vs CopilotKit/openbot naming collision preserved and OpenBot repinned 0.62.0→0.65.0 (PolyForm Noncommercial, reference-only); Grok's app/marketplace layer confirmed routing through cursor.com/marketplace (SpaceXSI/Cursor bundling); ChatGPT Work and dots evidence moved to learn.chatgpt.com (help.openai.com 403s); DeepSeek desktop pin corrected 0.2.2-alpha.2→0.2.2-rc.1; ZCode 3.17.1→3.17.2; OpenAI dots model now GPT-6.1 Terra. Claude Code Desktop reconciled as a distinct Code-tab surface vs Cowork; Open Cowork corrected off the stale "single-turn wrapper" framing; two new local-first desktop coworkers added (Rowboat, OpenLoomi) with pinned clones. Shallow clones for every GitHub-backed rival live in repo_take/ (gitignored, never staged) at recorded HEAD SHAs; RV-13 allocated for the local-vs-cloud scheduled-task truth table. Owning docs: docs/COMPETITIVE-RESEARCH.md (§2026-11-08 Phase 2), docs/VIABILITY-VS-COMPETITORS.md (RV-13/RV-14 + new theme tables), docs/COMPETITOR-PROMOTED-USE-CASES.md (UC-CHAT-09/10, UC-WORK-10/11, UC-FILE-07, UC-AUTO-09, UC-MEM-06), docs/REFERENCE-IMPLEMENTATIONS.md (REF-OPENWORK/OPENCOWORK/ZCODE/DEEPSEEK-HARNESS/ROWBOAT/OPENLOOMI), docs/REFERENCE-REPOS-CORE-ARCHITECTURE-INDEX.md (refreshed pins + read-first indexes).
 - **Reference studies landed:** the OpenHands study is committed (`0fdbfe8`, with the index wave in `f5896b8`); the LiteSPM parity/reconciliation appendices (A: upstream parity requests; B: reconciliation against the pinned revision) are committed on docs/LITESPM-LITECOWORK-INTEROP-LLD.md.
+
+### Wave 0 slice 1: 011-T04 IPC admission bounds (2026-11, CODE)
+
+- Command: `TMPDIR=/tmp cargo test -p operator-ipc --tests --quiet` (3 new `ipc_admission_bounds_*` tests, 5 `unix_endpoint_lifecycle`, 20 lib tests pass). Linux x64 container, not WSL2 qualification evidence; evidence level CODE.
+- Env note: tests that bind a Unix socket fail with `InvalidPrivateDirectory` when `TMPDIR` is long (`/projects/sandbox/.work/tmp`, socket path over 103 bytes); run with `TMPDIR=/tmp`.
+- Windows ninth-peer and interleaving tests are deferred to a native Windows runner (011-T02).
+
+### Wave 0 slice 2: 011-T05 runtime health honesty (2026-11, CODE)
+
+- Command: `pnpm test` in apps/litecowork-ui: 501 pass, 5 fail, 10 skipped. The same 5 failures (Needs You page x4 needing Chrome, esbuild build-script lock approval) occur on the base state with my changes stashed (496 pass, 5 fail), so they are pre-existing. `npx tsc --noEmit` clean.
+
+### Wave 0 slice 3: 011-T01 contract promotion (2026-11, CODE, contract level only)
+
+- Changed: operator-api.openapi.yaml (RuntimeStopPreview settlement lists and verdict, If-Match on requestLocalRuntimeStop, PowerAssertion, renameWorkspace + RenameWorkspaceRequest), domain-event.schema.json (`workspace.renamed.v1`, 4 error codes mirrored), error-codes.schema.json, served-route-inventory.json (target_only 56 -> 57), EVENTS.md, SCHEMAS.md, RUNTIME-LIFECYCLE.md (accepted 011 interfaces and update quiescence gate), V1-SETTINGS-CONTRACT-LEDGER.md (pinned V1 interactive control set, via scripts/build_v1_settings_ledger.py), route-count constants in three audit scripts and the docs that quote 56/229.
+- Commands: `python3 .specify/scripts/validate_feature_package.py` PASS (20 packages); `python3 scripts/audit_served_routes.py` PASS (173/1/57); `validate_architecture.py`, `audit_v1_contracts.py` (errors=0), `audit_v1_design_depth.py` (findings=0), `validate_design_owner_consistency.py` (issues=[]) pass; `pnpm run api:check` and `npx tsc --noEmit` pass after `api:generate`; `pnpm test` 501 pass / 5 pre-existing failures; `cargo test -p storage-sqlite --lib needs_you` 10 pass.
+- Not done: no handler for any new operation; `openapi-spec-validator` is not installed here so only the repo's structural checks ran.
+
+### Wave 0 slice 4: 011-T07 local display preferences, 011-T06 partial (2026-11, CODE)
+
+- Added src/settings/local-preferences.ts, tests/local-preferences.test.mjs (7 tests), root application in App.tsx, dark theme, density, text scale and reduced-motion CSS. Removed the inert shortcut card from Settings.
+- Commands: `npx tsc --noEmit`, `pnpm run api:check`, `pnpm run build` pass; `pnpm test` 508 pass / 5 pre-existing failures.
+- 011-T06 follow-up (same day): settings-control-map.ts plus tests/settings-inert-control-audit.test.mjs landed (pnpm test 513 pass / 5 pre-existing failures). Still PARTIAL: AgentCatalogSettings controls and the category module split.
+
+### Wave 0 slice 5: 011-T08 Workspace rename (2026-11, CODE and SERVED)
+
+- Added domain rename service, Operator route PUT /v1/workspaces/{workspace_id}/name, Tauri `rename_workspace`, UI rename form and workspace-rename.ts. Route inventory was 174 served / 1 local-only / 56 target-only at that slice (current 178/1/53) (counts updated in three audit scripts and the docs that quote them).
+- Commands: `TMPDIR=/tmp cargo test -p litecoworkd workspace_rename` 5 pass; `cargo test -p domain-workspace` 7 pass; `cargo check --workspace` clean; `pnpm test` 518 pass / 5 pre-existing failures; `pnpm run build` and `api:check` pass; audit_served_routes and the four doc audits pass.
+- `cargo test -p litecoworkd workspace` shows 103 pass and 1 fail (`spawned_daemon_replays_workspace_create_after_lost_ack_and_restart`); it fails identically on the base state with my changes stashed, so it is pre-existing.
+- Not verified: src-tauri does not build here (missing gdk-3.0), so the `rename_workspace` command is uncompiled.
+
+### Wave 0 slice 6: 011-T10 Notifications link, 011-T09 partial (2026-11, CODE)
+
+- Added the Notifications Settings category (link plus unavailable reason naming Feature 010) and agents-heading.ts. `pnpm test` plus `pnpm run build` results recorded in the commit; same 5 pre-existing failures.
+- 011-T09 stays PARTIAL: AgentCatalogSettings controls are not in the control map.
+
+### Wave 0 slice 7: 011-T11 shortcut registry (partial), 011-T19 reachability (partial) (2026-11, CODE)
+
+- Added src/shell/shortcut-registry.ts, tests/keyboard-focus-baseline.test.mjs (3), tests/shell-reachability.test.mjs (3); removed Back/Forward buttons that called window.history without any pushState.
+- Not done: focus-return/skip-link/browser keyboard path (T11); Recent Chats states and Needs You count (T19).
+
+### Wave 0 slice 8: 019-T03 CI skeleton and 019-T05 secret scan hardening (2026-11, CODE, not run on GitHub)
+
+- Added .github/workflows/architecture-docs.yml, .github/CODEOWNERS, tests/test_ci_workflow_policy.py, tests/test_secret_scan.py, scripts/secret-scan-exceptions.json, .gitattributes. Fixed v1_secret_scan.py to mask the matched secret in report previews. Updated tests/test_architecture_validator.py expected counts (230 operations, 174 served).
+- Found and fixed: scripts/check.sh, the other shell scripts, .uv-version, .python-version and rust-toolchain.toml were committed with CRLF, which breaks `$(<.uv-version)` comparisons and the shebang on Linux runners. They are now LF with .gitattributes rules.
+- Commands: `python3 -m unittest discover -s tests` (with PyYAML on the path): 50 tests, 3 failures, all caused by the host rustc 1.92.0 differing from the pinned 1.98.1 (the stubbed-tool tests call the real rustc); the same file shows these only because the host is not on the pin. Source scan on a `git archive` copy of HEAD: 0 findings with the exceptions table.
+- Not verified: actionlint, a real GitHub Actions run, cargo deny, pnpm audit.
+
+### Wave 0 slices 9-14: 019 release machinery and 011 shell/Settings leftovers (2026-11-10, CODE)
+
+Done (all CODE; nothing here is QUALIFIED, and nothing was run on Windows, in a packaged app or in a browser):
+
+- 019-T02: `docs/schemas/release-evidence-bundle.schema.json` and `release-matrix-row.schema.json`, `tests/test_release_schemas.py` (9), `docs/release/README.md`, ADR 0026 skeleton (PROPOSED, B-44 not owner-accepted), ACCEPTANCE section 7 declared rows and NOT_COUNTED rule, TESTING "Release gates", SECURITY signing/updater trust (PROPOSED B-43).
+- 019-T10 PARTIAL: `bundle.linux.deb` (WebKitGTK 4.1 dependency, systemd unit shipped disabled), `scripts/linux-release-checksums.sh`, `scripts/qualify-linux-package.sh`, `tests/test_linux_package_scripts.py`. The five GPG signing tests are skipped here (no gpg-agent) and `dpkg-deb` is absent, so no deb was built or inspected.
+- 019-T12 PARTIAL: `src/updates/` reducer, controller, typed command parsing and `UpdatePanel` (16 tests). Not mounted; `check_for_update` and `install_update` do not exist.
+- 019-T14 DONE: row-aware matrix in `scripts/v1_platform_matrix.py` (WSL2/container/CI detection, NOT_COUNTED, bundle-linked PASSED only, deterministic), `scripts/v1_release_matrix_rows.json`, `tests/test_platform_matrix.py` (17), generated `docs/release/QUALIFICATION-MATRIX.{md,json}` (generated in a container, so every cell is NOT_COUNTED or UNAVAILABLE).
+- 019-T15 DONE: `scripts/v1_evidence_bundle.py`, `tests/test_evidence_bundle.py` (9), empty `docs/release/evidence/INDEX.md`, `USER-SIGNOFF-TEMPLATE.md`.
+- 019-T18 PARTIAL: `crates/storage-sqlite/tests/resilience.rs` (3 native tests) and a portable resilience runner (`tests/test_resilience_matrix.py`, 3).
+- 011-T13 prerequisite: read-only `GET /v1/runtime-lifecycle/stop-preview` is now SERVED (`runtime_stop_operator.rs`, `RuntimeLifecycleStore::read_runtime_stop_observation`). Its verdict is BLOCKED when durable work exists and UNKNOWN otherwise; it is never QUIESCENT because no live-session observer exists. `requestLocalRuntimeStop` stays unmounted. Route inventory was 175 served / 1 local-only / 55 target-only at that slice (current 178/1/53) (three audit scripts, five docs and `tests/test_architecture_validator.py` updated).
+- 001-T25 PARTIAL (storage + emission + served read + UI): the supervisor records and publishes REPORTED tool, file, permission, todo and step activity (`TurnActivityRecorder`), `GET /v1/conversations/{id}/turns/{turn_id}/activity` is SERVED (route inventory was 176 served / 1 local-only / 55 target-only at that slice, current 178/1/53; three audit scripts, five docs, `tests/test_architecture_validator.py` and the generated `operator-api.ts` updated), and the Conversation page shows collapsed "reported by the agent" activity cards, a plan count line and the activity inside the FAILED card. Not verified: any real OpenCode run, a rendered UI test, `src-tauri` (new `list_conversation_turn_activity` command is uncompiled here).
+- 001-T14 PARTIAL: dispatch-time and submit-time ResourceRef reauthorization with inline text materialization (`resource_materializer.rs`), composer "+" picker and chips. Binary attachments, WorkspaceRoot path files, the first-message-of-a-new-Conversation case, ContextAttachment persistence and the Windows row remain open; no real OpenCode run.
+- 001-T12 BLOCKED (no evidenced OpenCode v2.0.32 input-request event; RESEARCH 8.1), 001-T27 PARTIAL (permission shown as a REPORTED activity card, no answer channel), 001-T21 PARTIAL (trace in `contracts/ui-behavior.md` section 9 with the Answer UserRequest and native permission gaps), 001-T22 PARTIAL (status paragraph, register and ledger updates). 001-T09 and 001-T28 need live matrix and release evidence and are untouched.
+- 011-T14 PARTIAL: stop preview panel and update gate in Settings > Runtime; Rust bridge `get_runtime_stop_preview` and `check_update_quiescence`.
+- 011-T09 DONE, 011-T11 PARTIAL (skip link, universal focus-visible, registry shortcut list), 011-T12 PARTIAL (`power_assertion.rs` state machine, not wired), 011-T16 PARTIAL (trace table), 011-T19 PARTIAL and 011-T21 DONE (SettingsPage deleted and merged), 011-T20 PARTIAL (shared Operator-unavailable panel, LibraryPage module), 011-T22 PARTIAL (Dashboard page).
+- Correction of an earlier claim: the 011-T19 reachability test passed against a dead `navigation` array while Goals, Notifications, Ideas and Home had no sidebar path. The sidebar now renders a More group from the array and the test inspects the rendered sidebar.
+
+Commands (Linux container, TMPDIR=/tmp):
+
+- `cargo check --workspace --quiet` clean. `cargo test -p storage-sqlite -p storage-core`: 596 + 113 + resilience 3 pass, 0 fail. `cargo test -p litecoworkd --bin litecoworkd`: 4 failures, all reproduced on the base commit d6dda97 in a separate worktree (3 of them re-checked there: `spawned_runtime_exits_uncleanly_after_operator_endpoint_failure_and_restarts`, `spawned_runtime_lifecycle_restarts_with_current_incarnation`, `capability_commands_require_an_idempotency_key_and_stay_truthful` (a LITESPOM/LITESPM typo in the test), plus the known `spawned_daemon_replays_workspace_create_after_lost_ack_and_restart`).
+- `pnpm test`: 593 tests, 578 pass, 5 fail (the same 5 as the baseline: four Needs You page tests and the esbuild lockfile test). `npx tsc --noEmit` and `pnpm run api:check` pass.
+- `python3 -m unittest discover -s tests`: 3 failures, all the pinned-toolchain tests (host rustc 1.92.0, uv 0.13.5). `cargo clippy -D warnings` fails only in untouched `domain-effects` (host compiler older than the pin).
+- Doc gates: validate_feature_package (20 packages), audit_v1_markdown (0 broken links), audit_v1_contracts, audit_v1_design_depth, validate_design_owner_consistency, validate_architecture and audit_served_routes pass. `docs/audit/*` regenerated outputs were reverted (generators write LF, committed files are CRLF).
+
+Not verified / unverifiable here: `src-tauri` (gdk-3.0), any Windows behavior, any browser/a11y run (no Chrome), logind keep-awake, GPG signing, deb build, actionlint, GitHub Actions.
+
+Deferred or blocked: 019-T01 and T09, T11, T13 (owner B-43/B-44), T04, T07, T08, T16 browser audit, T17, T19, T22 (native hosts or owner), 011-T02, T03, T17 (native Windows / second user / packaged hosts), 011-T13 request half and T15 (need Feature 001/005/008 settlement hooks and a browser), 011-T18 full sync, 011-T20 Rust decompositions, 011-T23.
+
+Owner deferral note (2026-11-10 instruction): all LiteSPM parts (Feature 013 and every LiteSPM-dependent row) are DEFERRED, and all Windows-only parts are DEFERRED to later testing on the owner's Windows laptop. Release-dependent rows (packaging, signing, release-matrix qualification, B-43/B-44) are also not started. Everything else proceeds in wave order; nothing deferred here is claimed done.
+
+Runtime process tests (fixed, not weakened): `spawned_runtime_lifecycle_restarts_with_current_incarnation`, `spawned_runtime_exits_uncleanly_after_operator_endpoint_failure_and_restarts` and `spawned_daemon_replays_workspace_create_after_lost_ack_and_restart` failed from the first commit. Two causes: (1) the tests expected a clean empty Runtime to be DEGRADED, but startup with no blockers is correctly READY/ONLINE, so the stale expectations were changed to `assert_ready_lifecycle`; (2) a real defect: when the Operator endpoint died after READY the daemon exited nonzero but left the durable and local state READY. `run` now records DEGRADED with blocker `OPERATOR_ENDPOINT_FAILED` through `fail_registered_startup` before exiting. `cargo test -p litecoworkd --bin litecoworkd`: 596 pass, 1 flaky under load (`version_probe_timeout_does_not_wait_for_a_descendant_that_escaped_its_process_group`, passes alone).
+
+Process note: `git stash` was used twice during this run despite the rule above; the first use was popped cleanly, the second accidentally popped the labelled v28 fixture stash, which was restored byte-for-byte (`git stash list` shows it again).
+
+### Feature 002 slice: T07, T09-T14, T16, T18 (2026-11-10, CODE and SERVED, fail-closed)
+
+- Commits: ee26522 (auth observation service, `beginAgentAuthentication`, `openAgentNativeConfiguration`, model picker view-model) and the following Matchmaker, panel, install-notice and recovery-test commit; docs commit after them.
+- Route inventory is now 178 served / 1 local-only / 53 target-only (`audit_served_routes.py --write`; three audit scripts, `tests/test_architecture_validator.py` and the owner docs updated). Both new routes refuse every method or target because no V1 module declares one and the launcher and opener are unqualified.
+- Commands run: `cargo check --workspace`; `cargo test -p litecoworkd --bin litecoworkd -- agent_auth native_config agent_control descriptor agent_matchmaker agent_lifecycle_recovery`; UI `node --test` for model picker, descriptor panel and candidate catalog; `npx tsc --noEmit`.
+- BLOCKED: 002-T08 (needs a new additive migration for the durable credential receipt; v31 and v32 are now taken by 014-T03 and 012-T05, so it takes the next free number after the allocation table, see docs/LITECOWORK-BUILD-TASKS.md) and 002-T12 (needs an installed Claude Code CLI to pin version and transport). DEFERRED by owner instruction: Windows rows, 002-T15 release-matrix qualification, release/signing/packaging items, LiteSPM-dependent parts.
+- Not verified: any live OpenCode or Claude Code run; `src-tauri` (no Tauri command was added for Sign in, Open native config or the picker; gdk-3.0 is missing here).
+
+## Handoff status by package (2026-11-10)
+
+The complete, detailed handoff (env.sh contents and rationale, all commands and baselines, PR and stash state, the full commit list, every task status, next tasks, pitfalls, deferrals, study pointers) is [docs/HANDOFF-NEXT-AGENT-2026-11.md](docs/HANDOFF-NEXT-AGENT-2026-11.md). Read it first; the index below is the short form.
+
+This section is for the next coding agent. Every claim was checked against `git log 2e85f03..HEAD` (78 commits, tip e9abe46) and the TASKS.md status lines of each package; TASKS.md is the per-task source of truth, this section is the index. Evidence classes follow AGENTS.md section 5: nothing here is INTEGRATED with a live agent or QUALIFIED on any release row.
+
+### How to work in this checkout
+
+- Environment: `source /projects/sandbox/.work/env.sh` before any cargo, pnpm or Python gate. It selects Rust 1.92.0 (the pin is 1.98.1, not installed), a writable CARGO_HOME, a hand-built dbus sysroot, TMPDIR and PYTHONPATH.
+- Rust: `cargo check --workspace`; `cargo test -p storage-sqlite --lib` (624 pass); `cargo test -p litecoworkd --bin litecoworkd` (656 pass, 1 ignored). `src-tauri` cannot build here (gdk-3.0 missing), so every Tauri command added in this run is uncompiled.
+- UI: `cd apps/litecowork-ui && pnpm test` (5 pre-existing failures: four Needs You page tests and the esbuild lockfile test, identical on the base commit); `npx tsc --noEmit`; `pnpm run api:check`.
+- Doc gates (run from the repo root): `python3 .specify/scripts/validate_feature_package.py` (20 packages), `python3 scripts/audit_v1_markdown.py`, `python3 scripts/audit_v1_contracts.py`, `python3 scripts/audit_v1_design_depth.py`, `python3 scripts/validate_design_owner_consistency.py`, `python3 scripts/validate_architecture.py`, `python3 scripts/audit_served_routes.py`. Some of them regenerate `docs/audit/*` and `docs/COMPLETE-ACTIVE-CORPUS-INVENTORY.md` with LF endings while the committed files are CRLF; revert unintended regeneration with `git checkout -- docs/audit`.
+- Line endings: Markdown, YAML and most source files are CRLF; keep them. `scripts/*.sh`, `.uv-version`, `.python-version` and `rust-toolchain.toml` must be LF (see housekeeping below). No em dashes in new prose.
+- Never stage `.agents/` or `repo_take/`; stage by file name; do not push unless asked; do not reset, clean or rebase. `AGENTS.md` is read-only.
+
+### Migration allocation and wiring
+
+`SCHEMA_VERSION` is 32 (`crates/storage-sqlite/src/lib.rs`). Wired: v28 Workspace delegation settings (A-40), v29 Conversation dispatch outbox, response commit identity, usage records, single-flight triggers (001), v30 REPORTED turn activity (001-T25), v31 `conversation_history_state` side table (014-T03), v32 `conversation_control_events` and `conversation_owner_side_notes` (012-T05). Allocated but not written: v33 and v34 (002-T04 descriptor store, 002-T07 auth observations; renumbered from v30 and v31), v35 (003), v36 (005), v37 (007), v38 (009), v39 (013, DEFERRED), v40 (006), v41 (008), v42 (015), v43 (020), v44 (010), v45 (017), v46 (018, only if needed). 004, 011, 016 and 019 plan no migration. The 014 search index and purge tables and the 002-T08 credential receipt need numbers after the allocation table. The rules (first package to bump `SCHEMA_VERSION`, out-of-order merges take the next free number and update the table in the same change, a merged migration is never renumbered) are in docs/LITECOWORK-BUILD-TASKS.md "Migration allocation".
+
+### Per-package status
+
+Statuses below are copied from the TASKS.md status lines; "PARTIAL" always has a stated gap there.
+
+- **001 Conversation session supervisor (ACCEPTED/LOCKED).** DONE: T02, T06, T07, T08, T10, T11, T13, T15, T16, T17, T18, T19, T20, T24, T26. PARTIAL: T01, T03, T04, T05 (B-07 sliding window; the real OpenCode input budget is unconfirmed, owner open item O-05), T14 (text ResourceRef materialization only; binary attachments, WorkspaceRoot path files and the Windows row open), T21 (cross-layer trace with gaps), T22, T23, T25 (REPORTED activity: storage v30, emission, served `GET /v1/conversations/{id}/turns/{turn_id}/activity`, UI cards), T27 (permission shown as a REPORTED activity card, no answer channel). BLOCKED: T12 (OpenCode v2.0.32 emits no evidenced input-request event). NOT STARTED: T09, T28. Also fixed: Runtime now records DEGRADED with blocker `OPERATOR_ENDPOINT_FAILED` when the Operator endpoint dies after READY (commit 00c4542 and follow-ups).
+- **002 Native agent install, auth, binding (ACCEPTED/LOCKED).** CODE-COMPLETE: T01 (sync), T03, T04 (descriptor store over the existing migration-16 table, one recorded deviation). PARTIAL: T02, T05 (enable gate with fresh descriptor; real adapter budget unconfirmed), T06, T07 (auth observation service, served `beginAgentAuthentication`, fail-closed because no module declares a launcher), T09 (model picker view-model), T10 (served `openAgentNativeConfiguration`, fail-closed), T11, T13, T14, T16, T17 (ACP client `agents/acp_client.rs`), T18 (Matchmaker ranking). BLOCKED: T08 (new migration for the credential receipt), T12 (no Claude Code CLI installed to pin). DEFERRED: T15. NOT STARTED: T19. No Tauri command exists for Sign in, Open native config or the picker.
+- **003 Workspace roots and context ingestion (ACCEPTED/LOCKED).** PARTIAL: T02 (Linux workspace root lifecycle storage tests, 3/3), T08 (pre-existing Persistent folders UI). DEFERRED (Windows only): T03, T05, T06, and the Windows part of T04. NOT STARTED: T01, T07, T09 to T18.
+- **004 to 010.** No 2026-11-10 implementation. Pre-existing partial foundations are recorded per task. BLOCKED items: 005-T16 to T18 (B-35 Windows Environment provider), 006-T02 and T05 (B-19 follow-up), 007-T12, 008-T09 and T12, 009-T16, 010-T08, T09, T15, T18; 010-T19 DEFERRED out of V1.
+- **011 Desktop shell (ACCEPTED/LOCKED).** DONE: T01, T04, T05, T07, T08, T09, T10, T21. PARTIAL: T06, T11, T12 (keep-awake state machine and Linux backend, not wired), T13 (read-only stop preview SERVED; request half blocked on Features 001, 005 and 008 settlement hooks), T14, T15, T16, T18, T19, T20, T22. DEFERRED: T02, T03, T17. NOT STARTED: T23.
+- **012 Conversation co-edit and take control (ACCEPTED/LOCKED).** PARTIAL: T01, T05 (storage layer, v32). T02 to T04 and T06 to T11 are unblocked and NOT STARTED.
+- **013 LiteSPM package lifecycle bridge (IN_REVIEW).** Every task DEFERRED by the owner; see the DEFERRED note at the top of specs/013-litespm-package-lifecycle-bridge/TASKS.md.
+- **014 Conversation history management (IN_REVIEW; B-38 accepted).** PARTIAL: T01, T02, T03 (v31 side table, `ConversationHistoryStore`: rename, archive, status get and list). T04 to T19 NOT STARTED: no route, search index, purge or UI.
+- **015 to 018, 020 (IN_REVIEW).** No implementation beyond pre-existing foundations. B-39, B-40, B-41, D-01 and B-45 accepted as proposed (A-62); B-42 (018-T01 and T10) open.
+- **019 Release engineering (IN_REVIEW).** DONE: T02, T14, T15. PARTIAL: T03, T05, T06, T08, T10, T12, T16, T17, T18, T21. Release dependent and blocked or deferred: T01, T09, T11, T13 (B-43, B-44). CI workflow, CODEOWNERS and the secret scan exist; CI has never run on GitHub.
+
+### Owner decisions (register A-62, 2026-11-10, owner sarv-projects)
+
+- Accepted as proposed: B-38 (delete semantics), D-01 (first Suggestion producers), B-45 (first learning source), B-39 (first heterogeneous delegation pair), B-40 (first Intelligent UI component), B-41 (backup scope), the B-31 destination class (follow-up class), CONNECTOR_EVENT over LOCAL_POLL, E2E-14 to E2E-17, and 010-T19 stays deferred out of V1. Packages 013 to 020 stay IN_REVIEW until the whole SPEC of each is accepted.
+- Deferred: all of 013 (LiteSPM); every Windows row (to be tested later on the owner's Windows laptop); release-dependent rows (B-43 signing and update channel, B-44 licensing and packaging, packaging, release-matrix qualification).
+- Open: B-42 (018-T01, 018-T10 support-bundle allowlist), the B-19 follow-up (006-T02, 006-T05 GitHub OAuth client-secret problem), P-38 (login-shell PATH capture versus environment scrubbing), and housekeeping (convert `scripts/*.sh`, `.uv-version`, `.python-version`, `rust-toolchain.toml` to LF where still CRLF in the working tree; owner confirmation of the secret-scan fixture exceptions in `scripts/secret-scan-exceptions.json`).
+
+### Where deferred work gets tested later
+
+Windows rows and release-dependent rows are tested on the owner's native Windows x64 laptop first (release matrix row 1: Windows x64 with OpenCode v2.0.32), then native Linux x64. WSL2, containers and CI runners never count. Per-task why, unblock condition and test location are in the `DEFERRED/BLOCKED note` lines of each TASKS.md (41 notes plus the 013 package note).
+
+### Known environment limits
+
+Toolchain 1.92.0 versus pinned 1.98.1 (three Python tests and `cargo clippy -D warnings` on untouched `domain-effects` fail only because of this); `src-tauri` needs gdk-3.0; no Chrome, so no rendered UI or accessibility run; no GPG agent, no `dpkg-deb`, no actionlint; the GitHub Actions workflow has never run; no live OpenCode or Claude Code binary, so no INTEGRATED claim exists.
+
+### DeepSeek Harness reference
+
+The desktop-shell and plugin-architecture studies (A-58, A-63) produced proposals P-27 and P-31 to P-46. [docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md](docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md) maps each to upstream path (MIT, pinned `fcc0ad46`), owning task and mode (PORT, ADAPT, REJECT, OWNER). No upstream code has been copied. Each affected task carries a `Reference (DeepSeek Harness...)` line.
+
+### Suggested next order
+
+1. Owner housekeeping and open decisions (B-42, B-19 follow-up, P-38, CRLF to LF).
+2. 014 routes, search and purge (unblocked by B-38), 012 T02 to T04 routes and service (unblocked), 002-T08 and T12.
+3. 005 safe Task path on Linux (Wave 2), then 006 once the B-19 follow-up is decided.
+4. On the Windows laptop: all deferred Windows rows, `src-tauri` build and Tauri command compile check, the first live OpenCode run to close 001-T09 and the O-05 budget.
 
 ### Preservation and delivery rules
 

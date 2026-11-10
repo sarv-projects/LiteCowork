@@ -144,6 +144,7 @@ Gaps to V1: cron grammar and catch-up bound not pinned in the owner contract, no
 ## 010-T08 - Hand occurrence Tasks to execution only through Feature 005
 
 - **Status:** BLOCKED - Feature 005 Task execution is not qualified (owner: Task Runtime). Occurrences create READY Tasks and `settle_started_occurrences_from_task_outcomes` already settles occurrences from terminal Task outcomes.
+- **DEFERRED/BLOCKED note:** Why: Feature 005 Task execution is not qualified. Unblocks when: Feature 005 admission and execution qualified. Test later at: native Linux, then the owner's native Windows x64 laptop (release matrix row 1); WSL2 and containers never count.
 - **Depends on:** T04
 - **Cross-package prerequisites:** Feature 005 qualified Task admission and execution on the Linux row (Windows row after the B-35 Environment provider).
 - **Owner:** Automation, Task Runtime.
@@ -160,7 +161,8 @@ Gaps to V1: cron grammar and catch-up bound not pinned in the owner contract, no
 
 ## 010-T09 - Add the event-trigger kind after cron (CONNECTOR_EVENT over LOCAL_POLL)
 
-- **Status:** BLOCKED - needs a qualified Feature 006 Connection and the T01 owner confirmation of the kind (owners: Capability Fabric, Product). `TriggerDefinition::ConnectorEvent` exists; `locally_reconcilable_trigger` refuses it.
+- **Status:** BLOCKED - the kind is owner-confirmed (CONNECTOR_EVENT over LOCAL_POLL, sarv-projects, 2026-11-10); still needs a qualified Feature 006 Connection (owner: Capability Fabric). `TriggerDefinition::ConnectorEvent` exists; `locally_reconcilable_trigger` refuses it.
+- **DEFERRED/BLOCKED note:** Why: needs a qualified Feature 006 Connection; CONNECTOR_EVENT is owner-confirmed. Unblocks when: Feature 006 Connection (needs the B-19 follow-up decision). Test later at: a real connector account on native Linux or the owner's native Windows x64 laptop (release matrix row 1); WSL2 and containers never count.
 - **Depends on:** T01, T03, T04
 - **Cross-package prerequisites:** Feature 006 Connection broker with a polling read for provider events.
 - **Owner:** Automation, Capability Fabric.
@@ -179,6 +181,8 @@ Gaps to V1: cron grammar and catch-up bound not pinned in the owner contract, no
 ## 010-T10 - Window close, Runtime stop and sleep matrix
 
 - **Status:** NOT STARTED. The worker runs while the daemon runs; no test covers window close versus Runtime stop or OS sleep.
+- **Reference (DeepSeek Harness, MIT, pinned `fcc0ad46`, no code copied yet):** upstream [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159), reuse map [DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md).
+  - **P-31 QuiescenceReport (one "interruptible work" predicate; unknown means busy; lock then learn; inspect once).** Class: **ADAPT**. Upstream permalinks: [src/host-process.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/host-process.ts), [src/quit-confirmation.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/quit-confirmation.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 3 and 14 (row P-31). Why: LiteCowork describes the same predicate in three places (T12, T13, T14 of package 011). Upstream shows the same facts must back stop, update, quit and keep-awake, and that unknown resolves to busy. The inputs differ (admitted turns, admitted Attempts, Terminal and Browser sessions, armed Automations, pending approvals, not Electron tasks), so it is an ADAPT, not a port. Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
 - **Depends on:** T03, T05
 - **Cross-package prerequisites:** Feature 011 Runtime lifecycle, stop/quiescence and keep-awake.
 - **Owner:** Runtime lifecycle, Automation.
@@ -261,6 +265,7 @@ Gaps to V1: cron grammar and catch-up bound not pinned in the owner contract, no
 ## 010-T15 - Qualify E2E-10 (scheduled and event Automation) on the release matrix rows
 
 - **Status:** BLOCKED - the event half needs T09 (Feature 006 Connection); Task execution needs Feature 005 on the Linux row and the B-35 Windows Environment provider on the Windows row (owner: Task Runtime).
+- **DEFERRED/BLOCKED note:** Why: E2E-10 needs T08 and T09 and Task execution. Unblocks when: T08, T09, Feature 005. Test later at: the owner's Windows laptop and native Linux.
 - **Depends on:** T08, T10, T12, T13, T14
 - **Cross-package prerequisites:** Feature 005 Task execution; Feature 006 Connection; Feature 011 packaged desktop and keep-awake; Feature 019 release matrix.
 - **Owner:** Product, QA, Automation.
@@ -308,6 +313,7 @@ Gaps to V1: cron grammar and catch-up bound not pinned in the owner contract, no
 ## 010-T18 - Qualified external WorkflowBackend Routine mapping (not a V1 release gate; formerly T05)
 
 - **Status:** BLOCKED - depends on qualified Feature 005 Task admission, Feature 006 CapabilityInvocation and a WorkflowBackendAdapter, none present (owners: Task Runtime, Capability Fabric).
+- **DEFERRED/BLOCKED note:** Why: not a V1 release gate; needs Feature 005 admission, Feature 006 invocation and a WorkflowBackendAdapter. Unblocks when: post-V1 decision plus those features. Test later at: not scheduled.
 - **Depends on:** T08
 - **Cross-package prerequisites:** Feature 005 and Feature 006 qualified; CONNECTORS-WORKFLOWS owner adapter.
 - **Owner:** Automation, Capability Fabric, Task Runtime, Desktop UI.
@@ -324,7 +330,8 @@ Gaps to V1: cron grammar and catch-up bound not pinned in the owner contract, no
 
 ## 010-T19 - Direct LiteCowork Coworker provider-graph authoring evaluation (deferred, not V1; formerly T06)
 
-- **Status:** BLOCKED - deferred; no implementation authorization until an owner ADR exists.
+- **Status:** BLOCKED - deferred; the owner confirmed on 2026-11-10 that it stays deferred and out of V1; no implementation authorization until an owner ADR exists.
+- **DEFERRED/BLOCKED note:** Why: owner confirmed on 2026-11-10 that this stays deferred and out of V1 (A-62). Unblocks when: an owner ADR. Test later at: not scheduled.
 - **Depends on:** T18
 - **Cross-package prerequisites:** provider-specific workflow authoring API; explicit owner ADR.
 - **Owner:** Product, Capability Fabric, Trust, Automation.
@@ -366,6 +373,15 @@ T02 is independent. T01 -> T03 and T04 and T06. T04 -> T05 (also needs T01). T06
 | T15, T17 | Feature 019 release matrix and evidence bundle | Qualification is per release row |
 
 Cross-package tasks are named by outcome because the other packages are being renumbered in the same release-planning pass; the orchestrator resolves them to IDs in the traceability index.
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+Status: PROPOSED. None of the items below is an accepted task. They come from the DeepSeek Harness studies ([desktop deep-dive](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) register A-63, proposals P-31 to P-46; [plugin deep-dive](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) register A-58). Owner review is required before any item becomes a numbered task in this package. They are labelled `PROP-Pnn` so they do not collide with the stable task IDs that `.specify/scripts/validate_feature_package.py` checks. On acceptance: assign the next free task ID in this file, copy the upstream permalink, class and reuse statement into the task, and update the [reuse map](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md). Upstream pin `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` (MIT, Copyright (c) 2026 DeepSeek). No upstream code is imported (AGENTS.md section 7).
+
+### Proposals owned elsewhere that touch this package (pointer only)
+
+- **PROP-P31 (P-31) QuiescenceReport (one "interruptible work" predicate; unknown means busy; lock then learn; inspect once)** [PROPOSED, not accepted, owner review required]: row owned by package 011; class **ADAPT**; would touch here: T12, T13, T14 of package 011; T11 of package 019; T10 of package 010. Upstream permalinks: [src/host-process.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/host-process.ts), [src/quit-confirmation.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/quit-confirmation.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Sections 3 and 14 (row P-31). Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React).
+
 
 ## Completion evidence
 

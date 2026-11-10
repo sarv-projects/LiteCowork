@@ -161,6 +161,7 @@ workspace.replication_policy.changed.v1
 workspace.default_agent_binding.changed.v1
 workspace.delegation.settings.changed.v1
 workspace.primary_coworker.changed.v1
+workspace.renamed.v1
 workspace.archived.v1
 workspace.instructions.revision.created.v1
 workspace.root.created.v1
@@ -352,6 +353,7 @@ store/forward unknown versions but cannot apply them to projections they do not 
 | `workspace.replication_policy.changed` | `workspace_id`, `from`, `to`, `replication_scope_root_ids[]`, `aggregate_version` |
 | `workspace.default_agent_binding.changed` | `workspace_id`, `from_agent_binding_id`, `to_agent_binding_id`, `changed_by`, `aggregate_version` |
 | `workspace.archived` | `workspace_id`, `archived_by`, `aggregate_version` |
+| `workspace.renamed` | `workspace_id`, `from_name`, `to_name`, `changed_by`, `aggregate_version` |
 | `workspace.instructions.revision.created` | `workspace_id`, `revision`, `parent_revisions[]`, `content_ref`, `content_digest`, `authored_by` |
 | `workspace.root.created` | `workspace_root_id`, `workspace_id`, `resource_id`, `location_id`, `added_by`, `aggregate_version` |
 | `workspace.root.status.changed` | `workspace_root_id`, `from`, `to`, `reason_code`, `aggregate_version` |
@@ -389,7 +391,7 @@ must not be copied into domain events, ordinary logs, or aggregate snapshots.
 | `conversation.message.added` | `message_id`, `conversation_id`, `author`, `content_digest`, `resource_refs` |
 | `conversation.turn.created` | `turn_id`, `conversation_id`, `user_message_id`, `agent_binding_id`, `aggregate_version` |
 | `rich.presentation.published` | `presentation_id`, `conversation_id`, `message_id`, `schema_version`, `renderer_contract_version`, `semantic_content_digest`, `document_digest`, `document_size_bytes`, `producer_agent_session_id?`, `host_instruction_digest?`, `host_skill_refs[]`, `aggregate_version` |
-| `conversation.turn.retried` | `turn_id`, `prior_agent_session_id?`, `agent_session_id`, `retry_ordinal`, `aggregate_version` |
+| `conversation.turn.retried` | `turn_id`, `prior_agent_session_id?`, `retry_ordinal`, `aggregate_version` (the turn returns to OPEN with no session; the fresh AgentSession is reserved by the dispatcher afterwards) |
 | `conversation.turn.resumed` | `turn_id`, `user_request_id`, `prior_agent_session_id?`, `agent_session_id`, `aggregate_version` |
 | `conversation.turn.status.changed` | `turn_id`, `from`, `to`, `reason_code`, `agent_session_id?`, `aggregate_version` |
 | `conversation.turn.settled` | `turn_id`, `from`, `to`, `reason_code?`, `agent_session_id?`, `aggregate_version` |
@@ -507,8 +509,8 @@ must not be copied into domain events, ordinary logs, or aggregate snapshots.
 `workspace.delegation.settings.changed.v1` stores the complete immutable settings revision
 and its prior revision in the same transaction that advances the Workspace settings head,
 Workspace aggregate version, and idempotency receipt. Workspace creation seeds revision 1
-with `NATIVE_DEFAULT`, an empty worker ceiling, and `AGENT_DEFAULT`; migration v28 (defined
-but not yet wired, `SCHEMA_VERSION` is 27; register A-40) would seed
+with `NATIVE_DEFAULT`, an empty worker ceiling, and `AGENT_DEFAULT`; migration v28 (wired,
+`SCHEMA_VERSION` is 32; register A-40) seeds
 existing Workspaces deterministically and does not fabricate user-authored setting events.
 The v1 settings event contains no credentials, model-provider secrets, native session data,
 or capability grant. The settings event changes future Task admission policy only.

@@ -1,7 +1,7 @@
 # Feature Specification - LiteSPM Package Lifecycle Bridge
 
 - **Feature ID:** 013 | **Status:** IN_REVIEW | **Revision:** 0.1
-- **Owner review:** authored 2026-11-09 after the owner accepted the review packet ([docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)). This package did not exist when the packet was accepted, so it is not owner-accepted. Its open decisions are new global blockers B-36 and B-37 (PROPOSED, pending owner). IN_REVIEW does not authorize implementation, and nothing here claims anything is implemented, SERVED, INTEGRATED or QUALIFIED.
+- **Owner review:** authored 2026-11-09 after the owner accepted the review packet ([docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)). This package did not exist when the packet was accepted, so it is not owner-accepted. Its decisions B-36 and B-37 are PROPOSED and were DEFERRED by the owner on 2026-11-10 together with all LiteSPM parts. IN_REVIEW does not authorize implementation, and nothing here claims anything is implemented, SERVED, INTEGRATED or QUALIFIED.
 - **Change control:** once accepted, any change to this contract requires a new revision and renewed owner approval (SPECIFICATION-STANDARD section 7).
 - **Target:** LiteCowork V1 Area 5 items 5.1 to 5.4, master plan P5 package exit, LiteSPM lane section 3 steps 1 to 7, gate C, E2E-06.
 - **Owners:** LiteSPM boundary (Capability Fabric), Operator/API, Storage, Trust/Approval, Desktop UI, Security, Product. Upstream LiteSPM owns package catalog, inventory, host registration, mutation and lifecycle.
@@ -44,7 +44,7 @@ No LiteCowork package database, resolver, catalog cache, CAS or host-config writ
 | Discover entry model | CODE: `DiscoverCatalogEntry`, `DiscoverInstallState`, `DiscoverEntrySource::LiteSpmPackage`, `derive_discover_availability` in `crates/storage-core/src/discover.rs`; `validate()` rejects `authoritative = true` | No LiteSPM-sourced rows exist |
 | Desktop Discover | CODE: `apps/litecowork-ui/src/discover/DiscoverPage.tsx` tabs Explore, "Installed / native", Managed, Connections; `connectActionOutcome()` in `discover-state.ts` disables every row action; Managed and Connections render "Not available"; `discover_request` in `apps/litecowork-ui/src-tauri/src/discover_bridge.rs` supports only `search` and `item`; test `apps/litecowork-ui/tests/discover-catalog-state.test.ts` | Truthful unavailable states; no lifecycle UI |
 | LiteSPM client, transport, peer auth | ABSENT: no `LiteSpm*` type in `apps/` or `crates/` | Whole bridge is target |
-| Package approval and receipt records | ABSENT: no table after `docs/schemas/sqlite-v28.sql` | Target |
+| Package approval and receipt records | ABSENT: no table after `docs/schemas/sqlite-v32.sql` | Target |
 | Reusable primitives | CODE: `crates/operator-ipc` (`BudgetedBody`, `InFlightBodyBudget`, framed read/write), `crates/windows-local-security` (`current_logon_sid`, `connect_operator_pipe`) | Built for LiteCowork's own Operator pipe; reuse for a LiteSPM client is unproven |
 | Upstream LiteSPM | Pins disagree: REF-LITESPM `9f42b25d` ([REFERENCE-IMPLEMENTATIONS.md](../../docs/REFERENCE-IMPLEMENTATIONS.md)); interop LLD header `111fd9b8`; LLD Appendix A/B study `f77a3a3`. Appendix A records that upstream publishes no approval-recording method (A1), no package `operation.get` (A2), no reconcile/unmanage (A3), no service descriptor (A4) and no agreed health meaning (A5) | Bridge contract not pinned; see B-36 |
 
@@ -242,7 +242,7 @@ See [contracts/errors-recovery.md](contracts/errors-recovery.md). Rules: unavail
 - Endpoint discovery follows the pinned descriptor's documented location only; no guessing.
 - Host compatibility profile is data: host, host version, OS/build, scope, kind, operation, evidence ref. Only rows qualified in 013-T18 are enabled.
 - Deadlines and caps are finite; proposed initial values (connect 5 s, call 30 s, response 4 MiB, inventory page 200) are confirmed against the descriptor in 013-T04.
-- Migration: one forward-only `sqlite-vNN.sql` (next free number at implementation time; the chain currently ends at `sqlite-v28.sql`).
+- Migration: one forward-only `sqlite-vNN.sql` (allocated v39 in docs/LITECOWORK-BUILD-TASKS.md; the chain currently ends at `sqlite-v32.sql`).
 
 ## 13. Observability
 

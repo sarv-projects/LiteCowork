@@ -1613,6 +1613,7 @@ mod tests {
             conversation_id: "conversation-one".to_owned(),
             target_agent_binding_id: "binding-b".to_owned(),
             through_message_id: "user-current".to_owned(),
+            omitted_message_count: 0,
             messages: vec![
                 message("user-first", "USER", "What is the issue?", None),
                 message(

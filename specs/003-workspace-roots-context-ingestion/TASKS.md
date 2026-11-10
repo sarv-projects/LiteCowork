@@ -23,7 +23,7 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 001 contract-promotion task (turn admission and `resource_refs` materialization contract must be promoted in the same change set or before); orchestrator assigns the next free migration number.
 - **Owner:** Resource, Conversation, Storage (contract owners)
-- **Allowed paths:** `docs/WORLD-RESOURCES.md`, `docs/CONTEXT.md`, `docs/STORAGE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/domain-event.schema.json`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-vNN.sql` (new, next free number after `sqlite-v28.sql`), `crates/storage-sqlite/src/lib.rs` (migration registration only), this package
+- **Allowed paths:** `docs/WORLD-RESOURCES.md`, `docs/CONTEXT.md`, `docs/STORAGE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/domain-event.schema.json`, `docs/schemas/error-codes.schema.json`, `docs/schemas/sqlite-v35.sql` (new, allocated in docs/LITECOWORK-BUILD-TASKS.md; v32 is the highest present), `crates/storage-sqlite/src/lib.rs` (migration registration only), this package
 - **Contract:** SPEC §5 (B-13, B-14 with B-28 rider), §7.2, §15 AC-013 to AC-019; WORLD-RESOURCES roots; CONTEXT attachments
 - **Change intent:** Promote `CommitContextAttachment`, `CommitRetrievalReceipt`, `ContextUsedEntry` and `ContextAttachmentError::{RootNotActive, RevisionConflicted, IntegrityFailure, OverBound}` into CONTEXT and STORAGE; add `context_attachments` and `retrieval_receipts` tables with `UNIQUE(workspace_id, idempotency_key)` and foreign keys to the turn and Resource revision; document the Windows root-selection rules (no-reparse open, volume serial + file id identity, UNC/drive-relative/device/ADS rejection) in WORLD-RESOURCES; add a platform-availability field for root add and scan to the Operator readiness or root list response (accepted target interface, not yet in source; exact field fixed here); register any new error code (root-not-active) in SCHEMAS and `error-codes.schema.json`.
 - **Acceptance:**
@@ -36,7 +36,7 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T02 - Qualify root lifecycle storage on both rows
 
-- **Status:** PARTIAL (create/list/pause/resume/revoke store methods in `crates/storage-core/src/lib.rs` and SQLite implementation with tests in `crates/storage-sqlite/src/workspace_root_scan_tests.rs`; overlap, revoke and status-gating negative coverage not proven on Windows)
+- **Status:** PARTIAL (Linux, 2026-11-10: `workspace_root_lifecycle` tests in `crates/storage-sqlite/src/workspace_root_lifecycle_tests.rs` pass 3/3 covering pause hides root from scan candidates, stale-version loser, revoke deletes private bindings and is terminal (AC-005), idempotent replay, changed-payload refusal and foreign principal NotFound. NOT yet covered: AC-001 fault injection between root and binding insert, AC-002 overlap body redaction (overlap is decided in the daemon adapter, not the store), concurrent pause/revoke race, Windows row. Create/list/pause/resume/revoke store methods in `crates/storage-core/src/lib.rs` and SQLite implementation with tests in `crates/storage-sqlite/src/workspace_root_scan_tests.rs`; overlap, revoke and status-gating negative coverage not proven on Windows)
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Resource and Storage
@@ -56,7 +56,8 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T03 - Implement Windows WorkspaceRoot add on the GA row
 
-- **Status:** NOT STARTED (Windows fallback of `create_workspace_root_from_native_selection` in `apps/litecoworkd/src/operator.rs` returns 503; Tauri `add_workspace_root` already has a `#[cfg(windows)]` path-encoding branch in `apps/litecowork-ui/src-tauri/src/lib.rs`)
+- **Status:** DEFERRED (Windows-only per owner instruction 2026-11-10; to be tested on the owner's Windows laptop later; nothing here is claimed done) - NOT STARTED (Windows fallback of `create_workspace_root_from_native_selection` in `apps/litecoworkd/src/operator.rs` returns 503; Tauri `add_workspace_root` already has a `#[cfg(windows)]` path-encoding branch in `apps/litecowork-ui/src-tauri/src/lib.rs`)
+- **DEFERRED/BLOCKED note:** Why: Windows-only, owner deferred to later laptop testing (A-62). Unblocks when: the owner runs the Windows build on the laptop; Linux implementation needs no unblocking. Test later at: native Windows 11 or 10 x64 on the owner's laptop, not WSL2.
 - **Depends on:** T01, T02
 - **Cross-package prerequisites:** Feature 011 Windows named-pipe Operator IPC (Wave 0) for the end-to-end call; the handler itself is unit-testable without it.
 - **Owner:** Resource, Security/Trust
@@ -75,7 +76,8 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T04 - Windows startup identity revalidation for saved roots
 
-- **Status:** PARTIAL (`list_workspace_root_revalidation_candidates` and `commit_workspace_root_revalidation` exist in `crates/storage-core/src/lib.rs`; Windows identity comparison through `RawDirectoryIdentity::matches_binding` in `apps/litecoworkd/src/local_filesystem.rs` is compiled but not exercised by a Windows root; startup call sites in `apps/litecoworkd/src/runtime.rs`)
+- **Status:** Windows part DEFERRED (owner instruction 2026-11-10); Linux part not reached in this slice. PARTIAL (`list_workspace_root_revalidation_candidates` and `commit_workspace_root_revalidation` exist in `crates/storage-core/src/lib.rs`; Windows identity comparison through `RawDirectoryIdentity::matches_binding` in `apps/litecoworkd/src/local_filesystem.rs` is compiled but not exercised by a Windows root; startup call sites in `apps/litecoworkd/src/runtime.rs`)
+- **DEFERRED/BLOCKED note:** Why: Windows part owner deferred (A-62); Linux part was not reached in the slice. Unblocks when: Windows laptop for the Windows part; Linux part is plain implementation work. Test later at: the owner's Windows laptop, and native Linux for the Linux part.
 - **Depends on:** T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Resource
@@ -93,7 +95,8 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T05 - Implement the Windows bounded manual rescan
 
-- **Status:** NOT STARTED (non-Linux returns 501 `SCAN_UNSUPPORTED_PLATFORM` at `scan_workspace_root`; Linux census in `scan_linux_root`; `windows_directory_entry_is_traversable` and `WINDOWS_FILE_ATTRIBUTE_REPARSE_POINT` exist in `apps/litecoworkd/src/local_filesystem.rs`, whose comment states Windows traversal stays unsupported until a race-free handle-relative open API exists)
+- **Status:** DEFERRED (Windows-only per owner instruction 2026-11-10; to be tested on the owner's Windows laptop later; nothing here is claimed done) - NOT STARTED (non-Linux returns 501 `SCAN_UNSUPPORTED_PLATFORM` at `scan_workspace_root`; Linux census in `scan_linux_root`; `windows_directory_entry_is_traversable` and `WINDOWS_FILE_ATTRIBUTE_REPARSE_POINT` exist in `apps/litecoworkd/src/local_filesystem.rs`, whose comment states Windows traversal stays unsupported until a race-free handle-relative open API exists)
+- **DEFERRED/BLOCKED note:** Why: Windows-only, owner deferred (A-62). Unblocks when: as T03. Test later at: the owner's Windows laptop.
 - **Depends on:** T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Resource
@@ -112,7 +115,8 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T06 - Symlink, reparse-point and path-identity denial matrix
 
-- **Status:** NOT STARTED
+- **Status:** DEFERRED (Windows-only per owner instruction 2026-11-10; to be tested on the owner's Windows laptop later; nothing here is claimed done) - NOT STARTED
+- **DEFERRED/BLOCKED note:** Why: Windows-only reparse-point and path-identity matrix, owner deferred (A-62). Unblocks when: as T03. Test later at: the owner's Windows laptop; the Linux symlink part can be tested here.
 - **Depends on:** T03, T05
 - **Cross-package prerequisites:** NONE
 - **Owner:** Security/Trust, Resource

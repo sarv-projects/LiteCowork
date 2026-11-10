@@ -1,0 +1,70 @@
+name: architecture-docs
+
+# 019-T03 Linux CI. Introduced through a reviewed pull request only. Shape is pinned by
+# tests/test_architecture_validator.py. No job reads a repository secret, so a
+# pull_request run from a fork cannot either.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: architecture-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Repository gate (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          version: 0.12.23
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f
+      - name: Install Linux native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libdbus-1-dev pkg-config bubblewrap
+      - run: scripts/check.sh
+      - name: Secret scan of tracked source
+        run: uv run --locked python scripts/v1_secret_scan.py --source --json
+
+  ui:
+    name: Desktop UI (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/litecowork-ui
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: apps/litecowork-ui/.node-version
+      - run: corepack pnpm@12.10.1 install --frozen-lockfile
+      - run: corepack pnpm@12.10.1 test
+      - run: corepack pnpm@12.10.1 build
+
+  tauri:
+    name: Tauri shell workspace (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f
+      - name: Install Tauri Linux native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential curl file libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev libdbus-1-dev librsvg2-dev pkg-config wget
+      - run: cargo test --manifest-path apps/litecowork-ui/src-tauri/Cargo.toml --workspace --locked

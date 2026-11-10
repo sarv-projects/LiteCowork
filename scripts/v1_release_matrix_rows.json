@@ -1,0 +1,46 @@
+{
+  "rows": [
+    {
+      "row_id": "windows-x64-opencode-v2.0.32",
+      "os": "windows",
+      "os_min_build": "10.0.19045",
+      "arch": "x86_64",
+      "target_triple": "x86_64-pc-windows-msvc",
+      "desktop_runtime": "WebView2",
+      "agent": "opencode",
+      "agent_version": "2.0.32",
+      "auth_mode": "user-configured",
+      "protocol": "acp",
+      "priority": 1,
+      "counted": true
+    },
+    {
+      "row_id": "linux-x64-opencode-v2.0.32",
+      "os": "linux",
+      "os_min_build": "Ubuntu 24.04",
+      "arch": "x86_64",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "desktop_runtime": "WebKitGTK",
+      "agent": "opencode",
+      "agent_version": "2.0.32",
+      "auth_mode": "user-configured",
+      "protocol": "acp",
+      "priority": 2,
+      "counted": true
+    }
+  ],
+  "unsupported": [
+    {"os": "macos", "arch": "aarch64", "reason": "No macOS row in V1"}
+  ],
+  "later_rows": [
+    {"row_id": "windows-x64-claude-code", "state": "NOT_RUN", "reason": "Claude Code row is declared after the first two rows qualify"},
+    {"row_id": "linux-x64-claude-code", "state": "NOT_RUN", "reason": "Claude Code row is declared after the first two rows qualify"}
+  ],
+  "unavailable_cells": {
+    "windows-x64-opencode-v2.0.32": {
+      "E2E-04": "Task execution is UNAVAILABLE on Windows until the B-35 provider qualifies (B-17)",
+      "E2E-08": "The daemon terminal half of this journey is UNAVAILABLE on Windows until the B-35 provider qualifies (B-17); the browser half is not qualified here",
+      "terminal_pty": "The daemon terminal is UNAVAILABLE on Windows until the B-35 provider qualifies (B-17)"
+    }
+  }
+}

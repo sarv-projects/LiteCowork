@@ -11,7 +11,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 - **Operator:** `apps/litecoworkd/src/conversation_operator.rs` mounts `POST/GET /v1/conversations`, `POST /v1/conversations/{conversation_id}/turns` (`submit_conversation_turn`), `.../turns/{turn_id}/retry` (`retry_conversation_turn`), `.../turns/{turn_id}/cancel` (`cancel_conversation_turn`), `PATCH .../agent-binding` and `GET /v1/conversations/{conversation_id}`. Submit commits USER message + OPEN turn + receipt through `create_conversation_turn`, then starts `AgentSessionSupervisor::dispatch_turn` in a detached `tokio::spawn`; a dispatch error is only printed with `eprintln!`. The module header comment (lines 1-2) still says turn dispatch is "intentionally absent", which is stale.
 - **Supervisor:** `apps/litecoworkd/src/agents/supervisor.rs` `AgentSessionSupervisor::dispatch_turn` runs the whole turn inside `spawn_blocking`: `resolve_conversation_session_host_for_turn`, creates a `LOCAL_PER_SESSION` `AgentHostInstanceRecord` if missing, reserves STARTING with `start_conversation_agent_session`, then `execute_agent_turn` matches only `provider_key == "opencode"`. That branch calls `OpenCodeServer::spawn` per turn, `create_session`, `activate_conversation_agent_session`, `load_conversation_context_for_turn`, `send_conversation_context_async`, polls `next_event` every 500 ms up to a hard-coded 60 s deadline, calls `server.stop()` and commits with `commit_conversation_agent_response`. The commit request id is `req-commit-{final_message_id}` with a freshly generated message id, so a repeated commit attempt is not idempotent; `expected_session_version: 2` and the message event `entity_revision: 3` are hard-coded.
 - **Adapter:** `apps/litecoworkd/src/agents/opencode_server.rs` pins `OpenCodeServerProtocol::V2_0_32`, caps a request at `MAX_REQUEST_BYTES` (512 KiB) and has `abort_session` (`/api/session/{session_id}/interrupt`) with no caller.
-- **Storage:** `crates/storage-core/src/conversation.rs` defines `CommitConversationAgentResponse` without retry ordinal or provider-response identity, plus `build_conversation_context_package`. `crates/storage-sqlite/src/conversations.rs` `create_conversation_turn` does not check for another nonterminal turn (the test `conversation_turn_creation_serializes_appends_from_the_same_stale_snapshot` in `crates/storage-sqlite/src/conversation_turn_tests.rs` still admits two OPEN turns). `transition_conversation_turn` accepts `TurnCommand::Retry` only when an ACTIVE session with the new id already exists (`CONVERSATION_SESSION_NOT_READY`), while `retry_conversation_turn` generates a brand-new session id, so the retry route cannot succeed; `crates/domain-conversation/src/lib.rs` moves Retry straight to RUNNING. `list_starting_conversation_agent_sessions` and `mark_starting_conversation_agent_session_lost` exist (tests in `crates/storage-sqlite/src/agent_binding_tests.rs`) but no daemon startup caller exists; `recover_and_persist_startup_blockers` in `apps/litecoworkd/src/runtime.rs` is the startup recovery hook that does not call them. No dispatch outbox, no usage record table, and no `CONVERSATION_TURN_IN_PROGRESS` code in `docs/schemas/error-codes.schema.json`. Migration chain ends at `docs/schemas/sqlite-v28.sql`.
+- **Storage:** `crates/storage-core/src/conversation.rs` defines `CommitConversationAgentResponse` without retry ordinal or provider-response identity, plus `build_conversation_context_package`. `crates/storage-sqlite/src/conversations.rs` `create_conversation_turn` does not check for another nonterminal turn (the test `conversation_turn_creation_serializes_appends_from_the_same_stale_snapshot` in `crates/storage-sqlite/src/conversation_turn_tests.rs` still admits two OPEN turns). `transition_conversation_turn` accepts `TurnCommand::Retry` only when an ACTIVE session with the new id already exists (`CONVERSATION_SESSION_NOT_READY`), while `retry_conversation_turn` generates a brand-new session id, so the retry route cannot succeed; `crates/domain-conversation/src/lib.rs` moves Retry straight to RUNNING. `list_starting_conversation_agent_sessions` and `mark_starting_conversation_agent_session_lost` exist (tests in `crates/storage-sqlite/src/agent_binding_tests.rs`) but no daemon startup caller exists; `recover_and_persist_startup_blockers` in `apps/litecoworkd/src/runtime.rs` is the startup recovery hook that does not call them. No dispatch outbox, no usage record table, and no `CONVERSATION_TURN_IN_PROGRESS` code in `docs/schemas/error-codes.schema.json`. Migration chain ended at `docs/schemas/sqlite-v28.sql` when this baseline was written (2026-11-09); it now ends at `sqlite-v32.sql` (v29 outbox and usage records, v30 turn activity, v31 and v32 from Features 014 and 012). The outbox, usage-record and `CONVERSATION_TURN_IN_PROGRESS` absences above are historical; each task status below records what exists now.
 - **Tauri:** `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs` has `submit_conversation_turn`, `retry_conversation_turn` and `cancel_conversation_turn` (both send `If-Match` from `expected_version`) and `get_conversation_presentation`; `apps/litecowork-ui/src-tauri/src/conversation_stream_bridge.rs` has `subscribe_conversation_stream` and `acknowledge_conversation_stream_frame` for the durable projection stream (no native TURN_DELTA producer).
 - **UI:** `apps/litecowork-ui/src/conversations/ConversationsPage.tsx`. Commit 8129420 added the `sendEligible` / `bindingEligibleForSend` gate (register A-24) and the truthful empty state (register A-26 empty-state part), guarded by `apps/litecowork-ui/tests/conversation-empty-state-truthfulness.test.mjs`. Still broken: `isTurnRunning` checks only RUNNING plus transient STREAMING/RECONNECTING turns; `cancelTurn` searches `transientTurns` and sends `expectedVersion: 1`; no `retry_conversation_turn` call site; submit always sends `resourceRefs: []`; the "+" (Add context or file), Voice Input, More options and Turbo controls have no handlers; the agent `<select>` falls back to the fabricated label "Gemini 3.8 Flash Low" and the header falls back to "AI Capabilities Overview". `apps/litecowork-ui/src/conversations/conversation-view.ts` types `active_turn` as `{ status }` only (no version or retry ordinal).
 - **Tests today:** `apps/litecoworkd/src/conversation_operator_tests.rs` (for example `conversation_turn_submit_returns_accepted_receipt_with_active_session_supervisor`), `crates/storage-sqlite/src/agent_binding_tests.rs` (`conversation_activation_commits_session_turn_and_local_host_binding_atomically`, `conversation_agent_response_commit_settles_turn_and_session_atomically`), `crates/storage-sqlite/src/conversation_turn_tests.rs`, UI `tests/conversation-stream.test.ts`, `tests/conversation-view.test.ts`. `apps/litecoworkd/tests/` contains only `cli.rs`; the canonical target `--test conversation_session_supervisor` does not exist.
@@ -20,7 +20,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T01 - Record owner acceptance and promote accepted contracts into owner docs and schemas
 
-- **Status:** PARTIAL - owner acceptance of B-01 to B-10 recorded 2026-11-09 (this revision); no accepted interface is promoted yet (`CONVERSATION_TURN_IN_PROGRESS` absent from `docs/schemas/error-codes.schema.json`; no dispatch-intent or usage tables after `sqlite-v28.sql`).
+- **Status:** PARTIAL - owner acceptance of B-01 to B-10 recorded 2026-11-09. Promoted and implemented in this slice: `CONVERSATION_TURN_IN_PROGRESS` (error-codes and domain-event schemas, SCHEMAS.md, API.md), migration `docs/schemas/sqlite-v29.sql` (dispatch intents, response commit identity, usage records, single-flight triggers; STORAGE.md migrations), v28 wired with it. Still not promoted: `retry_ordinal`/`provider_response_id` on the receipt schema, `active_turn.version`/`retry_ordinal` in the presentation snapshot, `turn.delta` correlation fields, Adapter 1.0 handshake names (T13/T16 own those).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE (Feature 018 must agree the usage record shape it will read; record its review in the PR).
 - **Owner:** Conversation, Storage, API, Events owners; Product for B-02 rider.
@@ -30,7 +30,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Acceptance:**
   - [x] B-01 to B-10 owner acceptance recorded with the B-02 rider and B-04/B-07/B-09 caveats (SPEC section 5).
   - [ ] Every promoted name exists exactly once in its owner doc and machine schema; no parallel definition in this package.
-  - [ ] The new migration is the next immutable `sqlite-vNN.sql`, older migrations are byte-identical, and the schema fingerprint test passes.
+  - [x] The new migration is the next immutable `sqlite-vNN.sql`, older migrations are byte-identical, and the schema fingerprint test passes.
   - [ ] Negative: schema validators reject a commit receipt missing `retry_ordinal` and a frame missing turn/retry/session correlation.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py` and `python3 scripts/validate_architecture.py` and `cargo test -p storage-sqlite --locked schema` (filter to be added by this task for the fingerprint check)
 - **Evidence:** PR link and command output in Completion evidence below; register rows for B-01 to B-10 closed by the orchestrator.
@@ -38,7 +38,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T02 - Harden the atomic final Agent response commit (B-04 caveat)
 
-- **Status:** PARTIAL - `CommitConversationAgentResponse` / `CommittedConversationAgentResponse` in `crates/storage-core/src/conversation.rs` and the IMMEDIATE transaction in `crates/storage-sqlite/src/conversations.rs` exist and are called by the supervisor; test `conversation_agent_response_commit_settles_turn_and_session_atomically` covers stale turn/session versions, foreign principal, success and exact replay. Missing: retry ordinal, provider-response identity, author validation, wrong-Workspace/session and fault-injection coverage.
+- **Status:** DONE (storage) - `CommitConversationAgentResponse` now carries `retry_ordinal`, `provider_response_id` and optional usage; the IMMEDIATE transaction verifies the ordinal, the AGENT author pinned to the session binding, derives the receipt identity from `(turn_id, retry_ordinal)` with a content digest (exact repeat replays the stored receipt under a different request id, any other repeat is `CONVERSATION_RESPONSE_IDENTITY_CONFLICT`), settles the dispatch intent and writes the usage record. Evidence: `conversation_agent_response_commit_*` tests in `crates/storage-sqlite/src/agent_binding_tests.rs` and `conversation_durable_turn_tests.rs`.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Storage, Conversation.
@@ -47,11 +47,11 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Change intent:** add `retry_ordinal: u32` and `provider_response_id: String` to `CommitConversationAgentResponse`; verify `retry_ordinal` equals the turn's current ordinal inside the transaction; derive the receipt identity from (turn_id, retry_ordinal, provider_response_id) instead of a caller-generated message id; validate `message.author` is `{kind: AGENT, agent_binding_id}` matching the turn-pinned binding; derive event revisions from loaded aggregate versions rather than trusting caller-supplied `entity_revision`.
 - **Acceptance:**
   - [x] Typed request/result and SQLite operation exist and are invoked by the OpenCode supervisor.
-  - [ ] Exact replay with the same turn, retry ordinal and provider-response id returns the stored receipt and message (AC-026).
-  - [ ] Same identity with different content digest, different retry ordinal or different author fails with no partial write (AC-026).
-  - [ ] Foreign owner, wrong Workspace, wrong or non-ACTIVE session and stale versions fail with no partial write (AC-009).
-  - [ ] Fault injection after each insert (message, turn, session, host binding delete, events, receipt) rolls back everything.
-  - [ ] Two concurrent commits for one turn: exactly one wins, the other gets a conflict or the stored receipt.
+  - [x] Exact replay with the same turn, retry ordinal and provider-response id returns the stored receipt and message (AC-026).
+  - [x] Same identity with different content digest, different retry ordinal or different author fails with no partial write (AC-026).
+  - [x] Foreign owner, wrong Workspace, wrong or non-ACTIVE session and stale versions fail with no partial write (AC-009).
+  - [x] Fault injection after each insert (message, turn, session, host binding delete, events, receipt) rolls back everything.
+  - [x] Two concurrent commits for one turn: exactly one wins, the other gets a conflict or the stored receipt.
 - **Command:** `cargo test -p storage-sqlite --locked conversation_agent_response_commit`
 - **Evidence:** test names and output recorded below; IMPLEMENTATION-STATUS.md Conversation final-commit row.
 - **Stop:** any path exposes a final answer as complete without the commit receipt.
@@ -79,7 +79,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T04 - Qualify the OpenCode v2.0.32 AgentAdapter behind the Adapter 1.0 contract
 
-- **Status:** PARTIAL - OpenCode Server v2.0.32 helper (`OpenCodeServer`, `OpenCodeServerProtocol::V2_0_32`) and the supervisor call path exist; no Adapter 1.0 wrapper, `abort_session` has no caller, the read loop uses a hard-coded 60 s deadline, and no Windows or USER evidence exists.
+- **Status:** PARTIAL - the provider-neutral `AgentAdapter` trait (probe_version, create_session, send_context, drive_turn, interrupt, shutdown), the OpenCode v2.0.32 `OpenCodeAdapter` (wraps `OpenCodeServer`, `interrupt` calls `abort_session`), the ACP client spine and per-provider launch catalog exist in `apps/litecoworkd/src/agents/adapter.rs`; the supervisor drives the OpenCode turn through them with a line-resetting idle watchdog instead of the old 60 s cap, and tests `selected_adapter_conversation_*` pass. Not done: the Stop route does not yet call `interrupt` (T07), a timeout after dispatch is not yet reconciled from native session state, and no Windows or USER evidence exists.
 - **Depends on:** T01, T03
 - **Cross-package prerequisites:** Feature 002 OpenCode probe fix so the binding is creatable (probe currently records `compatible=false`).
 - **Owner:** Agent Runtime.
@@ -98,7 +98,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T05 - Complete bounded context dispatch and confirm the first adapter budget (B-07 caveat)
 
-- **Status:** PARTIAL - `load_conversation_context_for_turn` and `build_conversation_context_package` (1,024 messages / 4 MiB, refuses oversize with `CONVERSATION_CONTEXT_LIMIT_EXCEEDED`) and `encode_conversation_context_prompt` in `apps/litecoworkd/src/agents/conversation_prompt.rs` exist; OpenCode caps requests at 512 KiB; the B-07 sliding window and truncation receipt are not implemented and the real OpenCode budget is unconfirmed.
+- **Status:** PARTIAL (window implemented; real OpenCode budget NOT confirmed) - the B-07 window now exists in two layers. `build_conversation_context_package` no longer refuses a long Conversation: it keeps the newest contiguous messages ending at the boundary within 1,024 messages and 4 MiB and records the older count in `omitted_message_count` (refusing with `CONVERSATION_CONTEXT_LIMIT_EXCEEDED` only when the boundary message alone exceeds 4 MiB); the SQLite loader reads only the newest 1,024 committed messages. `window_conversation_context` in `conversation_prompt.rs` then keeps the package unchanged when it encodes within the native input cap, otherwise keeps the newest suffix within 80% of that cap, adds the visible `[Notice: Messages 1..N omitted due to model context window budget]` to the encoded transcript and returns a `ContextReduction` receipt (counts only), or refuses with `InputTooLarge` when the current message cannot fit. The supervisor applies it before dispatch. Budget used is LiteCowork's own 256 KiB text-input cap (`MAX_NATIVE_CONVERSATION_INPUT_BYTES`) under the 512 KiB HTTP request cap; neither was measured against what OpenCode v2.0.32 accepts because no OpenCode binary exists in this environment (O-05 stays open: owner must measure on a machine with the pinned build). The reduction receipt is returned to the supervisor but not yet persisted or shown in the UI. Pinned Workspace instructions and selected ResourceRefs are not part of the package yet (T14). Evidence: `conversation_context_dispatch_*` (4), `context_window_boundary_at_1024_and_1025_messages_omits_only_the_oldest`, `context_window_byte_bound_keeps_the_boundary_and_refuses_when_it_alone_is_too_large` (storage-core), storage-sqlite context tests (29 pass). No SQLite test seeds more than 1,024 committed messages through the loader.
 - **Depends on:** T01, T03, T04
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, Agent Runtime.
@@ -116,7 +116,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T06 - Wire final response settlement with stable identity in the supervisor
 
-- **Status:** PARTIAL - the supervisor calls `commit_conversation_agent_response`, but the request id comes from a freshly generated message id, the message event revision is hard-coded to 3, and a failed commit is returned as an error string that then marks the turn FAILED.
+- **Status:** DONE (without a live native adapter) - the supervisor derives the commit request id, message id and `provider_response_id` deterministically from `(turn_id, retry_ordinal, native session/message)`, takes expected versions from the activation result instead of hard-coded 2/3, and retries only transient store failures through `retry_transient_store_commit`; every retry repeats the identical commit so a lost acknowledgement is answered from the stored receipt (T02 replay) and the prompt is never resent. Failed and cancelled turns settle through `settle_conversation_turn` and leave no AGENT message. Evidence: `conversation_final_settlement` helper test `conversation_final_settlement_retries_only_transient_store_failures`, storage `conversation_agent_response_commit_*` tests. A full supervisor run against a fake or live native agent is not tested here (no such harness in this checkout).
 - **Depends on:** T02, T03, T04, T05
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, Agent Runtime.
@@ -133,7 +133,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T07 - Make Stop effective with observed quiescence and fix the Retry lifecycle (daemon)
 
-- **Status:** NOT STARTED - `cancel_conversation_turn` writes CANCEL_REQUESTED then CANCELLED in two transitions with no native interrupt; `retry_conversation_turn` cannot succeed because `transition_conversation_turn` requires an ACTIVE session for the newly generated id, and the domain `TurnCommand::Retry` moves FAILED straight to RUNNING, which conflicts with STARTING reservation.
+- **Status:** DONE (daemon + storage; native interrupt covered by adapter fixtures, not a live agent) - Cancel on RUNNING commits only CANCEL_REQUESTED and signals the attempt through `AgentSessionSupervisor::request_cancel` (per `(turn_id, retry_ordinal)` `CancelSignal`); the OpenCode drive loop sends one `abort_session` interrupt and reports `Stopped` only on observed quiescence, otherwise `StopUnconfirmed`, and only then `settle_attempt_cancelled` commits CANCELLED and closes the session. A completion observed before the interrupt stays COMPLETED (commit accepts a CANCEL_REQUESTED turn for Completed only) and a failure stays FAILED. A repeated cancel never settles. Retry is now `FAILED -> OPEN` with `retry_ordinal + 1`, no session, an UNCLAIMED intent for the new ordinal and `conversation.turn.retried.v1` without `agent_session_id` (domain, storage, schema, EVENTS and STATE-MACHINES updated); the dispatcher then reserves a fresh STARTING session. Duplicate retry/cancel keys replay via `find_conversation_turn_command_replay`; stale If-Match is 412, non-FAILED retry is 409, retry during another in-flight turn is 409 `CONVERSATION_TURN_IN_PROGRESS`. Known limit: OpenCode v2 cannot distinguish a completion that raced the interrupt after the interrupt was sent, so that case reports Stopped; failures during a failed settlement also now end the session LOST so Retry is not blocked. Tests: `conversation_stop_and_retry_*`, `conversation_cancel_commits_only_the_request_*`, `conversation_retry_is_refused_*` (litecoworkd), `selected_adapter_conversation_stop_*` (adapter), `conversation_retry_reopens_*`, `conversation_cancel_settles_*`, `conversation_turn_settlement_*` (storage), domain-conversation tests.
 - **Depends on:** T03, T04, T06
 - **Cross-package prerequisites:** NONE (Feature 012 take-control waits on this task).
 - **Owner:** Conversation, Agent Runtime.
@@ -152,7 +152,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T08 - Implement daemon restart and orphan recovery sweep
 
-- **Status:** NOT STARTED - `list_starting_conversation_agent_sessions` and `mark_starting_conversation_agent_session_lost` exist with tests but no caller in `recover_and_persist_startup_blockers` (`apps/litecoworkd/src/runtime.rs`) or elsewhere at startup.
+- **Status:** DONE (restart sweep; crash windows covered with seeded rows, no live agent kill) - `agents/conversation_recovery.rs` runs from `recover_and_persist_startup_blockers` before the Operator accepts commands. It settles every UNCLAIMED or CLAIMED dispatch intent's turn FAILED with reason `RUNTIME_RESTARTED` (RUNNING, CANCEL_REQUESTED and never-claimed OPEN turns alike; no same-incarnation resume in V1, so unknown native state is never reported completed and Retry is offered), ends the AgentSession LOST, and releases any STARTING session no intent explains. A failing row raises the `CONVERSATION_SESSION_RECOVERY_FAILED` startup blocker. Legacy turns from before the v29 outbox are only reached through their STARTING session. Evidence: `conversation_session_recovery_settles_prior_incarnation_attempts_idempotently` (RUNNING, CANCEL_REQUESTED, OPEN/UNCLAIMED, a COMPLETED turn untouched, no AGENT message invented, second sweep a no-op). Not exercised: a real process kill mid-turn.
 - **Depends on:** T03, T06, T07, T10
 - **Cross-package prerequisites:** Feature 011 Runtime incarnation and startup-blocker reporting.
 - **Owner:** Agent Runtime, Storage, Conversation.
@@ -171,6 +171,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 ## 001-T09 - Qualify the end-to-end native Conversation route on the release matrix and gate Send
 
 - **Status:** NOT STARTED - no `apps/litecoworkd/tests/conversation_session_supervisor.rs`; no Windows or Linux SYSTEM/USER evidence.
+- **DEFERRED/BLOCKED note:** Why: needs a real OpenCode v2.0.32 binary and a native desktop run, none available in the sandbox. Unblocks when: an installed pinned OpenCode and a machine that can run the packaged app. Test later at: Windows laptop first, then native Linux; run the packaged desktop UI against a real session.
 - **Depends on:** T01-T08, T10-T18
 - **Cross-package prerequisites:** Feature 002 OpenCode binding creatable; Feature 011 Windows named-pipe IPC and packaged sidecar; Feature 019 release matrix rows and evidence bundle process.
 - **Owner:** Product, Agent Runtime, Conversation, UI, Security.
@@ -189,7 +190,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T10 - Add a durable dispatch outbox for admitted turns
 
-- **Status:** NOT STARTED - submit commits USER + OPEN + receipt, then `tokio::spawn`; nothing durable records that dispatch is owed or claimed, and exact replay returns the 202 receipt without re-admitting dispatch.
+- **Status:** DONE - `conversation_dispatch_intents` (v29) is written in the same transaction as the turn by `create_conversation_turn`, claimed by compare-and-swap (`claim_conversation_dispatch_intent`) before the STARTING reservation in `AgentSessionSupervisor::dispatch_turn`, settled by the final-response commit and by any terminal turn transition, never deleted. Exact replay inserts no second intent and a losing dispatcher (including the replay re-spawn) returns without reserving a session. The Retry path inserting a new-ordinal intent and the startup sweep over UNCLAIMED/CLAIMED intents belong to T07 and T08.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Storage, Conversation.
@@ -197,17 +198,17 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Contract:** SPEC DATA-MODEL section 6; AC-022; STORAGE; FAILURE-RECOVERY.
 - **Change intent:** insert one dispatch-intent row (turn id, retry ordinal, UNCLAIMED) in the same transaction as `create_conversation_turn` and as the Retry transition; the dispatcher claims it by CAS (UNCLAIMED to CLAIMED with Runtime incarnation) before `start_conversation_agent_session`; settlement marks it SETTLED. Submit and retry both enqueue instead of spawning ad hoc.
 - **Acceptance:**
-  - [ ] Intent row commits atomically with the turn; rollback test removes both.
-  - [ ] Two dispatchers racing on one intent: exactly one claim wins.
+  - [x] Intent row commits atomically with the turn; rollback test removes both.
+  - [x] Two dispatchers racing on one intent: exactly one claim wins.
   - [ ] Crash after admission and before claim leaves an UNCLAIMED intent that the T08 sweep handles (AC-022).
-  - [ ] Exact submit replay does not create a second intent.
+  - [x] Exact submit replay does not create a second intent.
 - **Command:** `cargo test -p storage-sqlite --locked conversation_dispatch_intent` (filter to be added by this task)
 - **Evidence:** test output; migration checksum recorded.
 - **Stop:** the claim cannot be made atomic with STARTING reservation ordering.
 
 ## 001-T11 - Enforce single-flight admission in storage (B-01)
 
-- **Status:** NOT STARTED - `create_conversation_turn` has no nonterminal-turn check; the UI fence alone is not authority.
+- **Status:** DONE - `create_conversation_turn` rejects a second turn while another is OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED with `CONVERSATION_TURN_IN_PROGRESS` after the receipt replay check; v29 triggers back it at the database level (triggers rather than a partial unique index so legacy duplicate rows still migrate). The Operator maps it to 409. Tests: `conversation_turn_creation_rejects_a_second_nonterminal_turn_and_admits_after_settlement`, `conversation_turn_creation_two_concurrent_submits_admit_exactly_one`, `conversation_turn_submit_returns_409_while_another_turn_is_in_flight_and_writes_nothing`.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Storage, Conversation, API.
@@ -215,17 +216,18 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 - **Contract:** SPEC B-01; AC-023; STATE-MACHINES; API.
 - **Change intent:** inside the IMMEDIATE transaction reject when any turn of the Conversation is OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED, backed by a partial unique index on nonterminal turns per Conversation; map to `CONVERSATION_TURN_IN_PROGRESS` 409; update `conversation_turn_creation_serializes_appends_from_the_same_stale_snapshot` to assert one admission and one rejection.
 - **Acceptance:**
-  - [ ] Second submit during an active turn returns 409 and writes no message, turn, event or receipt (AC-023).
-  - [ ] Two concurrent submits from the same stale snapshot: one 202, one 409.
-  - [ ] Exact replay of the admitted submit still returns its receipt (receipt check runs before the single-flight check).
-  - [ ] Submit after the active turn settles succeeds.
+  - [x] Second submit during an active turn returns 409 and writes no message, turn, event or receipt (AC-023).
+  - [x] Two concurrent submits from the same stale snapshot: one 202, one 409.
+  - [x] Exact replay of the admitted submit still returns its receipt (receipt check runs before the single-flight check).
+  - [x] Submit after the active turn settles succeeds.
 - **Command:** `cargo test -p storage-sqlite --locked conversation_turn_creation` and `cargo test -p litecoworkd --locked conversation_turn_submit`
 - **Evidence:** test output in Completion evidence.
 - **Stop:** the index conflicts with existing turn rows during migration; repair forward, never delete user messages.
 
 ## 001-T12 - Wire Conversation-scoped UserRequest continuation (B-06)
 
-- **Status:** NOT STARTED - `apps/litecoworkd/src/user_request_operator.rs` and the domain WAITING_USER/WAITING_DEPENDENCY transitions exist (domain test `rejected_provider_input_returns_waiting_dependency_to_waiting_user`); the OpenCode adapter does not surface provider input requests to this path.
+- **Status:** BLOCKED (provider capability not evidenced; path recorded unavailable per the Stop rule) - the domain WAITING_USER/WAITING_DEPENDENCY transitions and `user_request_operator.rs` exist, but the OpenCode v2.0.32 normalizer maps no input-request event and neither the captured fixture nor any repository source shows the pinned server emitting one, so there is nothing to correlate to a Runtime-local provider input key. The finding is recorded in RESEARCH.md section 8.1. No speculative code was added. Unblocks when an owner runs the pinned OpenCode on a machine that has it and captures an input-request envelope (same capture as T23).
+- **DEFERRED/BLOCKED note:** Why: OpenCode v2.0.32 emits no evidenced input-request event, so continuation would be fabricated (RESEARCH 8.1). Unblocks when: a captured real OpenCode run that shows the input-request event, or another module that declares one. Test later at: the same pinned OpenCode on the owner's native Windows x64 laptop (release matrix row 1); WSL2 and containers never count.
 - **Depends on:** T04, T07, T10
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, Agent Runtime, Trust.
@@ -243,7 +245,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T13 - Emit bounded transient TURN_DELTA frames with resync (B-05)
 
-- **Status:** PARTIAL - durable projection stream exists (`subscribe_conversation_stream`, `acknowledge_conversation_stream_frame`, `tests/conversation-stream.test.ts`); `turn.delta` is named in `docs/schemas/operator-stream.schema.json` but the Operator does not emit it, and the supervisor accumulates text without projecting it.
+- **Status:** DONE (daemon; UI reducer already handled the frames) - `apps/litecoworkd/src/transient_frames.rs` holds a fixed 256-frame broadcast ring (`transient_bus()`); `TurnFramePublisher` is attached to the OpenCode adapter as a `TurnObserver` and coalesces answer text into `turn.delta` frames (flush at 1 KiB or 100 ms, at most 8 KiB per frame, 256 KiB per attempt, then it stops), never includes reasoning, streams only the unseen suffix of the terminal text part and stops on a divergent terminal text. The supervisor publishes `turn.settled` (with `committed_message_id` only after a successful commit). The single-Conversation stream in `presentation_operator.rs` forwards only frames for its Workspace and Conversation while polling; publishing never blocks the native read loop. The Operator schema `turn_delta` has no session field, so correlation is (Workspace, Conversation, turn, retry ordinal, sequence); the UI reducer drops stale retry ordinals. The batch (2 to 20 Conversation) stream does not forward transient frames (the Desktop UI subscribes to one). Evidence: `conversation_turn_delta_*` (8 tests: coalescing, suffix-only terminal text, divergence, chunking and cap, slow subscriber lag, settled frame, fixture stream equals committed answer, route-level scoping). The Tauri bridge forwards frames generically and cannot be compiled here (gdk-3.0 missing).
 - **Depends on:** T04, T06
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Presentation Operator, Desktop bridge, UI.
@@ -261,7 +263,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T14 - Composer attachments and B-08 resource materialization
 
-- **Status:** NOT STARTED - the "+" button in `ConversationsPage.tsx` has no handler, submit sends `resourceRefs: []`, `validate_turn_resource_ref` in `conversation_operator.rs` accepts same-Workspace refs, and `encode_conversation_context_prompt` refuses non-empty refs with `ConversationPromptError::ResourceMaterializationRequired`.
+- **Status:** PARTIAL (text attachments CODE-level; binary UNAVAILABLE; no Windows row; no live run) - `agents/resource_materializer.rs` reauthorizes every `resource_refs` entry and `RESOURCE` content block at dispatch (same-Workspace identity, Resource exists, pinned revision still the head, not RESTRICTED, allowlisted text, at most 128 KiB each and 16 per message, valid UTF-8) and replaces them with a delimited TEXT block `[Attached resource BEGIN id= revision= name= media_type= bytes= digest=...]` carrying the provider-verified `sha256:` digest; any refusal fails the turn before dispatch with a typed reason (`RESOURCE_*`). The same rules run at submit (`check_turn_resources` in `conversation_operator.rs`) so a bad attachment is refused with 404/409/422 while the draft and chips are still on screen. The prompt encoder still refuses unmaterialized refs. UI: `conversation-attachments.ts` (bounded, de-duplicated chips pinned to the revision, accessible remove names, refusal notices) and the "+" picker in `ConversationsPage.tsx` (lists only Workspace Resources via `list_resources`, text and size filtered, Escape closes, enabled only with a selected Conversation and no running turn; chips and draft stay on a refused send). Not done and stated honestly: binary attachments stay UNAVAILABLE (the OpenCode text transport has no verified file input, per the task Stop rule); WorkspaceRoot files are not attachable until 003-T07 ingests them, so the "canonicalized read-only path inside an admitted root" and symlink or traversal rows have no code path to test; the first message of a not-yet-created Conversation cannot carry attachments; ContextAttachment persistence and the Context Used surface are 003-T09 and 003-T12; the Windows WorkspaceRoot row is deferred. `src-tauri` is unchanged (it reuses `list_resources` and `submit_conversation_turn`). Evidence: `conversation_resource_materialization_*` (3, real SQLite store: inline header and digest, block and ref de-duplication, foreign Workspace, missing, stale revision, binary, restricted, non-UTF-8, oversized, submit-time check), `tests/conversation-attachments.test.ts` (4), updated AC-025 source test.
 - **Depends on:** T05
 - **Cross-package prerequisites:** Feature 003 ResourceRef authority, persisted ContextAttachment and Context Used surface; Feature 003 Windows WorkspaceRoot add for the Windows row.
 - **Owner:** Conversation, Resource, Agent Runtime, UI.
@@ -279,7 +281,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T15 - Write usage records at turn settlement (B-10)
 
-- **Status:** NOT STARTED - no usage record table or writer exists in any Rust source.
+- **Status:** DONE (OpenCode path; table was v29) - every attempt settlement writes exactly one `conversation_turn_usage_records` row inside its own transaction: the final commit (T02) and now `settle_conversation_turn` (FAILED and CANCELLED, `INSERT OR IGNORE`, `SettleConversationTurn.usage`). The supervisor attributes PROVIDER_REPORTED when the native `step-finish` frames carried non-zero `tokens.input` or `tokens.output` (summed by `UsageCollector`), else ESTIMATED_LOCAL `max(1, bytes / 4)` per direction from the encoded prompt and the answer, else UNKNOWN. A zero-token report is treated as not-provider-reported (the captured fixture reports 0/0). No cost is stored. Restart-recovery settlements record UNKNOWN. Evidence: `conversation_usage_attribution_prefers_reported_then_estimate_then_unknown`, `conversation_usage_collector_sums_reported_tokens_across_steps`, `conversation_usage_record_written_at_settlement_keeps_the_reported_attribution_once`, the UNKNOWN assertion in `conversation_turn_settlement_fails_turn_*`, existing commit tests. Whether real OpenCode v2.0.32 reports tokens in this shape is unconfirmed (fixture only).
 - **Depends on:** T01, T06
 - **Cross-package prerequisites:** Feature 018 owns the reader and dashboard.
 - **Owner:** Conversation, Observability.
@@ -296,7 +298,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T16 - Bind Stop to the projected active turn and real aggregate version
 
-- **Status:** NOT STARTED - `cancelTurn` searches `transientTurns` (not emitted on the OpenCode path) and sends `expectedVersion: 1`; `active_turn` carries only `{ status }` in `conversation-view.ts`.
+- **Status:** DONE (prerequisite of T17/T18, done with them; rendered DOM not exercised) - the projected `active_turn` now carries `version` and the snapshot gains `retryable_turn` (OpenAPI `ConversationTurnPresentation` and `ConversationRetryableTurn`, stream schema, generated `operator-api.ts`). `conversation-turn-state.ts` `stopTarget` binds Stop to the projected turn id and version; `cancelTurn` sends them to `cancel_conversation_turn`, shows `Stopping` for CANCEL_REQUESTED (button disabled, named `Stopping the response`), and on any failure refreshes the snapshot and shows a recoverable message. Focus returns to the composer when the fence lifts. Evidence: `conversation-turn-state.test.ts` (10 tests), storage `conversation_presentation_snapshot_is_bounded_paged_and_keeps_semantic_truth` (version, retryable reason). The Tauri command path cannot be compiled here (gdk-3.0 missing); no React render test exists for the page.
 - **Depends on:** T01, T07
 - **Cross-package prerequisites:** NONE
 - **Owner:** UI, Presentation Operator.
@@ -313,7 +315,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T17 - Add the failed-turn Retry UI
 
-- **Status:** NOT STARTED - `retry_conversation_turn` exists in `conversation_bridge.rs` but has no call site in `apps/litecowork-ui/src`.
+- **Status:** DONE (logic and source-level guards; no rendered test) - the latest FAILED turn renders an inline card with a fixed safe reason (`retryReasonLabel`; unknown codes never leak raw text), says the message was kept, and a Retry button whose accessible name includes the reason. It invokes `retry_conversation_turn` with the projected `retryable_turn.version` and a fresh request id, is disabled while pending (double click sends one request), and a failure refreshes the snapshot. Retry is hidden once any turn is in flight. Evidence: `conversation-turn-state.test.ts`, `conversation-empty-state-truthfulness.test.mjs` (source guards: no hard-coded `expectedVersion: 1`, retry command present).
 - **Depends on:** T07, T16
 - **Cross-package prerequisites:** NONE
 - **Owner:** UI.
@@ -330,7 +332,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T18 - Fence the composer for every nonterminal state and remove inert or fabricated composer controls
 
-- **Status:** PARTIAL - `sendEligible` gate and truthful empty state landed at 8129420; `isTurnRunning` ignores OPEN, WAITING_USER, WAITING_DEPENDENCY and CANCEL_REQUESTED; Voice Input, More options and Turbo are inert; "@ to mention, / for actions" placeholder, the "Gemini 3.8 Flash Low" fallback option label and the "AI Capabilities Overview" title fallback are fabricated copy.
+- **Status:** DONE (logic and source-level guards; no rendered test) - `isSendEligible` and `isTurnOccupyingComposer` in `conversation-turn-state.ts` fence OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY and CANCEL_REQUESTED plus a visible streamed turn and the in-flight submit (so the gap after the 202 is covered). Attachments, Voice input and the header More options are disabled with `(unavailable)` accessible names; the Turbo pill and the `@`/`/` placeholder hint were removed; the fabricated `Gemini 3.8 Flash Low` and `AI Capabilities Overview` fallbacks became `No agent selected` and `Untitled conversation`. The A-24 `disabled={!sendEligible}` guard still passes. Evidence: `conversation-turn-state.test.ts`, extended `conversation-empty-state-truthfulness.test.mjs`. `pnpm run build` was not run (api:check, tsc and tests were).
 - **Depends on:** T16
 - **Cross-package prerequisites:** Feature 002 descriptor-declared commands and model/effort (render only when declared); Feature 003 @-reference picker; Feature 011 app-wide keyboard and focus baseline.
 - **Owner:** UI.
@@ -365,7 +367,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T20 - Fix the stale Operator header and extract the shared dispatch admission path
 
-- **Status:** NOT STARTED - `conversation_operator.rs` lines 1-2 claim dispatch is absent; `submit_conversation_turn` and `retry_conversation_turn` each hold a copied `tokio::spawn` + `eprintln!` dispatch block, and no `AgentTurnCoordinator` exists (SPEC L-07 target).
+- **Status:** DONE - the module header now describes the OpenCode-only dispatch path; `agents/turn_coordinator.rs` adds `AgentTurnCoordinator::dispatch_admitted_turn`, the single entry both submit and retry use (no handler calls `dispatch_turn` or `tokio::spawn` directly). The coordinator drives the supervisor, which claims the durable intent (T10) before reserving a session; admission still commits first and the T08 sweep owns crash leftovers. The copied `eprintln!` blocks are replaced by `dispatch_diagnostic`, which emits only turn id, correlation id and a coarse error class (text before the first `:`, `{` or `(`, at most 48 safe characters). Evidence: `conversation_turn_dispatch_diagnostic_carries_ids_and_class_but_no_detail` and the 25 existing `conversation_turn*`/`conversation_stop*`/`conversation_retry*`/`conversation_cancel*` tests pass; `cargo clippy -p litecoworkd` reports no warnings in the touched modules (the crate-wide `-D warnings` run was not completed). Diagnostics are still plain `eprintln!`, not a structured logger; there is no log-capture harness.
 - **Depends on:** T10
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, Agent Runtime.
@@ -382,7 +384,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T21 - Record the cross-layer trace for each user-visible operation
 
-- **Status:** NOT STARTED.
+- **Status:** PARTIAL (trace recorded for Send, Stop, Retry, Reload, Activity and Attach; Answer UserRequest and native permission rows are recorded as gaps) - `contracts/ui-behavior.md` section 9 holds the rows with the exact control, Tauri command, route, fence, recovery and evidence test. Per the Stop rule the missing hops are open tasks (T12 BLOCKED, T27 PARTIAL), not documented as present. WIRING edges were not flipped to served because T09 evidence does not exist.
 - **Depends on:** T07, T12-T18
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, UI, Agent Runtime.
@@ -398,7 +400,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T22 - Synchronize status documents and inventories
 
-- **Status:** NOT STARTED.
+- **Status:** PARTIAL (rows synced to current CODE evidence; closure waits on T09) - the served-route inventory was regenerated (176/1/55 at that time; current 178/1/53) and `audit_served_routes.py` matches it; `docs/IMPLEMENTATION-STATUS.md` has a 2026-11-10 Conversation status paragraph, register A-25 and A-26 carry dated updates but stay open (no live run, no rendered DOM test), and the UI action ledger attachment row states the text-only boundary. No row claims QUALIFIED. A-24 stays as previously recorded. SPEC section 4 was not rewritten because T09 evidence does not exist; the SPEC/AC statuses are unchanged.
 - **Depends on:** T09, T21
 - **Cross-package prerequisites:** NONE (orchestrator owns shared ledgers; this task supplies the edits for review).
 - **Owner:** Conversation, Documentation owners.
@@ -414,7 +416,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T23 - Capture a redacted OpenCode v2.0.32 turn fixture (P-00)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-00 from docs/UI-RENDERING-SETTINGS-ARCHITECTURE-AUDIT-2026-11.md section 9 into this LOCKED package.
+- **Status:** PARTIAL - `apps/litecoworkd/src/agents/fixtures/opencode_v2_0_32_turn.jsonl` replays deterministically and `opencode_turn_fixture_*` tests assert no handle, credential or prompt body survives. R-01 is not yet confirmed or refuted in RESEARCH.md and no OpenCode binary exists in this environment to re-capture a live v2.0.32 turn, so a live capture is BLOCKED here (owner: run on a machine with the pinned OpenCode and record the envelope keys).
 - **Depends on:** T04
 - **Cross-package prerequisites:** Feature 002 OpenCode probe fix so a live binding is creatable for the capture.
 - **Owner:** Agent Runtime.
@@ -431,7 +433,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T24 - OpenCodeEventNormalizer with correlated internal events (P-01)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-01 (audit section 7 and 9; findings R-01, R-04, X-01) into this LOCKED package.
+- **Status:** DONE (fixture-driven) - `apps/litecoworkd/src/agents/normalizer.rs` (`OpenCodeEventNormalizer`) maps events to correlated internal events, counts and drops unknown, foreign-session and uncorrelated frames, never stores reasoning in the answer, and the supervisor consumes it through `drive_turn` with an idle/heartbeat budget. Evidence: `opencode_event_normalizer_*` (11) and `normalizer::` (10) tests pass. Live-capture confirmation remains with T23.
 - **Depends on:** T04, T23
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime.
@@ -449,7 +451,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T25 - Transient turn.activity frames and REPORTED activity records with UI cards (P-02)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-02 (audit C-1, C-2; findings R-04, R-07) into this LOCKED package.
+- **Status:** PARTIAL (CODE + SERVED; no live OpenCode run, no rendered UI test) - migration v30 stores REPORTED records (`append_conversation_turn_activity`, `list_conversation_turn_activity`). The supervisor now attaches a `TurnActivityRecorder` observer next to the delta publisher and usage collector: for tool start and settle, permission asked, file change, todo update and step start and end it first persists a REPORTED record (bounded label of safe characters only, at most 200 per attempt) and then publishes a `turn.activity` frame (`operator-stream.schema.json` `turn_activity`; a failed persist publishes nothing). Tool progress is deliberately not recorded. Read path: `GET /v1/conversations/{id}/turns/{turn_id}/activity?retry_ordinal=` (`listConversationTurnActivity`, route inventory was 176/1/55 at that time; current 178/1/53) plus Tauri command `list_conversation_turn_activity`. UI: `turn-activity.ts` (pure parse, merge, cards, plan line), `TurnActivityView` (collapsed `details`, copy "Activity reported by the agent"), reducer support for `turn.activity`, page wiring that reads stored records for the active or failed turn and merges live frames, and the activity inside the inline FAILED card. Limits, stated honestly: the plan checklist is a count line ("Plan reported by the agent: N items") because the normalizer keeps only the todo count, not item text; stored records are re-read only for the active or retryable turn, so activity of older completed turns is not rehydrated in the transcript; the Tauri command was added by copying the existing bridge pattern but `src-tauri` cannot be compiled in this environment (gdk-3.0 missing); no real OpenCode run produced these events here. Evidence: `turn_activity_records_publish_frames_and_persist_reported_rows_without_content`, `turn_activity_records_are_bounded_and_a_failed_persist_publishes_nothing`, `turn_activity_records_route_returns_reported_rows_scoped_to_the_turn_attempt` (litecoworkd), `turn_activity_records_are_reported_ordered_idempotent_scoped_and_immutable` (storage-sqlite), `tests/turn-activity.test.ts` (5). Original note: added by owner approval on 2026-11-09. Folds proposed task P-02 (audit C-1, C-2; findings R-04, R-07) into this LOCKED package.
 - **Depends on:** T13, T24
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Conversation, UI.
@@ -466,7 +468,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T26 - Stick-to-bottom autoscroll and new-messages indicator (P-04)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-04 (audit finding R-08) into this LOCKED package.
+- **Status:** DONE (logic and source wiring; no rendered scroll test) - `isAtBottom` (48 px threshold), `scrollFollowDecision` and `contentSignature` are pure and tested. The page follows new messages and streamed text only while the reader is at the bottom and not selecting text; otherwise it keeps the scroll position and shows a `New messages` indicator that clears on return to the bottom or on the scroll-to-bottom button. A different Conversation starts at the bottom. Evidence: `conversation-turn-state.test.ts` autoscroll tests. jsdom scroll behavior is not tested.
 - **Depends on:** T13
 - **Cross-package prerequisites:** NONE
 - **Owner:** UI.
@@ -483,7 +485,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T27 - Surface native permission prompts inline and in Needs You (P-09)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-09 (audit C-3), owned jointly with Feature 002 (ACP `request_permission`, see Feature 002 T17), into this LOCKED package.
+- **Status:** PARTIAL (display only; answer channel BLOCKED) - `PermissionAsked` is persisted and framed as a REPORTED PERMISSION activity (T25) and the activity card says the agent asked for permission, that LiteCowork is not asking and cannot relay an answer yet, with no answer control. Not done: answering through the harness (the ACP `request_permission` path is Feature 002 T17 and no OpenCode permission-reply call is verified or implemented), the Needs You entry (a native permission has no LiteCowork UserRequest and showing an unanswerable prompt there would mislead), denial reaching the harness, and the unanswered-prompt timeout behavior (an unanswered OpenCode permission is currently bounded only by the idle watchdog). Acceptance boxes 1 to 3 therefore remain open. Evidence: `turn-activity.test.ts` (asked wording, no answer control).
 - **Depends on:** T24, T25
 - **Cross-package prerequisites:** Feature 002 ACP client `request_permission` path (Feature 002 T17) delivers the harness answer channel.
 - **Owner:** Agent Runtime, Conversation, UI.
@@ -501,6 +503,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 ## 001-T28 - Package VERIFIED for V1
 
 - **Status:** NOT STARTED.
+- **DEFERRED/BLOCKED note:** Why: depends on T09 live matrix and release evidence. Unblocks when: T09 evidence plus Feature 019 evidence bundle tooling (done) and release rows. Test later at: packaged build on the owner's native Windows x64 laptop (release matrix row 1); WSL2 and containers never count, then native Linux.
 - **Depends on:** T01-T27
 - **Cross-package prerequisites:** Feature 019 evidence bundle process and release qualification matrix.
 - **Owner:** Product (sign-off), Conversation, Agent Runtime, Security.

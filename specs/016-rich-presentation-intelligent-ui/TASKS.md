@@ -8,7 +8,7 @@ Cross-package task references inside task fields are written as "Feature NNN Txx
 
 ## Current baseline
 
-Verified against branch `docs/audit-competitor-superset`; highest migration `docs/schemas/sqlite-v28.sql`.
+Verified against branch `docs/audit-competitor-superset`; highest migration file `docs/schemas/sqlite-v32.sql` (016 plans no migration).
 
 - **Desktop validator:** `apps/litecowork-ui/src/presentation/rich-presentation.ts` with `MAX_DOCUMENT_BYTES = 512 * 1024`, `MAX_BLOCKS = 200`, `MAX_DEPTH = 8`, `MAX_JSON_VALUES = 30_000`, `MAX_JSON_DEPTH = 32`; accepts TEXT_SLICE, LAYOUT, CARD, CALLOUT, TABLE; `renderer_contract_version` must be 1; `parseRichPresentationResponse`, `resolveRichResponseContent`.
 - **Rust validator:** `validate_metadata`, `validate_document`, `validate_block` in `crates/storage-sqlite/src/rich_presentations.rs` accept only TEXT_SLICE and LAYOUT; `MAX_RICH_PRESENTATION_BYTES = 1_048_576` in `crates/storage-core/src/rich_presentation.rs` (doc comment names a nonexistent DIVIDER kind). `publish_rich_presentation` is called only from tests in `apps/litecoworkd/src/presentation_operator.rs`.
@@ -21,7 +21,8 @@ Gaps to V1: owner acceptance (B-40), validator drift, no producer, no chart or I
 
 ## 016-T01 - Owner acceptance of SPEC and blockers
 
-- **Status:** BLOCKED - pending owner acceptance of SPEC revision 0.1 and blocker B-40 (owner: repository owner, sarv-projects; Presentation Runtime, Product and Security prepare the decision).
+- **Status:** BLOCKED - B-40 accepted as proposed (2026-11-10); pending owner acceptance of SPEC revision 0.1 (owner: repository owner, sarv-projects; Presentation Runtime, Product and Security prepare the decision).
+- **DEFERRED/BLOCKED note:** Why: whole-SPEC acceptance of revision 0.1 is pending although B-40 is accepted. Unblocks when: owner reviews and accepts the SPEC. Test later at: decision only.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Product, Presentation Runtime, Security; decision by the repository owner.

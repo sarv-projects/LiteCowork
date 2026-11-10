@@ -7,7 +7,7 @@ This directory contains the feature-level Software Design Document packages for 
 
 DRAFT → IN_REVIEW → ACCEPTED/LOCKED → IMPLEMENTING → VERIFIED. A package validator checks required files and structure; it does not accept design or establish implementation/qualification.
 
-Owner acceptance was recorded on 2026-11-09 in [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Packages 001-012 are ACCEPTED/LOCKED; 013-020 were added from the V1 gap analysis and are IN_REVIEW until their own blockers are accepted. Every package carries a V1 TASKS.md that ends in a "Package VERIFIED for V1" task; the release go/no-go is 019-T23. Delivery waves are in [LITECOWORK-BUILD-TASKS.md](../docs/LITECOWORK-BUILD-TASKS.md).
+Owner acceptance was recorded on 2026-11-09 in [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Packages 001-012 are ACCEPTED/LOCKED; 013-020 were added from the V1 gap analysis and are IN_REVIEW until the whole SPEC of each is accepted. On 2026-11-10 the owner accepted B-38 to B-41, D-01 and B-45 as proposed, deferred all of 013, every Windows row and the release-dependent rows (B-43, B-44), and left B-42 and the B-19 follow-up open (register A-62). Code status per package is in [../CURRENT-RUN.md](../CURRENT-RUN.md) "Handoff status by package" and each package README. Every package carries a V1 TASKS.md that ends in a "Package VERIFIED for V1" task; the release go/no-go is 019-T23. Delivery waves are in [LITECOWORK-BUILD-TASKS.md](../docs/LITECOWORK-BUILD-TASKS.md).
 
 On the same 2026-11-09 review the owner also approved folding the proposed tasks P-05 and P-11..P-19 (with the P-00..P-09 rendering and shell set) into their owning packages, including the LOCKED ones, under the ACP native-agent transport direction (register [A-54](../docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md)). The native-agent adapter (Feature 002 002-T17, consumed by Feature 001) is now defined as an Agent Client Protocol (ACP) client with a per-provider launch catalog, keeping the OpenCode v2 HTTP path as one non-ACP adapter until its ACP route qualifies. The folded tasks pushed several packages to new final ids (001 to T28, 002 to T19, 003 to T18, 008 to T21, 011 to T23, 013 to T21, 015 to T21, 016 to T19, 018 to T19); always read the current TASKS.md for the exact ids. The capability-to-task coverage map is [V1-PRODUCT-FEATURE-COVERAGE.md](../docs/V1-PRODUCT-FEATURE-COVERAGE.md).
 
@@ -22,17 +22,17 @@ On the same 2026-11-09 review the owner also approved folding the proposed tasks
 | 007 | Professional Artifacts, one format | ACCEPTED/LOCKED 2026-11-09 (B-21, B-30, B-31); 007-T06 BLOCKED on the export receipt class | [007-professional-artifacts](007-professional-artifacts/README.md) |
 | 008 | Workbench browser, terminal and computer | ACCEPTED/LOCKED 2026-11-09 (B-22, B-23, B-32 deferred) | [008-workbench-browser-terminal-computer](008-workbench-browser-terminal-computer/README.md) |
 | 009 | Coworkers and scoped memory | ACCEPTED/LOCKED 2026-11-09 (B-24, B-25) | [009-coworkers-scoped-memory](009-coworkers-scoped-memory/README.md) |
-| 010 | Automations and recurring host | ACCEPTED/LOCKED 2026-11-09 (B-26, B-27); CONNECTOR_EVENT trigger kind pending owner confirmation | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
+| 010 | Automations and recurring host | ACCEPTED/LOCKED 2026-11-09 (B-26, B-27); CONNECTOR_EVENT over LOCAL_POLL confirmed 2026-11-10 | [010-automations-recurring-host](010-automations-recurring-host/README.md) |
 | 011 | Desktop shell, IPC, settings and Runtime | ACCEPTED/LOCKED 2026-11-09 (B-28 Windows-first rider, B-29, B-33) | [011-desktop-shell-ipc-settings-runtime](011-desktop-shell-ipc-settings-runtime/README.md) |
 | 012 | Conversation co-edit and take-control | ACCEPTED/LOCKED 2026-11-09 (B-34 model; implementation waits on the 001 Stop fix) | [012-conversation-coedit-take-control](012-conversation-coedit-take-control/README.md) |
-| 013 | LiteSPM package lifecycle bridge | IN_REVIEW (new 2026-11-09); B-36, B-37 PROPOSED | [013-litespm-package-lifecycle-bridge](013-litespm-package-lifecycle-bridge/README.md) |
-| 014 | Conversation history management | IN_REVIEW (new); B-38 PROPOSED | [014-conversation-history-management](014-conversation-history-management/README.md) |
-| 015 | Task control and heterogeneous delegation | IN_REVIEW (new); B-39 PROPOSED | [015-task-control-delegation](015-task-control-delegation/README.md) |
-| 016 | Rich presentation, Intelligent UI and generated media | IN_REVIEW (new); B-40 PROPOSED | [016-rich-presentation-intelligent-ui](016-rich-presentation-intelligent-ui/README.md) |
-| 017 | Data portability, backup and restore | IN_REVIEW (new); B-41 PROPOSED | [017-data-portability-backup-restore](017-data-portability-backup-restore/README.md) |
-| 018 | Usage, diagnostics and observability | IN_REVIEW (new); B-42 PROPOSED | [018-usage-diagnostics-observability](018-usage-diagnostics-observability/README.md) |
-| 019 | Release engineering and V1 qualification | IN_REVIEW (new); B-43, B-44 PROPOSED | [019-release-engineering-qualification](019-release-engineering-qualification/README.md) |
-| 020 | Proactivity and quiet learning | IN_REVIEW (new); D-01, B-45 PROPOSED | [020-proactivity-quiet-learning](020-proactivity-quiet-learning/README.md) |
+| 013 | LiteSPM package lifecycle bridge | IN_REVIEW (new 2026-11-09); B-36, B-37 DEFERRED by the owner 2026-11-10 (all LiteSPM parts; nothing implemented) | [013-litespm-package-lifecycle-bridge](013-litespm-package-lifecycle-bridge/README.md) |
+| 014 | Conversation history management | IN_REVIEW (new); B-38 ACCEPTED as proposed 2026-11-10; storage layer v31 only | [014-conversation-history-management](014-conversation-history-management/README.md) |
+| 015 | Task control and heterogeneous delegation | IN_REVIEW (new); B-39 ACCEPTED as proposed 2026-11-10 | [015-task-control-delegation](015-task-control-delegation/README.md) |
+| 016 | Rich presentation, Intelligent UI and generated media | IN_REVIEW (new); B-40 ACCEPTED as proposed 2026-11-10 | [016-rich-presentation-intelligent-ui](016-rich-presentation-intelligent-ui/README.md) |
+| 017 | Data portability, backup and restore | IN_REVIEW (new); B-41 ACCEPTED as proposed 2026-11-10 | [017-data-portability-backup-restore](017-data-portability-backup-restore/README.md) |
+| 018 | Usage, diagnostics and observability | IN_REVIEW (new); B-42 PROPOSED and open after the 2026-11-10 review | [018-usage-diagnostics-observability](018-usage-diagnostics-observability/README.md) |
+| 019 | Release engineering and V1 qualification | IN_REVIEW (new); B-43, B-44 DEFERRED 2026-11-10 (release dependent); CI and release machinery skeleton in code | [019-release-engineering-qualification](019-release-engineering-qualification/README.md) |
+| 020 | Proactivity and quiet learning | IN_REVIEW (new); D-01, B-45 ACCEPTED as proposed 2026-11-10 | [020-proactivity-quiet-learning](020-proactivity-quiet-learning/README.md) |
 
 ## Package 001 manifest
 

@@ -323,9 +323,11 @@ current session pointer, and emits `conversation.turn.resumed.v1` with the UserR
 The response and continuation are idempotent by request identity; a stale/dismissed request
 cannot resume a turn. A retry is legal only from
 `FAILED`, before the turn is cancelled or completed, and while the Conversation and
-selected AgentBinding remain usable. It increments `retry_ordinal`, starts a fresh
-Conversation-scoped AgentSession, and emits `conversation.turn.retried.v1` atomically
-with setting the current session and status to `RUNNING`. It does not erase or rewrite
+selected AgentBinding remain usable. It increments `retry_ordinal`, clears the current
+session pointer, returns the turn to `OPEN` and emits `conversation.turn.retried.v1`
+atomically with a new UNCLAIMED dispatch intent for the new ordinal; the dispatcher then
+reserves a fresh Conversation-scoped AgentSession (STARTING) and activation moves the turn
+to `RUNNING`. It does not erase or rewrite
 partial agent messages: each remains linked to the AgentSession that produced it. A
 completed response is appended once per successful turn settlement; duplicate retries
 are rejected by expected turn version/idempotency key. AgentSession ID on the turn is a

@@ -1,7 +1,7 @@
 # Feature Specification - Task Control and Heterogeneous Delegation
 
 - **Feature ID:** 015 | **Status:** IN_REVIEW | **Revision:** 0.1
-- **Owner acceptance:** not yet accepted. This package was created after the 2026-11-09 owner acceptance of [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md) and is authored complete for review. Blocker B-39 is PROPOSED and needs an owner decision. Nothing in this package authorizes implementation until the owner accepts it (TASKS 015-T01).
+- **Owner acceptance:** not yet accepted. This package was created after the 2026-11-09 owner acceptance of [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md) and is authored complete for review. Blocker B-39 was accepted as proposed by the owner (sarv-projects) on 2026-11-10; the SPEC as a whole is not yet accepted. Nothing in this package authorizes implementation until the owner accepts it (TASKS 015-T01).
 - **Change control:** after acceptance this becomes a locked contract; any later change needs a new revision and renewed owner approval (SPECIFICATION-STANDARD section 7).
 - **Target:** LiteCowork V1 local desktop, Area 6 "Real Tasks and Multi-Agent Work" items 6.5 (eligible native or heterogeneous delegation), 6.6 (control, steering, cancellation) and 6.9 (handoff), release-contract invariant section 6 item 3, gate E (heterogeneous delegation).
 - **Release rows:** Linux x86_64 desktop row first (Task execution qualifies there first per the accepted B-17 rider). On the Windows 11/10 `x86_64-pc-windows-msvc` row every execution-dependent operation in this package stays visibly UNAVAILABLE until Feature 005 blocker B-35 (Windows Environment provider) is accepted and qualified.
@@ -32,7 +32,7 @@ No new Environment provider (Feature 005 owns Linux bubblewrap and B-35). No Con
 
 ## 4. Current implementation/evidence boundary
 
-Verified against the checkout on branch `docs/audit-competitor-superset`. Highest migration is `docs/schemas/sqlite-v28.sql`.
+Verified against the checkout on branch `docs/audit-competitor-superset`. Highest migration file is `docs/schemas/sqlite-v32.sql` (wired, `SCHEMA_VERSION` 32); nothing in v29 to v32 touches task control.
 
 | Capability | Current evidence | Limitation |
 |---|---|---|
@@ -78,13 +78,13 @@ Verified against the checkout on branch `docs/audit-competitor-superset`. Highes
 | F-03 | Quiescence wait | Async settle worker or polling reconciler | No SQLite transaction spans a native or Environment call |
 | F-04 | ResumePacket storage | Dedicated table or blob plus row | Immutable, digest-bound, Workspace-scoped |
 
-### PROPOSED DECISIONS (pending owner acceptance)
+### DECISIONS (B-39 accepted as proposed 2026-11-10)
 
 | ID | Topic | Proposed resolution | Canonical authority and consequence |
 |---|---|---|---|
-| B-39 | First heterogeneous delegation pair and Environment sharing rule | **PROPOSED (pending owner).** (1) **Pair:** the lead is **OpenCode v2.0.32** (the first qualified route, B-02 rider) and the first delegated worker is **Claude Code CLI** (the second AgentModule, Feature 002 B-11 and Feature 004 B-16), each through its own AgentBinding and a DelegationProfile whose `native_delegation_policy` is `INHERIT` and whose integrity mode is `NATIVE_UNMODIFIED`. The independent verifier is a third AgentBinding that differs from the producing worker's binding (the OpenCode lead binding is allowed as verifier of a Claude Code worker, never the worker itself). The pair qualifies first on the Linux x86_64 row; on Windows it is UNAVAILABLE until Feature 005 B-35 qualifies. (2) **Environment sharing:** every child Attempt runs in its own `ATTEMPT_PRIVATE` Environment (separate worktree or overlay attested by the Feature 005 provider); `TASK_SHARED`, `WORKSPACE_SHARED` and `USER_SHARED` writable sharing are refused in V1; child output reaches the Task only as a ResultEnvelope plus lead-reviewed Effects or Artifacts; the verifier gets a read-only Environment pinned to the produced revision. (3) **V1 bounds:** `max_host_delegation_depth = 1` (lead to worker, no grandchildren) and `max_concurrency <= 2` per Task, both inside the platform limits. (4) **A-37 default:** once the dispatcher is wired, producers always emit `on_exhaustion`; a stored legacy packet without it is treated as `NEEDS_YOU`. | [DELEGATION.md](../../docs/DELEGATION.md), [TASK-RUNTIME.md](../../docs/TASK-RUNTIME.md), [ENVIRONMENTS.md](../../docs/ENVIRONMENTS.md). Gives gate E one concrete, testable pair with no shared-write merge problem in V1. Owner: Delegation with Product; decision needed from the repository owner. |
+| B-39 | First heterogeneous delegation pair and Environment sharing rule | **ACCEPTED as proposed (owner sarv-projects, 2026-11-10).** (1) **Pair:** the lead is **OpenCode v2.0.32** (the first qualified route, B-02 rider) and the first delegated worker is **Claude Code CLI** (the second AgentModule, Feature 002 B-11 and Feature 004 B-16), each through its own AgentBinding and a DelegationProfile whose `native_delegation_policy` is `INHERIT` and whose integrity mode is `NATIVE_UNMODIFIED`. The independent verifier is a third AgentBinding that differs from the producing worker's binding (the OpenCode lead binding is allowed as verifier of a Claude Code worker, never the worker itself). The pair qualifies first on the Linux x86_64 row; on Windows it is UNAVAILABLE until Feature 005 B-35 qualifies. (2) **Environment sharing:** every child Attempt runs in its own `ATTEMPT_PRIVATE` Environment (separate worktree or overlay attested by the Feature 005 provider); `TASK_SHARED`, `WORKSPACE_SHARED` and `USER_SHARED` writable sharing are refused in V1; child output reaches the Task only as a ResultEnvelope plus lead-reviewed Effects or Artifacts; the verifier gets a read-only Environment pinned to the produced revision. (3) **V1 bounds:** `max_host_delegation_depth = 1` (lead to worker, no grandchildren) and `max_concurrency <= 2` per Task, both inside the platform limits. (4) **A-37 default:** once the dispatcher is wired, producers always emit `on_exhaustion`; a stored legacy packet without it is treated as `NEEDS_YOU`. | [DELEGATION.md](../../docs/DELEGATION.md), [TASK-RUNTIME.md](../../docs/TASK-RUNTIME.md), [ENVIRONMENTS.md](../../docs/ENVIRONMENTS.md). Gives gate E one concrete, testable pair with no shared-write merge problem in V1. Owner: Delegation with Product; decision needed from the repository owner. |
 
-Do not infer owner sign-off from this document. This package stays IN_REVIEW until the owner accepts the SPEC and B-39 (TASKS 015-T01); implementation and qualification status are tracked in section 4 and [docs/IMPLEMENTATION-STATUS.md](../../docs/IMPLEMENTATION-STATUS.md).
+B-39 was accepted as proposed on 2026-11-10. This package stays IN_REVIEW until the owner accepts the SPEC as a whole (TASKS 015-T01); implementation and qualification status are tracked in section 4 and [docs/IMPLEMENTATION-STATUS.md](../../docs/IMPLEMENTATION-STATUS.md).
 
 ## 6. High-level design
 
@@ -244,7 +244,7 @@ Accepted target routes (not yet in source): `POST /v1/tasks/{task_id}/pause`, `P
 
 ## 8. Data model and lifecycle
 
-See [DATA-MODEL.md](DATA-MODEL.md). New durable records (accepted target, next migration after `sqlite-v28.sql`): `task_control_requests` (idempotent pause/resume/steer/cancel requests with outcome), `task_resume_packets` (immutable ResumePacket, digest, source Attempt), and an `on_exhaustion` column on the stored escalation policy. Existing records reused: `tasks`, `task_spec_revisions` (`parent_revisions_json` already supports siblings), `attempts` (`parent_attempt_id`, `delegation_profile_id`, `delegation_profile_revision`), `execution_leases` (`epoch`), `delegation_results`, `verification_runs`, `coworker_revisions.enabled_delegation_profile_ids_json`.
+See [DATA-MODEL.md](DATA-MODEL.md). New durable records (accepted target, migration v42 per docs/LITECOWORK-BUILD-TASKS.md): `task_control_requests` (idempotent pause/resume/steer/cancel requests with outcome), `task_resume_packets` (immutable ResumePacket, digest, source Attempt), and an `on_exhaustion` column on the stored escalation policy. Existing records reused: `tasks`, `task_spec_revisions` (`parent_revisions_json` already supports siblings), `attempts` (`parent_attempt_id`, `delegation_profile_id`, `delegation_profile_revision`), `execution_leases` (`epoch`), `delegation_results`, `verification_runs`, `coworker_revisions.enabled_delegation_profile_ids_json`.
 
 ## 9. Wiring
 

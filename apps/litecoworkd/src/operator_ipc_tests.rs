@@ -18,6 +18,8 @@ mod resource_upload_archive_operator_tests;
 mod runtime_capability_hosts_tests;
 #[path = "workspace_idempotency_key_bounds_operator_tests.rs"]
 mod workspace_idempotency_key_bounds_operator_tests;
+#[path = "workspace_rename_operator_tests.rs"]
+mod workspace_rename_operator_tests;
 use super::runtime_offers_operator::{RuntimeOffersApiState, runtime_offers_router};
 use super::{
     AuthenticatedLocalPeer, OperatorIpcConnection, OperatorRequestSettlement,
@@ -4557,8 +4559,14 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
         "incarnation-ipc-stale".to_owned(),
         blockers,
     ));
+    let preview_router = runtime_lifecycle_router(RuntimeLifecycleApiState::new(
+        store.clone(),
+        runtime_id.to_owned(),
+        incarnation_id.to_owned(),
+        Vec::new(),
+    ));
     let server = tokio::spawn(async move {
-        for router in [current_router, stale_router] {
+        for router in [current_router, stale_router, preview_router] {
             let connection = listener
                 .accept(|peer| peer.uid == expected_uid)
                 .await
@@ -4578,6 +4586,7 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
         endpoint: &UnixEndpoint,
         expected_uid: u32,
         request_id: &str,
+        path: &str,
     ) -> operator_ipc::ResponseFrame {
         let mut client = endpoint
             .connect(|peer| peer.uid == expected_uid)
@@ -4590,7 +4599,7 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
                 protocol_version: PROTOCOL_VERSION,
                 request_id: request_id.to_owned(),
                 method: "GET".to_owned(),
-                path_and_query: "/v1/runtime-lifecycle".to_owned(),
+                path_and_query: path.to_owned(),
                 headers: Vec::<LogicalHeader>::new(),
                 body_length: 0,
             },
@@ -4608,7 +4617,13 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
             .expect("response frame is correlated")
     }
 
-    let current = send_lifecycle_request(&endpoint, expected_uid, "lifecycle-current").await;
+    let current = send_lifecycle_request(
+        &endpoint,
+        expected_uid,
+        "lifecycle-current",
+        "/v1/runtime-lifecycle",
+    )
+    .await;
     assert_eq!(current.header.request_id, "lifecycle-current");
     assert_eq!(current.header.status, StatusCode::OK.as_u16());
     assert!(
@@ -4641,7 +4656,13 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
     assert!(body.get("dependent_tasks").is_none());
     assert!(body.to_string().find("test-boot-id").is_none());
 
-    let stale = send_lifecycle_request(&endpoint, expected_uid, "lifecycle-stale").await;
+    let stale = send_lifecycle_request(
+        &endpoint,
+        expected_uid,
+        "lifecycle-stale",
+        "/v1/runtime-lifecycle",
+    )
+    .await;
     assert_eq!(stale.header.request_id, "lifecycle-stale");
     assert_eq!(
         stale.header.status,
@@ -4653,9 +4674,29 @@ async fn authenticated_unix_runtime_lifecycle_uses_current_sqlite_incarnation() 
         body["message"],
         "Current Runtime incarnation could not be verified"
     );
-    server
-        .await
-        .expect("server handles both lifecycle requests");
+    let preview = send_lifecycle_request(
+        &endpoint,
+        expected_uid,
+        "stop-preview",
+        "/v1/runtime-lifecycle/stop-preview",
+    )
+    .await;
+    assert_eq!(preview.header.status, StatusCode::OK.as_u16());
+    assert!(
+        preview
+            .header
+            .headers
+            .iter()
+            .any(|header| header.name == "cache-control" && header.value == "no-store")
+    );
+    let body: Value = serde_json::from_slice(preview.body()).expect("stop preview JSON");
+    assert_eq!(body["runtime_id"], runtime_id);
+    assert_eq!(body["runtime_incarnation_id"], incarnation_id);
+    // An idle Runtime is still UNKNOWN: no live-work observer exists, so QUIESCENT is unreachable.
+    assert_eq!(body["verdict"], "UNKNOWN");
+    assert_eq!(body["blockers"][0]["code"], "RUNTIME_QUIESCENCE_UNKNOWN");
+    assert_eq!(body["admitted_turn_ids"], serde_json::json!([]));
+    server.await.expect("server handles all lifecycle requests");
     let persisted = store
         .read_local_lifecycle_snapshot(runtime_id, incarnation_id)
         .expect("post-request lifecycle read succeeds")
@@ -8032,4 +8073,133 @@ async fn workspace_archive_unix_ipc_blocker_is_fail_closed_without_writes() {
         "blocked archive adds neither an event nor an idempotency receipt"
     );
     drop(store);
+}
+
+#[tokio::test]
+async fn conversation_turn_delta_stream_forwards_only_the_subscribed_conversation_frames() {
+    use futures_util::StreamExt;
+    use rusqlite::Connection;
+
+    const OWNER: &str = "ipc-delta-stream-owner";
+    const WORKSPACE: &str = "ipc-delta-stream-workspace";
+    const MINE: &str = "ipc-delta-stream-mine";
+    const OTHER: &str = "ipc-delta-stream-other";
+    const RUNTIME: &str = "ipc-delta-stream-runtime";
+    const NOW: &str = "2026-10-11T12:00:00.000000000Z";
+
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))
+        .expect("private directory");
+    let database = directory.path().join("state.sqlite3");
+    let store = SqliteWorkspaceStore::open(
+        &database,
+        Arc::new(FileBlobStore::new(
+            directory.path().join("blobs"),
+            IpcReplayTestKeys,
+        )),
+        SqliteConfig {
+            writer_queue_capacity: 8,
+            busy_timeout: Duration::from_secs(2),
+        },
+    )
+    .expect("real SQLite store opens");
+    WorkspaceService::new(store.clone())
+        .create(CreateWorkspace {
+            workspace_id: WORKSPACE.to_owned(),
+            name: "Delta stream fixture".to_owned(),
+            owner_principal_id: OWNER.to_owned(),
+            event: EventContext {
+                event_id: "ipc-delta-stream-workspace-event".to_owned(),
+                origin_runtime_id: RUNTIME.to_owned(),
+                hlc_timestamp: NOW.to_owned(),
+                correlation_id: "ipc-delta-stream-correlation".to_owned(),
+                causation_id: None,
+                recorded_at: NOW.to_owned(),
+            },
+        })
+        .expect("Workspace commits");
+    let connection = Connection::open(&database).expect("fixture database opens");
+    for conversation_id in [MINE, OTHER] {
+        connection
+            .execute(
+                "INSERT INTO conversations(conversation_id,workspace_id,created_at) VALUES(?1,?2,?3)",
+                rusqlite::params![conversation_id, WORKSPACE, NOW],
+            )
+            .expect("Conversation fixture persists");
+    }
+    drop(connection);
+
+    let (_shutdown_sender, shutdown_receiver) = tokio::sync::watch::channel(false);
+    let router = Router::new()
+        .route("/v1/stream", post(subscribe_stream))
+        .with_state(StreamApiState {
+            store: store.clone(),
+            principal_id: OWNER.to_owned(),
+            runtime_id: RUNTIME.to_owned(),
+            local_incarnation_id: "ipc-delta-stream-incarnation".to_owned(),
+            runtime_inventory_revision: Arc::new(std::sync::atomic::AtomicU64::new(1)),
+            stream_admission: Arc::new(tokio::sync::Semaphore::new(1)),
+            stream_shutdown: shutdown_receiver,
+            task_stream_test_gate: None,
+            task_stream_snapshot_test_gate: None,
+        });
+    let subscription = json!({
+        "workspace_id": WORKSPACE,
+        "conversation_ids": [MINE],
+        "projection_types": ["conversation_presentation"]
+    });
+    let response = router
+        .oneshot(
+            Request::post("/v1/stream")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header("x-workspace-id", WORKSPACE)
+                .extension(AuthenticatedLocalPeer)
+                .body(Body::from(serde_json::to_vec(&subscription).expect("subscription")))
+                .expect("stream request"),
+        )
+        .await
+        .expect("stream route responds");
+    assert_eq!(response.status(), StatusCode::OK);
+    let mut body = response.into_body().into_data_stream();
+    let mut kinds = Vec::new();
+    while kinds.len() < 2 {
+        let chunk = tokio::time::timeout(Duration::from_secs(5), body.next())
+            .await
+            .expect("initial frame arrives")
+            .expect("stream open")
+            .expect("frame bytes");
+        let frame: Value = serde_json::from_slice(&chunk).expect("frame json");
+        kinds.push(frame["type"].as_str().expect("frame type").to_owned());
+    }
+    assert_eq!(kinds, ["stream.ready", "projection"]);
+
+    let frame = |conversation: &str, sequence: u64, text: &str| {
+        crate::transient_frames::TransientFrame {
+            workspace_id: WORKSPACE.to_owned(),
+            conversation_id: conversation.to_owned(),
+            bytes: serde_json::to_vec(&json!({
+                "type": "turn.delta",
+                "workspace_id": WORKSPACE,
+                "conversation_id": conversation,
+                "turn_id": "turn-1",
+                "retry_ordinal": 0,
+                "sequence": sequence,
+                "text_delta": text,
+            }))
+            .expect("delta json"),
+        }
+    };
+    let bus = crate::transient_frames::transient_bus();
+    bus.publish(frame(OTHER, 1, "not mine"));
+    bus.publish(frame(MINE, 1, "hello"));
+    let chunk = tokio::time::timeout(Duration::from_secs(5), body.next())
+        .await
+        .expect("delta arrives")
+        .expect("stream open")
+        .expect("frame bytes");
+    let delta: Value = serde_json::from_slice(&chunk).expect("delta json");
+    assert_eq!(delta["type"], "turn.delta");
+    assert_eq!(delta["conversation_id"], MINE);
+    assert_eq!(delta["text_delta"], "hello");
+    assert_eq!(delta["retry_ordinal"], 0);
 }

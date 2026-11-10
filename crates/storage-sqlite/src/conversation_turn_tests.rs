@@ -7,9 +7,11 @@ use storage_core::{
     CreateConversationCommit, CreateConversationTurnCommit, WorkspaceCreateRequest,
 };
 
+use storage_core::conversation::CONVERSATION_TURN_IN_PROGRESS;
+
 const AT: &str = "2026-10-09T12:00:00Z";
 
-fn fixture() -> (
+pub(super) fn fixture() -> (
     tempfile::TempDir,
     SqliteWorkspaceStore,
     CreateConversationTurnCommit,
@@ -798,17 +800,9 @@ fn unavailable_admission_settles_the_durable_turn_and_exact_replay_writes_nothin
     );
 }
 
-#[test]
-fn conversation_turn_creation_serializes_appends_from_the_same_stale_snapshot() {
-    let (directory, store, first) = fixture();
-    let adapter = SqliteConversationStore::new(store);
-    adapter
-        .create_conversation_turn(first.clone())
-        .expect("first turn commits from Conversation revision 1");
-
-    // A second request was prepared from the same revision-1 snapshot before the first
-    // append committed. Its event therefore also carries revision 2; the serialized
-    // storage transaction must assign the actual next Conversation revision.
+fn second_turn_commit(first: CreateConversationTurnCommit) -> CreateConversationTurnCommit {
+    // A second request prepared from the same revision-1 snapshot as `first`: its event
+    // also carries revision 2, so storage must assign the actual next revision.
     let mut second = first;
     second.request.request_id = "second-conversation-turn-request".into();
     second.request.request_payload["turn_id"] = serde_json::json!("turn-two");
@@ -835,29 +829,109 @@ fn conversation_turn_creation_serializes_appends_from_the_same_stale_snapshot() 
     second.turn_event.recorded_at = turn_context.recorded_at;
     second.turn_event.payload["turn_id"] = serde_json::json!("turn-two");
     second.turn_event.payload["user_message_id"] = serde_json::json!("message-two");
-
     assert_eq!(second.message_event.entity_revision, 2);
-    adapter
-        .create_conversation_turn(second)
-        .expect("a concurrent append must be serialized at the current revision");
+    second
+}
 
-    let connection =
-        Connection::open(state_database(&directory)).expect("inspect serialized turns");
-    let (conversation_version, message_revision, messages, turns): (i64, i64, i64, i64) = connection
+fn turn_row_counts(directory: &tempfile::TempDir) -> (i64, i64, i64, i64, i64, i64) {
+    Connection::open(state_database(directory))
+        .expect("inspect turn rows")
         .query_row(
             "SELECT
                (SELECT version FROM conversations WHERE conversation_id='conversation-turn'),
-               (SELECT entity_revision FROM domain_events WHERE event_id='event-user-message-two'),
                (SELECT COUNT(*) FROM conversation_messages WHERE conversation_id='conversation-turn'),
-               (SELECT COUNT(*) FROM conversation_turns WHERE conversation_id='conversation-turn')",
+               (SELECT COUNT(*) FROM conversation_turns WHERE conversation_id='conversation-turn'),
+               (SELECT COUNT(*) FROM conversation_dispatch_intents WHERE conversation_id='conversation-turn'),
+               (SELECT COUNT(*) FROM domain_events WHERE event_id IN ('event-user-message-two','event-turn-created-two')),
+               (SELECT COUNT(*) FROM request_dedup WHERE request_id='second-conversation-turn-request')",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         )
-        .expect("read serialized Conversation and event revisions");
-    assert_eq!(
-        (conversation_version, message_revision, messages, turns),
-        (3, 3, 2, 2)
+        .expect("read turn row counts")
+}
+
+#[test]
+fn conversation_turn_creation_rejects_a_second_nonterminal_turn_and_admits_after_settlement() {
+    let (directory, store, first) = fixture();
+    let adapter = SqliteConversationStore::new(store);
+    adapter
+        .create_conversation_turn(first.clone())
+        .expect("first turn commits from Conversation revision 1");
+    assert_eq!(turn_row_counts(&directory), (2, 1, 1, 1, 0, 0));
+
+    let second = second_turn_commit(first.clone());
+    let rejected = adapter.create_conversation_turn(second.clone());
+    assert!(
+        matches!(rejected, Err(StoreError::Invalid(ref code)) if code == CONVERSATION_TURN_IN_PROGRESS),
+        "second submit while OPEN is rejected: {rejected:?}"
     );
+    assert_eq!(
+        turn_row_counts(&directory),
+        (2, 1, 1, 1, 0, 0),
+        "the rejected submit writes no message, turn, intent, event or receipt"
+    );
+
+    // An exact replay of the admitted first submit still returns its receipt.
+    adapter
+        .create_conversation_turn(first)
+        .expect("exact replay is checked before single-flight");
+
+    // Every nonterminal status blocks admission; a terminal one does not.
+    let connection = Connection::open(state_database(&directory)).expect("settle first turn");
+    for status in ["RUNNING", "WAITING_USER", "WAITING_DEPENDENCY", "CANCEL_REQUESTED"] {
+        connection
+            .execute("UPDATE conversation_turns SET status=?1 WHERE turn_id='turn-one'", [status])
+            .expect("move the first turn to a nonterminal status");
+        assert!(
+            matches!(
+                adapter.create_conversation_turn(second.clone()),
+                Err(StoreError::Invalid(ref code)) if code == CONVERSATION_TURN_IN_PROGRESS
+            ),
+            "{status} blocks a second submit"
+        );
+    }
+    connection
+        .execute("UPDATE conversation_turns SET status='COMPLETED', settled_at=?1 WHERE turn_id='turn-one'", [AT])
+        .expect("settle the first turn");
+    drop(connection);
+    adapter
+        .create_conversation_turn(second)
+        .expect("submit after the active turn settles succeeds at the current revision");
+    assert_eq!(turn_row_counts(&directory), (3, 2, 2, 2, 2, 1));
+    let message_revision: i64 = Connection::open(state_database(&directory))
+        .expect("inspect revision")
+        .query_row(
+            "SELECT entity_revision FROM domain_events WHERE event_id='event-user-message-two'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("message revision");
+    assert_eq!(message_revision, 3);
+}
+
+#[test]
+fn conversation_turn_creation_two_concurrent_submits_admit_exactly_one() {
+    let (directory, store, first) = fixture();
+    let adapter = SqliteConversationStore::new(store);
+    let second = second_turn_commit(first.clone());
+    let handles: Vec<_> = [first, second]
+        .into_iter()
+        .map(|commit| {
+            let adapter = adapter.clone();
+            std::thread::spawn(move || adapter.create_conversation_turn(commit))
+        })
+        .collect();
+    let results: Vec<_> = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("submit thread"))
+        .collect();
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert!(results.iter().any(|result| matches!(
+        result,
+        Err(StoreError::Invalid(code)) if code == CONVERSATION_TURN_IN_PROGRESS
+    )));
+    let (_, messages, turns, intents, ..) = turn_row_counts(&directory);
+    assert_eq!((messages, turns, intents), (1, 1, 1));
 }
 
 fn insert_context_message_event(

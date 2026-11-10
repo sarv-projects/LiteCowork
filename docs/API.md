@@ -303,6 +303,7 @@ POST /v1/conversations/{id}/messages
 POST /v1/conversations/{id}/turns
 POST /v1/conversations/{id}/turns/{turn_id}/retry
 POST /v1/conversations/{id}/turns/{turn_id}/cancel
+GET  /v1/conversations/{id}/turns/{turn_id}/activity?retry_ordinal=
 GET  /v1/conversations/{id}/messages?cursor=
 GET  /v1/conversations/{id}/presentation?cursor=&limit=
 GET  /v1/rich-presentations/{presentation_id}
@@ -313,6 +314,10 @@ Implementation status (source audit reconciled 2026-11-06). Message append/list 
 operations remain **target-only**: they are declared in OpenAPI but no handler is mounted.
 The mounted Conversation routes include create/list/get, AgentBinding mutation,
 presentation/rich-presentation/tasks, and the three turn routes below.
+Turn submit reauthorizes `resource_refs` and `RESOURCE` blocks: only same-Workspace, current-revision, non-RESTRICTED text Resources up to 128 KiB (16 per message) are accepted (404 `NOT_FOUND`, 409 `RESOURCE_STALE`, 422 `INVALID_RESOURCE_REF`, 503 `RESOURCE_UNAVAILABLE`), and they are inlined as digest-headed text at dispatch (001-T14).
+`GET .../turns/{turn_id}/activity` is SERVED (read-only): bounded, ordered REPORTED activity
+observations (tool, file, permission, todo, step) the native agent said it performed, so the UI can
+rebuild activity cards after restart. They are never Effects, receipts or grants (001-T25, AC-029).
 
 The context package builder, SQLite turn-prefix reader, STARTING reservation,
 `activate_conversation_agent_session`, and atomic final-response writer exist in the active
@@ -562,8 +567,12 @@ not yet wire them into a Conversation startup recovery sweep.
 
 `POST /v1/conversations/{id}/turns` first resolves and checks the Conversation override or
 Workspace default AgentBinding/endpoint. If none is eligible, it returns
-`AGENT_UNAVAILABLE` and persists no message or turn. Otherwise it atomically appends the
-user message and creates the ConversationTurn, then starts a fresh Conversation-scoped
+`AGENT_UNAVAILABLE` and persists no message or turn. A Conversation admits one turn at a
+time: while another turn is OPEN, RUNNING, WAITING_USER, WAITING_DEPENDENCY or
+CANCEL_REQUESTED the route returns `409 CONVERSATION_TURN_IN_PROGRESS` and writes nothing
+(an exact replay of the admitted request is still answered from its receipt first).
+Otherwise it atomically appends the
+user message, creates the ConversationTurn and its UNCLAIMED dispatch intent, then starts a fresh Conversation-scoped
 AgentSession. It returns `202` with the turn ID and command receipt;
 the agent response is appended with AgentSession/AgentBinding provenance. This path does
 not create a Task unless ordinary product materialization rules determine the request
@@ -908,14 +917,22 @@ providers, mutate lifecycle state, or imply that execution is ready. Dependent T
 Automation arrays are omitted until their inventories can be reported truthfully.
 `GET /v1/operator/readiness` remains a separate proof that the Operator API is serving.
 
-`PATCH /v1/runtime-lifecycle/startup-policy`,
-`GET /v1/runtime-lifecycle/stop-preview`, and `POST /v1/runtime-lifecycle/stop` remain
+`GET /v1/runtime-lifecycle/stop-preview` is served (011-T13 prerequisite, read-only). It lists the
+durable records that block a safe stop for the exact current incarnation: admitted Conversation
+turns, non-terminal Attempts, dispatched unresolved Effects, held execution and environment
+control leases and pending cleanup. Its `verdict` is `BLOCKED` when any is present and `UNKNOWN`
+otherwise, because no live-work observer exists yet for agent sessions, child processes and
+terminal or browser sessions; `QUIESCENT` is unreachable in this build, `provider_reference_ids`
+stays empty and the dependent Automation, WorkspaceRoot, service-reference and handoff lists
+stay empty until their inventories exist.
+
+`PATCH /v1/runtime-lifecycle/startup-policy` and `POST /v1/runtime-lifecycle/stop` remain
 unimplemented. No authenticated Operator stop command is exposed. Do not emulate one
 with a signal, process kill, or direct socket shortcut. Implementing these operations
 requires a RuntimeLifecycleService that inventories and drains admitted Attempts,
 reconciles Effects, fences/releases leases, and settles local trigger/provider references
 before process exit. Those owners are not integrated, so the current Runtime must fail
-closed rather than claim a safe stop preview or accepted drain.
+closed rather than accept a drain or claim a safe stop.
 
 When implemented, these are local-Operator operations. Desktop Tauri calls use the OS-authenticated local
 IPC contract in [`LOCAL-OPERATOR-IPC.md`](LOCAL-OPERATOR-IPC.md); Windows transport source
@@ -1028,10 +1045,12 @@ from the first page after a Runtime inventory notification.
 
 ## Agents
 
-Implementation status (2026-10-22): `beginAgentAuthentication`,
-`openAgentNativeConfiguration`, `PUT /v1/agent-bindings/{id}/configuration`,
+Implementation status (2026-11-10): `beginAgentAuthentication` and
+`openAgentNativeConfiguration` are **served** (fail-closed: they act only on a method or
+target declared by the profile's fresh module descriptor, and the V1 OpenCode module
+declares none). `PUT /v1/agent-bindings/{id}/configuration`,
 `getAgentSessionOptions`, `getAgentHarnessCapabilities`, `installRegistryAgent` and
-`updateRegistryAgent` are all **target-only** — declared, never mounted, never called.
+`updateRegistryAgent` are **target-only** — declared, never mounted, never called.
 Served today: inventory/registry list and refresh, profile probe, control-descriptor
 refresh, credential submission, binding CRUD with enable/disable/default, and the quota
 observation.
@@ -2310,8 +2329,9 @@ origin frontier from the same SQLite read transaction as their projected records
 inventory sends closed invalidation notifications, and consumers reread the authorized
 offers route for current state. The shared subscription schema retains the broader planned
 envelope and can validate combinations the local route does not serve. The schema-defined
-transient `turn.delta`, `turn.settled`, and `rich.draft` frame types are not emitted by the
-local Operator yet. This implementation status does not narrow the planned stream contract
+transient `turn.delta` and `turn.settled` frames are emitted by the local Operator on the
+single-Conversation projection stream from a bounded in-memory ring (256 frames; a slow reader loses the
+oldest frames and sees a sequence gap); `rich.draft` is not emitted yet. This implementation status does not narrow the planned stream contract
 above.
 
 While a Conversation turn is active, the stream may also deliver bounded transient

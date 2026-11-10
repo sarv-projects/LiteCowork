@@ -89,13 +89,14 @@ pub(crate) struct OpenCodeProfileProbe {
     pub inference_access_verified: bool,
     pub host_process_stopped: bool,
     pub writer_quiescence_proven: bool,
-    /// Always false until session lifecycle, Environment isolation, and native
-    /// capability mediation are implemented and qualified.
+    /// Computed Conversation admission (002-T01): true only for the exact
+    /// accepted route (CLI 2.0.32, a complete probe and an observed host stop).
+    /// Task admission stays unsupported and keeps its own flag in UI copy.
     pub profile_admission_supported: bool,
 }
 
 impl OpenCodeProfileProbe {
-    fn initial() -> Self {
+    pub(crate) fn initial() -> Self {
         Self {
             agent_id: "opencode",
             protocol: "OPENCODE_SERVER",
@@ -183,6 +184,10 @@ pub(crate) fn probe_opencode_profile(
     } else {
         OpenCodeProbeReadiness::Failed
     };
+    // Conversation admission is the single computed predicate (002-T01). Task
+    // admission stays unsupported and carries its own flag in UI copy.
+    result.profile_admission_supported =
+        super::native_provider::opencode_profile_admission_supported(&result);
     result
 }
 

@@ -32,7 +32,11 @@
 body { margin: 0; min-height: 100vh; background: var(--color-background); color: var(--color-text); font-size: 16px; line-height: 1.5; }
 button, textarea { font: inherit; }
 button { color: inherit; }
-button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.skip-link { position: absolute; left: 8px; top: -48px; z-index: 1000; padding: 8px 12px; border-radius: 6px; background: #fff; color: #111827; font-weight: 600; text-decoration: none; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+.skip-link:focus, .skip-link:focus-visible { top: 8px; }
+#main-content:focus { outline: none; }
+#main-content:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar {
   width: 264px;
@@ -1261,3 +1265,55 @@ h1 { margin: 9px 0 8px; font-size: 32px; line-height: 1.2; letter-spacing: -.035
 .sidebar-runtime-indicator.warning {
   background: #f59e0b;
 }
+
+/* Local display preferences (011-T07): applied at the document root from LocalPreferenceStore. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-background: #11161e;
+  --color-surface: #1a212c;
+  --color-text: #e8edf4;
+  --color-text-muted: #b3bdcb;
+  --color-text-subtle: #97a3b5;
+  --color-border: #2c3646;
+  --color-border-strong: #3d4a5e;
+  --color-primary: #7da2ff;
+  --color-primary-hover: #a3bdff;
+  --color-primary-soft: #1f2d4d;
+  --color-focus: #7da2ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+    --color-background: #11161e;
+    --color-surface: #1a212c;
+    --color-text: #e8edf4;
+    --color-text-muted: #b3bdcb;
+    --color-text-subtle: #97a3b5;
+    --color-border: #2c3646;
+    --color-border-strong: #3d4a5e;
+    --color-primary: #7da2ff;
+    --color-primary-hover: #a3bdff;
+    --color-primary-soft: #1f2d4d;
+    --color-focus: #7da2ff;
+  }
+}
+html { font-size: calc(100% * var(--lc-text-scale, 1)); }
+:root[data-density="compact"] .nav-item { padding-top: 4px; padding-bottom: 4px; }
+:root[data-density="compact"] .settings-row { padding-top: 8px; padding-bottom: 8px; }
+:root[data-reduced-motion="true"] *, :root[data-reduced-motion="true"] *::before, :root[data-reduced-motion="true"] *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Update panel (019-T12): no animation, so reduced motion needs no override. */
+.update-panel { display: grid; gap: 8px; }
+.update-panel-message:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.update-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.update-panel-reason { color: #4b5563; font-size: 13px; margin: 0; }
+
+/* Workspace Dashboard (011-T22) */
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.dashboard-widget-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dashboard-note { color: #4b5563; font-size: 13px; margin: 4px 0 0; }

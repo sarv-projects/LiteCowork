@@ -2,6 +2,25 @@
 
 This is the working delivery checklist for the active source tree. It is not a Git commit plan. Feature-specific work items belong in specs/NNN-*/TASKS.md. Product semantics remain in owner contracts; current evidence is in IMPLEMENTATION-STATUS.md.
 
+## Status snapshot (2026-11-10, tip e9abe46)
+
+The tables below are the plan and carry no per-row status. Per-task status lives in specs/NNN-*/TASKS.md; this snapshot only indexes it. Nothing is INTEGRATED with a live agent or QUALIFIED.
+
+| Group | State | Detail |
+|---|---|---|
+| BT-00 | Partly done | Route inventory generated and matches (178 served / 1 local-only / 53 target-only); CURRENT-RUN.md and IMPLEMENTATION-STATUS.md synced 2026-11-10 |
+| BT-01 | CODE and SERVED for BT-01.1, 01.2, 01.4; BT-01.3 CODE (ACP client, OpenCode HTTP adapter kept); BT-01.5 and 01.6 partial | 001 DONE/PARTIAL list in CURRENT-RUN.md; live OpenCode run (001-T09) NOT STARTED |
+| BT-02 | Linux storage tests only; Windows tasks DEFERRED to the owner's Windows laptop | 003-T02 PARTIAL |
+| BT-03 | Registry, descriptors, auth observation, Matchmaker CODE/SERVED; Claude Code module BLOCKED; relay (004) not started | 002 statuses |
+| BT-04 | Not started | 005; Windows Environment provider B-35 still PROPOSED |
+| BT-05 | 013 part: whole package DEFERRED by the owner (A-62). 006 part: BLOCKED on the B-19 follow-up | See the DEFERRED note in specs/013-litespm-package-lifecycle-bridge/TASKS.md |
+| BT-06 to BT-09 | Not started (pre-existing foundations only); 010-T19 deferred out of V1 | 007, 016, 008, 009, 010 |
+| BT-10 | Partly done for Linux; Windows and packaged rows DEFERRED | 011 DONE T01, T04, T05, T07, T08, T09, T10, T21 |
+| BT-11 | Storage layer only (014-T03 partial, migration v31) | Routes, search, purge, UI NOT STARTED |
+| BT-12 to BT-14 | Not started; B-39, B-40, B-41, D-01, B-45 accepted as proposed; B-42 open | 015 to 018, 020 |
+| BT-15 | CI and release machinery skeleton (CODE, never run on GitHub); B-43 and B-44 items DEFERRED | 019 |
+| Co-edit (012) | Storage layer only (012-T05 partial, migration v32) | Routes, service, UI NOT STARTED |
+
 ## BT-00 — Current baseline and documentation integrity
 
 | ID | Task | Exit evidence |
@@ -12,6 +31,7 @@ This is the working delivery checklist for the active source tree. It is not a G
 | BT-00.4 | **Validated** — Windows WorkspaceRoot private-locator route regressions | Six route tests pass on the declared Windows target; production locator validation remains fail-closed |
 | BT-00.5 | Run documentation link and owner-contract guards | Markdown audit and cross-contract validator pass with reviewed exceptions only |
 | BT-00.6 | Run frontend type/build/unit checks and packaged desktop smoke | Exact commands and results recorded |
+| BT-00.7 | Release evidence and release-row schemas, release docs index | docs/schemas/release-evidence-bundle.schema.json, docs/schemas/release-matrix-row.schema.json, docs/release/README.md; 019-T02 |
 
 ## BT-01 — Conversation dispatch durability (Feature 001)
 
@@ -117,7 +137,7 @@ BT-06.1 and BT-06.2 are owned by Feature 007; BT-06.3..BT-06.5 are owned by Feat
 | BT-10.2 | Map every visible Settings control to exact owner and receipt | Control-level semantic map |
 | BT-10.3 | Verify Runtime vs Operator vs Task readiness copy | No false “execution ready” indication |
 | BT-10.4 | Complete shell keyboard/focus/reduced-motion tests | Packaged desktop acceptance |
-| BT-10.5 | Run full declared OS/provider release matrix | CODE/SYSTEM/USER and owner sign-off |
+| BT-10.5 | Run full declared OS/provider release matrix | CODE/SYSTEM/USER and owner sign-off; owned by 019-T14, 019-T15 and 019-T22 |
 
 ## BT-11: Conversation history management (Feature 014)
 
@@ -187,27 +207,28 @@ Folded tasks (owner-accepted 2026-11-09, register A-55) land in the wave of thei
 
 ## Migration allocation (provisional)
 
-The wired schema is v27 and `docs/schemas/sqlite-v28.sql` exists but is unwired (register A-40). Many packages wrote "sqlite-v29.sql or the next free number" and Feature 012 named v30, so the numbers collide. This table assigns numbers in wave merge order. Rules: the first package to bump `SCHEMA_VERSION` also wires v28, because migrations apply in order; a package that merges out of order takes the next free number and updates this table in the same change; a merged migration is never renumbered or edited.
+The wired schema is v32 (v30 adds REPORTED turn activity records, 001-T25 storage layer; v31 adds Conversation history lifecycle state, 014-T03; v32 adds Conversation control events and owner side notes, 012-T05): v28 (register A-40) and v29 (Feature 001 durable turn) are applied by `crates/storage-sqlite/src/lib.rs`. Many packages wrote "sqlite-v29.sql or the next free number" and Feature 012 named v30, so the numbers collide. This table assigns numbers in wave merge order. Rules: the first package to bump `SCHEMA_VERSION` also wires v28, because migrations apply in order; a package that merges out of order takes the next free number and updates this table in the same change; a merged migration is never renumbered or edited.
 
 | Migration | Package and task | Content (from the package DATA-MODEL) |
 |---|---|---|
-| v28 (existing) | first migration-bearing merge, planned 001 | Workspace delegation settings revisions (A-40) |
-| v29 | 001 (W1) | Dispatch outbox, single-flight index, commit identity fields, usage records |
-| v30, v31 | 002-T04, 002-T07 (W1) | Runtime-local descriptor store; auth observations |
-| v32 | 003-T09 (W1) | `context_attachments`, `retrieval_receipts` |
-| v33 | 014 (W1) | Conversation status columns, search index, deletion tombstone and purge manifest |
-| v34 | 012-T05 (W1, replaces the v30 named in 012) | Control events and side notes |
-| v35 | 005-T01 (W2) | Plan acceptance, Attempt admission and Effect records |
-| v36 | 007-T01 (W2) | `artifact_export_receipts`, source Conversation columns |
-| v37 | 009 (W2) | Conversation Coworker origin and memory fields |
-| v38 | 013 (W2/W3) | Package approvals and operation receipts |
-| v39 | 006-T01 (W3) | `connections` rebuild and Connection records |
-| v40 | 008-T01 (W3) | Browser session/lease/receipt and terminal session/receipt |
-| v41 | 015 (W4) | `task_control_requests`, `task_resume_packets` |
-| v42 | 020-T02 (W4) | `learning_candidates`, `coworker_learning_policies`, `memory_records` |
-| v43 | 010-T01 (W5) | Delivery lease and status transitions, SUPPRESSED rows |
-| v44 | 017 (W6) | `backup_operations` |
-| v45 (if needed) | 018 (W6) | Optional diagnostics table; the usage table comes from 001 |
+| v28 (existing) | wired by 001 (done) | Workspace delegation settings revisions (A-40) |
+| v29 (wired) | 001 (W1, done) | Dispatch outbox, single-flight triggers, commit identity table, usage records |
+| v30 (wired) | 001-T25 (done) | REPORTED Conversation turn activity records |
+| v31 (wired) | 014-T03 (partial: storage only) | `conversation_history_state` side table (status, archived_at, deleted_at); search index and purge manifest are NOT in v31 and take a later number |
+| v32 (wired) | 012-T05 (partial: storage only) | `conversation_control_events`, `conversation_owner_side_notes` (replaces the v30 named in 012) |
+| v33, v34 | 002-T04, 002-T07 (W1) | Runtime-local descriptor store; auth observations (renumbered from v30, v31 on 2026-11-10 because those were taken) |
+| v35 | 003-T09 (W1) | `context_attachments`, `retrieval_receipts` (renumbered from v32) |
+| v36 | 005-T01 (W2) | Plan acceptance, Attempt admission and Effect records |
+| v37 | 007-T01 (W2) | `artifact_export_receipts`, source Conversation columns |
+| v38 | 009 (W2) | Conversation Coworker origin and memory fields |
+| v39 | 013 (W2/W3) | Package approvals and operation receipts |
+| v40 | 006-T01 (W3) | `connections` rebuild and Connection records |
+| v41 | 008-T01 (W3) | Browser session/lease/receipt and terminal session/receipt |
+| v42 | 015 (W4) | `task_control_requests`, `task_resume_packets` |
+| v43 | 020-T02 (W4) | `learning_candidates`, `coworker_learning_policies`, `memory_records` |
+| v44 | 010-T01 (W5) | Delivery lease and status transitions, SUPPRESSED rows |
+| v45 | 017 (W6) | `backup_operations` |
+| v46 (if needed) | 018 (W6) | Optional diagnostics table; the usage table comes from 001 |
 
 Packages 004, 011, 016 and 019 plan no migration.
 

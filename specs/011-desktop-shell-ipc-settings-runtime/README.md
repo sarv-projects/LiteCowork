@@ -2,6 +2,7 @@
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 **Revision:** 1.0 | **Updated:** 2026-11-09 | **Owner acceptance:** repository owner, 2026-11-09, via [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)
+**Implementation state (2026-11-10):** CODE and SERVED for Linux. DONE: T01, T04, T05, T07, T08, T09, T10, T21. PARTIAL: T06, T11, T12, T13 (read-only stop preview served; request half blocked), T14, T15, T16, T18, T19, T20, T22. DEFERRED: T02, T03, T17 (native Windows, second OS user, packaged hosts). NOT STARTED: T23. src-tauri is not buildable in the authoring sandbox (gdk-3.0 missing), so Tauri commands are uncompiled there.
 **Component owners:** Runtime, Operator IPC, Desktop UI, Product, Security/Trust.
 
 ## User outcome

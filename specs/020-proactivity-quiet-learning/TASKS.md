@@ -14,13 +14,14 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (HEAD 2
 - **Needs You (SERVED, read-only):** `apps/litecoworkd/src/needs_you_operator.rs` (`GET /v1/needs-you`, `no-store` middleware), `crates/storage-core/src/needs_you.rs`, tests `apps/litecoworkd/src/needs_you_operator_tests.rs`; UI `apps/litecowork-ui/src/needs-you/TaskAttentionPage.tsx` and `needs-you-*` tests.
 - **Learning (CODE, no caller):** `crates/storage-core/src/coworker_learning.rs` (gates, 30 tests), exported from `crates/storage-core/src/lib.rs`; `redact_sensitive_content` reused by `crates/storage-core/src/skill.rs`. No learning table, service, route, event producer or UI. `apps/litecowork-ui/src/coworkers/CoworkerSettings.tsx` discloses that quiet learning is inactive.
 - **Quiet hours (Feature 010 domain):** `crates/domain-responsibility/src/notifications.rs` `QuietHours::{parse, contains}`; `notification_preferences.quiet_hours_json` per Workspace and event class; `NotificationEventClass` has no Suggestion or learning class.
-- **Migrations:** chain ends at `docs/schemas/sqlite-v28.sql` today (other packages may claim the next numbers first).
+- **Migrations:** chain ends at `docs/schemas/sqlite-v32.sql` today; task T02 is allocated v43 in docs/LITECOWORK-BUILD-TASKS.md (take the next free number if another package merges first).
 
 Gaps to V1: no producer and no `propose`; no quiet-hours behavior; no learning pipeline; three gate defects (SPEC 7.1); no owner for Goals/Needs You conformance; no qualification.
 
 ## 020-T01 - Owner acceptance of SPEC, D-01 and blocker B-45
 
-- **Status:** BLOCKED (pending owner acceptance of SPEC revision 0.1, D-01 first Suggestion producers and B-45 first learning source and auto-commit policy; owner: repository owner, sarv-projects).
+- **Status:** BLOCKED (D-01 and B-45 accepted as proposed 2026-11-10; pending owner acceptance of SPEC revision 0.1; owner: repository owner, sarv-projects).
+- **DEFERRED/BLOCKED note:** Why: whole-SPEC acceptance pending although D-01 and B-45 are accepted. Unblocks when: owner reviews and accepts the SPEC. Test later at: decision only.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Product (repository owner), Responsibility domain, Security.
@@ -144,6 +145,7 @@ Gaps to V1: no producer and no `propose`; no quiet-hours behavior; no learning p
 ## 020-T08 - Learning storage with CAS, idempotency and Resource-backed payloads
 
 - **Status:** BLOCKED (B-45 pending owner; owner: repository owner).
+- **DEFERRED/BLOCKED note:** Why: blocked on T01 SPEC acceptance and the migration v43 allocation. Unblocks when: T01. Test later at: any Linux host (storage tests).
 - **Depends on:** T01, T02, T03
 - **Cross-package prerequisites:** 009-T04 (COWORKER_NOTES ContextDocument re-widen, A-18/B-24 rider) for memory text; Feature 003 Resource revision commit and purge.
 - **Owner:** Storage, Responsibility.
@@ -163,6 +165,7 @@ Gaps to V1: no producer and no `propose`; no quiet-hours behavior; no learning p
 ## 020-T09 - LearningService and LearningClassifier port (B-45)
 
 - **Status:** BLOCKED (B-45 pending owner; Feature 009 Coworker-owned Conversation admission absent, owner Coworker domain).
+- **DEFERRED/BLOCKED note:** Why: blocked on T01 and on Feature 009 Coworker-owned Conversation admission. Unblocks when: T01 and Feature 009. Test later at: native Linux with a real agent.
 - **Depends on:** T01, T03, T08
 - **Cross-package prerequisites:** 009-T02 (immutable Coworker origin on Conversations); Feature 001 settled-turn commit as checkpoint; Feature 001 qualified OpenCode v2.0.32 route if the optional extractor uses the native lead.
 - **Owner:** Responsibility, Agent Runtime (extractor adapter), Security.
@@ -183,6 +186,7 @@ Gaps to V1: no producer and no `propose`; no quiet-hours behavior; no learning p
 ## 020-T10 - Learning Operator routes, authorization and Tauri bridge
 
 - **Status:** BLOCKED (B-45 pending owner).
+- **DEFERRED/BLOCKED note:** Why: blocked on T01. Unblocks when: T01. Test later at: any Linux host.
 - **Depends on:** T01, T02, T09
 - **Cross-package prerequisites:** NONE
 - **Owner:** Operator/API, Desktop Shell.
@@ -201,6 +205,7 @@ Gaps to V1: no producer and no `propose`; no quiet-hours behavior; no learning p
 ## 020-T11 - Learning review list, Remembered notice, policy and memory controls
 
 - **Status:** BLOCKED (B-45 pending owner); `CoworkerSettings.tsx` shows the inactive-learning disclosure today.
+- **DEFERRED/BLOCKED note:** Why: blocked on T01. Unblocks when: T01. Test later at: a rendered browser run (none available here).
 - **Depends on:** T01, T10, T06
 - **Cross-package prerequisites:** 009-T09 (Coworker chats and Memory & Knowledge UI host) and Coworker onboarding (`HomeCoworkerOnboarding.tsx`); Feature 001 message actions slot in the Conversation view.
 - **Owner:** Desktop UI.

@@ -99,7 +99,26 @@ export function UnavailableControlsNotice({ message, reference }: { message: str
   );
 }
 
-function DescriptorSummary({ descriptor }: { descriptor: AgentControlDescriptor }) {
+export type DescriptorActions = {
+  /** Present only when a served begin-authentication command exists for this desktop build. */
+  onBeginAuth?: (authMethodId: string) => void;
+  /** Present only when a served open-native-configuration command exists. */
+  onOpenNativeConfig?: (targetId: string) => void;
+};
+
+const AUTH_TEXT: Record<AgentControlDescriptor["auth"]["state"], string> = {
+  UNKNOWN: "Unknown. Sign-in has not been observed.",
+  NEEDS_AUTH: "Needs sign-in.",
+  AUTHENTICATING: "Authenticating. Complete the sign-in in the agent's own window.",
+  AUTHENTICATED: "Signed in (reported by the agent module).",
+  EXPIRED: "Sign-in expired.",
+  DEGRADED: "Degraded. Sign-in may be partially working.",
+  ERROR: "Sign-in failed or was denied.",
+};
+
+export function DescriptorSummary({ descriptor, actions = {} }: { descriptor: AgentControlDescriptor; actions?: DescriptorActions }) {
+  const nativeFlows = descriptor.auth.methods.filter((method) => method.kind === "NATIVE_FLOW");
+  const targets = descriptor.configuration.native_config_targets;
   return (
     <div className="agent-control-panel__summary">
       <dl>
@@ -119,6 +138,40 @@ function DescriptorSummary({ descriptor }: { descriptor: AgentControlDescriptor 
         {descriptor.input_surface.slash_commands.length
           ? `Commands: ${descriptor.input_surface.slash_commands.map((command) => command.token).join(", ")}`
           : "No native commands declared."}
+      </p>
+      <ul className="agent-control-panel__axes" aria-label="Independent readiness axes">
+        <li><b>Detection</b>: {descriptor.installation.state === "MISSING" ? "not detected" : "detected"}</li>
+        <li><b>Installation</b>: {descriptor.installation.state.toLowerCase().replace(/_/g, " ")}</li>
+        <li><b>Configuration</b>: {descriptor.configuration.fields.length ? `${descriptor.configuration.fields.length} declared fields` : "no LiteCowork-managed fields"}</li>
+        <li><b>Authentication</b>: {AUTH_TEXT[descriptor.auth.state]}</li>
+        <li><b>Readiness</b>: checked separately at send; this descriptor does not prove it.</li>
+      </ul>
+      {nativeFlows.length === 0
+        ? <p className="agent-control-panel__signin">No sign-in method is declared by this agent module.</p>
+        : nativeFlows.map((method) => (
+          <button
+            key={method.auth_method_id}
+            type="button"
+            disabled={!actions.onBeginAuth || descriptor.auth.state === "AUTHENTICATING"}
+            onClick={() => actions.onBeginAuth?.(method.auth_method_id)}
+          >
+            {descriptor.auth.state === "AUTHENTICATING" ? "Authenticating…" : `Sign in: ${method.display_name}`}
+          </button>
+        ))}
+      {targets.length === 0
+        ? <p className="agent-control-panel__native-config">No native configuration target is declared, so Open native config is unavailable.</p>
+        : targets.map((target) => (
+          <button
+            key={target.target_id}
+            type="button"
+            disabled={!actions.onOpenNativeConfig}
+            onClick={() => actions.onOpenNativeConfig?.(target.target_id)}
+          >
+            Open native config: {target.display_name}
+          </button>
+        ))}
+      <p className="agent-control-panel__native-state">
+        Native MCP servers, hooks and extensions are native harness state. LiteCowork does not mediate or record them as Core Effects.
       </p>
       <p className="agent-control-panel__qualification">
         Descriptor observed. Session readiness and send authorization are checked separately.

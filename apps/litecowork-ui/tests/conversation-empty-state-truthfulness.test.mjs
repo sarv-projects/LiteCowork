@@ -79,3 +79,32 @@ test("the Send control is gated on a qualified binding, not merely a non-empty d
     "send eligibility must incorporate a binding-qualification predicate",
   );
 });
+
+test("no fabricated model, title or composer hint copy remains in the Conversation page", () => {
+  for (const fabricated of ["Gemini 3.8 Flash Low", "AI Capabilities Overview", "@ to mention, / for actions", "Turbo"]) {
+    assert.equal(source.includes(fabricated), false, `fabricated copy must not return: ${fabricated}`);
+  }
+});
+
+test("composer controls without an owner route are disabled and named unavailable (AC-025)", () => {
+  for (const name of ["Voice input (unavailable)", "More options (unavailable)"]) {
+    const at = source.indexOf(`aria-label="${name}"`);
+    assert.notEqual(at, -1, `${name} must exist as an unavailable control`);
+    assert.match(source.slice(at, at + 60), /disabled/, `${name} must be disabled`);
+  }
+});
+
+test("the attachment control has an owner route and stays fenced to a selected Conversation (001-T14)", () => {
+  const at = source.indexOf('aria-label="Add context or file"');
+  assert.notEqual(at, -1, "the attach control exists");
+  assert.match(source.slice(at, at + 200), /disabled=\{!operatorReady \|\| !selectedId \|\| isTurnRunning\}/);
+  assert.match(source, /invoke<\{ items: AttachmentCandidate\[\] \}>\("list_resources"/);
+  assert.match(source, /resourceRefs: toResourceRefs\(chips, workspaceId\)/);
+});
+
+test("Stop and Retry send the projected turn version, never a hard-coded one (AC-024, AC-025)", () => {
+  assert.equal(/expectedVersion:\s*1\b/.test(source), false, "expectedVersion must not be hard-coded");
+  assert.match(source, /expectedVersion: stopping\.expectedVersion/);
+  assert.match(source, /expectedVersion: retrying\.version/);
+  assert.match(source, /invoke<unknown>\("retry_conversation_turn"/);
+});

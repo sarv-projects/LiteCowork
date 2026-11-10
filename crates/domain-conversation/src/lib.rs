@@ -59,7 +59,9 @@ pub enum TurnCommand {
     Fail { settled_at: String },
     RequestCancel,
     SettleCancelled { settled_at: String },
-    Retry { agent_session_id: String },
+    /// FAILED to OPEN with `retry_ordinal + 1` and no session pointer. A fresh
+    /// Conversation-scoped session is reserved afterwards by the dispatcher.
+    Retry,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -160,14 +162,14 @@ pub fn transition(
             next.status = ConversationTurnStatus::Cancelled;
             next.settled_at = Some(valid_timestamp(settled_at)?);
         }
-        TurnCommand::Retry { agent_session_id } => {
+        TurnCommand::Retry => {
             require_status(current, ConversationTurnStatus::Failed)?;
             next.retry_ordinal = current
                 .retry_ordinal
                 .checked_add(1)
                 .ok_or(TurnTransitionError::RetryOrdinalExhausted)?;
-            next.agent_session_id = Some(valid_new_session_id(current, agent_session_id)?);
-            next.status = ConversationTurnStatus::Running;
+            next.agent_session_id = None;
+            next.status = ConversationTurnStatus::Open;
             next.settled_at = None;
         }
     }
@@ -338,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn resumption_and_retry_require_a_fresh_agent_session() {
+    fn resumption_requires_a_fresh_agent_session() {
         let mut waiting = turn(ConversationTurnStatus::WaitingDependency);
         waiting.agent_session_id = Some("closed-session".into());
         assert_eq!(
@@ -352,34 +354,18 @@ mod tests {
             Err(TurnTransitionError::SessionMustBeFresh)
         );
 
-        let mut failed = turn(ConversationTurnStatus::Failed);
-        failed.agent_session_id = Some("closed-session".into());
-        assert_eq!(
-            transition(
-                &failed,
-                1,
-                TurnCommand::Retry {
-                    agent_session_id: "closed-session".into()
-                }
-            ),
-            Err(TurnTransitionError::SessionMustBeFresh)
-        );
     }
 
     #[test]
-    fn retry_is_explicit_fresh_session_and_preserves_message_and_preference() {
+    fn retry_reopens_a_failed_turn_without_a_session_and_preserves_message_and_preference() {
         let mut failed = turn(ConversationTurnStatus::Failed);
+        failed.agent_session_id = Some("failed-session".into());
         failed.settled_at = Some("2026-10-09T00:01:00Z".into());
         failed.presentation_preference = PresentationPreference::Rich;
-        let retried = transition(
-            &failed,
-            1,
-            TurnCommand::Retry {
-                agent_session_id: "session-2".into(),
-            },
-        )
-        .unwrap();
-        assert_eq!(retried.status, ConversationTurnStatus::Running);
+        let retried = transition(&failed, 1, TurnCommand::Retry).unwrap();
+        assert_eq!(retried.status, ConversationTurnStatus::Open);
+        assert_eq!(retried.agent_session_id, None);
+        assert_eq!(retried.version, 2);
         assert_eq!(retried.retry_ordinal, 1);
         assert_eq!(retried.user_message_id, "message-1");
         assert_eq!(
@@ -403,13 +389,7 @@ mod tests {
             Err(TurnTransitionError::StaleVersion)
         );
         assert_eq!(
-            transition(
-                &open,
-                1,
-                TurnCommand::Retry {
-                    agent_session_id: "s1".into()
-                }
-            ),
+            transition(&open, 1, TurnCommand::Retry),
             Err(TurnTransitionError::InvalidTransition)
         );
     }

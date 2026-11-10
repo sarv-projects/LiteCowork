@@ -2,6 +2,7 @@
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
 **Revision:** 1.0 | **Updated:** 2026-11-09 | **Owner acceptance:** B-24 and B-25 accepted 2026-11-09 by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md); the automatic LearningCandidate pipeline moves to Feature 020.
+**Implementation state (2026-11-10):** Not implemented beyond pre-existing partial foundations. T16 BLOCKED on live 001/002 rows; migration v38 allocated.
 **Owners:** Coworkers, Conversation, Memory, Trust, Desktop UI.
 
 ## User outcome

@@ -130,6 +130,23 @@ export type paths = {
         patch: operations["updateWorkspacePolicy"];
         trace?: never;
     };
+    "/workspaces/{workspaceId}/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Renames an ACTIVE Workspace over the existing workspaces.name column; bumps Workspace.version and emits workspace.renamed.v1. Archived Workspaces are read-only. */
+        put: operations["renameWorkspace"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspaceId}/delegation-settings": {
         parameters: {
             query?: never;
@@ -431,6 +448,23 @@ export type paths = {
         get?: never;
         put?: never;
         post: operations["submitConversationTurn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{conversationId}/turns/{turnId}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Served (read-only). Returns the bounded, ordered REPORTED activity observations (tool, file, permission, todo and step events the native agent said it performed) for one turn attempt so the UI can rebuild activity cards after a restart. Records carry only a bounded display word, never a path, argument, output or reasoning text, and are never Effects, receipts or grants. */
+        get: operations["listConversationTurnActivity"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1317,6 +1351,7 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
+        /** @description Served (read-only). Lists durable owner records that block a safe stop (admitted turns, non-terminal Attempts, unresolved Effects, held leases, pending cleanup). The verdict is UNKNOWN, never QUIESCENT, while no live-work observer exists for agent sessions, child processes and terminal or browser sessions; provider_reference_ids stays empty until that observer exists. */
         get: operations["previewLocalRuntimeStop"];
         put?: never;
         post?: never;
@@ -1335,6 +1370,7 @@ export type paths = {
         };
         get?: never;
         put?: never;
+        /** @description Target-only until Task/Attempt, Effect, lease and local service-reference settlement is proven. Authenticated, idempotent, If-Match on the current incarnation version. Admission is fenced before DRAINING; STOPPED is never reported while any settlement item is unsettled or UNKNOWN. */
         post: operations["requestLocalRuntimeStop"];
         delete?: never;
         options?: never;
@@ -3545,6 +3581,10 @@ export type components = {
             /** @description Required and non-empty when replication_policy is SELECTED_FOLDERS; every ID must be an active root in this Workspace. */
             replication_scope_root_ids?: string[];
         };
+        RenameWorkspaceRequest: {
+            /** @description Trimmed */
+            name: string;
+        };
         SetWorkspaceDefaultAgentBindingRequest: {
             /** @description Null clears the default binding. */
             agent_binding_id: string | null;
@@ -4155,8 +4195,7 @@ export type components = {
             host_process_stopped: boolean;
             /** @constant */
             writer_quiescence_proven: false;
-            /** @constant */
-            profile_admission_supported: false;
+            profile_admission_supported: boolean;
         };
         OpenCodeProviderOption: {
             id: string;
@@ -4538,6 +4577,16 @@ export type components = {
             blockers: components["schemas"]["Blocker"][];
             dependent_tasks?: components["schemas"]["TaskSummary"][];
             dependent_automations?: components["schemas"]["AutomationSummary"][];
+            power_assertion?: components["schemas"]["PowerAssertion"];
+        };
+        /** @description Keep-awake observation held by the daemon process and read from the OS; HELD is reported only after the OS confirms the assertion, and it is released on drain. */
+        PowerAssertion: {
+            /** @enum {string} */
+            mode: "OFF" | "WHILE_WORK_RUNS" | "WHILE_WORK_RUNS_ON_POWER";
+            /** @enum {string} */
+            os_state: "HELD" | "RELEASED" | "UNSUPPORTED" | "UNKNOWN";
+            /** Format: date-time */
+            observed_at: string;
         };
         LocalOperatorReadiness: {
             /** @enum {string} */
@@ -4556,6 +4605,18 @@ export type components = {
             runtime_incarnation_id: string;
             /** Format: date-time */
             observed_at: string;
+            admitted_turn_ids: string[];
+            admitted_attempt_ids: string[];
+            unresolved_effect_ids: string[];
+            execution_lease_ids: string[];
+            environment_control_lease_ids: string[];
+            provider_reference_ids: string[];
+            pending_cleanup_ids: string[];
+            /**
+             * @description QUIESCENT only when every list above is empty and observed; any unobservable item makes the verdict UNKNOWN
+             * @enum {string}
+             */
+            verdict: "QUIESCENT" | "BLOCKED" | "UNKNOWN";
             dependent_task_ids: string[];
             dependent_automation_ids: string[];
             workspace_root_ids: string[];
@@ -5133,9 +5194,19 @@ export type components = {
             /** @description Conversation message pagination cursor. */
             next_cursor?: string | null;
             active_turn: components["schemas"]["ConversationTurnPresentation"] | null;
+            /** @description The latest turn when it is FAILED; carries the aggregate version Retry must send as If-Match and the typed settlement reason. */
+            retryable_turn: components["schemas"]["ConversationRetryableTurn"] | null;
+        };
+        ConversationRetryableTurn: {
+            turn_id: string;
+            version: number;
+            retry_ordinal: number;
+            reason_code: string | null;
         };
         ConversationTurnPresentation: {
             turn_id: string;
+            /** @description ConversationTurn aggregate version; Stop sends it as If-Match. */
+            version: number;
             /** @enum {string} */
             status: "OPEN" | "RUNNING" | "WAITING_USER" | "WAITING_DEPENDENCY" | "CANCEL_REQUESTED";
             retry_ordinal: number;
@@ -5426,6 +5497,26 @@ export type components = {
             correlation_id: string;
             /** @enum {string} */
             presentation_preference: "AUTO" | "SIMPLE" | "RICH";
+        };
+        ConversationTurnActivityPage: {
+            turn_id: string;
+            retry_ordinal: number;
+            /** @enum {string} */
+            attribution: "REPORTED";
+            items: components["schemas"]["ConversationTurnActivityRecord"][];
+        };
+        ConversationTurnActivityRecord: {
+            turn_id: string;
+            retry_ordinal: number;
+            conversation_id: string;
+            sequence: number;
+            /** @enum {string} */
+            kind: "TOOL" | "FILE" | "PERMISSION" | "TODO" | "STEP" | "CONTEXT";
+            /** @enum {string} */
+            status: "STARTED" | "PROGRESS" | "SUCCEEDED" | "FAILED" | "ASKED" | "UPDATED" | "ENDED" | "REDUCED";
+            call_ref: string | null;
+            label: string | null;
+            created_at: string;
         };
         TimelinePage: {
             items: components["schemas"]["TimelineEntry"][];
@@ -6066,10 +6157,10 @@ export type components = {
             purge_manifest_digest?: string;
             purge_target_count?: number;
         } & (unknown & unknown);
-        /** @description Current domain-workspace create validation accepts only PERSONAL_PROFILE with a USER owner_ref matching the authenticated principal, and WORKSPACE_NOTES with a WORKSPACE owner_ref matching the selected Workspace. COWORKER_NOTES and GOAL_NOTES remain target enum values and are rejected by the current create validator until their authoritative owner aggregates and resource authorization are implemented. */
+        /** @description PROPOSED owner resolution (register A-18, pending acceptance): the create-metadata kind enum is narrowed to the two kinds the domain-workspace create validator actually accepts, PERSONAL_PROFILE with a USER owner_ref matching the authenticated principal and WORKSPACE_NOTES with a WORKSPACE owner_ref matching the selected Workspace, so the machine create contract no longer overstates it. COWORKER_NOTES and GOAL_NOTES remain valid ContextDocumentKind values for the record/read type and policy allowlists but are TARGET-pending-aggregate-services for creation: they cannot be created until their authoritative Coworker/Goal owner aggregates and resource authorization exist, so they are not offered here. See DATA-MODEL.md ContextDocument create ownership. */
         ContextDocumentCreateMetadata: {
             /** @enum {string} */
-            kind: "PERSONAL_PROFILE" | "COWORKER_NOTES" | "WORKSPACE_NOTES" | "GOAL_NOTES";
+            kind: "PERSONAL_PROFILE" | "WORKSPACE_NOTES";
             owner_ref: components["schemas"]["ContextOwnerRef"];
         };
         CoworkerRevisionRef: {
@@ -7471,7 +7562,7 @@ export type components = {
          * LiteCowork ErrorCode
          * @enum {string}
          */
-        "error-codes.schema": "AGENT_NATIVE_CONFIG_CHANGED" | "AGENT_NOT_LEAD_ELIGIBLE" | "AGENT_QUOTA_EXHAUSTED" | "AGENT_SESSION_OVERRIDE_UNSUPPORTED" | "AGENT_UNAVAILABLE" | "APPROVAL_ALREADY_CONSUMED" | "APPROVAL_REQUIRED" | "ARTIFACT_ARCHIVED" | "AUTOMATION_DISABLED" | "AUTOMATION_NOT_FOUND" | "AUTOMATION_NOT_PAUSED" | "AUTOMATION_REVISION_NOT_FOUND" | "BUDGET_EXCEEDED" | "BUSY" | "CAPABILITY_UNAVAILABLE" | "CAPABILITY_UNHEALTHY" | "CAPACITY_EXCEEDED" | "CAPTURE_REFUSED" | "CHANNEL_INGRESS_GAP_CONFIRMATION_REQUIRED" | "CLAIM_WINDOW_UNAVAILABLE" | "COMPUTER_PROVIDER_UNAVAILABLE" | "CONFLICT" | "CONSENT_REQUIRED" | "CONTEXT_DOCUMENT_NOT_ACTIVE" | "CONTEXT_DOCUMENT_OWNER_SCOPE_MISMATCH" | "COWORKER_ARCHIVED" | "COWORKER_HAS_ACTIVE_WORK" | "COWORKER_PAUSED" | "DEADLINE_EXECUTION_PRECONDITION_FAILED" | "DELEGATION_CONCURRENCY_EXCEEDED" | "DELEGATION_DEPTH_EXCEEDED" | "DELEGATION_PROFILE_ARCHIVED" | "DELEGATION_PROFILE_DISABLED" | "DELEGATION_PROFILE_INCOMPATIBLE" | "DELEGATION_PROFILE_OPTIONS_INVALID" | "DEMONSTRATION_CAPTURE_LIMIT_REACHED" | "DEPENDENCY_UNAVAILABLE" | "EFFECT_AMBIGUOUS" | "EFFECT_RECONCILIATION_REQUIRED" | "EMPTY_CAPTURE" | "ENVIRONMENT_CLASS_MISMATCH" | "ENVIRONMENT_MISMATCH" | "ENVIRONMENT_UNAVAILABLE" | "FORBIDDEN" | "GOAL_ARCHIVED" | "IDEMPOTENCY_CONFLICT" | "INTEGRITY_FAILURE" | "INTERNAL" | "INVALID_ARGUMENT" | "INVALID_ARTIFACT_TRANSITION" | "INVALID_PLAN" | "INVALID_RESOURCE_REF" | "INVALID_TRANSITION" | "INVALID_TRIGGER" | "INVOCATION_AMBIGUOUS" | "INVOCATION_NOT_FOUND" | "LEAD_FAILOVER_POLICY_INVALID" | "LEASE_CONFLICT" | "LIMIT_EXCEEDED" | "MISFIRED_SLOT_SKIPPED" | "MISFIRE_LIMIT_EXCEEDED" | "NOT_AN_APP_PUBLISHER" | "NOT_FOUND" | "OBSERVATION_PROVIDER_UNAVAILABLE" | "OCCURRENCE_CONFLICT" | "OCCURRENCE_NOT_FOUND" | "PLACEMENT_UNAVAILABLE" | "PLAN_CYCLE" | "POLICY_DENIED" | "PROVIDER_INPUT_UNSUPPORTED" | "PROVIDER_UNAVAILABLE" | "RATE_LIMITED" | "RECOVERY_EXHAUSTED" | "REDACTION_FAILED" | "RESOURCE_CONFLICT" | "RESOURCE_CONTENT_EXTERNAL" | "RESOURCE_IDENTITY_CHANGED" | "RESOURCE_IDENTITY_UNAVAILABLE" | "RESOURCE_INDEX_UNAVAILABLE" | "RESOURCE_LOCATION_UNAVAILABLE" | "RESOURCE_REVISION_PARENT_MISMATCH" | "RESOURCE_STALE" | "RESOURCE_UNAVAILABLE" | "ROUTINE_ARCHIVED" | "ROUTINE_ARCHIVE_BLOCKED" | "ROUTINE_INPUT_INVALID" | "ROUTINE_NOT_ACTIVE" | "ROUTINE_NOT_FOUND" | "ROUTINE_REVISION_DRIFTED" | "ROUTINE_REVISION_NOT_FOUND" | "RUNTIME_MISMATCH" | "RUNTIME_STARTUP_UNAVAILABLE" | "RUNTIME_STOP_BLOCKED" | "RUNTIME_UNAVAILABLE" | "SCAN_UNAVAILABLE" | "SCAN_UNSUPPORTED_PLATFORM" | "SCHEDULE_PLAN_UNAVAILABLE" | "SECRET_UNAVAILABLE" | "SENSITIVE_INPUT_UNSUPPORTED" | "SKILL_DRIFT_DETECTED" | "SOURCE_REFERENCE_REQUIRED" | "STALE_CLAIM_EPOCH" | "STALE_FENCE" | "STALE_SPEC_REVISION" | "STALE_TASK_VERSION" | "STALE_VERSION" | "STALE_WORKSPACE_VERSION" | "STEP_NOT_READY" | "STORE_BUSY" | "SUGGESTION_EXPIRED" | "TASK_ALREADY_PAUSED" | "TASK_NOT_FOUND" | "TASK_PAUSE_UNSAFE" | "TASK_TERMINAL" | "TIMEOUT" | "TRIGGER_HOST_UNAVAILABLE" | "TRIGGER_UNSUPPORTED" | "UNAUTHORIZED" | "UNAVAILABLE" | "UNSUPPORTED_PROJECTION" | "UNSUPPORTED_VERSION" | "UPLOAD_EXPIRED" | "UPLOAD_OFFSET_CONFLICT" | "USER_REQUEST_EXPIRED" | "USER_REQUEST_NOT_FOUND" | "USER_REQUEST_RESPONSE_TOO_LARGE" | "VERIFICATION_FAILED" | "WORKER_BUDGET_EXCEEDED" | "WORKER_QUALITY_FLOOR_UNMET" | "WORKSPACE_ARCHIVED" | "WORKSPACE_NOT_QUIESCENT";
+        "error-codes.schema": "AGENT_NATIVE_CONFIG_CHANGED" | "AGENT_NOT_LEAD_ELIGIBLE" | "AGENT_QUOTA_EXHAUSTED" | "AGENT_SESSION_OVERRIDE_UNSUPPORTED" | "AGENT_UNAVAILABLE" | "APPROVAL_ALREADY_CONSUMED" | "APPROVAL_REQUIRED" | "ARTIFACT_ARCHIVED" | "AUTOMATION_DISABLED" | "AUTOMATION_NOT_FOUND" | "AUTOMATION_NOT_PAUSED" | "AUTOMATION_REVISION_NOT_FOUND" | "BUDGET_EXCEEDED" | "BUSY" | "CAPABILITY_UNAVAILABLE" | "CAPABILITY_UNHEALTHY" | "CAPACITY_EXCEEDED" | "CAPTURE_REFUSED" | "CHANNEL_INGRESS_GAP_CONFIRMATION_REQUIRED" | "CLAIM_WINDOW_UNAVAILABLE" | "COMPUTER_PROVIDER_UNAVAILABLE" | "CONFLICT" | "CONSENT_REQUIRED" | "CONTEXT_DOCUMENT_NOT_ACTIVE" | "CONTEXT_DOCUMENT_OWNER_SCOPE_MISMATCH" | "CONVERSATION_TURN_IN_PROGRESS" | "COWORKER_ARCHIVED" | "COWORKER_HAS_ACTIVE_WORK" | "COWORKER_PAUSED" | "DEADLINE_EXECUTION_PRECONDITION_FAILED" | "DELEGATION_CONCURRENCY_EXCEEDED" | "DELEGATION_DEPTH_EXCEEDED" | "DELEGATION_PROFILE_ARCHIVED" | "DELEGATION_PROFILE_DISABLED" | "DELEGATION_PROFILE_INCOMPATIBLE" | "DELEGATION_PROFILE_OPTIONS_INVALID" | "DEMONSTRATION_CAPTURE_LIMIT_REACHED" | "DEPENDENCY_UNAVAILABLE" | "EFFECT_AMBIGUOUS" | "EFFECT_RECONCILIATION_REQUIRED" | "EMPTY_CAPTURE" | "ENVIRONMENT_CLASS_MISMATCH" | "ENVIRONMENT_MISMATCH" | "ENVIRONMENT_UNAVAILABLE" | "FORBIDDEN" | "GOAL_ARCHIVED" | "IDEMPOTENCY_CONFLICT" | "INTEGRITY_FAILURE" | "INTERNAL" | "INVALID_ARGUMENT" | "INVALID_ARTIFACT_TRANSITION" | "INVALID_PLAN" | "INVALID_RESOURCE_REF" | "INVALID_TRANSITION" | "INVALID_TRIGGER" | "INVOCATION_AMBIGUOUS" | "INVOCATION_NOT_FOUND" | "KEEP_AWAKE_UNSUPPORTED" | "LEAD_FAILOVER_POLICY_INVALID" | "LEASE_CONFLICT" | "LIMIT_EXCEEDED" | "MISFIRED_SLOT_SKIPPED" | "MISFIRE_LIMIT_EXCEEDED" | "NOT_AN_APP_PUBLISHER" | "NOT_FOUND" | "OBSERVATION_PROVIDER_UNAVAILABLE" | "OCCURRENCE_CONFLICT" | "OCCURRENCE_NOT_FOUND" | "PLACEMENT_UNAVAILABLE" | "PLAN_CYCLE" | "POLICY_DENIED" | "PROVIDER_INPUT_UNSUPPORTED" | "PROVIDER_UNAVAILABLE" | "RATE_LIMITED" | "RECOVERY_EXHAUSTED" | "REDACTION_FAILED" | "RESOURCE_CONFLICT" | "RESOURCE_CONTENT_EXTERNAL" | "RESOURCE_IDENTITY_CHANGED" | "RESOURCE_IDENTITY_UNAVAILABLE" | "RESOURCE_INDEX_UNAVAILABLE" | "RESOURCE_LOCATION_UNAVAILABLE" | "RESOURCE_REVISION_PARENT_MISMATCH" | "RESOURCE_STALE" | "RESOURCE_UNAVAILABLE" | "ROUTINE_ARCHIVED" | "ROUTINE_ARCHIVE_BLOCKED" | "ROUTINE_INPUT_INVALID" | "ROUTINE_NOT_ACTIVE" | "ROUTINE_NOT_FOUND" | "ROUTINE_REVISION_DRIFTED" | "ROUTINE_REVISION_NOT_FOUND" | "RUNTIME_MISMATCH" | "RUNTIME_QUIESCENCE_UNKNOWN" | "RUNTIME_STARTUP_UNAVAILABLE" | "RUNTIME_STOP_BLOCKED" | "RUNTIME_STOP_UNSETTLED" | "RUNTIME_UNAVAILABLE" | "SCAN_UNAVAILABLE" | "SCAN_UNSUPPORTED_PLATFORM" | "SCHEDULE_PLAN_UNAVAILABLE" | "SECRET_UNAVAILABLE" | "SENSITIVE_INPUT_UNSUPPORTED" | "SKILL_DRIFT_DETECTED" | "SOURCE_REFERENCE_REQUIRED" | "STALE_CLAIM_EPOCH" | "STALE_FENCE" | "STALE_SPEC_REVISION" | "STALE_TASK_VERSION" | "STALE_VERSION" | "STALE_WORKSPACE_VERSION" | "STEP_NOT_READY" | "STORE_BUSY" | "SUGGESTION_EXPIRED" | "TASK_ALREADY_PAUSED" | "TASK_NOT_FOUND" | "TASK_PAUSE_UNSAFE" | "TASK_TERMINAL" | "TIMEOUT" | "TRIGGER_HOST_UNAVAILABLE" | "TRIGGER_UNSUPPORTED" | "UNAUTHORIZED" | "UNAVAILABLE" | "UNSUPPORTED_PROJECTION" | "UNSUPPORTED_VERSION" | "UPLOAD_EXPIRED" | "UPLOAD_OFFSET_CONFLICT" | "USER_REQUEST_EXPIRED" | "USER_REQUEST_NOT_FOUND" | "USER_REQUEST_RESPONSE_TOO_LARGE" | "VERIFICATION_FAILED" | "WORKER_BUDGET_EXCEEDED" | "WORKER_QUALITY_FLOOR_UNMET" | "WORKSPACE_ARCHIVED" | "WORKSPACE_NAME_INVALID" | "WORKSPACE_NOT_QUIESCENT";
     };
     responses: {
         /** @description Safe typed error */
@@ -7745,6 +7836,37 @@ export interface operations {
         };
         responses: {
             /** @description Policy update applies to future replication transfers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workspace"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    renameWorkspace: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Expected aggregate version as a decimal integer for optimistic concurrency. Current Operator parsers also accept a decimal value surrounded by double quotes. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                workspaceId: components["parameters"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameWorkspaceRequest"];
+            };
+        };
+        responses: {
+            /** @description Workspace renamed; the response carries the new version */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8365,6 +8487,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationTurnReceipt"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listConversationTurnActivity: {
+        parameters: {
+            query?: {
+                retry_ordinal?: number;
+            };
+            header?: never;
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description REPORTED activity for the attempt in sequence order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationTurnActivityPage"];
                 };
             };
             default: components["responses"]["Error"];
@@ -10106,6 +10254,8 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Expected aggregate version as a decimal integer for optimistic concurrency. Current Operator parsers also accept a decimal value surrounded by double quotes. */
+                "If-Match": components["parameters"]["IfMatch"];
             };
             path?: never;
             cookie?: never;
@@ -10318,7 +10468,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Explicit owner-triggered, bounded local adapter observation. Each request performs a new probe and records a refreshed expiring Runtime offer; it is not an idempotent domain mutation. Requires the selected Workspace owner and an active local RuntimeWorkspaceBinding. Codex and OpenCode are accepted. OpenCode accepts only the exactly qualified CLI versions 2.0.26 and 2.0.28 and reads /api/provider plus /api/model. Version 2.0.26 readiness uses /api/health with healthy=true and username litecowork; version 2.0.28 uses /api/info with exact version and owned child PID matching, and username opencode. It returns bounded sanitized catalog IDs and display names, never native provider/model objects, options, headers, keys, URLs, raw responses, or location paths. Catalog provider IDs are not connected-provider or authentication evidence. Unsupported versions fail closed without route fallback. OpenCode session-model selection is NOT_QUALIFIED and its offer is always incompatible, so the profile cannot be bound or enabled. Raw native messages, endpoint locators, account identifiers, and private configuration are omitted. */
+            /** @description Explicit owner-triggered, bounded local adapter observation. Each request performs a new probe and records a refreshed expiring Runtime offer; it is not an idempotent domain mutation. Requires the selected Workspace owner and an active local RuntimeWorkspaceBinding. Codex and OpenCode are accepted. OpenCode accepts the observation-only CLI versions 2.0.26 and 2.0.28 and the accepted CLI version 2.0.32, and reads /api/provider plus /api/model. Version 2.0.26 readiness uses /api/health with healthy=true and username litecowork; version 2.0.28 uses /api/info with exact version and owned child PID matching, and username opencode. It returns bounded sanitized catalog IDs and display names, never native provider/model objects, options, headers, keys, URLs, raw responses, or location paths. Catalog provider IDs are not connected-provider or authentication evidence. Unsupported versions fail closed without route fallback. OpenCode session-model selection is NOT_QUALIFIED. The offer is compatible (and profile_admission_supported is true, Conversation admission only) only for CLI 2.0.32 with a complete probe and an observed host stop; every other outcome keeps the offer incompatible so the profile cannot be bound or enabled. Raw native messages, endpoint locators, account identifiers, and private configuration are omitted. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10565,6 +10715,8 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Expected aggregate version as a decimal integer for optimistic concurrency. Current Operator parsers also accept a decimal value surrounded by double quotes. */
                 "If-Match": components["parameters"]["IfMatch"];
+                /** @description Digest of the AgentControlDescriptor the caller read. Required in effect when the bound profile's provider has a trusted AgentModule (OpenCode). Enable then succeeds only against the latest unexpired descriptor revision and otherwise fails with RESOURCE_STALE and no state change. Providers without a module ignore it. */
+                "X-Agent-Descriptor-Revision"?: string;
             };
             path: {
                 agentBindingId: string;

@@ -7,6 +7,23 @@ import type { PresentationStreamState, TransientTurn } from "../presentation/pre
 import { appendConversationListPage, appendConversationPage, conversationDraftScope, ConversationCreateRequestCache, ConversationRequestEpochs, ConversationWorkspaceSelectionEpochs, mergeConversationStreamSnapshot, parseConversationListPage, parseConversationList, parseConversationSnapshot, richPresentationCacheKey, type ConversationMessageView, type ConversationSnapshotView, type ConversationSummary, type PendingConversationCreate } from "./conversation-view";
 import { ConversationStreamController, type ConversationStreamDriver, type StreamEnvelope } from "./conversation-stream";
 import { buildConversationAgentChoices, type ConversationAgentBindingOption, type ConversationAgentProfileOption } from "./conversation-agent-selection";
+import {
+  COMPOSER_PLACEHOLDER,
+  contentSignature,
+  conversationTitle,
+  defaultAgentOptionLabel,
+  isAtBottom,
+  isSendEligible,
+  isTurnOccupyingComposer,
+  retryReasonLabel,
+  retryTarget,
+  scrollFollowDecision,
+  stopTarget,
+  turnStatusLabel,
+} from "./conversation-turn-state";
+import { addAttachment, attachmentChipLabel, attachmentRefusalNotice, isAttachable, removeAttachment, toResourceRefs, type AttachmentCandidate, type AttachmentChip } from "./conversation-attachments";
+import { TurnActivityView } from "./TurnActivityView";
+import { mergeActivity, parseActivityPage, type ActivityEntry } from "./turn-activity";
 import "./conversations-page.css";
 
 // Keep ambiguous create receipts across keyed Workspace page remounts for this app session.
@@ -701,8 +718,40 @@ export function ConversationsPage({
   const activeStatus = currentSnapshot?.active_turn?.status;
   const [sendingTurn, setSendingTurn] = useState(false);
   const [turnError, setTurnError] = useState<string | null>(null);
+  const [retryPending, setRetryPending] = useState(false);
+  const [stopPending, setStopPending] = useState(false);
 
-  const isTurnRunning = transientTurns.some(t => t.state === "STREAMING" || t.state === "RECONNECTING") || activeStatus === "RUNNING";
+  // REPORTED activity (T25): stored records are read back for the active or failed turn so the
+  // cards survive a restart; live frames add to them. Both are observations, never Effects.
+  const activityTurn = currentSnapshot?.active_turn ?? currentSnapshot?.retryable_turn ?? null;
+  const activityTurnId = activityTurn?.turn_id ?? null;
+  const activityRetry = activityTurn?.retry_ordinal ?? 0;
+  const activityStatus = currentSnapshot?.active_turn?.status ?? (currentSnapshot?.retryable_turn ? "FAILED" : null);
+  const [storedActivity, setStoredActivity] = useState<{ key: string; entries: ActivityEntry[] } | null>(null);
+  useEffect(() => {
+    if (!workspaceId || !selectedId || !activityTurnId) return;
+    const key = JSON.stringify([workspaceId, selectedId, activityTurnId, activityRetry]);
+    let current = true;
+    invoke<unknown>("list_conversation_turn_activity", {
+      workspaceId, conversationId: selectedId, turnId: activityTurnId, retryOrdinal: activityRetry,
+    }).then(page => {
+      const entries = parseActivityPage(page, activityTurnId, activityRetry);
+      if (current && entries) setStoredActivity({ key, entries });
+    }).catch(() => { /* activity is an aid; the transcript and turn state stay authoritative */ });
+    return () => { current = false; };
+  }, [workspaceId, selectedId, activityTurnId, activityRetry, activityStatus]);
+  const activityKey = activityTurnId && selectedId ? JSON.stringify([workspaceId, selectedId, activityTurnId, activityRetry]) : null;
+  const liveActivity = activityTurnId && selectedId
+    ? currentPresentationStream?.activities[JSON.stringify([selectedId, activityTurnId, activityRetry])]?.entries ?? []
+    : [];
+  const activityEntries = mergeActivity(storedActivity && storedActivity.key === activityKey ? storedActivity.entries : [], liveActivity);
+
+  const transientStreaming = transientTurns.some(t => t.state === "STREAMING" || t.state === "RECONNECTING");
+  // Every nonterminal status, a visible streamed turn and an in-flight submit (including the gap
+  // after the 202 and before OPEN is projected) occupy the composer (001-T18, AC-024).
+  const isTurnRunning = isTurnOccupyingComposer({ activeTurn: currentSnapshot?.active_turn ?? null, transientStreaming, submitting: sendingTurn });
+  const stopping = stopTarget(currentSnapshot?.active_turn);
+  const retrying = retryTarget(currentSnapshot?.active_turn, currentSnapshot?.retryable_turn, sendingTurn || retryPending);
 
   // A-24 disabled-until-qualified gate (docs/V1-UI-SCREEN-CONTRACT.md "Conversation screen" steps 1/3):
   // Send requires a qualified (selectable) AgentBinding, not merely a non-empty draft. A binding is
@@ -717,12 +766,29 @@ export function ConversationsPage({
   // workspace default (when selectable) or any selectable choice makes Send eligible after creation.
   const hasQualifiedBindingForNewConversation = agentChoices.some(choice => choice.selectable);
   const bindingEligibleForSend = selectedId ? selectedBindingQualified : hasQualifiedBindingForNewConversation;
-  const sendEligible = Boolean(composerDraft.trim())
-    && Boolean(workspaceId)
-    && operatorReady
-    && !sendingTurn
-    && !isTurnRunning
-    && bindingEligibleForSend;
+  const sendEligible = isSendEligible({
+    activeTurn: currentSnapshot?.active_turn ?? null,
+    transientStreaming,
+    submitting: sendingTurn,
+    draft: composerDraft,
+    hasWorkspace: Boolean(workspaceId),
+    operatorReady,
+    bindingEligible: bindingEligibleForSend,
+  });
+
+  // Composer attachments (T14): chips are kept per selected Conversation and survive a refused send.
+  const [attachmentChips, setAttachmentChips] = useState<Record<string, AttachmentChip[]>>({});
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerState, setPickerState] = useState<{ status: "LOADING" | "READY" | "FAILED"; items: AttachmentCandidate[] }>({ status: "LOADING", items: [] });
+  const chips = composerDraftKey ? attachmentChips[composerDraftKey] ?? [] : [];
+  const openPicker = () => {
+    if (!workspaceId || !selectedId) return;
+    setPickerOpen(true);
+    setPickerState({ status: "LOADING", items: [] });
+    invoke<{ items: AttachmentCandidate[] }>("list_resources", { workspaceId, cursor: null })
+      .then(page => setPickerState({ status: "READY", items: page.items.filter(item => item.workspaceId === workspaceId && isAttachable(item)) }))
+      .catch(() => setPickerState({ status: "FAILED", items: [] }));
+  };
 
   const sendTurn = async () => {
     const text = composerDraft.trim();
@@ -760,13 +826,14 @@ export function ConversationsPage({
         conversationId: selectedId,
         requestId: reqId,
         content: [{ kind: "TEXT", text }],
-        resourceRefs: [],
+        resourceRefs: toResourceRefs(chips, workspaceId),
         agentBindingId: selected?.active_agent_binding_id || null,
         presentationPreference: "RICH",
       });
+      if (draftKey) setAttachmentChips(current => ({ ...current, [draftKey]: [] }));
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : String(cause);
-      setTurnError(msg);
+      setTurnError(attachmentRefusalNotice(msg) ?? msg);
       if (draftKey) {
         setConversationDrafts(current => ({ ...current, [draftKey]: text }));
       }
@@ -775,34 +842,115 @@ export function ConversationsPage({
     }
   };
 
+  const refreshSnapshot = async () => {
+    if (!workspaceId || !selectedId) return;
+    try {
+      const value = await invoke<unknown>("get_conversation_presentation", { workspaceId, conversationId: selectedId });
+      const fresh = parseConversationSnapshot(value, workspaceId, selectedId);
+      setSnapshot(current => current && current.conversation_id === selectedId ? mergeConversationStreamSnapshot(current, fresh, workspaceId, selectedId) : current);
+    } catch {
+      // The live stream will deliver the next snapshot; nothing else to do here.
+    }
+  };
   const cancelTurn = async () => {
-    if (!selectedId || !workspaceId || !operatorReady) return;
-    const turn = transientTurns.find(t => t.state === "STREAMING" || t.state === "RECONNECTING");
-    if (!turn) return;
+    if (!selectedId || !workspaceId || !operatorReady || !stopping || stopPending) return;
     const reqId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `cancel-req-${Date.now()}`;
+    setStopPending(true);
+    setTurnError(null);
     try {
       await invoke<unknown>("cancel_conversation_turn", {
         workspaceId,
         conversationId: selectedId,
-        turnId: turn.turnId,
-        expectedVersion: 1,
+        turnId: stopping.turnId,
+        expectedVersion: stopping.expectedVersion,
         requestId: reqId,
       });
-    } catch (cause) {
-      setTurnError(cause instanceof Error ? cause.message : String(cause));
+    } catch {
+      // A stale version or a racing settlement: reload the projected turn and let the owner decide again.
+      setTurnError("The turn changed before Stop was applied. The conversation was refreshed; try Stop again if it is still running.");
+      await refreshSnapshot();
+    } finally {
+      setStopPending(false);
     }
   };
-  const statusLabel = activeStatus === "RUNNING" ? "A conversation turn is running"
-    : activeStatus === "WAITING_USER" ? "Waiting for your response"
-      : activeStatus === "WAITING_DEPENDENCY" ? "Waiting for a service"
-        : activeStatus === "CANCEL_REQUESTED" ? "Stopping"
-          : activeStatus === "OPEN" ? "Preparing"
-            : null;
+  const retryTurn = async () => {
+    if (!selectedId || !workspaceId || !operatorReady || !retrying || retryPending) return;
+    const reqId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `retry-req-${Date.now()}`;
+    setRetryPending(true);
+    setTurnError(null);
+    try {
+      await invoke<unknown>("retry_conversation_turn", {
+        workspaceId,
+        conversationId: selectedId,
+        turnId: retrying.turn_id,
+        expectedVersion: retrying.version,
+        requestId: reqId,
+      });
+    } catch {
+      setTurnError("The turn changed before Retry was applied. The conversation was refreshed; try Retry again if it is still failed.");
+      await refreshSnapshot();
+    } finally {
+      setRetryPending(false);
+    }
+  };
+  const statusLabel = turnStatusLabel(activeStatus);
   const streamStatusLabel = currentPresentationStream?.resyncRequired ? "Refreshing saved conversation updates…"
     : streamStatus === "LIVE" ? "Saved history updates live"
     : streamStatus === "RECONNECTING" ? "Reconnecting saved-history updates…"
       : streamStatus === "CONNECTING" ? "Connecting saved-history updates…"
         : null;
+  // Stick-to-bottom autoscroll (001-T26, AC-030): follow new content only while the reader is
+  // already at the bottom and not selecting text; otherwise keep the position and show an indicator.
+  const [showNewMessages, setShowNewMessages] = useState(false);
+  const atBottomRef = useRef(true);
+  const lastContentSignatureRef = useRef<string | null>(null);
+  const followScrollSelectionKey = useRef<string | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const wasOccupyingRef = useRef(false);
+  const onStreamScroll = () => {
+    const element = streamContainerRef.current;
+    if (!element) return;
+    const atBottom = isAtBottom(element);
+    atBottomRef.current = atBottom;
+    if (atBottom) setShowNewMessages(false);
+  };
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    const element = streamContainerRef.current;
+    if (!element) return;
+    element.scrollTo({ top: element.scrollHeight, behavior });
+    atBottomRef.current = true;
+    setShowNewMessages(false);
+  };
+  const contentIds = (currentSnapshot?.messages ?? []).map(message => message.message_id);
+  const transientLength = transientTurns.reduce((total, turn) => total + turn.text.length, 0);
+  const signature = contentSignature(contentIds, transientLength);
+  useEffect(() => {
+    if (followScrollSelectionKey.current !== selectionKey) {
+      // A different Conversation starts at the bottom without an indicator.
+      followScrollSelectionKey.current = selectionKey;
+      lastContentSignatureRef.current = signature;
+      atBottomRef.current = true;
+      setShowNewMessages(false);
+      scrollToBottom();
+      return;
+    }
+    if (lastContentSignatureRef.current === signature) return;
+    lastContentSignatureRef.current = signature;
+    const selection = typeof window !== "undefined" ? window.getSelection?.() : null;
+    const decision = scrollFollowDecision({
+      wasAtBottom: atBottomRef.current,
+      hasNewContent: true,
+      selectionActive: Boolean(selection && !selection.isCollapsed && selection.toString().length > 0),
+    });
+    if (decision === "FOLLOW") scrollToBottom();
+    else if (decision === "INDICATE") setShowNewMessages(true);
+  }, [signature, selectionKey]);
+  // When a turn leaves the composer fence, return focus to the composer (Stop's accessibility contract).
+  useEffect(() => {
+    if (wasOccupyingRef.current && !isTurnRunning) composerTextareaRef.current?.focus();
+    wasOccupyingRef.current = isTurnRunning;
+  }, [isTurnRunning]);
+
     
   return (
     <div className="conversations-page-modern">
@@ -810,12 +958,12 @@ export function ConversationsPage({
       <header className="conversation-top-breadcrumbs">
         <span className="crumb-workspace">{workspaceName}</span>
         <span className="crumb-sep">/</span>
-        <strong className="crumb-title">{selected?.title ?? "AI Capabilities Overview"}</strong>
+        <strong className="crumb-title">{conversationTitle(selected?.title)}</strong>
         {statusLabel && <span className="conversation-header-badge">{statusLabel}</span>}
         {streamStatusLabel && <span className="conversation-header-badge">{streamStatusLabel}</span>}
         {(error || createReceiptError) && <span className="conversation-header-badge is-error">{error || createReceiptError?.message}</span>}
         <div className="conversation-top-actions">
-          <button className="conversation-action-icon-btn" type="button" title="More options">
+          <button className="conversation-action-icon-btn" type="button" title="More options are unavailable" aria-label="More options (unavailable)" disabled>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
               <circle cx="12" cy="5" r="2" />
               <circle cx="12" cy="12" r="2" />
@@ -854,7 +1002,7 @@ export function ConversationsPage({
       )}
 
       {/* Main Conversation Canvas */}
-      <div className="conversation-stream-container" ref={streamContainerRef}>
+      <div className="conversation-stream-container" ref={streamContainerRef} onScroll={onStreamScroll}>
         <div className="conversation-messages-flow">
           {(currentSnapshot?.messages && currentSnapshot.messages.length > 0) || transientTurns.length > 0 ? (
             <>
@@ -891,6 +1039,12 @@ export function ConversationsPage({
                 </article>
               ))}
 
+              {activityEntries.length > 0 && !retrying && (
+                <article className="message-row agent turn-activity-row">
+                  <div className="message-assistant-wrap"><div className="message-assistant-body"><TurnActivityView entries={activityEntries} /></div></div>
+                </article>
+              )}
+
               {transientTurns.map(turn => (
                 <article
                   className="message-row agent transient"
@@ -904,6 +1058,26 @@ export function ConversationsPage({
                   </div>
                 </article>
               ))}
+
+              {retrying && (
+                <article className="message-row agent turn-failed" role="group" aria-label={`Turn failed. ${retryReasonLabel(retrying.reason_code)}`}>
+                  <div className="message-assistant-wrap">
+                    <div className="message-assistant-body turn-failed-card">
+                      <p><strong>This turn failed.</strong> {retryReasonLabel(retrying.reason_code)} Your message was kept.</p>
+                      <TurnActivityView entries={activityEntries} />
+                      <button
+                        className="quiet-button"
+                        type="button"
+                        disabled={!operatorReady || retryPending}
+                        aria-label={`Retry turn. ${retryReasonLabel(retrying.reason_code)}`}
+                        onClick={() => void retryTurn()}
+                      >
+                        {retryPending ? "Retrying…" : "Retry"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              )}
             </>
           ) : (
             <div className="message-assistant-wrap">
@@ -929,13 +1103,17 @@ export function ConversationsPage({
           )}
         </div>
 
-        {/* Scroll to bottom button */}
+        {/* Scroll to bottom button, with the new-messages indicator while the reader is in history */}
         <div className="scroll-to-bottom-wrap">
+          {showNewMessages && (
+            <span className="new-messages-indicator" role="status">New messages</span>
+          )}
           <button
             className="scroll-to-bottom-btn"
             type="button"
-            onClick={() => streamBottomRef.current?.scrollIntoView({ behavior: "smooth" })}
-            title="Scroll to bottom"
+            onClick={() => scrollToBottom("smooth")}
+            title={showNewMessages ? "New messages: scroll to bottom" : "Scroll to bottom"}
+            aria-label={showNewMessages ? "New messages, scroll to bottom" : "Scroll to bottom"}
           >
             ↓
           </button>
@@ -950,7 +1128,8 @@ export function ConversationsPage({
         <textarea
           className="composer-textarea"
           aria-label="Message draft"
-          placeholder={isTurnRunning ? "Assistant is responding..." : "Ask anything, @ to mention, / for actions"}
+          ref={composerTextareaRef}
+          placeholder={isTurnRunning ? "Assistant is responding..." : COMPOSER_PLACEHOLDER}
           value={composerDraft}
           disabled={isTurnRunning}
           onChange={event => {
@@ -967,9 +1146,41 @@ export function ConversationsPage({
         />
         <div className="composer-footer-toolbar">
           <div className="composer-footer-left">
-            <button className="composer-pill-btn" type="button" title="Add context or file">
+            <button
+              className="composer-pill-btn"
+              type="button"
+              title={selectedId ? "Attach a text file from this Workspace" : "Start the conversation first to attach files"}
+              aria-label="Add context or file"
+              aria-expanded={pickerOpen}
+              disabled={!operatorReady || !selectedId || isTurnRunning}
+              onClick={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
+            >
               +
             </button>
+            {pickerOpen && (
+              <div className="composer-attachment-picker" role="dialog" aria-label="Attach a file from this Workspace" onKeyDown={event => { if (event.key === "Escape") setPickerOpen(false); }}>
+                {pickerState.status === "LOADING" && <p role="status">Loading files…</p>}
+                {pickerState.status === "FAILED" && <p role="alert">Files could not be loaded.</p>}
+                {pickerState.status === "READY" && pickerState.items.length === 0 && <p>No text files in this Workspace yet.</p>}
+                <ul>
+                  {pickerState.items.map(item => (
+                    <li key={item.resourceId}>
+                      <button type="button" onClick={() => {
+                        if (!composerDraftKey || !workspaceId) return;
+                        setAttachmentChips(current => ({ ...current, [composerDraftKey]: addAttachment(current[composerDraftKey] ?? [], item, workspaceId) }));
+                        setPickerOpen(false);
+                      }}>{item.displayName}</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {chips.map(chip => (
+              <span className="composer-attachment-chip" key={chip.resourceId}>
+                {chip.displayName}
+                <button type="button" aria-label={attachmentChipLabel(chip)} onClick={() => composerDraftKey && setAttachmentChips(current => ({ ...current, [composerDraftKey]: removeAttachment(current[composerDraftKey] ?? [], chip.resourceId) }))}>×</button>
+              </span>
+            ))}
             <div className="model-selector-pill" title="Active Model">
               <div className="agent-select-wrapper">
                 <select
@@ -977,7 +1188,7 @@ export function ConversationsPage({
                   disabled={!operatorReady || agentCatalogStatus === "LOADING" || agentMutationNotice?.status === "SAVING"}
                   onChange={event => selected && void saveConversationAgentBinding(event.target.value || null)}
                 >
-                  <option value="">{workspaceDefaultOptionLabel || "Gemini 3.8 Flash Low"}</option>
+                  <option value="">{defaultAgentOptionLabel(workspaceDefaultOptionLabel)}</option>
                   {agentChoices.map(choice => (
                     <option key={choice.agentBindingId} value={choice.agentBindingId} disabled={!choice.selectable}>
                       {choice.label}
@@ -990,12 +1201,7 @@ export function ConversationsPage({
           </div>
 
           <div className="composer-footer-right">
-            <div className="mode-selector-pill" title="Execution Mode">
-              <span className="mode-icon">⚡</span>
-              <span>Turbo</span>
-              <span className="pill-chevron">⌄</span>
-            </div>
-            <button className="composer-icon-btn" type="button" title="Voice Input">
+            <button className="composer-icon-btn" type="button" title="Voice input is unavailable" aria-label="Voice input (unavailable)" disabled>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
@@ -1007,8 +1213,10 @@ export function ConversationsPage({
               <button
                 className="composer-submit-btn is-running"
                 type="button"
+                disabled={!stopping || stopPending || !operatorReady}
                 onClick={() => void cancelTurn()}
-                title="Stop responding"
+                title={activeStatus === "CANCEL_REQUESTED" ? "Stopping" : stopping ? "Stop responding" : "Preparing"}
+                aria-label={activeStatus === "CANCEL_REQUESTED" ? "Stopping the response" : stopping ? "Stop responding" : "Preparing the response"}
               >
                 ■
               </button>

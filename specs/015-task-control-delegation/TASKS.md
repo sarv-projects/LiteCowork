@@ -8,7 +8,7 @@ Cross-package task references inside task fields are written as "Feature NNN Txx
 
 ## Current baseline
 
-Verified against the checkout on branch `docs/audit-competitor-superset`; highest migration `docs/schemas/sqlite-v28.sql`.
+Verified against the checkout on branch `docs/audit-competitor-superset`; highest migration file `docs/schemas/sqlite-v32.sql` (none of v29 to v32 touches task control; 015 is allocated v42).
 
 - **Domain (Rust, CODE, no production caller):** `crates/domain-task/src/delegation_admission.rs` (`decide_child_attempt_admission`, `decide_child_attempt_admission_from_durable_snapshot`, `preview_child_attempt_admission`, `ChildAdmissionDenial` with 15 variants including `ProfileNotEnabledForCoworker`); `crates/domain-task/src/execution.rs` (`StepAttemptCoordinator::preview_delegated_admission`, `admit`); `crates/domain-task/src/lead_failover.rs` (`FailoverPolicy`, `decide_lead_failover`), `lead_failover_service.rs` (`LeadFailoverService::evaluate`), `lead_handoff_packet.rs` (`prepare_lead_handoff_packet`); `crates/domain-task/src/delegation_recovery.rs` (`EscalationPolicy { max_worker_attempts, fallback_profile_ids }`, no `on_exhaustion`, register A-37); `crates/domain-task/src/delegation_result_service.rs`.
 - **Served:** `POST /v1/tasks/{task_id}/lead-agent` (`owner_handoff` in `apps/litecoworkd/src/task_lead_handoff_operator.rs`) commits only the lead-binding CAS, `task.lead_agent.changed.v1` and the receipt through `TaskStore::commit_task_lead_handoff`; it creates no Attempt and fences nothing. `GET /v1/tasks/{task_id}/verification-runs` (`list_task_verification_runs` in `apps/litecoworkd/src/verification_runs_operator.rs`) is read-only; `start_verification_run` and `settle_verification_run` in `crates/storage-sqlite/src/verification_runs.rs` have no route. Delegation profile routes in `apps/litecoworkd/src/delegation_profiles_operator.rs`.
@@ -20,7 +20,8 @@ Gaps to V1: no owner acceptance (B-39), no typed Task status, no pause/resume/st
 
 ## 015-T01 - Owner acceptance of SPEC and blockers
 
-- **Status:** BLOCKED - pending owner acceptance of this SPEC revision 0.1 and blocker B-39 (owner: repository owner, sarv-projects; Delegation and Product prepare the decision).
+- **Status:** BLOCKED - B-39 accepted as proposed (2026-11-10); pending owner acceptance of this SPEC revision 0.1 (owner: repository owner, sarv-projects; Delegation and Product prepare the decision).
+- **DEFERRED/BLOCKED note:** Why: whole-SPEC acceptance of revision 0.1 is pending although B-39 is accepted. Unblocks when: owner reviews and accepts the SPEC. Test later at: decision only.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 005 accepted (done 2026-11-09); Feature 005 B-35 decision is separate and does not block acceptance of this package.
 - **Owner:** Product, Delegation; decision by the repository owner.
@@ -310,6 +311,7 @@ Gaps to V1: no owner acceptance (B-39), no typed Task status, no pause/resume/st
 ## 015-T18 - Windows-row qualification after B-35
 
 - **Status:** BLOCKED - Feature 005 B-35 is PROPOSED (owner: repository owner) and no Windows Environment provider exists.
+- **DEFERRED/BLOCKED note:** Why: Windows row needs B-35 and a Windows Environment provider. Unblocks when: Feature 005 task T17 is done. Test later at: the owner's Windows laptop.
 - **Depends on:** T01, T14, T17
 - **Cross-package prerequisites:** Feature 005 T17 (Windows Environment provider) and Feature 005 T18 (Windows E2E-04 qualified); Feature 011 Windows named-pipe profile qualified.
 - **Owner:** Product, Release, repository owner.

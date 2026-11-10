@@ -15,15 +15,24 @@ import type {
 } from "../App";
 import type { WorkspaceListState } from "../workspaces/WorkspaceFirstRun";
 import type { RuntimeInventoryStreamStatus } from "../runtime/runtime-inventory-stream";
+import { deriveRuntimeHealthRows } from "../runtime/runtime-health";
+import { RuntimeStopPreviewPanel } from "../runtime/RuntimeStopPreviewPanel";
+import type { StopPreviewState } from "../runtime/runtime-stop-state";
+import type { LocalPreferences } from "./local-preferences";
+import { agentSettingsDescription } from "./agents-heading";
+import { ShortcutList } from "../shell/ShortcutList";
 import "./settings-view.css";
 
 export type SettingsCategory =
   | "general"
   | "workspaces"
   | "agents"
+  | "notifications"
   | "runtime";
 
 export type SettingsViewProps = {
+  localPreferences: LocalPreferences;
+  onChangeLocalPreferences: (next: LocalPreferences) => void;
   runtime: RuntimeStatus | null;
   runtimeLifecycle: RuntimeLifecycleView | null;
   runtimeLifecycleLoading: boolean;
@@ -32,6 +41,9 @@ export type SettingsViewProps = {
   runtimeBusy: boolean;
   startRuntime: () => Promise<void>;
   refreshRuntime: () => Promise<void>;
+  /** Stop preview (previewLocalRuntimeStop). Optional so hosts without the bridge render it disabled. */
+  stopPreview?: StopPreviewState;
+  onPreviewStop?: () => Promise<void>;
   agents: AgentInstallationView[];
   agentError: string | null;
   refreshAgents: () => Promise<void>;
@@ -74,6 +86,11 @@ export type SettingsViewProps = {
   policyRetryPending: boolean;
   onArchiveWorkspace: () => Promise<void>;
   archiveBusy: boolean;
+  onRenameWorkspace: (name: string) => Promise<boolean>;
+  renameBusy: boolean;
+  renameError: string | null;
+  onClearRenameError: () => void;
+  onOpenNotifications: () => void;
   onSetDefaultAgentBinding: (agentBindingId: string | null) => Promise<void>;
   defaultAgentBusy: boolean;
   instructions: string;
@@ -89,14 +106,23 @@ export type SettingsViewProps = {
 export function SettingsView(props: SettingsViewProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("workspaces");
   const [archiveConfirmationFor, setArchiveConfirmationFor] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState<{ workspaceId: string; text: string } | null>(null);
+  const runtimeHealth = deriveRuntimeHealthRows(
+    {
+      operatorReady: props.runtime?.operatorReady ?? false,
+      recoveryState: props.runtimeLifecycle?.incarnation?.recoveryState ?? null,
+    },
+    typeof navigator === "undefined" ? "" : navigator.platform,
+  );
 
-  // General Preferences (component-local state; not persisted or applied globally)
-  const [theme, setTheme] = useState<"system" | "light" | "dark">("light");
-  const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
-  const [textScale, setTextScale] = useState<"100" | "110" | "125">("100");
-  const [reducedMotion, setReducedMotion] = useState(false);
+  // General display preferences are LOCAL_PREF: applied at the document root by App and persisted locally.
+  const { theme, density, textScale, reducedMotion } = props.localPreferences;
+  const updatePreference = (patch: Partial<LocalPreferences>) =>
+    props.onChangeLocalPreferences({ ...props.localPreferences, ...patch });
 
   const selectedWorkspace = props.workspaces.find(ws => ws.workspaceId === props.selectedWorkspaceId);
+  const renameDraftText =
+    renameDraft && renameDraft.workspaceId === props.selectedWorkspaceId ? renameDraft.text : (selectedWorkspace?.name ?? "");
   const currentRuntimeBinding = props.runtimeBindings.find(
     binding => binding.workspaceId === props.selectedWorkspaceId && binding.runtimeId === props.runtime?.runtimeId && binding.status === "ACTIVE"
   ) ?? props.runtimeBindings.find(
@@ -109,7 +135,7 @@ export function SettingsView(props: SettingsViewProps) {
       {/* Settings Category Navigation Sidebar */}
       <aside className="settings-sidebar" aria-label="Settings Categories">
         <div className="settings-sidebar-heading">Workspace &amp; App</div>
-        <button
+        <button data-control-id="nav-general"
           className={`settings-nav-item ${activeCategory === "general" ? "active" : ""}`}
           type="button"
           onClick={() => setActiveCategory("general")}
@@ -117,7 +143,7 @@ export function SettingsView(props: SettingsViewProps) {
           <span className="settings-nav-icon">⚙</span>
           <span>General</span>
         </button>
-        <button
+        <button data-control-id="nav-workspaces"
           className={`settings-nav-item ${activeCategory === "workspaces" ? "active" : ""}`}
           type="button"
           onClick={() => setActiveCategory("workspaces")}
@@ -126,7 +152,7 @@ export function SettingsView(props: SettingsViewProps) {
           <span>Workspaces</span>
         </button>
         <div className="settings-sidebar-heading">Capabilities &amp; Tools</div>
-        <button
+        <button data-control-id="nav-agents"
           className={`settings-nav-item ${activeCategory === "agents" ? "active" : ""}`}
           type="button"
           onClick={() => setActiveCategory("agents")}
@@ -134,8 +160,16 @@ export function SettingsView(props: SettingsViewProps) {
           <span className="settings-nav-icon">🤖</span>
           <span>Agents</span>
         </button>
+        <button data-control-id="nav-notifications"
+          className={`settings-nav-item ${activeCategory === "notifications" ? "active" : ""}`}
+          type="button"
+          onClick={() => setActiveCategory("notifications")}
+        >
+          <span className="settings-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </button>
         <div className="settings-sidebar-heading">System &amp; Trust</div>
-        <button
+        <button data-control-id="nav-runtime"
           className={`settings-nav-item ${activeCategory === "runtime" ? "active" : ""}`}
           type="button"
           onClick={() => setActiveCategory("runtime")}
@@ -143,6 +177,21 @@ export function SettingsView(props: SettingsViewProps) {
           <span className="settings-nav-icon">⚡</span>
           <span>Runtime</span>
         </button>
+        <div className="settings-sidebar-heading">Not available yet</div>
+        <ul className="settings-unavailable-list" aria-label="Unavailable Settings categories">
+          <li>
+            <strong>Usage &amp; Monitoring</strong>
+            <span>Unavailable until the Feature 018 usage dashboard ships.</span>
+          </li>
+          <li>
+            <strong>Storage &amp; Backup</strong>
+            <span>Unavailable until Feature 017 data portability ships.</span>
+          </li>
+          <li>
+            <strong>About &amp; Diagnostics</strong>
+            <span>Unavailable until Feature 018 diagnostics ships.</span>
+          </li>
+        </ul>
       </aside>
 
       {/* Main Settings Detail Content */}
@@ -156,9 +205,11 @@ export function SettingsView(props: SettingsViewProps) {
               <header className="settings-header">
                 <h1 className="settings-title">General &amp; Desktop</h1>
                 <p className="settings-description">
-                  Customize the visual appearance, density, keyboard interaction, and display scaling of your LiteCowork desktop workspace.
+                  Customize the visual appearance, density, motion, and display scaling of your LiteCowork desktop workspace.
                 </p>
               </header>
+
+              <ShortcutList />
 
               <section className="settings-card">
                 <div className="settings-card-header">
@@ -174,10 +225,10 @@ export function SettingsView(props: SettingsViewProps) {
                     <span className="settings-row-desc">Select between a calm high-contrast light mode, dark mode, or system sync.</span>
                   </div>
                   <div className="settings-row-action">
-                    <select
+                    <select data-control-id="pref-theme"
                       className="settings-select"
                       value={theme}
-                      onChange={e => setTheme(e.target.value as "system" | "light" | "dark")}
+                      onChange={e => updatePreference({ theme: e.target.value as LocalPreferences["theme"] })}
                     >
                       <option value="light">Light (Calm Workstation)</option>
                       <option value="dark">Dark (Deep Contrast)</option>
@@ -192,10 +243,10 @@ export function SettingsView(props: SettingsViewProps) {
                     <span className="settings-row-desc">Adjust padding in lists, sidebar items, and conversation blocks.</span>
                   </div>
                   <div className="settings-row-action">
-                    <select
+                    <select data-control-id="pref-density"
                       className="settings-select"
                       value={density}
-                      onChange={e => setDensity(e.target.value as "comfortable" | "compact")}
+                      onChange={e => updatePreference({ density: e.target.value as LocalPreferences["density"] })}
                     >
                       <option value="comfortable">Comfortable</option>
                       <option value="compact">Compact</option>
@@ -209,10 +260,10 @@ export function SettingsView(props: SettingsViewProps) {
                     <span className="settings-row-desc">Base font scaling across conversation transcripts and documents.</span>
                   </div>
                   <div className="settings-row-action">
-                    <select
+                    <select data-control-id="pref-text-scale"
                       className="settings-select"
                       value={textScale}
-                      onChange={e => setTextScale(e.target.value as "100" | "110" | "125")}
+                      onChange={e => updatePreference({ textScale: e.target.value as LocalPreferences["textScale"] })}
                     >
                       <option value="100">100% (Default 15px)</option>
                       <option value="110">110% (16.5px)</option>
@@ -228,10 +279,10 @@ export function SettingsView(props: SettingsViewProps) {
                   </div>
                   <div className="settings-row-action">
                     <label className="settings-toggle">
-                      <input
+                      <input data-control-id="pref-reduced-motion"
                         type="checkbox"
                         checked={reducedMotion}
-                        onChange={e => setReducedMotion(e.target.checked)}
+                        onChange={e => updatePreference({ reducedMotion: e.target.checked })}
                       />
                       <span className="settings-toggle-slider" />
                     </label>
@@ -239,35 +290,6 @@ export function SettingsView(props: SettingsViewProps) {
                 </div>
               </section>
 
-              <section className="settings-card">
-                <div className="settings-card-header">
-                  <div>
-                    <h2 className="settings-card-title">Keyboard Shortcuts</h2>
-                    <p className="settings-card-subtitle">Global shortcuts configured for high-speed local workstation navigation.</p>
-                  </div>
-                </div>
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">New Conversation</span>
-                    <span className="settings-row-desc">Clear draft and focus conversation composer</span>
-                  </div>
-                  <kbd className="settings-badge">Ctrl + N</kbd>
-                </div>
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Toggle Side Workbench</span>
-                    <span className="settings-row-desc">Show or hide the right tool workbench panel</span>
-                  </div>
-                  <kbd className="settings-badge">Ctrl + W</kbd>
-                </div>
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Global Search / Library</span>
-                    <span className="settings-row-desc">Quickly find saved files, artifacts, and conversations</span>
-                  </div>
-                  <kbd className="settings-badge">Ctrl + K</kbd>
-                </div>
-              </section>
             </>
           )}
 
@@ -289,7 +311,7 @@ export function SettingsView(props: SettingsViewProps) {
                     <h2 className="settings-card-title">Active Workspace</h2>
                     <p className="settings-card-subtitle">Select or inspect the active project root.</p>
                   </div>
-                  <button className="settings-btn" type="button" onClick={() => void props.refreshWorkspaces()}>
+                  <button data-control-id="workspaces-refresh" className="settings-btn" type="button" onClick={() => void props.refreshWorkspaces()}>
                     Refresh
                   </button>
                 </div>
@@ -300,7 +322,7 @@ export function SettingsView(props: SettingsViewProps) {
                     <span className="settings-row-desc">All conversations, tasks, and file resources belong to this workspace.</span>
                   </div>
                   <div className="settings-row-action">
-                    <select
+                    <select data-control-id="workspaces-select"
                       className="settings-select"
                       value={props.selectedWorkspaceId}
                       onChange={e => props.onSelectWorkspace(e.target.value)}
@@ -334,6 +356,55 @@ export function SettingsView(props: SettingsViewProps) {
                     </div>
                   </dl>
                 )}
+
+                {selectedWorkspace && (
+                  <div className="settings-row">
+                    <div className="settings-row-info">
+                      <span className="settings-row-label">Workspace Name</span>
+                      <span className="settings-row-desc">
+                        {selectedWorkspace.status === "ACTIVE"
+                          ? "Renaming changes the display name only; it does not move files or change access."
+                          : "This workspace is archived and read-only, so it cannot be renamed."}
+                      </span>
+                    </div>
+                    {selectedWorkspace.status === "ACTIVE" ? (
+                      <form
+                        className="settings-row-action"
+                        onSubmit={e => {
+                          e.preventDefault();
+                          void props.onRenameWorkspace(renameDraftText).then(renamed => {
+                            if (renamed) setRenameDraft(null);
+                          });
+                        }}
+                      >
+                        <input data-control-id="workspaces-rename-name"
+                          type="text"
+                          className="settings-select"
+                          aria-label="Workspace name"
+                          value={renameDraftText}
+                          maxLength={200}
+                          disabled={props.renameBusy}
+                          onChange={e => {
+                            props.onClearRenameError();
+                            setRenameDraft({ workspaceId: selectedWorkspace.workspaceId, text: e.target.value });
+                          }}
+                        />
+                        <button data-control-id="workspaces-rename-submit"
+                          className="settings-btn primary"
+                          type="submit"
+                          disabled={props.renameBusy || renameDraftText.trim() === "" || renameDraftText.trim() === selectedWorkspace.name || props.runtime?.operatorReady !== true}
+                        >
+                          {props.renameBusy ? "Renaming…" : "Rename"}
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="settings-badge">Read-only</span>
+                    )}
+                  </div>
+                )}
+                {props.renameError && (
+                  <p className="settings-error" role="alert" aria-live="assertive">{props.renameError}</p>
+                )}
               </section>
 
               <section className="settings-card">
@@ -350,7 +421,7 @@ export function SettingsView(props: SettingsViewProps) {
                     void props.createWorkspace();
                   }}
                 >
-                  <input
+                  <input data-control-id="workspaces-create-name"
                     type="text"
                     className="settings-select"
                     style={{ flex: 1 }}
@@ -360,7 +431,7 @@ export function SettingsView(props: SettingsViewProps) {
                     disabled={props.workspaceCreateBusy || props.workspaceListState !== "READY"}
                     onChange={e => props.setWorkspaceName(e.target.value)}
                   />
-                  <button
+                  <button data-control-id="workspaces-create-submit"
                     className="settings-btn primary"
                     type="submit"
                     disabled={props.workspaceCreateBusy || !props.workspaceName.trim() || props.runtime?.operatorReady !== true}
@@ -385,7 +456,7 @@ export function SettingsView(props: SettingsViewProps) {
                     </span>
                   </div>
 
-                  <textarea
+                  <textarea data-control-id="workspaces-instructions-text"
                     rows={6}
                     className="settings-select"
                     style={{ width: "100%", fontFamily: "inherit", resize: "vertical" }}
@@ -400,7 +471,7 @@ export function SettingsView(props: SettingsViewProps) {
                     <small style={{ color: "#6b7280" }}>
                       {new TextEncoder().encode(props.instructions).byteLength.toLocaleString()} / 65,536 bytes (Immutable revision)
                     </small>
-                    <button
+                    <button data-control-id="workspaces-instructions-save"
                       className="settings-btn primary"
                       type="button"
                       disabled={props.instructionBusy || selectedWorkspace.status !== "ACTIVE"}
@@ -410,8 +481,91 @@ export function SettingsView(props: SettingsViewProps) {
                     </button>
                   </div>
                   {props.instructionMessage && <p className="settings-badge">{props.instructionMessage}</p>}
+                  {props.latestInstructionsAfterConflict !== null && (
+                    <section className="instruction-conflict" aria-label="Latest saved Workspace instructions">
+                      <div className="settings-card-header">
+                        <div>
+                          <h3 className="settings-card-title">Latest saved version</h3>
+                          <p className="settings-card-subtitle">Another save won. Your unsaved draft remains in the editor above.</p>
+                        </div>
+                        <button data-control-id="workspaces-instructions-use-latest" className="settings-btn" type="button" onClick={props.onUseLatestInstructions}>
+                          Use this version
+                        </button>
+                      </div>
+                      <pre>{props.latestInstructionsAfterConflict || "(This revision is empty.)"}</pre>
+                    </section>
+                  )}
+                  {props.instructionHistory.length > 0 && (
+                    <details className="instruction-history">
+                      <summary>Revision history and source provenance ({props.instructionHistory.length})</summary>
+                      <p className="settings-card-subtitle">
+                        These are the immutable Workspace instruction sources returned by the authenticated Operator. They describe saved Workspace guidance; they do not claim which sources a Task or agent actually consumed.
+                      </p>
+                      <ol>
+                        {[...props.instructionHistory].reverse().map(revision => (
+                          <li key={`${revision.workspaceId}-${revision.revision}`}>
+                            <strong>Revision {revision.revision}</strong>
+                            <small> {new Date(revision.createdAt).toLocaleString()} · {revision.contentDigest.slice(0, 19)}…</small>
+                            <small> Source Resource: {revision.contentRef.resource_id ?? "Unavailable"} · revision: {revision.contentRef.revision_id ?? "Unavailable"}</small>
+                            <small> Parent instruction revisions: {revision.parentRevisions.length ? revision.parentRevisions.join(", ") : "None (initial revision)"}</small>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+                  <p className="settings-card-subtitle" data-precedence-note="workspace-instructions">
+                    Precedence: an Automation or Coworker instruction applies to its own runs in addition to these Workspace instructions; it never replaces or silently overrides them.
+                  </p>
                 </section>
               )}
+
+              <section className="settings-card runtime-enrollment-card" aria-labelledby="runtime-enrollment-title">
+                <div className="settings-card-header">
+                  <div>
+                    <h2 id="runtime-enrollment-title" className="settings-card-title">This computer’s Workspace access</h2>
+                    <p className="settings-card-subtitle">Enrollment authorizes this local Runtime installation for the selected Workspace.</p>
+                  </div>
+                  <button data-control-id="runtime-enrollment-refresh" className="settings-btn" type="button"
+                    onClick={() => void props.onRefreshRuntimeBindings()}
+                    disabled={props.runtime?.operatorReady !== true || !props.selectedWorkspaceId}>
+                    Refresh
+                  </button>
+                </div>
+                {!selectedWorkspace ? (
+                  <p className="settings-card-subtitle">Select a Workspace above to check this computer’s enrollment.</p>
+                ) : (
+                  <>
+                    <p role="status" data-enrollment-state={currentRuntimeEnrolled ? "ENROLLED" : currentRuntimeBinding?.status ?? "NOT_ENROLLED"}>
+                      {props.runtimeBindingsLoading ? "Checking…"
+                        : props.runtimeBindingError ? "Could not check"
+                        : !props.runtime?.runtimeId ? "Runtime unavailable"
+                        : currentRuntimeEnrolled ? "Active on this computer"
+                        : currentRuntimeBinding?.status === "PENDING" ? "Enrollment pending"
+                        : "Not enrolled"}
+                      {" "}for {selectedWorkspace.name}
+                    </p>
+                    {currentRuntimeBinding && (
+                      <dl className="settings-details-grid">
+                        <div><dt>Enrollment</dt><dd>{currentRuntimeBinding.enrollmentMode.replaceAll("_", " ").toLowerCase()}</dd></div>
+                        <div><dt>Roles</dt><dd>{currentRuntimeBinding.roles.map(role => role.replaceAll("_", " ").toLowerCase()).join(", ") || "None reported"}</dd></div>
+                      </dl>
+                    )}
+                    <p className="settings-card-subtitle">
+                      This grants this installation its authorized local execution role in the Workspace. It does not pair another computer, start an agent, or execute a Task.
+                    </p>
+                    {props.runtimeBindingError && <p role="status" className="settings-badge danger">{props.runtimeBindingError}</p>}
+                    {props.runtimeEnrollmentError && <p role="alert" className="settings-badge danger">{props.runtimeEnrollmentError}</p>}
+                    {props.runtimeEnrollmentMessage && <p role="status" className="settings-badge">{props.runtimeEnrollmentMessage}</p>}
+                    {!currentRuntimeEnrolled && (
+                      <button data-control-id="runtime-enroll" className="settings-btn primary" type="button"
+                        onClick={() => void props.onEnrollLocalRuntime()}
+                        disabled={props.runtimeEnrollmentBusy || props.runtimeBindingsLoading || props.runtimeBindingError !== null || props.runtime?.operatorReady !== true || !props.runtime?.runtimeId || selectedWorkspace.status !== "ACTIVE"}>
+                        {props.runtimeEnrollmentBusy ? "Enrolling this computer…" : "Enroll this computer"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </section>
 
               {selectedWorkspace && (
                 <section className="settings-card">
@@ -428,10 +582,10 @@ export function SettingsView(props: SettingsViewProps) {
                     archiveConfirmationFor === selectedWorkspace.workspaceId ? (
                       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                         <span style={{ fontSize: "13px", color: "#b91c1c" }}>Confirm read-only transition?</span>
-                        <button className="settings-btn" type="button" onClick={() => setArchiveConfirmationFor(null)}>
+                        <button data-control-id="workspaces-archive-cancel" className="settings-btn" type="button" onClick={() => setArchiveConfirmationFor(null)}>
                           Cancel
                         </button>
-                        <button
+                        <button data-control-id="workspaces-archive-confirm"
                           className="settings-btn danger"
                           type="button"
                           disabled={props.archiveBusy}
@@ -441,7 +595,7 @@ export function SettingsView(props: SettingsViewProps) {
                         </button>
                       </div>
                     ) : (
-                      <button
+                      <button data-control-id="workspaces-archive-begin"
                         className="settings-btn danger"
                         type="button"
                         onClick={() => setArchiveConfirmationFor(selectedWorkspace.workspaceId)}
@@ -458,6 +612,39 @@ export function SettingsView(props: SettingsViewProps) {
           )}
 
           {/* ================================================================= */}
+          {/* NOTIFICATIONS: link only. Quiet hours semantics belong to Feature 010. */}
+          {/* ================================================================= */}
+          {activeCategory === "notifications" && (
+            <>
+              <header className="settings-header">
+                <h1 className="settings-title">Notifications</h1>
+                <p className="settings-description">
+                  Delivery history and notification policies are owned by the Notifications page.
+                </p>
+              </header>
+              <section className="settings-card">
+                <div className="settings-row">
+                  <div className="settings-row-info">
+                    <span className="settings-row-label">Quiet hours</span>
+                    <span className="settings-row-desc" data-testid="quiet-hours-unavailable">
+                      Quiet-hours editing is unavailable until Feature 010 serves its control surface. The saved policy is shown read-only on the Notifications page.
+                    </span>
+                  </div>
+                  <div className="settings-row-action">
+                    <button data-control-id="notifications-open"
+                      className="settings-btn"
+                      type="button"
+                      onClick={() => props.onOpenNotifications()}
+                    >
+                      Open Notifications
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* ================================================================= */}
           {/* 3. AGENT HARNESSES & MODELS                                       */}
           {/* ================================================================= */}
           {activeCategory === "agents" && (
@@ -465,9 +652,12 @@ export function SettingsView(props: SettingsViewProps) {
               <header className="settings-header">
                 <h1 className="settings-title">Agent Harnesses &amp; Models</h1>
                 <p className="settings-description">
-                  Configure detected native agent harnesses (OpenCode, Codex, Claude Code, Gemini). LiteCowork coordinates native harnesses without imposing an external reasoning loop.
+                  {agentSettingsDescription(props.agentProfiles)}
                 </p>
               </header>
+              <p className="settings-card-subtitle" data-precedence-note="default-agent">
+                Precedence: the Workspace default lead agent applies to new Conversations. A Coworker or Automation that names its own agent uses that agent for its own runs and does not change this default.
+              </p>
 
               <AgentCatalogSettings
                 workspaceId={props.selectedWorkspaceId || null}
@@ -535,7 +725,7 @@ export function SettingsView(props: SettingsViewProps) {
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
                     {props.runtime?.state !== "READY" && (
-                      <button
+                      <button data-control-id="runtime-start"
                         className="settings-btn primary"
                         type="button"
                         disabled={props.runtimeBusy}
@@ -544,7 +734,7 @@ export function SettingsView(props: SettingsViewProps) {
                         {props.runtimeBusy ? "Starting…" : "Start Local Runtime"}
                       </button>
                     )}
-                    <button className="settings-btn" type="button" onClick={() => void props.refreshRuntime()}>
+                    <button data-control-id="runtime-refresh" className="settings-btn" type="button" onClick={() => void props.refreshRuntime()}>
                       Refresh Status
                     </button>
                   </div>
@@ -557,7 +747,11 @@ export function SettingsView(props: SettingsViewProps) {
                   </div>
                   <div>
                     <dt>Operator API</dt>
-                    <dd>{props.runtime?.operatorReady ? "Connected (Localhost)" : "Not Serving"}</dd>
+                    <dd>{runtimeHealth.operator}</dd>
+                  </div>
+                  <div>
+                    <dt>Execution</dt>
+                    <dd>{runtimeHealth.execution}</dd>
                   </div>
                   <div>
                     <dt>Runtime ID</dt>
@@ -575,11 +769,44 @@ export function SettingsView(props: SettingsViewProps) {
                       </div>
                       <div>
                         <dt>Recovery State</dt>
-                        <dd>{props.runtimeLifecycle.incarnation.recoveryState}</dd>
+                        <dd>{runtimeHealth.recoveryState}</dd>
                       </div>
                     </>
                   )}
                 </dl>
+
+                <div aria-live="polite">
+                  {props.runtimeLifecycleLoading && (
+                    <p role="status" style={{ fontSize: "12.5px", color: "#4b5563" }}>Checking Runtime lifecycle…</p>
+                  )}
+                </div>
+                {props.runtimeLifecycleError && (
+                  <p role="alert" style={{ fontSize: "12.5px", color: "#b91c1c" }}>
+                    Runtime lifecycle unavailable: {props.runtimeLifecycleError}
+                  </p>
+                )}
+                {props.runtimeError && (
+                  <p role="alert" style={{ fontSize: "12.5px", color: "#b91c1c" }}>
+                    Runtime error: {props.runtimeError}
+                  </p>
+                )}
+
+                <div style={{ marginTop: "12px" }}>
+                  <h3 className="settings-card-title">Stop and update safety</h3>
+                  <p className="settings-card-subtitle">
+                    Preview what is running before the Runtime is stopped or LiteCowork is updated. Closing the window does not stop the Runtime.
+                  </p>
+                  <button data-control-id="runtime-stop-preview" className="settings-btn" type="button"
+                    disabled={!props.onPreviewStop || !props.runtime?.operatorReady || props.stopPreview?.status === "LOADING"}
+                    onClick={() => void props.onPreviewStop?.()}>
+                    {props.stopPreview?.status === "LOADING" ? "Checking…" : "Preview stop"}
+                  </button>
+                  <RuntimeStopPreviewPanel
+                    state={props.stopPreview ?? { status: "IDLE" }}
+                    runtimeId={props.runtime?.runtimeId ?? null}
+                    incarnationId={props.runtime?.localIncarnationId ?? null}
+                  />
+                </div>
 
                 {props.runtimeLifecycle?.blockers && props.runtimeLifecycle.blockers.length > 0 && (
                   <div style={{ marginTop: "12px" }}>

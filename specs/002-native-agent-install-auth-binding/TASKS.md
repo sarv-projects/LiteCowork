@@ -1,6 +1,6 @@
 # Tasks - Native Agent Install, Auth and Binding
 
-**Feature:** 002 | **Status:** ACCEPTED/LOCKED - implementation authorized; tasks not started unless marked.
+**Feature:** 002 | **Status:** ACCEPTED/LOCKED - implementation authorized; see each task Status line. Windows rows, T15 release-matrix qualification and release/signing/packaging items are DEFERRED to the owner's laptop testing (standing owner instruction); LiteSPM-dependent parts are deferred likewise.
 **Spec revision:** 1.0 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
 
 ## Current baseline
@@ -9,7 +9,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T01 - OpenCode v2.0.32 profile produces a bindable, dispatch-consistent offer
 
-- **Status:** NOT STARTED (probe, offer publication and storage gates exist; the offer is hard-coded incompatible, see SPEC §4a).
+- **Status:** CODE-COMPLETE 2026-11-10 (offer admission computed in `agents/native_provider.rs`, `NativeProviderKey`, shared executable resolver, OpenAPI `profile_admission_supported` boolean and generated types synced; probe, native_provider_key and opencode_profile tests pass). Open: Windows x64 and Linux x64 probe-to-binding transcripts need a live OpenCode 2.0.32 binary (not available in this sandbox), so AC-013 is not evidenced.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE. This task is the P1 prerequisite that Feature 001 (first native Conversation route, gate A) and Feature 004 consume.
 - **Owner:** Agent Runtime (probe, supervisor provider identity), Storage (gate unchanged, tests), Desktop UI (catalog copy).
@@ -36,11 +36,11 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T02 - Promote the accepted 002 interfaces into owner docs and machine schemas
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL (no migration was needed: the Runtime-local descriptor table already exists since migration 16, so no `sqlite-vNN.sql` was added; `EnableBindingWithDescriptor` is promoted as the optional `X-Agent-Descriptor-Revision` header on `enableAgentBinding` in the OpenAPI with `RESOURCE_STALE` for DescriptorStale; probe budget is in-process, see T04. Not done: auth-observation DDL and `beginAgentAuthentication` response, Claude Code route-matrix row, SPEC revision relabel, which belong to T07/T12).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 011 IPC/route conventions (Wave 0); coordinate the migration number with the orchestrator because other packages also add `sqlite-vNN.sql` files.
 - **Owner:** Agent Runtime, Security/Trust, API/schema owner.
-- **Allowed paths:** `docs/AGENT-CONTROL.md`, `docs/AGENT-ACCOUNT-ROUTE-MATRIX.md`, `docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/domain-event.schema.json`, `docs/schemas/sqlite-vNN.sql` (new, next unused number; v28 is the highest present), `apps/litecowork-ui/src/api/operator-api.ts` (regenerated), this package.
+- **Allowed paths:** `docs/AGENT-CONTROL.md`, `docs/AGENT-ACCOUNT-ROUTE-MATRIX.md`, `docs/V1-AGENT-DISCOVERY-AND-CATALOG-LLD.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/domain-event.schema.json`, `docs/schemas/sqlite-v33.sql` and `sqlite-v34.sql` (new; allocated in docs/LITECOWORK-BUILD-TASKS.md; v32 is the highest present), `apps/litecowork-ui/src/api/operator-api.ts` (regenerated), this package.
 - **Contract:** SPEC §5 (B-11, B-12), §7.2, §11, AC-004, AC-008, AC-012, AC-014, AC-016, AC-017; docs/SPECIFICATION-STANDARD.md §7.
 - **Change intent:** Promote together, in one reviewed change: `EnableBindingWithDescriptor` (enable request carries `descriptor_revision`); `AgentControlDescriptorFreshness` (TTL 900 s, 3 probes per minute per module, module-overridable downward); the Runtime-local descriptor record and auth-observation record DDL; `AgentAuthObservation` response for `beginAgentAuthentication` and a read of the latest observation; typed errors `DescriptorStale`, `OfferIncompatible`, `NotLeadEligible`, `ReplayConflict`, `MethodNotDeclared` mapped to canonical error codes (reuse existing codes where they exist, add only missing ones); the Claude Code CLI row in AGENT-ACCOUNT-ROUTE-MATRIX as "second module, not qualified". No event is added unless the owner promotes a Runtime-local observation event.
 - **Acceptance:**
@@ -54,7 +54,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T03 - Wire AgentModuleRegistry with the OpenCode v2.0.32 manifest and conformance fixture
 
-- **Status:** PARTIAL (`AgentModuleRegistry`, `AgentModuleManifest`, `ModuleSupportAssessment` and their tests exist in `apps/litecoworkd/src/agents/module_registry.rs`, marked `dead_code` with no caller).
+- **Status:** CODE-COMPLETE 2026-11-10 (OpenCode 2.0.32 manifest in `agents/modules/opencode.rs` with TTL 900 s and probe budget 3 per minute fields validated by the registry, registered through `default_module_registry()`, pinned fixture `apps/litecoworkd/tests/fixtures/agent-modules/opencode-2.0.32.json`; the registry file keeps a reduced `dead_code` allow for the F13 lookups no route calls yet).
 - **Depends on:** T02
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime.
@@ -71,11 +71,11 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T04 - Runtime-local descriptor store with digest, TTL and probe budget
 
-- **Status:** NOT STARTED
+- **Status:** CODE-COMPLETE with one deviation 2026-11-10 (`AgentDescriptorStore` in storage-core, implemented over the existing `agent_control_descriptors` table: append with compare-and-swap on the prior digest, latest/current reads, TTL boundary at expiry, oversize and non-object bodies refused; tests `descriptor_*` in agent_binding_tests). Deviation: the 3-per-minute probe budget is an in-process sliding window in `agents/descriptor_service.rs`, not a stored ledger, so a daemon restart resets it.
 - **Depends on:** T02, T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Storage, Agent Runtime.
-- **Allowed paths:** `crates/storage-core/src/lib.rs` (AgentCatalogStore trait additions), `crates/storage-sqlite/src/agent_control_descriptors.rs` (new), `crates/storage-sqlite/src/lib.rs` (module registration and migration hook), `crates/storage-sqlite/tests/agent_control_descriptors.rs` (new), `docs/schemas/sqlite-vNN.sql` (from T02).
+- **Allowed paths:** `crates/storage-core/src/lib.rs` (AgentCatalogStore trait additions), `crates/storage-sqlite/src/agent_control_descriptors.rs` (new), `crates/storage-sqlite/src/lib.rs` (module registration and migration hook), `crates/storage-sqlite/tests/agent_control_descriptors.rs` (new), `docs/schemas/sqlite-v34.sql` (from T02).
 - **Contract:** SPEC §5 B-12, §7.2 `AgentControlDescriptorFreshness`, §11, §12, DATA-MODEL "Lifecycle and consistency", AC-008, AC-012.
 - **Change intent:** Add `put_agent_control_descriptor` (insert-or-replace by `(agent_profile_id, module_version)` with CAS on prior `descriptor_digest`), `current_agent_control_descriptor(profile, now)` returning `None` past `expires_at`, and `admit_descriptor_probe(module_id, now)` enforcing at most 3 per minute. Store only the validated non-secret descriptor JSON, digest and times. No Workspace id. No network/process call inside the transaction.
 - **Acceptance:**
@@ -90,7 +90,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T05 - AgentControlDescriptor producer and served descriptor routes
 
-- **Status:** PARTIAL (routes mounted in `agent_control_operator.rs` and returning `503`; `CurrentAgentDescriptorSource` trait and `NoAgentDescriptorSource` stub in `agent_credentials_routes.rs`; Tauri `agent_control_bridge.rs`, `AgentControlDescriptorPanel.tsx`, `desktop-agent-control-api.ts` already call the read).
+- **Status:** PARTIAL (descriptor routes `getAgentControlDescriptor` and `refreshAgentProfileControl` now served for a profile whose provider selects the OpenCode module: bounded probe outside any transaction, budget `429 RATE_LIMITED`, `Cache-Control: no-store`, Codex/unknown profiles still `503`; route tests added. Not done: `getAgentSessionOptions` and `getAgentHarnessCapabilities` projections (still target-only; serving them changed the 176/1/55 route counts; current is 178/1/53), `StoredAgentDescriptorSource` for the credential route, panel stale/refresh test, and a live-OpenCode refresh).
 - **Depends on:** T01, T04
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Desktop UI.
@@ -109,7 +109,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T06 - Fresh-descriptor gate on binding enable and admission
 
-- **Status:** PARTIAL (`enable_agent_binding_transaction` checks only `has_fresh_compatible_endpoint`; versioned CAS, idempotency receipts and audit already exist).
+- **Status:** PARTIAL (enable gate enforced inside the enable transaction when the profile's module declares a descriptor: stale, missing or superseded revision fails with `DESCRIPTOR_STALE` mapped to `409 RESOURCE_STALE` and no write; exact replay returns the receipt; desktop enable reads or refreshes the descriptor and sends the revision. Not done: stale-option rejection at Send admission (AC-005), Enable-failure reason and Refresh focus return in the UI, `src-tauri` build check because gdk-3.0 is missing here).
 - **Depends on:** T05
 - **Cross-package prerequisites:** Feature 001 composer admission and draft preservation (Wave 1) for the AC-005 send-side half.
 - **Owner:** Storage, Agent Runtime, Conversation Runtime.
@@ -128,11 +128,13 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T07 - Native sign-in begin and auth observation
 
-- **Status:** NOT STARTED (`beginAgentAuthentication` is OpenAPI target-only; `AgentAuthDescriptor`/`AgentAuthState` types exist in `control_descriptor.rs`; inventory reports auth `UNKNOWN`).
+- **Status:** PARTIAL 2026-11-10 (CODE + SERVED, fail-closed). `beginAgentAuthentication` is served by `agent_auth_operator.rs` and `AgentAuthService` (`agents/auth_service.rs`): it acts only on a method declared by the profile's fresh module descriptor, returns the in-flight challenge instead of a second launch, records `AUTHENTICATING`/`NEEDS_AUTH`/`ERROR` observations, reads an unreported or expired observation back as `UNKNOWN` (never success), refuses an undeclared method with `INVALID_ARGUMENT`, and reseals the observed state into the next descriptor. Observations are Runtime-local and in-memory (no migration); a restart returns `UNKNOWN`. Deviations and open items: the production `NativeLoginLauncher` is `UnqualifiedLauncher`, so every declared method is refused (503) and the OpenCode module still declares no auth method, because a native login cannot be launched or verified without a live OpenCode 2.0.32 binary; no completion re-probe hook is wired to a module; no Tauri command exists for Sign in (`src-tauri` cannot be built here, gdk-3.0 missing); the SPEC AuthObservation DDL is not added. UI: `DescriptorSummary` shows Sign in only for a declared `NATIVE_FLOW` method and an Authenticating text state. Evidence: `agent_auth_*` and `agent_auth_begin_*` tests (litecoworkd), `agent-control-descriptor-panel.test.mjs`. Windows launch DEFERRED (Windows rows are deferred to laptop testing).
+- **Reference (DeepSeek Harness, MIT, pinned `fcc0ad46`, no code copied yet):** upstream [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159), reuse map [DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md).
+  - **P-38 Login-shell PATH-class capture for agents launched from a Linux desktop entry.** Class: **OWNER (open; not ADOPT, ADAPT or REJECT yet)**. Upstream permalinks: [src/login-shell-environment.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/login-shell-environment.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Section 14 (row P-38 and the conflict note). Why: CONFLICT, stays open: capturing the login-shell environment merges ambient variables over the inherited environment, which conflicts with environment scrubbing (A-58, Section 9 of the desktop study and the Env scrubbing lesson in the plugin study) and with the T07 and T13 environment rules of package 002. Only a PATH-class allowlist could be considered, and only after an owner decision. Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React). No reuse is allowed before the owner decision.
 - **Depends on:** T05
 - **Cross-package prerequisites:** Feature 011 authenticated IPC and OS-open helper (Wave 0).
 - **Owner:** Agent Runtime, Security/Trust, Desktop UI.
-- **Allowed paths:** `apps/litecoworkd/src/agent_auth_operator.rs` (new), `apps/litecoworkd/src/operator.rs` (route merge only), `apps/litecoworkd/src/agents/modules/opencode.rs`, `crates/storage-core/src/lib.rs`, `crates/storage-sqlite/src/agent_auth_observations.rs` (new), `docs/schemas/sqlite-vNN.sql` (from T02), `apps/litecowork-ui/src-tauri/src/agent_control_bridge.rs`, `apps/litecowork-ui/src/agents/AgentCatalogSettings.tsx`, `apps/litecowork-ui/tests/agent-catalog-settings.test.mjs`.
+- **Allowed paths:** `apps/litecoworkd/src/agent_auth_operator.rs` (new), `apps/litecoworkd/src/operator.rs` (route merge only), `apps/litecoworkd/src/agents/modules/opencode.rs`, `crates/storage-core/src/lib.rs`, `crates/storage-sqlite/src/agent_auth_observations.rs` (new), `docs/schemas/sqlite-v34.sql` (from T02), `apps/litecowork-ui/src-tauri/src/agent_control_bridge.rs`, `apps/litecowork-ui/src/agents/AgentCatalogSettings.tsx`, `apps/litecowork-ui/tests/agent-catalog-settings.test.mjs`.
 - **Contract:** SPEC §6 step 3, §7.2 `AgentAuthObservation`, §10, AC-003, AC-016; docs/AGENT-ACCOUNT-ROUTE-MATRIX.md (only QUALIFIED routes offered as ready).
 - **Change intent:** Serve `beginAgentAuthentication` for module-declared auth methods only. For OpenCode the module declares its own native login flow; the daemon launches it as the native harness process for the user to complete (never capturing credentials), then records an `AgentAuthObservation` after a bounded re-probe. Auth state is derived only from module-reported signals; the provider catalog's connected-provider list is labelled as reported, not as authentication proof, unless the module conformance fixture says otherwise. Add a read of the latest observation and feed it into the T05 descriptor `auth` block.
 - **Acceptance:**
@@ -147,7 +149,8 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T08 - Replay-safe credential slot submission
 
-- **Status:** PARTIAL (`submit_agent_credential` in `agent_credentials_operator.rs` validates descriptor freshness, writes through `OsSecretStore` and zeroizes; the route returns `503` because exact durable replay is not implemented).
+- **Status:** BLOCKED (retryable) 2026-11-10: the durable idempotency receipt needs a new additive table (a new migration; v31 and v32 are now taken by 014-T03 and 012-T05, so this is v33 per the allocation table in docs/LITECOWORK-BUILD-TASKS.md) and the matching `SecretStore` crash-reconcile path. Adding a migration touches the version-gated migration matrix, the failpoint suite and `docs/STORAGE.md`, and needs the full storage suite (about 10 minutes) plus the OS credential-store qualification script on the release-matrix OS, so it was not shipped in this slice. The route keeps returning `503 DEPENDENCY_UNAVAILABLE` rather than ship a non-idempotent secret write (this task's stop rule). OpenCode and Claude Code declare no `LITECOWORK_SECRET_STORE` slot in V1, so no user flow is affected. `StoredAgentDescriptorSource` is also still not wired to the credential route.
+- **DEFERRED/BLOCKED note:** Why: the durable credential receipt needs a new additive migration (v33 per the allocation table) and the SecretStore write-then-commit path. Unblocks when: implement the migration and receipt in the next 002 slice, no external dependency. Test later at: storage tests on any Linux host; sign-in against a real agent on the owner's native Windows x64 laptop (release matrix row 1); WSL2 and containers never count.
 - **Depends on:** T05
 - **Cross-package prerequisites:** Feature 011 SecretStore qualification on the release-matrix OS (`scripts/qualify-os-credential-store.sh`).
 - **Owner:** Security/Trust, Storage.
@@ -164,7 +167,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T09 - Composer model, effort and declared native commands from the descriptor
 
-- **Status:** NOT STARTED (`apps/litecowork-ui/src/conversations/conversation-agent-surface.ts` `deriveConversationAgentSurface` has tests but no production caller; `ConversationsPage.tsx` uses `buildConversationAgentChoices` only; "/ for actions" is placeholder copy).
+- **Status:** PARTIAL 2026-11-10 (CODE, UI view-model only). `conversation-model-picker.ts` adds `deriveModelPicker`, `buildModelSelection` and `deriveCommandList`: descriptor-backed model list with selected check and provider-default marker, Effort row only when declared, distinct LOADING/ERROR/DENIED/OFFLINE/STALE/BLOCKED/EMPTY texts, listbox announcement text, a payload `{optionId, providerModelId, descriptorRevision}` that refuses an undeclared model, and the "No commands declared by this agent" slash state. The placeholder "/ for actions" hint was already removed (guarded by `conversation-empty-state-truthfulness.test.mjs`). Not done, per this task's stop rule (no picker without a consuming send path): the popover component is not mounted in `ConversationsPage.tsx`, `getAgentSessionOptions` is not served, and the dispatcher does not revalidate the option at admission. Tests: `tests/conversation-model-picker.test.ts` (6).
 - **Depends on:** T05, T06
 - **Cross-package prerequisites:** Feature 001 composer and Send admission (Wave 1); Feature 004 consumes the same picker gating.
 - **Owner:** Desktop UI, Agent Runtime.
@@ -183,7 +186,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T10 - Supply 002 operations to the Feature 011 Settings -> Agents screen
 
-- **Status:** PARTIAL (`AgentCatalogSettings.tsx` renders catalog, inventory, probes, profiles, bindings and default lead; no sign-in, descriptor matrix or native-config action).
+- **Status:** PARTIAL 2026-11-10 (CODE + SERVED, fail-closed). `openAgentNativeConfiguration` is served by `agent_native_config_operator.rs`: the caller supplies only a `targetId`; an id with a path separator or control character is rejected, a target not declared in the fresh module descriptor is rejected before any opener is consulted, and the production `UnqualifiedOpener` refuses declared targets with 503. UI: `DescriptorSummary` shows five independent axes (Detection, Installation, Configuration, Authentication, Readiness), declared Sign in and Open native config controls only, a disabled state when no desktop command is supplied, and the "native harness state" label for MCP/hooks/extensions (AC-007, AC-011). Not done: Tauri commands in `agent_binding_bridge.rs` (`src-tauri` cannot be built here), per-card probe loading test (AC-012 UI), and a real opener. Tests: `native_config_open_rejects_undeclared_targets_and_caller_paths`, `agent-control-descriptor-panel.test.mjs`.
 - **Depends on:** T05, T07
 - **Cross-package prerequisites:** Feature 011 Settings -> Agents screen and control table (A-35 owner). This task links to that screen and does not republish it.
 - **Owner:** Desktop UI (operation wiring), Feature 011 (screen).
@@ -202,7 +205,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T11 - Catalog, inventory and honest install/update unavailability for V1
 
-- **Status:** PARTIAL (registry and inventory served; install/update are OpenAPI target-only with no handler).
+- **Status:** PARTIAL 2026-11-10 (CODE). Registry and inventory remain served; Install and Update are shown as unavailable with the reason "No qualified installer for this module in V1" and no Install or Update control exists to focus (test `install and update are visibly unavailable and no install control is offered`). Not done: the "Install guide" external link (no verified guide URL per module), and "Add existing installation" through the native picker plus exact module validation.
 - **Depends on:** T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Desktop UI.
@@ -220,7 +223,8 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T12 - Claude Code CLI as the second AgentModule (B-11)
 
-- **Status:** NOT STARTED (only the `CLAUDE_CODE` inventory candidate exists in `apps/litecoworkd/src/agents/native_cli.rs`).
+- **Status:** BLOCKED (retryable) 2026-11-10: the module needs the exact Claude Code CLI version, its non-interactive streaming transport and native auth method pinned from an installed CLI, and none is installed in this sandbox. Shipping a manifest with a guessed version pin would violate AC-017 and the T12 stop rule, so `CLAUDE_CODE` stays inventory-only, `NativeProviderKey::ClaudeCode` still selects no module and the probe allowlist is unchanged. Windows x64 pinning is DEFERRED to laptop testing; Linux x64 pinning needs the CLI installed.
+- **DEFERRED/BLOCKED note:** Why: no Claude Code CLI is installed here, so version, streaming transport and auth method cannot be pinned without guessing. Unblocks when: install the Claude Code CLI on a test machine and capture its non-interactive transport, then write the AgentModule manifest. Test later at: native Linux or the Windows laptop with the CLI installed (release matrix Claude Code rows are NOT_RUN).
 - **Depends on:** T03, T05, T07
 - **Cross-package prerequisites:** Feature 004 Claude Code dispatch arm in `AgentSessionSupervisor` (Wave 4) consumes this module; Feature 001 supervisor durability.
 - **Owner:** Agent Runtime, Security/Trust.
@@ -237,7 +241,9 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T13 - Failure, restart and race recovery for probe, descriptor, auth and binding
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL 2026-11-10 (CODE). Added `agent_lifecycle_recovery_restart_revalidates_the_descriptor_until_reprobed` (a new RuntimeIncarnation never inherits a descriptor until re-probed) and `agent_lifecycle_recovery_failed_probe_leaves_the_prior_descriptor_intact` (crash or unpinned probe leaves the prior descriptor current and no partial row) in `descriptor_service.rs`; auth unknown and cancel are covered by `agent_auth_*`; descriptor race and TTL by existing `descriptor_*` storage tests. The planned integration file `tests/agent_lifecycle_recovery.rs` was not created because `litecoworkd` is a binary crate whose internals are not importable from `tests/`. Not done: credential replay after crash (blocked with T08), duplicate create/enable replay beyond existing receipt tests, and the `scripts/v1_resilience_matrix.py` row.
+- **Reference (DeepSeek Harness, MIT, pinned `fcc0ad46`, no code copied yet):** upstream [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness/tree/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159), reuse map [DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md).
+  - **P-38 Login-shell PATH-class capture for agents launched from a Linux desktop entry.** Class: **OWNER (open; not ADOPT, ADAPT or REJECT yet)**. Upstream permalinks: [src/login-shell-environment.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/login-shell-environment.ts). Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Section 14 (row P-38 and the conflict note). Why: CONFLICT, stays open: capturing the login-shell environment merges ambient variables over the inherited environment, which conflicts with environment scrubbing (A-58, Section 9 of the desktop study and the Env scrubbing lesson in the plugin study) and with the T07 and T13 environment rules of package 002. Only a PATH-class allowlist could be considered, and only after an owner decision. Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React). No reuse is allowed before the owner decision.
 - **Depends on:** T05-T08
 - **Cross-package prerequisites:** Feature 011 Runtime incarnation and restart observation.
 - **Owner:** Agent Runtime, Storage.
@@ -255,7 +261,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T14 - Cross-layer trace for every 002 user-visible operation
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL 2026-11-10 (DOCS). Trace table for Probe, Create/Enable/Disable binding, Refresh descriptor, Sign in, Select model and Open native config is in `contracts/ui-behavior.md` with real symbol names and test ids. Three breaks are recorded rather than hidden (no Tauri command for Sign in, Open native config or the picker; `getAgentSessionOptions` still target-only; no qualified launcher or opener). `docs/V1-UI-ACTION-STATE-LEDGER.md` rows were not added because that ledger is keyed by UIV1 ids owned by the documentation owner.
 - **Depends on:** T09, T10, T13
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Desktop UI.
@@ -271,7 +277,8 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T15 - Release-matrix qualification (CODE, SYSTEM, USER)
 
-- **Status:** NOT STARTED
+- **Status:** DEFERRED 2026-11-10 by owner instruction: release-matrix qualification (Windows x64 and Linux x64 packaged runs, owner USER evidence) depends on Windows hardware, the packaged installer and release items, and is to be tested later on the owner's laptop. No QUALIFIED claim is made anywhere in this package.
+- **DEFERRED/BLOCKED note:** Why: release-matrix qualification needs packaged installers, Windows hardware and owner USER evidence. Unblocks when: Feature 019 packaging plus the signing decision B-43 and a Windows build. Test later at: the owner's Windows laptop, then native Linux x64.
 - **Depends on:** T12, T14
 - **Cross-package prerequisites:** Feature 019 release matrix rows and packaged installer; Feature 001 E2E-01 Send path; Feature 004 E2E-02 relay for the Claude Code row.
 - **Owner:** Agent Runtime, Product (owner USER evidence).
@@ -289,7 +296,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T16 - Documentation and ledger sync
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL 2026-11-10 (DOCS). `served-route-inventory.json` regenerated (178 served / 1 local-only / 53 target-only; three audit scripts, `tests/test_architecture_validator.py`, IMPLEMENTATION-STATUS, the register, coverage and semantic maps updated), `docs/API.md` and `contracts/api-events.md` state the two newly served fail-closed routes. SPEC section 4 and the function ledger F13 rows were not rewritten because T15 produced no evidence; no claim is above CODE/SERVED. Closing register rows B-11/B-12 is left to the orchestrator.
 - **Depends on:** T15
 - **Cross-package prerequisites:** orchestrator-owned register and traceability updates.
 - **Owner:** Agent Runtime, documentation owner.
@@ -305,7 +312,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T17 - Define the native-agent adapter as an ACP client (P-11)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09 (docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Folds proposed task P-11 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package. This is the register A-54 ACP direction (see docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md); rationale and the borrowable mapping stay in that register row and the synthesis doc, not restated here.
+- **Status:** PARTIAL 2026-11-10 (CODE, commit bf9b8e0). `agents/acp_client.rs` implements a bounded-framing ACP client (initialize, session/new, session/prompt, session/update, session/cancel, request_permission, fs and terminal routing to the Client owner, foreign-session traffic ignored, one cancel, fail-closed faults) with tests `acp_client_adapter_*` (6). Open: the ACP SDK package version and protocol revision are still not pinned in RESEARCH.md (no network fetch of the published SDK was done), so that acceptance box is unmet; the module is not wired to any dispatch path.
 - **Depends on:** T03
 - **Cross-package prerequisites:** Feature 001 adapter-trait task (Feature 001 T04) is the Conversation-side integration point; this package's Adapter 1.0 registry task T03 is the local integration point.
 - **Owner:** Agent Runtime.
@@ -323,7 +330,7 @@ Verified against source on 2026-11-09. Served today: ACP Registry and local inve
 
 ## 002-T18 - Agent Matchmaker ranking for a job (P-12)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-12 from docs/REFERENCE-SYNTHESIS-AND-V1-FEATURE-ALIGNMENT-2026-11.md section 8 into this LOCKED package.
+- **Status:** PARTIAL 2026-11-10 (CODE). `agents/matchmaker.rs` `rank_agents` ranks eligible bindings by capabilities declared in fresh descriptors, gives a plain-language reason per candidate, excludes disabled, not-lead-eligible, missing and stale-descriptor candidates with a reason and no rank, keeps caller order on ties and always reports `advisory: true` (tests `agent_matchmaker_*`, 3). Not done: the Operator route (adds an OpenAPI operation and route counts), the UI surface in `apps/litecowork-ui/src/`, and the job-text need extraction is a fixed keyword table, not a model.
 - **Depends on:** T05, T17
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, UI.
@@ -372,6 +379,22 @@ Cross-package task numbers are being re-authored in parallel, so this table name
 | T10 | Feature 011 (Settings -> Agents screen, A-35) | 011 owns the screen; 002 supplies operations. |
 | T12 | Feature 004 (Claude Code dispatch arm) | 004 adds the supervisor arm that uses this module. |
 | T15 | Feature 019 (release matrix, installer), Feature 001 (E2E-01), Feature 004 (E2E-02) | Packaged qualification rows. |
+
+## DeepSeek Harness proposals (PROPOSED, owner review required)
+
+Status: PROPOSED. None of the items below is an accepted task. They come from the DeepSeek Harness studies ([desktop deep-dive](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) register A-63, proposals P-31 to P-46; [plugin deep-dive](../../docs/DEEPSEEK-HARNESS-PLUGIN-ARCHITECTURE-DEEP-DIVE-2026-11.md) register A-58). Owner review is required before any item becomes a numbered task in this package. They are labelled `PROP-Pnn` so they do not collide with the stable task IDs that `.specify/scripts/validate_feature_package.py` checks. On acceptance: assign the next free task ID in this file, copy the upstream permalink, class and reuse statement into the task, and update the [reuse map](../../docs/DEEPSEEK-HARNESS-REUSE-MAP-2026-11.md). Upstream pin `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` (MIT, Copyright (c) 2026 DeepSeek). No upstream code is imported (AGENTS.md section 7).
+
+### Proposed tasks owned by this package
+
+- **PROP-P38 (P-38) Login-shell PATH-class capture for agents launched from a Linux desktop entry** [PROPOSED, not accepted, owner review required; CONFLICTS with environment scrubbing (A-58) and stays OPEN]
+  - Class: **OWNER (open; not ADOPT, ADAPT or REJECT yet)**.
+  - Would touch: T07 and T13 of package 002; package 005 Environment admission.
+  - Upstream permalinks: [src/login-shell-environment.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/apps/desktop/src/login-shell-environment.ts).
+  - Study: [desktop study](../../docs/DEEPSEEK-HARNESS-DESKTOP-DEEP-DIVE-2026-11.md) Section 14 (row P-38 and the conflict note).
+  - Why: CONFLICT, stays open: capturing the login-shell environment merges ambient variables over the inherited environment, which conflicts with environment scrubbing (A-58, Section 9 of the desktop study and the Env scrubbing lesson in the plugin study) and with the T07 and T13 environment rules of package 002. Only a PATH-class allowlist could be considered, and only after an owner decision.
+  - Reuse: Pattern only, reimplement. No upstream code or text is copied or imported (AGENTS.md section 7; upstream is Electron and TypeScript, LiteCowork is Tauri, Rust and React). No reuse is allowed before the owner decision.
+  - Deferral note: Blocked on the owner decision. Then a Linux desktop-entry launch test.
+
 
 ## Completion evidence
 

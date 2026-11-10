@@ -227,3 +227,11 @@ test("empty local inventory reports only that no known executable was detected",
   assert.match(html, /No known executable was detected by the current inventory provider/);
   assert.doesNotMatch(html, /No supported coding-agent executable/);
 });
+
+test("install and update are visibly unavailable and no install control is offered", () => {
+  const html = renderCandidateCatalog();
+  assert.match(html, /Install and Update are unavailable in this version/);
+  assert.match(html, /No qualified installer for this module in V1/);
+  assert.doesNotMatch(html, /<button[^>]*>\s*(Install|Update)\b/i);
+  assert.doesNotMatch(html, /Installed on this computer/);
+});

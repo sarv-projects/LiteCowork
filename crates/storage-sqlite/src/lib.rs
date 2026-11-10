@@ -1,3 +1,4 @@
+mod agent_control_descriptors;
 mod agent_registry_cache;
 mod artifacts;
 mod automation_admission;
@@ -59,6 +60,8 @@ mod user_request_resolutions;
 mod verification_runs;
 mod workspace_archive;
 mod workspace_root_cleanup;
+#[cfg(all(test, unix))]
+mod workspace_root_lifecycle_tests;
 #[cfg(test)]
 mod workspace_root_membership_migration_tests;
 #[cfg(all(test, unix))]
@@ -98,6 +101,7 @@ pub use os_principal_binding::{
     OsRuntimePrincipalBindingProvider, RuntimeOsPlatform, RuntimeOsPrincipal,
     RuntimeOsPrincipalBinding, RuntimeOsPrincipalIdentity, UnixPrincipalId,
 };
+pub use resource_index::is_allowlisted_text;
 pub use routines::{
     RoutineEventContext, RoutineHealthFacts, RoutinePage, RoutineRevisionPage, RoutineTaskOutcome,
     SqliteRoutineStore,
@@ -159,17 +163,18 @@ use storage_core::{
     ResourceUploadStore, RootObservationScanStatus, RuntimeCapabilityHostPageRequest,
     RuntimeCapabilityHostRecord, RuntimeCapabilityRef, RuntimeIncarnationLocalObservationRecord,
     RuntimeIncarnationRecord, RuntimeIncarnationStateUpdate, RuntimeLifecycleStore,
-    RuntimeOfferPageRequest, RuntimeOfferRecord, RuntimeRecord, RuntimeWorkspaceBindingRecord,
-    RuntimeWorkspaceBindingStore, StateStore, StepRecord, StoreError, StoredResourceContent,
-    TaskAggregateSnapshot, TaskCreateCommit, TaskLeadHandoffCommit, TaskPlanningSessionStart,
-    TaskRecord, TaskSpecRevisionCommit, TaskSpecRevisionRecord, TaskStore, TaskSummaryRecord,
-    TaskView, Workspace, WorkspaceCreateRequest, WorkspaceEventReplayEntry,
-    WorkspaceEventReplayPage, WorkspaceInstructionRevisionRecord, WorkspaceRootCreateCommit,
-    WorkspaceRootObservationBatch, WorkspaceRootRecord, WorkspaceRootResumeCommit,
-    WorkspaceRootRevalidationBindings, WorkspaceRootRevalidationCandidate,
-    WorkspaceRootRevalidationCommit, WorkspaceRootRevalidationFailure, WorkspaceRootScanCandidate,
-    WorkspaceRootScanCommit, WorkspaceRootScanResult, WorkspaceRootScanStatus,
-    WorkspaceRootStatusAction, WorkspaceRootStatusCommit, WorkspaceRootStore,
+    RuntimeOfferPageRequest, RuntimeOfferRecord, RuntimeRecord, RuntimeStopObservation,
+    RuntimeWorkspaceBindingRecord, RuntimeWorkspaceBindingStore, StateStore, StepRecord,
+    StoreError, StoredResourceContent, TaskAggregateSnapshot, TaskCreateCommit,
+    TaskLeadHandoffCommit, TaskPlanningSessionStart, TaskRecord, TaskSpecRevisionCommit,
+    TaskSpecRevisionRecord, TaskStore, TaskSummaryRecord, TaskView, Workspace,
+    WorkspaceCreateRequest, WorkspaceEventReplayEntry, WorkspaceEventReplayPage,
+    WorkspaceInstructionRevisionRecord, WorkspaceRootCreateCommit, WorkspaceRootObservationBatch,
+    WorkspaceRootRecord, WorkspaceRootResumeCommit, WorkspaceRootRevalidationBindings,
+    WorkspaceRootRevalidationCandidate, WorkspaceRootRevalidationCommit,
+    WorkspaceRootRevalidationFailure, WorkspaceRootScanCandidate, WorkspaceRootScanCommit,
+    WorkspaceRootScanResult, WorkspaceRootScanStatus, WorkspaceRootStatusAction,
+    WorkspaceRootStatusCommit, WorkspaceRootStore,
 };
 
 #[cfg(unix)]
@@ -215,7 +220,12 @@ const SQLITE_V24_DDL: &str = include_str!("../../../docs/schemas/sqlite-v24.sql"
 const SQLITE_V25_DDL: &str = include_str!("../../../docs/schemas/sqlite-v25.sql");
 const SQLITE_V26_DDL: &str = include_str!("../../../docs/schemas/sqlite-v26.sql");
 const SQLITE_V27_DDL: &str = include_str!("../../../docs/schemas/sqlite-v27.sql");
-const SCHEMA_VERSION: i64 = 27;
+const SQLITE_V28_DDL: &str = include_str!("../../../docs/schemas/sqlite-v28.sql");
+const SQLITE_V29_DDL: &str = include_str!("../../../docs/schemas/sqlite-v29.sql");
+const SQLITE_V30_DDL: &str = include_str!("../../../docs/schemas/sqlite-v30.sql");
+const SQLITE_V31_DDL: &str = include_str!("../../../docs/schemas/sqlite-v31.sql");
+const SQLITE_V32_DDL: &str = include_str!("../../../docs/schemas/sqlite-v32.sql");
+const SCHEMA_VERSION: i64 = 32;
 const V3_SCHEMA_VERSION: i64 = 3;
 const V4_SCHEMA_VERSION: i64 = 4;
 const V5_SCHEMA_VERSION: i64 = 5;
@@ -241,6 +251,11 @@ const V24_SCHEMA_VERSION: i64 = 24;
 const V25_SCHEMA_VERSION: i64 = 25;
 const V26_SCHEMA_VERSION: i64 = 26;
 const V27_SCHEMA_VERSION: i64 = 27;
+const V28_SCHEMA_VERSION: i64 = 28;
+const V29_SCHEMA_VERSION: i64 = 29;
+const V30_SCHEMA_VERSION: i64 = 30;
+const V31_SCHEMA_VERSION: i64 = 31;
+const V32_SCHEMA_VERSION: i64 = 32;
 
 fn require_task_planning_isolation_admission() -> Result<(), StoreError> {
     // No qualified Runtime-owned admission proof producer is connected in this
@@ -276,6 +291,11 @@ const V24_MIGRATION_NAME: &str = "immutable_delegation_results_v24";
 const V25_MIGRATION_NAME: &str = "immutable_resource_edges_v25";
 const V26_MIGRATION_NAME: &str = "invocation_dispatch_admission_v26";
 const V27_MIGRATION_NAME: &str = "automation_test_runs_v27";
+const V28_MIGRATION_NAME: &str = "workspace_delegation_settings_v28";
+const V29_MIGRATION_NAME: &str = "conversation_durable_turn_v29";
+const V30_MIGRATION_NAME: &str = "conversation_turn_activity_v30";
+const V31_MIGRATION_NAME: &str = "conversation_history_state_v31";
+const V32_MIGRATION_NAME: &str = "conversation_coedit_v32";
 #[cfg(test)]
 const MIGRATION_NAME: &str = V1_MIGRATION_NAME; // version-one compatibility for schema baseline assertions
 const STATE_MEDIA_TYPE: &str = "application/vnd.litecowork.aggregate-state+json";
@@ -750,6 +770,11 @@ enum Command {
         runtime_id: String,
         expected_incarnation_id: String,
         reply: mpsc::Sender<Result<Option<LocalRuntimeLifecycleSnapshot>, StoreError>>,
+    },
+    ReadRuntimeStopObservation {
+        runtime_id: String,
+        expected_incarnation_id: String,
+        reply: mpsc::Sender<Result<Option<RuntimeStopObservation>, StoreError>>,
     },
     ListWorkspaces {
         reply: mpsc::Sender<Result<Vec<Workspace>, StoreError>>,
@@ -2077,6 +2102,28 @@ impl RuntimeLifecycleStore for SqliteWorkspaceStore {
         let (reply_sender, reply_receiver) = mpsc::channel();
         self.execute_command(
             Command::ReadLocalRuntimeLifecycleSnapshot {
+                runtime_id: runtime_id.to_owned(),
+                expected_incarnation_id: expected_incarnation_id.to_owned(),
+                reply: reply_sender,
+            },
+            reply_receiver,
+        )
+    }
+
+    fn read_runtime_stop_observation(
+        &self,
+        runtime_id: &str,
+        expected_incarnation_id: &str,
+    ) -> Result<Option<RuntimeStopObservation>, StoreError> {
+        validate_nonempty(&[runtime_id, expected_incarnation_id])?;
+        if runtime_id.len() > 256 || expected_incarnation_id.len() > 256 {
+            return Err(StoreError::Invalid(
+                "Runtime stop observation identifier is too long".to_owned(),
+            ));
+        }
+        let (reply_sender, reply_receiver) = mpsc::channel();
+        self.execute_command(
+            Command::ReadRuntimeStopObservation {
                 runtime_id: runtime_id.to_owned(),
                 expected_incarnation_id: expected_incarnation_id.to_owned(),
                 reply: reply_sender,
@@ -14568,8 +14615,8 @@ pub(crate) fn create_task_in_transaction(
     let spec_author_json = String::from_utf8(canonical_json(&spec.authored_by)?)
         .map_err(|error| StoreError::Invalid(error.to_string()))?;
     tx.execute(
-        "INSERT INTO task_spec_revisions(task_id, workspace_id, revision, parent_revisions_json, objective, task_category, constraints_json, non_goals_json, input_refs_json, workspace_instruction_revision, required_outputs_json, acceptance_criteria_json, approvals_required_json, budget_json, delegation_budget_policy_json, lead_failover_policy_json, deadline, source_message_refs_json, placement_preference, preferred_lead_agent_binding_id, authored_by_json, created_at)
-         VALUES (?1, ?2, 1, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+        "INSERT INTO task_spec_revisions(task_id, workspace_id, revision, parent_revisions_json, objective, task_category, constraints_json, non_goals_json, input_refs_json, workspace_instruction_revision, required_outputs_json, acceptance_criteria_json, approvals_required_json, budget_json, delegation_budget_policy_json, lead_failover_policy_json, deadline, source_message_refs_json, placement_preference, preferred_lead_agent_binding_id, authored_by_json, created_at, delegation_policy_snapshot_json)
+         VALUES (?1, ?2, 1, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
         params![
             spec.task_id, spec.workspace_id, parent_json, spec.objective, spec.task_category,
             constraints_json, non_goals_json, input_refs_json,
@@ -14577,6 +14624,7 @@ pub(crate) fn create_task_in_transaction(
             required_outputs_json, criteria_json, approvals_json, budget_json,
             delegation_budget_json, failover_json, spec.deadline, source_refs_json,
             placement_json, spec.preferred_lead_agent_binding_id, spec_author_json, spec.created_at,
+            delegation_policy_snapshot_json(&tx, &spec.workspace_id)?,
         ],
     ).map_err(map_database_error)?;
 
@@ -15511,15 +15559,57 @@ fn insert_task_spec_revision_row(
     let placement_json = encode(&revision.placement_preference)?;
     let authored_by_json = encode(&revision.authored_by)?;
     transaction.execute(
-        "INSERT INTO task_spec_revisions(task_id, workspace_id, revision, parent_revisions_json, objective, task_category, constraints_json, non_goals_json, input_refs_json, workspace_instruction_revision, required_outputs_json, acceptance_criteria_json, approvals_required_json, budget_json, delegation_budget_policy_json, lead_failover_policy_json, deadline, source_message_refs_json, placement_preference, preferred_lead_agent_binding_id, authored_by_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+        "INSERT INTO task_spec_revisions(task_id, workspace_id, revision, parent_revisions_json, objective, task_category, constraints_json, non_goals_json, input_refs_json, workspace_instruction_revision, required_outputs_json, acceptance_criteria_json, approvals_required_json, budget_json, delegation_budget_policy_json, lead_failover_policy_json, deadline, source_message_refs_json, placement_preference, preferred_lead_agent_binding_id, authored_by_json, created_at, delegation_policy_snapshot_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
         params![revision.task_id, revision.workspace_id, to_sql_i64(revision.revision, "TaskSpec revision")?,
             parent_json, revision.objective, revision.task_category, constraints_json, non_goals_json,
             inputs_json, revision.workspace_instruction_revision.map(|value| to_sql_i64(value, "Workspace instruction revision")).transpose()?,
             outputs_json, criteria_json, approvals_json, budget_json, delegation_budget_json, failover_json,
             revision.deadline, source_refs_json, placement_json, revision.preferred_lead_agent_binding_id,
-            authored_by_json, revision.created_at],
+            authored_by_json, revision.created_at,
+            delegation_policy_snapshot_json(transaction, &revision.workspace_id)?],
     ).map_err(map_database_error)?;
     Ok(())
+}
+
+/// Builds the immutable delegation policy snapshot pinned on a TaskSpec revision from
+/// the Workspace's current delegation settings revision (migration v28). Worker
+/// profiles are pinned only when the Workspace strategy delegates beyond the agent's
+/// native behaviour.
+fn delegation_policy_snapshot_json(
+    transaction: &rusqlite::Transaction<'_>,
+    workspace_id: &str,
+) -> Result<String, StoreError> {
+    let (revision, strategy, profiles_json, native_child_model_policy): (i64, String, String, String) =
+        transaction
+            .query_row(
+                "SELECT s.revision, s.default_strategy, s.enabled_delegation_profile_revisions_json, s.native_child_model_policy
+                 FROM workspaces w
+                 JOIN workspace_delegation_settings_revisions s
+                   ON s.workspace_id = w.workspace_id AND s.revision = w.current_delegation_settings_revision
+                 WHERE w.workspace_id = ?1",
+                params![workspace_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .optional()
+            .map_err(map_database_error)?
+            .ok_or_else(|| {
+                StoreError::Invalid("Workspace delegation settings revision is missing".to_owned())
+            })?;
+    let profiles: Value = serde_json::from_str(&profiles_json)
+        .map_err(|error| StoreError::Invalid(error.to_string()))?;
+    let worker_profiles = if strategy == "NATIVE_DEFAULT" {
+        json!([])
+    } else {
+        profiles
+    };
+    String::from_utf8(canonical_json(&json!({
+        "source": "WORKSPACE_DEFAULT",
+        "strategy": strategy,
+        "native_child_model_policy": native_child_model_policy,
+        "worker_profiles": worker_profiles,
+        "workspace_settings_revision": revision,
+    }))?)
+    .map_err(|error| StoreError::Invalid(error.to_string()))
 }
 
 fn payload_has_exact_keys(payload: &Value, expected: &[&str]) -> bool {
@@ -18949,6 +19039,26 @@ fn enable_agent_binding_transaction(
                 .to_owned(),
         ));
     }
+    if let Some(gate) = &request.require_descriptor {
+        let current_revision = request
+            .descriptor_revision
+            .as_deref()
+            .is_some_and(|revision| {
+                agent_control_descriptors::descriptor_revision_is_current(
+                    connection,
+                    gate,
+                    revision,
+                    &request.now,
+                )
+                .unwrap_or(false)
+            });
+        if !current_revision {
+            return Err(StoreError::Invalid(
+                "DESCRIPTOR_STALE: the AgentControlDescriptor is missing, stale or does not match the current revision"
+                    .to_owned(),
+            ));
+        }
+    }
     let payload = agent_binding_enabled_payload(&next, &request.request.principal_id);
     validate_binding_event(
         &request.event,
@@ -19471,6 +19581,91 @@ fn transition_local_runtime_incarnation_transaction(
     })
 }
 
+/// Maximum identifiers a caller should keep per category. One extra row is fetched so the
+/// caller can tell that the list was truncated; the verdict is BLOCKED either way.
+const STOP_OBSERVATION_LIMIT: i64 = 200;
+
+fn stop_observation_ids(
+    connection: &Connection,
+    sql: &str,
+    runtime_id: &str,
+) -> Result<Vec<String>, StoreError> {
+    let mut statement = connection.prepare(sql).map_err(map_database_error)?;
+    let rows = statement
+        .query_map(params![runtime_id, STOP_OBSERVATION_LIMIT + 1], |row| {
+            row.get::<_, String>(0)
+        })
+        .map_err(map_database_error)?;
+    let mut ids = Vec::new();
+    for row in rows {
+        ids.push(row.map_err(map_database_error)?);
+    }
+    Ok(ids)
+}
+
+fn read_runtime_stop_observation(
+    connection: &Connection,
+    runtime_id: &str,
+    expected_incarnation_id: &str,
+) -> Result<Option<RuntimeStopObservation>, StoreError> {
+    let current: Option<String> = connection
+        .query_row(
+            "SELECT current_incarnation_id FROM runtimes WHERE runtime_id = ?1 AND current_incarnation_id = ?2",
+            params![runtime_id, expected_incarnation_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(map_database_error)?;
+    if current.is_none() {
+        return Ok(None);
+    }
+    // Conversation turns are not Runtime-scoped rows; one local Runtime owns the database.
+    let admitted_turn_ids = stop_observation_ids(
+        connection,
+        "SELECT turn_id FROM conversation_turns WHERE ?1 IS NOT NULL AND status IN ('OPEN', 'RUNNING', 'WAITING_USER', 'WAITING_DEPENDENCY', 'CANCEL_REQUESTED') ORDER BY turn_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let admitted_attempt_ids = stop_observation_ids(
+        connection,
+        "SELECT attempt_id FROM attempts WHERE runtime_id = ?1 AND status IN ('CREATED', 'PREPARING', 'RUNNING', 'WAITING_APPROVAL', 'WAITING_RESOURCE', 'CHECKPOINTING', 'CANCEL_REQUESTED') ORDER BY attempt_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let dependent_task_ids = stop_observation_ids(
+        connection,
+        "SELECT DISTINCT task_id FROM attempts WHERE runtime_id = ?1 AND status IN ('CREATED', 'PREPARING', 'RUNNING', 'WAITING_APPROVAL', 'WAITING_RESOURCE', 'CHECKPOINTING', 'CANCEL_REQUESTED') ORDER BY task_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let unresolved_effect_ids = stop_observation_ids(
+        connection,
+        "SELECT e.effect_id FROM effects e JOIN attempts a ON a.attempt_id = e.attempt_id WHERE a.runtime_id = ?1 AND e.state IN ('STARTED', 'ACKNOWLEDGED', 'RECONCILING', 'AMBIGUOUS') ORDER BY e.effect_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let execution_lease_ids = stop_observation_ids(
+        connection,
+        "SELECT lease_id FROM execution_leases WHERE runtime_id = ?1 AND state IN ('ACTIVE', 'RELEASING') ORDER BY lease_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let environment_control_lease_ids = stop_observation_ids(
+        connection,
+        "SELECT control_lease_id FROM environment_control_leases WHERE runtime_id = ?1 AND state IN ('ACTIVE', 'RELEASING') ORDER BY control_lease_id LIMIT ?2",
+        runtime_id,
+    )?;
+    let pending_cleanup_ids = stop_observation_ids(
+        connection,
+        "SELECT workspace_root_id FROM workspace_root_cleanup_outbox WHERE ?1 IS NOT NULL AND status = 'PENDING' ORDER BY workspace_root_id LIMIT ?2",
+        runtime_id,
+    )?;
+    Ok(Some(RuntimeStopObservation {
+        admitted_turn_ids,
+        admitted_attempt_ids,
+        dependent_task_ids,
+        unresolved_effect_ids,
+        execution_lease_ids,
+        environment_control_lease_ids,
+        pending_cleanup_ids,
+    }))
+}
+
 fn read_local_runtime_lifecycle_snapshot(
     connection: &Connection,
     runtime_id: &str,
@@ -19894,6 +20089,17 @@ fn writer_loop(
                         reply,
                     } => {
                         let _ = reply.send(read_local_runtime_lifecycle_snapshot(
+                            &connection,
+                            &runtime_id,
+                            &expected_incarnation_id,
+                        ));
+                    }
+                    Command::ReadRuntimeStopObservation {
+                        runtime_id,
+                        expected_incarnation_id,
+                        reply,
+                    } => {
+                        let _ = reply.send(read_runtime_stop_observation(
                             &connection,
                             &runtime_id,
                             &expected_incarnation_id,
@@ -21188,7 +21394,12 @@ fn migrate_with_failpoint(
         verify_migration_record(connection, 24, V24_MIGRATION_NAME, SQLITE_V24_DDL, false)?;
         verify_migration_record(connection, 25, V25_MIGRATION_NAME, SQLITE_V25_DDL, false)?;
         verify_migration_record(connection, 26, V26_MIGRATION_NAME, SQLITE_V26_DDL, false)?;
-        verify_migration_record(connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, true)?;
+        verify_migration_record(connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, false)?;
+        verify_migration_record(connection, 28, V28_MIGRATION_NAME, SQLITE_V28_DDL, false)?;
+        verify_migration_record(connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, false)?;
+        verify_migration_record(connection, 30, V30_MIGRATION_NAME, SQLITE_V30_DDL, false)?;
+        verify_migration_record(connection, 31, V31_MIGRATION_NAME, SQLITE_V31_DDL, false)?;
+        verify_migration_record(connection, 32, V32_MIGRATION_NAME, SQLITE_V32_DDL, true)?;
         return Ok(());
     }
 
@@ -21444,6 +21655,42 @@ fn migrate_with_failpoint(
                 schema_version == V27_SCHEMA_VERSION,
             )?;
         }
+        if schema_version >= 28 {
+            verify_migration_record(
+                connection,
+                28,
+                V28_MIGRATION_NAME,
+                SQLITE_V28_DDL,
+                schema_version == V28_SCHEMA_VERSION,
+            )?;
+        }
+        if schema_version >= 29 {
+            verify_migration_record(
+                connection,
+                29,
+                V29_MIGRATION_NAME,
+                SQLITE_V29_DDL,
+                schema_version == V29_SCHEMA_VERSION,
+            )?;
+        }
+        if schema_version >= 30 {
+            verify_migration_record(
+                connection,
+                30,
+                V30_MIGRATION_NAME,
+                SQLITE_V30_DDL,
+                schema_version == V30_SCHEMA_VERSION,
+            )?;
+        }
+        if schema_version >= 31 {
+            verify_migration_record(
+                connection,
+                31,
+                V31_MIGRATION_NAME,
+                SQLITE_V31_DDL,
+                schema_version == V31_SCHEMA_VERSION,
+            )?;
+        }
         if schema_version == 1 {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -21598,6 +21845,11 @@ fn migrate_with_failpoint(
             | V25_SCHEMA_VERSION
             | V26_SCHEMA_VERSION
             | V27_SCHEMA_VERSION
+            | V28_SCHEMA_VERSION
+            | V29_SCHEMA_VERSION
+            | V30_SCHEMA_VERSION
+            | V31_SCHEMA_VERSION
+            | V32_SCHEMA_VERSION
     ) {
         return Err(StoreError::CorruptSchema(format!(
             "migration stopped at unexpected schema version {current_version}"
@@ -21615,6 +21867,11 @@ fn migrate_with_failpoint(
             | V25_SCHEMA_VERSION
             | V26_SCHEMA_VERSION
             | V27_SCHEMA_VERSION
+            | V28_SCHEMA_VERSION
+            | V29_SCHEMA_VERSION
+            | V30_SCHEMA_VERSION
+            | V31_SCHEMA_VERSION
+            | V32_SCHEMA_VERSION
     ) {
         return Err(StoreError::CorruptSchema(format!(
             "migration stopped at unexpected schema version {current_version}"
@@ -21627,7 +21884,15 @@ fn migrate_with_failpoint(
         migrate_delegation_results(connection, failpoint)?;
     } else if !matches!(
         current_version,
-        V24_SCHEMA_VERSION | V25_SCHEMA_VERSION | V26_SCHEMA_VERSION | V27_SCHEMA_VERSION
+        V24_SCHEMA_VERSION
+            | V25_SCHEMA_VERSION
+            | V26_SCHEMA_VERSION
+            | V27_SCHEMA_VERSION
+            | V28_SCHEMA_VERSION
+            | V29_SCHEMA_VERSION
+            | V30_SCHEMA_VERSION
+            | V31_SCHEMA_VERSION
+            | V32_SCHEMA_VERSION
     ) {
         return Err(StoreError::CorruptSchema(format!(
             "migration stopped at unexpected schema version {current_version}"
@@ -21640,7 +21905,14 @@ fn migrate_with_failpoint(
         migrate_resource_edges(connection, failpoint)?;
     } else if !matches!(
         current_version,
-        V25_SCHEMA_VERSION | V26_SCHEMA_VERSION | V27_SCHEMA_VERSION
+        V25_SCHEMA_VERSION
+            | V26_SCHEMA_VERSION
+            | V27_SCHEMA_VERSION
+            | V28_SCHEMA_VERSION
+            | V29_SCHEMA_VERSION
+            | V30_SCHEMA_VERSION
+            | V31_SCHEMA_VERSION
+            | V32_SCHEMA_VERSION
     ) {
         return Err(StoreError::CorruptSchema(format!(
             "migration stopped at unexpected schema version {current_version}"
@@ -21651,7 +21923,16 @@ fn migrate_with_failpoint(
         .map_err(map_database_error)?;
     if current_version == V25_SCHEMA_VERSION {
         migrate_invocation_dispatch_admission(connection, failpoint)?;
-    } else if !matches!(current_version, V26_SCHEMA_VERSION | V27_SCHEMA_VERSION) {
+    } else if !matches!(
+        current_version,
+        V26_SCHEMA_VERSION
+            | V27_SCHEMA_VERSION
+            | V28_SCHEMA_VERSION
+            | V29_SCHEMA_VERSION
+            | V30_SCHEMA_VERSION
+            | V31_SCHEMA_VERSION
+            | V32_SCHEMA_VERSION
+    ) {
         return Err(StoreError::CorruptSchema(format!(
             "migration stopped at unexpected schema version {current_version}"
         )));
@@ -21661,12 +21942,186 @@ fn migrate_with_failpoint(
         .map_err(map_database_error)?;
     if current_version == V26_SCHEMA_VERSION {
         migrate_automation_test_runs(connection, failpoint)?;
-    } else if current_version != V27_SCHEMA_VERSION {
+    } else if !matches!(
+        current_version,
+        V27_SCHEMA_VERSION
+            | V28_SCHEMA_VERSION
+            | V29_SCHEMA_VERSION
+            | V30_SCHEMA_VERSION
+            | V31_SCHEMA_VERSION
+            | V32_SCHEMA_VERSION
+    ) {
+        return Err(StoreError::CorruptSchema(format!(
+            "migration stopped at unexpected schema version {current_version}"
+        )));
+    }
+    let current_version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(map_database_error)?;
+    if current_version == V27_SCHEMA_VERSION {
+        migrate_workspace_delegation_settings(connection, failpoint)?;
+    } else if !matches!(
+        current_version,
+        V28_SCHEMA_VERSION | V29_SCHEMA_VERSION | V30_SCHEMA_VERSION | V31_SCHEMA_VERSION | V32_SCHEMA_VERSION
+    ) {
+        return Err(StoreError::CorruptSchema(format!(
+            "migration stopped at unexpected schema version {current_version}"
+        )));
+    }
+    let current_version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(map_database_error)?;
+    if current_version == V28_SCHEMA_VERSION {
+        migrate_conversation_durable_turn(connection, failpoint)?;
+    } else if !matches!(
+        current_version,
+        V29_SCHEMA_VERSION | V30_SCHEMA_VERSION | V31_SCHEMA_VERSION | V32_SCHEMA_VERSION
+    ) {
+        return Err(StoreError::CorruptSchema(format!(
+            "migration stopped at unexpected schema version {current_version}"
+        )));
+    }
+    let current_version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(map_database_error)?;
+    if current_version == V29_SCHEMA_VERSION {
+        migrate_conversation_turn_activity(connection, failpoint)?;
+    } else if !matches!(
+        current_version,
+        V30_SCHEMA_VERSION | V31_SCHEMA_VERSION | V32_SCHEMA_VERSION
+    ) {
+        return Err(StoreError::CorruptSchema(format!(
+            "migration stopped at unexpected schema version {current_version}"
+        )));
+    }
+    let current_version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(map_database_error)?;
+    if current_version == V30_SCHEMA_VERSION {
+        migrate_conversation_history_state(connection, failpoint)?;
+    } else if !matches!(current_version, V31_SCHEMA_VERSION | V32_SCHEMA_VERSION) {
+        return Err(StoreError::CorruptSchema(format!(
+            "migration stopped at unexpected schema version {current_version}"
+        )));
+    }
+    let current_version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(map_database_error)?;
+    if current_version == V31_SCHEMA_VERSION {
+        migrate_conversation_coedit(connection, failpoint)?;
+    } else if current_version != V32_SCHEMA_VERSION {
         return Err(StoreError::CorruptSchema(format!(
             "migration stopped at unexpected schema version {current_version}"
         )));
     }
     Ok(())
+}
+
+/// Version thirty-two adds Conversation control events and owner side notes.
+fn migrate_conversation_coedit(
+    connection: &mut Connection,
+    failpoint: Option<Failpoint>,
+) -> Result<(), StoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(map_database_error)?;
+    transaction
+        .execute_batch(SQLITE_V32_DDL)
+        .map_err(map_database_error)?;
+    fail_if(failpoint, Failpoint::DuringV32Migration)?;
+    record_migration(&transaction, 32, V32_MIGRATION_NAME, SQLITE_V32_DDL)?;
+    transaction
+        .pragma_update(None, "user_version", V32_SCHEMA_VERSION)
+        .map_err(map_database_error)?;
+    validate_schema(&transaction)?;
+    transaction.commit().map_err(map_database_error)?;
+    validate_schema(connection)
+}
+
+/// Version thirty-one adds the Conversation history lifecycle state side table.
+fn migrate_conversation_history_state(
+    connection: &mut Connection,
+    failpoint: Option<Failpoint>,
+) -> Result<(), StoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(map_database_error)?;
+    transaction
+        .execute_batch(SQLITE_V31_DDL)
+        .map_err(map_database_error)?;
+    fail_if(failpoint, Failpoint::DuringV31Migration)?;
+    record_migration(&transaction, 31, V31_MIGRATION_NAME, SQLITE_V31_DDL)?;
+    transaction
+        .pragma_update(None, "user_version", V31_SCHEMA_VERSION)
+        .map_err(map_database_error)?;
+    validate_schema(&transaction)?;
+    transaction.commit().map_err(map_database_error)?;
+    validate_schema(connection)
+}
+
+/// Version twenty-eight adds Workspace-scoped delegation settings revisions and the
+/// immutable per-TaskSpec delegation policy snapshot.
+fn migrate_workspace_delegation_settings(
+    connection: &mut Connection,
+    failpoint: Option<Failpoint>,
+) -> Result<(), StoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(map_database_error)?;
+    transaction
+        .execute_batch(SQLITE_V28_DDL)
+        .map_err(map_database_error)?;
+    fail_if(failpoint, Failpoint::DuringV28Migration)?;
+    record_migration(&transaction, 28, V28_MIGRATION_NAME, SQLITE_V28_DDL)?;
+    transaction
+        .pragma_update(None, "user_version", V28_SCHEMA_VERSION)
+        .map_err(map_database_error)?;
+    validate_schema(&transaction)?;
+    transaction.commit().map_err(map_database_error)?;
+    validate_schema(connection)
+}
+
+/// Version twenty-nine adds Conversation single-flight admission, the durable
+/// dispatch outbox, final-response commit identity and per-turn usage records.
+fn migrate_conversation_durable_turn(
+    connection: &mut Connection,
+    failpoint: Option<Failpoint>,
+) -> Result<(), StoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(map_database_error)?;
+    transaction
+        .execute_batch(SQLITE_V29_DDL)
+        .map_err(map_database_error)?;
+    fail_if(failpoint, Failpoint::DuringV29Migration)?;
+    record_migration(&transaction, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL)?;
+    transaction
+        .pragma_update(None, "user_version", V29_SCHEMA_VERSION)
+        .map_err(map_database_error)?;
+    validate_schema(&transaction)?;
+    transaction.commit().map_err(map_database_error)?;
+    validate_schema(connection)
+}
+
+/// Version thirty adds REPORTED Conversation turn activity observation records.
+fn migrate_conversation_turn_activity(
+    connection: &mut Connection,
+    failpoint: Option<Failpoint>,
+) -> Result<(), StoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(map_database_error)?;
+    transaction
+        .execute_batch(SQLITE_V30_DDL)
+        .map_err(map_database_error)?;
+    fail_if(failpoint, Failpoint::DuringV30Migration)?;
+    record_migration(&transaction, 30, V30_MIGRATION_NAME, SQLITE_V30_DDL)?;
+    transaction
+        .pragma_update(None, "user_version", V30_SCHEMA_VERSION)
+        .map_err(map_database_error)?;
+    validate_schema(&transaction)?;
+    transaction.commit().map_err(map_database_error)?;
+    validate_schema(connection)
 }
 
 /// Version twenty-seven adds the Automation test-run reservation and the
@@ -22789,6 +23244,11 @@ enum Failpoint {
     DuringV25Migration,
     DuringV26Migration,
     DuringV27Migration,
+    DuringV28Migration,
+    DuringV29Migration,
+    DuringV30Migration,
+    DuringV31Migration,
+    DuringV32Migration,
     AfterAggregate,
     AfterSequence,
     AfterEvent,
@@ -23972,6 +24432,9 @@ fn map_database_error(error: rusqlite::Error) -> StoreError {
                     .contains("DEFAULT_AGENT_BINDING_NOT_LEAD_ELIGIBLE")
                 {
                     return StoreError::Invalid("AGENT_NOT_LEAD_ELIGIBLE".to_owned());
+                }
+                if error.to_string().contains("CONVERSATION_TURN_IN_PROGRESS") {
+                    return StoreError::Invalid("CONVERSATION_TURN_IN_PROGRESS".to_owned());
                 }
                 return StoreError::Database("database constraint rejected the write".to_owned());
             }

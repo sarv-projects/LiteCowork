@@ -20,9 +20,9 @@ No new global model-catalog or provider route is introduced. The UI reads model/
 |---|---|---|
 | `probeLocalAgentProfile` | SERVED; OpenCode offer always `compatible=false` | 002-T01 |
 | `createAgentBinding`, `enableAgentBinding`, `disableAgentBinding` | SERVED; enable lacks the fresh-descriptor gate | 002-T06 |
-| `getAgentControlDescriptor`, `refreshAgentProfileControl` | mounted, return `503 DEPENDENCY_UNAVAILABLE` | 002-T05 |
+| `getAgentControlDescriptor`, `refreshAgentProfileControl` | SERVED for the OpenCode module; module-less profiles `503` | 002-T05 |
 | `submitAgentCredential` | mounted, returns `503`; no SecretStore write | 002-T08 |
-| `beginAgentAuthentication` | OpenAPI target-only, not served | 002-T07 |
+| `beginAgentAuthentication` | SERVED (fail-closed: declared methods only; V1 modules declare none; unqualified launcher) | 002-T07 |
 | `getAgentSessionOptions`, `getAgentHarnessCapabilities` | OpenAPI target-only, not served | 002-T05, 002-T09 |
-| `openAgentNativeConfiguration` | OpenAPI target-only, not served | 002-T10 |
+| `openAgentNativeConfiguration` | SERVED (fail-closed: declared targets only; V1 modules declare none; unqualified opener) | 002-T10 |
 | install / update under `/agent-registry/{registryAgentId}` | OpenAPI target-only, not served; V1 shows them unavailable | 002-T11 |
