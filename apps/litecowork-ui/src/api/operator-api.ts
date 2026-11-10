@@ -454,6 +454,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/conversations/{conversationId}/turns/{turnId}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Served (read-only). Returns the bounded, ordered REPORTED activity observations (tool, file, permission, todo and step events the native agent said it performed) for one turn attempt so the UI can rebuild activity cards after a restart. Records carry only a bounded display word, never a path, argument, output or reasoning text, and are never Effects, receipts or grants. */
+        get: operations["listConversationTurnActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/conversations/{conversationId}/turns/{turnId}/retry": {
         parameters: {
             query?: never;
@@ -5482,6 +5499,26 @@ export type components = {
             /** @enum {string} */
             presentation_preference: "AUTO" | "SIMPLE" | "RICH";
         };
+        ConversationTurnActivityPage: {
+            turn_id: string;
+            retry_ordinal: number;
+            /** @enum {string} */
+            attribution: "REPORTED";
+            items: components["schemas"]["ConversationTurnActivityRecord"][];
+        };
+        ConversationTurnActivityRecord: {
+            turn_id: string;
+            retry_ordinal: number;
+            conversation_id: string;
+            sequence: number;
+            /** @enum {string} */
+            kind: "TOOL" | "FILE" | "PERMISSION" | "TODO" | "STEP" | "CONTEXT";
+            /** @enum {string} */
+            status: "STARTED" | "PROGRESS" | "SUCCEEDED" | "FAILED" | "ASKED" | "UPDATED" | "ENDED" | "REDUCED";
+            call_ref: string | null;
+            label: string | null;
+            created_at: string;
+        };
         TimelinePage: {
             items: components["schemas"]["TimelineEntry"][];
             next_cursor?: string | null;
@@ -8451,6 +8488,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationTurnReceipt"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listConversationTurnActivity: {
+        parameters: {
+            query?: {
+                retry_ordinal?: number;
+            };
+            header?: never;
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+                turnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description REPORTED activity for the attempt in sequence order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationTurnActivityPage"];
                 };
             };
             default: components["responses"]["Error"];

@@ -5503,6 +5503,7 @@ pub fn run() {
             conversation_bridge::submit_conversation_turn,
             conversation_bridge::retry_conversation_turn,
             conversation_bridge::cancel_conversation_turn,
+            conversation_bridge::list_conversation_turn_activity,
             conversation_bridge::get_conversation_presentation,
             conversation_bridge::get_rich_presentation,
             conversation_stream_bridge::subscribe_conversation_stream,

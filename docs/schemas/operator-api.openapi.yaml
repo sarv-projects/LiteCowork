@@ -552,6 +552,25 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/ConversationTurnReceipt'}
         default: {$ref: '#/components/responses/Error'}
+  /conversations/{conversationId}/turns/{turnId}/activity:
+    get:
+      tags: [conversations]
+      operationId: listConversationTurnActivity
+      description: Served (read-only). Returns the bounded, ordered REPORTED activity observations (tool, file, permission, todo and step events the native agent said it performed) for one turn attempt so the UI can rebuild activity cards after a restart. Records carry only a bounded display word, never a path, argument, output or reasoning text, and are never Effects, receipts or grants.
+      parameters:
+      - {$ref: '#/components/parameters/ConversationId'}
+      - name: turnId
+        in: path
+        required: true
+        schema: {type: string}
+      - {name: retry_ordinal, in: query, required: false, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200':
+          description: REPORTED activity for the attempt in sequence order
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConversationTurnActivityPage'}
+        default: {$ref: '#/components/responses/Error'}
   /conversations/{conversationId}/turns/{turnId}/retry:
     post:
       tags: [conversations]
@@ -7459,6 +7478,30 @@ components:
         accepted_at: {type: string, format: date-time}
         correlation_id: {type: string}
         presentation_preference: {type: string, enum: [AUTO, SIMPLE, RICH]}
+    ConversationTurnActivityPage:
+      type: object
+      required: [turn_id, retry_ordinal, attribution, items]
+      properties:
+        turn_id: {type: string}
+        retry_ordinal: {type: integer, minimum: 0}
+        attribution: {type: string, enum: [REPORTED]}
+        items:
+          type: array
+          maxItems: 200
+          items: {$ref: '#/components/schemas/ConversationTurnActivityRecord'}
+    ConversationTurnActivityRecord:
+      type: object
+      required: [turn_id, retry_ordinal, conversation_id, sequence, kind, status, call_ref, label, created_at]
+      properties:
+        turn_id: {type: string}
+        retry_ordinal: {type: integer, minimum: 0}
+        conversation_id: {type: string}
+        sequence: {type: integer, minimum: 1}
+        kind: {type: string, enum: [TOOL, FILE, PERMISSION, TODO, STEP, CONTEXT]}
+        status: {type: string, enum: [STARTED, PROGRESS, SUCCEEDED, FAILED, ASKED, UPDATED, ENDED, REDUCED]}
+        call_ref: {type: [string, 'null'], maxLength: 128}
+        label: {type: [string, 'null'], maxLength: 128}
+        created_at: {type: string}
     TimelinePage:
       type: object
       required: [items]

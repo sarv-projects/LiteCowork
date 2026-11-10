@@ -436,7 +436,7 @@ fn status_wire(status: ConversationTurnStatus) -> &'static str {
 }
 
 /// UTC timestamp in the storage layer's canonical nine-digit fractional form.
-fn canonical_now() -> String {
+pub(crate) fn canonical_now() -> String {
     let now = time::OffsetDateTime::now_utc();
     format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}Z",
@@ -850,6 +850,17 @@ fn execute_agent_turn(
                         retry_ordinal,
                     )),
                     Box::new(usage_collector.clone()),
+                    Box::new(crate::transient_frames::TurnActivityRecorder::new(
+                        crate::transient_frames::transient_bus().clone(),
+                        workspace_id,
+                        conversation_id,
+                        turn_id,
+                        retry_ordinal,
+                        {
+                            let activity_store = conv_store.clone();
+                            Box::new(move |record| activity_store.append_conversation_turn_activity(record).is_ok())
+                        },
+                    )),
                 ])));
 
             // Phase 1: version/capability probe (B-03). A failed probe is a typed

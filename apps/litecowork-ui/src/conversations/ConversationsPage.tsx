@@ -21,6 +21,8 @@ import {
   stopTarget,
   turnStatusLabel,
 } from "./conversation-turn-state";
+import { TurnActivityView } from "./TurnActivityView";
+import { mergeActivity, parseActivityPage, type ActivityEntry } from "./turn-activity";
 import "./conversations-page.css";
 
 // Keep ambiguous create receipts across keyed Workspace page remounts for this app session.
@@ -718,6 +720,31 @@ export function ConversationsPage({
   const [retryPending, setRetryPending] = useState(false);
   const [stopPending, setStopPending] = useState(false);
 
+  // REPORTED activity (T25): stored records are read back for the active or failed turn so the
+  // cards survive a restart; live frames add to them. Both are observations, never Effects.
+  const activityTurn = currentSnapshot?.active_turn ?? currentSnapshot?.retryable_turn ?? null;
+  const activityTurnId = activityTurn?.turn_id ?? null;
+  const activityRetry = activityTurn?.retry_ordinal ?? 0;
+  const activityStatus = currentSnapshot?.active_turn?.status ?? (currentSnapshot?.retryable_turn ? "FAILED" : null);
+  const [storedActivity, setStoredActivity] = useState<{ key: string; entries: ActivityEntry[] } | null>(null);
+  useEffect(() => {
+    if (!workspaceId || !selectedId || !activityTurnId) return;
+    const key = JSON.stringify([workspaceId, selectedId, activityTurnId, activityRetry]);
+    let current = true;
+    invoke<unknown>("list_conversation_turn_activity", {
+      workspaceId, conversationId: selectedId, turnId: activityTurnId, retryOrdinal: activityRetry,
+    }).then(page => {
+      const entries = parseActivityPage(page, activityTurnId, activityRetry);
+      if (current && entries) setStoredActivity({ key, entries });
+    }).catch(() => { /* activity is an aid; the transcript and turn state stay authoritative */ });
+    return () => { current = false; };
+  }, [workspaceId, selectedId, activityTurnId, activityRetry, activityStatus]);
+  const activityKey = activityTurnId && selectedId ? JSON.stringify([workspaceId, selectedId, activityTurnId, activityRetry]) : null;
+  const liveActivity = activityTurnId && selectedId
+    ? currentPresentationStream?.activities[JSON.stringify([selectedId, activityTurnId, activityRetry])]?.entries ?? []
+    : [];
+  const activityEntries = mergeActivity(storedActivity && storedActivity.key === activityKey ? storedActivity.entries : [], liveActivity);
+
   const transientStreaming = transientTurns.some(t => t.state === "STREAMING" || t.state === "RECONNECTING");
   // Every nonterminal status, a visible streamed turn and an in-flight submit (including the gap
   // after the 202 and before OPEN is projected) occupy the composer (001-T18, AC-024).
@@ -996,6 +1023,12 @@ export function ConversationsPage({
                 </article>
               ))}
 
+              {activityEntries.length > 0 && !retrying && (
+                <article className="message-row agent turn-activity-row">
+                  <div className="message-assistant-wrap"><div className="message-assistant-body"><TurnActivityView entries={activityEntries} /></div></div>
+                </article>
+              )}
+
               {transientTurns.map(turn => (
                 <article
                   className="message-row agent transient"
@@ -1015,6 +1048,7 @@ export function ConversationsPage({
                   <div className="message-assistant-wrap">
                     <div className="message-assistant-body turn-failed-card">
                       <p><strong>This turn failed.</strong> {retryReasonLabel(retrying.reason_code)} Your message was kept.</p>
+                      <TurnActivityView entries={activityEntries} />
                       <button
                         className="quiet-button"
                         type="button"

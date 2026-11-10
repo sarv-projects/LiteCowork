@@ -16,6 +16,9 @@
       "$ref": "#/$defs/turn_settled"
     },
     {
+      "$ref": "#/$defs/turn_activity"
+    },
+    {
       "$ref": "#/$defs/rich_draft"
     },
     {
@@ -522,6 +525,23 @@
           "minLength": 1,
           "maxLength": 32768
         }
+      },
+      "additionalProperties": false
+    },
+    "turn_activity": {
+      "type": "object",
+      "required": ["type", "workspace_id", "conversation_id", "turn_id", "retry_ordinal", "sequence", "kind", "status", "call_ref", "label"],
+      "properties": {
+        "type": {"const": "turn.activity"},
+        "workspace_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "conversation_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "turn_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "retry_ordinal": {"type": "integer", "minimum": 0},
+        "sequence": {"type": "integer", "minimum": 1, "maximum": 200},
+        "kind": {"enum": ["TOOL", "FILE", "PERMISSION", "TODO", "STEP", "CONTEXT"]},
+        "status": {"enum": ["STARTED", "PROGRESS", "SUCCEEDED", "FAILED", "ASKED", "UPDATED", "ENDED", "REDUCED"]},
+        "call_ref": {"type": ["string", "null"], "maxLength": 128},
+        "label": {"type": ["string", "null"], "maxLength": 128}
       },
       "additionalProperties": false
     },

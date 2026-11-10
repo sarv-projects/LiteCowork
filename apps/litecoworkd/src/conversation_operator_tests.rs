@@ -1862,6 +1862,46 @@ async fn conversation_stop_and_retry_failed_turn_lifecycle() {
 }
 
 #[tokio::test]
+async fn turn_activity_records_route_returns_reported_rows_scoped_to_the_turn_attempt() {
+    let fixture = turn_command_fixture("turn-activity-route-workspace");
+    fixture.seed_turn("turn-activity", "RUNNING", 2, 0);
+    for (sequence, kind, status, label) in [(2, "TOOL", "SUCCEEDED", None), (1, "TOOL", "STARTED", Some("bash"))] {
+        fixture
+            .connection()
+            .execute(
+                "INSERT INTO conversation_turn_activity_records(activity_id,turn_id,retry_ordinal,conversation_id,sequence,kind,status,call_ref,label,created_at) VALUES(?1,'turn-activity',0,?2,?3,?4,?5,'call-1',?6,'2026-10-15T12:00:04.000000000Z')",
+                rusqlite::params![format!("a-{sequence}"), fixture.conversation_id, sequence, kind, status, label],
+            )
+            .expect("seed activity");
+    }
+    let get = |workspace: &'static str, uri: String| {
+        let mut request = Request::get(uri)
+            .header("x-workspace-id", workspace)
+            .body(Body::empty())
+            .expect("activity request");
+        request.extensions_mut().insert(AuthenticatedLocalPeer);
+        let router = fixture.router.clone();
+        async move { router.oneshot(request).await.expect("activity route responds") }
+    };
+    let uri = format!("/v1/conversations/{}/turns/turn-activity/activity", fixture.conversation_id);
+    let response = get(WORKSPACE_A, uri.clone()).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = to_bytes(response.into_body(), 64 * 1024).await.expect("body");
+    let page: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
+    assert_eq!(page["attribution"], "REPORTED");
+    assert_eq!(page["items"].as_array().expect("items").len(), 2);
+    assert_eq!(page["items"][0]["sequence"], 1);
+    assert_eq!(page["items"][0]["label"], "bash");
+
+    // Another retry ordinal has no records, and another Workspace cannot read this one.
+    let other_attempt = get(WORKSPACE_A, format!("{uri}?retry_ordinal=1")).await;
+    let bytes = to_bytes(other_attempt.into_body(), 64 * 1024).await.expect("body");
+    assert!(serde_json::from_slice::<serde_json::Value>(&bytes).expect("json")["items"].as_array().expect("items").is_empty());
+    let foreign = get(WORKSPACE_B, uri).await;
+    assert_eq!(foreign.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn conversation_retry_is_refused_while_another_turn_is_in_flight() {
     let fixture = turn_command_fixture("turn-retry-in-flight-workspace");
     fixture.seed_turn("turn-old-failed", "FAILED", 3, 0);

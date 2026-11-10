@@ -303,6 +303,7 @@ POST /v1/conversations/{id}/messages
 POST /v1/conversations/{id}/turns
 POST /v1/conversations/{id}/turns/{turn_id}/retry
 POST /v1/conversations/{id}/turns/{turn_id}/cancel
+GET  /v1/conversations/{id}/turns/{turn_id}/activity?retry_ordinal=
 GET  /v1/conversations/{id}/messages?cursor=
 GET  /v1/conversations/{id}/presentation?cursor=&limit=
 GET  /v1/rich-presentations/{presentation_id}
@@ -313,6 +314,9 @@ Implementation status (source audit reconciled 2026-11-06). Message append/list 
 operations remain **target-only**: they are declared in OpenAPI but no handler is mounted.
 The mounted Conversation routes include create/list/get, AgentBinding mutation,
 presentation/rich-presentation/tasks, and the three turn routes below.
+`GET .../turns/{turn_id}/activity` is SERVED (read-only): bounded, ordered REPORTED activity
+observations (tool, file, permission, todo, step) the native agent said it performed, so the UI can
+rebuild activity cards after restart. They are never Effects, receipts or grants (001-T25, AC-029).
 
 The context package builder, SQLite turn-prefix reader, STARTING reservation,
 `activate_conversation_agent_session`, and atomic final-response writer exist in the active

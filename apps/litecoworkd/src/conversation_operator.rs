@@ -128,6 +128,10 @@ where
             post(submit_conversation_turn),
         )
         .route(
+            "/v1/conversations/{conversation_id}/turns/{turn_id}/activity",
+            get(list_conversation_turn_activity),
+        )
+        .route(
             "/v1/conversations/{conversation_id}/turns/{turn_id}/retry",
             post(retry_conversation_turn),
         )
@@ -363,6 +367,64 @@ async fn get_conversation(
     .map_err(|_| internal())?
     .map_err(map_store_error)?;
     record.map(Json).ok_or_else(not_found)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TurnActivityQuery {
+    retry_ordinal: Option<u32>,
+}
+
+#[derive(Serialize)]
+struct TurnActivityPage {
+    turn_id: String,
+    retry_ordinal: u32,
+    /// Always `REPORTED`: these are the native agent's own statements, never Effects.
+    attribution: &'static str,
+    items: Vec<storage_core::conversation::ConversationActivityRecord>,
+}
+
+/// Read-only, bounded, ordered REPORTED activity observations for one turn attempt
+/// (001-T25, AC-029). The records let the UI rebuild activity cards after a restart.
+async fn list_conversation_turn_activity(
+    State(state): State<ConversationApiState>,
+    Path((conversation_id, turn_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Query(query): Query<TurnActivityQuery>,
+) -> Result<Response, Response> {
+    let workspace_id = selected_workspace(&headers)?;
+    if !valid_task_query_id(&turn_id) {
+        return Err(error(
+            StatusCode::BAD_REQUEST,
+            "INVALID_ARGUMENT",
+            "Turn ID is invalid",
+        ));
+    }
+    load_authorized_conversation(&state, &workspace_id, &conversation_id).await?;
+    let retry_ordinal = query.retry_ordinal.unwrap_or(0);
+    let store = state.store.clone();
+    let turn_for_read = turn_id.clone();
+    let items = tokio::task::spawn_blocking(move || {
+        SqliteConversationStore::new(store).list_conversation_turn_activity(
+            &workspace_id,
+            &conversation_id,
+            &turn_for_read,
+            retry_ordinal,
+            storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT,
+        )
+    })
+    .await
+    .map_err(|_| internal())?
+    .map_err(map_store_error)?;
+    Ok(no_store(
+        Json(TurnActivityPage {
+            turn_id,
+            retry_ordinal,
+            attribution: "REPORTED",
+            items,
+        })
+        .into_response(),
+    ))
 }
 
 async fn submit_conversation_turn(

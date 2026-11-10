@@ -10,8 +10,8 @@ integrated or qualified. The authority chain is in docs/README.md. Current sourc
 evidence is in docs/IMPLEMENTATION-STATUS.md.
 
 - Included files: 364
-- Included lines: 72604
-- Included bytes: 6398392
+- Included lines: 72655
+- Included bytes: 6411276
 - Per-file SHA-256: docs/audit/active-corpus-manifest.csv
 - This manifest excludes itself to avoid a self-referential hash/count.
 - reading/ contains derived audit snapshots and is intentionally excluded.
@@ -25,8 +25,8 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | apps/ | 3 | 273 |
 | capabilities/ | 1 | 133 |
 | crates/ | 1 | 137 |
-| docs/ | 144 | 48340 |
-| repository root | 6 | 1677 |
+| docs/ | 144 | 48388 |
+| repository root | 6 | 1680 |
 | scripts/ | 1 | 14 |
 | specs/ | 201 | 21793 |
 
@@ -44,7 +44,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | AGENTS.md | 118 | 9080 | 63d7f2acf5a2a191 |
 | ARCHITECTURE.md | 803 | 56649 | 370f19d571ec7deb |
 | CONTRIBUTING.md | 81 | 6032 | 2fc07511243a861e |
-| CURRENT-RUN.md | 291 | 42064 | 7e4ccf8efc63c248 |
+| CURRENT-RUN.md | 294 | 43251 | 4eabadda92474593 |
 | GLOSSARY.md | 292 | 12637 | bd9ffa34cb5ee0a0 |
 | README.md | 92 | 7389 | 5a5a73e85c542f17 |
 | apps/litecowork-ui/README.md | 77 | 4351 | c47d822925a4b15b |
@@ -56,7 +56,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/AGENT-ACCOUNT-ROUTE-MATRIX.md | 105 | 13947 | 4c6732bf0ea16f6e |
 | docs/AGENT-CONTROL.md | 1347 | 55342 | 6700424469327bdb |
 | docs/AGENT-FABRIC.md | 497 | 32590 | 2a40c04496cfb4ec |
-| docs/API.md | 2415 | 170575 | 8b620fe8d2fca392 |
+| docs/API.md | 2420 | 171097 | 46842e7a8401193d |
 | docs/ARTIFACTS-EVIDENCE.md | 378 | 23528 | 578bcdabd6d2a17d |
 | docs/AUTOMATION.md | 705 | 41619 | 015fc6660d91eb00 |
 | docs/BENCHMARKS.md | 754 | 45114 | 42f307511fe0d5ac |
@@ -70,7 +70,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/CONNECTOR-FACTORY-DESIGN.md | 139 | 10873 | 6212797fb13b160f |
 | docs/CONNECTORS-WORKFLOWS.md | 1020 | 50069 | 61c9453212502f75 |
 | docs/CONTEXT.md | 272 | 19955 | f80c31cda1a4c7aa |
-| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 171 | 77263 | 551ab9dbfd5360f3 |
+| docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md | 171 | 77263 | 570b8027db6b3a0b |
 | docs/COVERAGE-MATRIX.md | 174 | 25381 | 9a370eb0721ef07c |
 | docs/COWORKER-FLOWS.md | 166 | 20076 | 309015aa4fe4a14a |
 | docs/COWORKERS-TARGET.md | 456 | 58061 | 3afdfb6005644afe |
@@ -80,21 +80,21 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/DESIGN-SYSTEM.md | 532 | 36016 | 7627e7f97848794a |
 | docs/DESKTOP-REFERENCE-IMPLEMENTATION-AUDIT.md | 196 | 26038 | 7f263349a5b4d436 |
 | docs/DESKTOP-SHELL-LLD.md | 275 | 29171 | 8589424b2b164b09 |
-| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | 2697aa7c41e087bc |
+| docs/DOCS-REAUDIT-2026.md | 122 | 13685 | ef346a2a2ab369f8 |
 | docs/ENVIRONMENTS.md | 435 | 24997 | 02ec0270d13db966 |
-| docs/EVENTS.md | 929 | 69386 | b86ea96d470d6ac2 |
+| docs/EVENTS.md | 929 | 69386 | e4aae09464d8030b |
 | docs/EXPERIENCE.md | 1096 | 77409 | acdb24b092c2e914 |
 | docs/FAILURE-RECOVERY.md | 213 | 17867 | 71418bc2b863c859 |
-| docs/FEATURE-AND-UI-CONTRACT-COVERAGE.md | 137 | 21086 | 53b9b565f90bbd0e |
+| docs/FEATURE-AND-UI-CONTRACT-COVERAGE.md | 137 | 21086 | 21343252489808be |
 | docs/FLOWS.md | 4513 | 319382 | 47817b00c268f83b |
 | docs/HOST-GUIDANCE.md | 138 | 5902 | c2a6b68146651635 |
 | docs/IMPLEMENTATION-MASTER-PLAN.md | 168 | 12860 | e901a943fa3b9ad6 |
-| docs/IMPLEMENTATION-STATUS.md | 309 | 62130 | 48dc764fac6777b1 |
+| docs/IMPLEMENTATION-STATUS.md | 309 | 62130 | d32a9af328f3a777 |
 | docs/IMPLEMENTATION.md | 232 | 9336 | c9dbf532b8948bbc |
 | docs/INTELLIGENT-UI-AND-IMAGE-CONTENT.md | 334 | 14062 | 7c876ce6b07697ca |
 | docs/INTERACTIVE-ARTIFACT-RUNTIME.md | 135 | 20237 | 6d5d6bd44fb9dd82 |
 | docs/LEARNING.md | 818 | 37094 | ad064961a3f69b5e |
-| docs/LITECOWORK-BUILD-TASKS.md | 244 | 17996 | 19bc665bd4e0e481 |
+| docs/LITECOWORK-BUILD-TASKS.md | 244 | 18061 | a8b181b12b4d7a32 |
 | docs/LITESPM-INTEGRATION-PLAN.md | 191 | 17575 | 6733e01124489db5 |
 | docs/LITESPM-INTEGRATION-STUDY-2026-11.md | 81 | 14288 | 29a0f78ec96dd977 |
 | docs/LITESPM-LITECOWORK-INTEROP-LLD.md | 289 | 32052 | b7d8effeaed325b7 |
@@ -106,7 +106,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/OPEN-DESIGN-CAPABILITY-DEEP-DIVE-2026-11.md | 66 | 12012 | d734504079895f10 |
 | docs/OPENBOT-REFERENCE-IMPLEMENTATION-STUDY.md | 279 | 29919 | 2bf520dce2718a2e |
 | docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md | 137 | 23857 | 4bb371e948d920c8 |
-| docs/PRESENTATION-RUNTIME.md | 533 | 31633 | 4003073b58c690de |
+| docs/PRESENTATION-RUNTIME.md | 571 | 32726 | f58225851c588270 |
 | docs/PRODUCT-CONTRACT-INDEX.md | 38 | 6373 | 265eef23bbd47c0f |
 | docs/PRODUCT-STRATEGY.md | 113 | 10724 | 8e39b7022710cfef |
 | docs/PRODUCT.md | 254 | 16913 | 76a270f4af39c91c |
@@ -126,14 +126,14 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | docs/RUNTIME-MESH.md | 744 | 36915 | 5df0580b7369d59d |
 | docs/SCHEMAS.md | 1631 | 74000 | b33cf6312eae963e |
 | docs/SECURITY.md | 299 | 17184 | 77bdfeb2b19ebbfa |
-| docs/SEMANTIC-SERVED-UI-MAP.md | 184 | 30911 | 9c7a8da909e9a75c |
+| docs/SEMANTIC-SERVED-UI-MAP.md | 185 | 31230 | 467123d5c22bcf17 |
 | docs/SERVICES.md | 1582 | 101551 | 43c93b0fb23f464f |
 | docs/SETTINGS-AND-SHELL-SURFACE-AUDIT.md | 111 | 18984 | e5d28f0061fcff69 |
 | docs/SOURCE-RECONCILIATION.md | 179 | 16220 | 5567fad3a3b603ea |
 | docs/SPEC-TASK-TRACEABILITY.md | 103 | 10365 | a4c230a6e1155ac2 |
 | docs/SPECIFICATION-STANDARD.md | 134 | 10792 | f2cf584a47acdda7 |
 | docs/STATE-MACHINES.md | 1447 | 92581 | 081c280f4022da8f |
-| docs/STORAGE.md | 1350 | 100011 | 68334fd1b3bc81da |
+| docs/STORAGE.md | 1354 | 100374 | 32c890650e234ce1 |
 | docs/SUPERSET-GAP-MATRIX.md | 192 | 29782 | 12b4a1a8279829fc |
 | docs/TASK-RUNTIME.md | 760 | 44849 | d8b8237e3a772882 |
 | docs/TESTING.md | 538 | 47339 | a106856e125d6989 |
@@ -202,7 +202,7 @@ evidence is in docs/IMPLEMENTATION-STATUS.md.
 | specs/001-conversation-session-supervisor/README.md | 30 | 3880 | b6531e9ee31f6dc3 |
 | specs/001-conversation-session-supervisor/RESEARCH.md | 102 | 14808 | c384b7f5c45b8890 |
 | specs/001-conversation-session-supervisor/SPEC.md | 385 | 54748 | 93ea63a3227d1868 |
-| specs/001-conversation-session-supervisor/TASKS.md | 554 | 68457 | a952f9b1361ea664 |
+| specs/001-conversation-session-supervisor/TASKS.md | 554 | 77792 | 8e6eacf1729aebc4 |
 | specs/001-conversation-session-supervisor/contracts/README.md | 12 | 841 | db996aef02f977b4 |
 | specs/001-conversation-session-supervisor/contracts/api-events.md | 63 | 6530 | 7579c4b6b3b0b386 |
 | specs/001-conversation-session-supervisor/contracts/errors-recovery.md | 78 | 9090 | 47de1c535b262d4f |

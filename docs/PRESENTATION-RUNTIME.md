@@ -204,6 +204,25 @@ These frames:
   hidden reasoning; normal output safety/redaction policy still applies;
 - are reconciled against the committed message after turn settlement;
 - are not replayed as new activity after reconnect or historical hydration.
+
+Activity the native agent reports during a turn is sent as a separate bounded transient frame:
+
+```text
+TurnActivityFrame {
+  type: "turn.activity"
+  workspace_id, conversation_id, turn_id, retry_ordinal   # same correlation as turn.delta
+  sequence: u32                 # 1..200, monotonic per (turn_id, retry_ordinal)
+  kind: TOOL | FILE | PERMISSION | TODO | STEP | CONTEXT
+  status: STARTED | SUCCEEDED | FAILED | ASKED | UPDATED | ENDED | REDUCED
+  call_ref: string | null       # sanitized correlation word, never a native handle
+  label: string | null          # sanitized tool name, or the todo count; never a path, argument or output
+}
+```
+
+Each frame is published only after its REPORTED record is stored (`conversation_turn_activity_records`,
+read back by `GET /v1/conversations/{id}/turns/{turn_id}/activity`), so activity reconstructs after
+restart. It is an observation of what the agent said it did, never a LiteCowork Effect, receipt or
+grant. Tool progress is not recorded. The todo list carries a count only; item text is not captured.
 
 The Operator/API contract advertises a finite maximum frame size and applies backpressure;
 agents are not streamed one model token per frame. The UI keeps a bounded partial buffer.

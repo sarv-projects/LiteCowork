@@ -1,4 +1,5 @@
 import { parsePresentationItem, type PresentationItem } from "./presentation-types.ts";
+import { parseActivityEntry, MAX_ACTIVITY_ENTRIES, type ActivityEntry } from "../conversations/turn-activity.ts";
 import { mergeConversationStreamSnapshot, parseConversationSnapshot, type ConversationSnapshotView } from "../conversations/conversation-view.ts";
 
 /** Transport frames are untrusted and only update an ephemeral rendering projection. */
@@ -8,6 +9,7 @@ export type PresentationFrame =
   | { type: "stream.resync_required"; workspace_id: string; reason: string }
   | { type: "turn.delta"; workspace_id: string; conversation_id: string; turn_id: string; retry_ordinal: number; sequence: number; text_delta: string }
   | { type: "turn.settled"; workspace_id: string; conversation_id: string; turn_id: string; retry_ordinal: number; committed_message_id?: string }
+  | { type: "turn.activity"; workspace_id: string; conversation_id: string; turn_id: string; retry_ordinal: number; sequence: number; kind: string; status: string; call_ref: string | null; label: string | null }
   | { type: "rich.draft"; workspace_id: string; conversation_id: string; turn_id: string; retry_ordinal: number; agent_session_id: string; draft_id: string; sequence: number; event: string; payload: unknown };
 
 export type TransientTurn = {
@@ -17,6 +19,14 @@ export type TransientTurn = {
   text: string;
   lastSequence: number;
   state: "STREAMING" | "RECONNECTING" | "INCOMPLETE";
+};
+
+/** REPORTED activity for one turn attempt; transient until read back from the stored records. */
+export type TurnActivity = {
+  conversationId: string;
+  turnId: string;
+  retryOrdinal: number;
+  entries: ActivityEntry[];
 };
 
 export type RichDraftBlock = {
@@ -56,6 +66,7 @@ export type PresentationStreamState = {
   conversationSnapshot: ConversationSnapshotView | null;
   itemRevisions: Record<string, number>;
   turns: Record<string, TransientTurn>;
+  activities: Record<string, TurnActivity>;
   drafts: Record<string, RichDraft>;
   retryFences: Record<string, number>;
   settledRetries: Record<string, number>;
@@ -63,7 +74,7 @@ export type PresentationStreamState = {
 
 export const emptyPresentationStream: PresentationStreamState = {
   ready: false, resyncRequired: false, snapshotReady: false, workspaceId: null, projectionVersion: null,
-  projectionRevision: 0, cursor: null, maxFrameBytes: 0, items: [], conversationSnapshot: null, itemRevisions: {}, turns: {}, drafts: {}, retryFences: {}, settledRetries: {},
+  projectionRevision: 0, cursor: null, maxFrameBytes: 0, items: [], conversationSnapshot: null, itemRevisions: {}, turns: {}, activities: {}, drafts: {}, retryFences: {}, settledRetries: {},
 };
 
 const MAX_FRAME_BYTES = 1024 * 1024;
@@ -148,7 +159,7 @@ export function reducePresentationFrame(
     if (!exactKeys(f, ["type", "workspace_id", "reason"]) || !state.ready || f.workspace_id !== state.workspaceId || typeof f.reason !== "string" || f.reason.length === 0) return state;
     // The authenticated transport remains live. Preserve its ready state while
     // fencing the old cursor until the replacement projection snapshot arrives.
-    return { ...state, resyncRequired: true, snapshotReady: false, cursor: null, items: [], conversationSnapshot: null, itemRevisions: {}, turns: {}, drafts: {}, retryFences: {}, settledRetries: {} };
+    return { ...state, resyncRequired: true, snapshotReady: false, cursor: null, items: [], conversationSnapshot: null, itemRevisions: {}, turns: {}, activities: {}, drafts: {}, retryFences: {}, settledRetries: {} };
   }
   if (!state.ready) return state;
   if (f.type === "projection") {
@@ -294,6 +305,28 @@ export function reducePresentationFrame(
     const activeDraft = drafts[baseKey];
     if (activeDraft && (f.retry_ordinal as number) > activeDraft.retryOrdinal) delete drafts[baseKey];
     return { ...state, turns, drafts, retryFences: setRetryFence(state.retryFences, baseKey, f.retry_ordinal as number) };
+  }
+  if (f.type === "turn.activity") {
+    if (!exactKeys(f, ["type", "workspace_id", "conversation_id", "turn_id", "retry_ordinal", "sequence", "kind", "status", "call_ref", "label"]) || !state.snapshotReady) return state;
+    if (f.workspace_id !== state.workspaceId || !text(f.conversation_id, 256) || !text(f.turn_id, 256)
+      || (expectedScope !== undefined && f.conversation_id !== expectedScope.conversationId)
+      || !Number.isSafeInteger(f.retry_ordinal) || (f.retry_ordinal as number) < 0) return state;
+    const entry = parseActivityEntry(f);
+    if (!entry) return state;
+    const key = turnKey(f.conversation_id, f.turn_id, f.retry_ordinal as number);
+    const previous = state.activities[key];
+    // A repeated or older sequence is ignored; a gap is tolerated because each entry is
+    // an independent observation (the stored records fill any hole on the next read).
+    if (previous && previous.entries.some((existing) => existing.sequence >= entry.sequence)) return state;
+    if (!previous && Object.keys(state.activities).length >= MAX_RETAINED_TURNS) return state;
+    if (previous && previous.entries.length >= MAX_ACTIVITY_ENTRIES) return state;
+    const next: TurnActivity = {
+      conversationId: f.conversation_id,
+      turnId: f.turn_id,
+      retryOrdinal: f.retry_ordinal as number,
+      entries: [...(previous?.entries ?? []), entry],
+    };
+    return { ...state, activities: { ...state.activities, [key]: next } };
   }
   if (f.type === "turn.settled") {
     if (!exactKeys(f, ["type", "workspace_id", "conversation_id", "turn_id", "retry_ordinal", ...(Object.hasOwn(f, "committed_message_id") ? ["committed_message_id"] : [])])

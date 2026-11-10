@@ -210,6 +210,134 @@ impl TurnObserver for TurnFramePublisher {
     }
 }
 
+/// Receives each REPORTED activity observation for persistence. Failures are swallowed
+/// by the recorder: activity is an observation aid and must never fail a turn.
+pub(crate) type ActivitySink =
+    Box<dyn Fn(storage_core::conversation::ConversationActivityRecord) -> bool + Send>;
+
+/// Turns tool, file, permission, todo and step events into transient `turn.activity`
+/// frames and REPORTED activity records (001-T25, AC-029). Records carry only a bounded
+/// display word, never a path, argument, output or reasoning text, and are never Effects.
+pub(crate) struct TurnActivityRecorder {
+    bus: TransientFrameBus,
+    workspace_id: String,
+    conversation_id: String,
+    turn_id: String,
+    retry_ordinal: u32,
+    sequence: u32,
+    sink: ActivitySink,
+}
+
+/// A bounded display word: ASCII letters, digits and `_ - . :` only, at most 64 bytes.
+fn activity_label(raw: &str) -> Option<String> {
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | ':'))
+        .take(64)
+        .collect();
+    (!cleaned.is_empty()).then_some(cleaned)
+}
+
+fn activity_call_ref(raw: &str) -> Option<String> {
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | ':'))
+        .take(128)
+        .collect();
+    (!cleaned.is_empty()).then_some(cleaned)
+}
+
+impl TurnActivityRecorder {
+    pub(crate) fn new(
+        bus: TransientFrameBus,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        retry_ordinal: u32,
+        sink: ActivitySink,
+    ) -> Self {
+        Self {
+            bus,
+            workspace_id: workspace_id.to_owned(),
+            conversation_id: conversation_id.to_owned(),
+            turn_id: turn_id.to_owned(),
+            retry_ordinal,
+            sequence: 0,
+            sink,
+        }
+    }
+
+    fn record(&mut self, kind: &str, status: &str, call_ref: Option<String>, label: Option<String>) {
+        if self.sequence as usize >= storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT {
+            return;
+        }
+        self.sequence += 1;
+        let record = storage_core::conversation::ConversationActivityRecord {
+            turn_id: self.turn_id.clone(),
+            retry_ordinal: self.retry_ordinal,
+            conversation_id: self.conversation_id.clone(),
+            sequence: self.sequence,
+            kind: kind.to_owned(),
+            status: status.to_owned(),
+            call_ref,
+            label,
+            created_at: crate::agents::supervisor::canonical_now(),
+        };
+        let frame = json!({
+            "type": "turn.activity",
+            "workspace_id": self.workspace_id,
+            "conversation_id": self.conversation_id,
+            "turn_id": self.turn_id,
+            "retry_ordinal": self.retry_ordinal,
+            "sequence": record.sequence,
+            "kind": record.kind,
+            "status": record.status,
+            "call_ref": record.call_ref,
+            "label": record.label,
+        });
+        // Persist first so a frame never advertises activity that cannot be reconstructed.
+        if !(self.sink)(record) {
+            return;
+        }
+        if let Ok(bytes) = serde_json::to_vec(&frame) {
+            self.bus.publish(TransientFrame {
+                workspace_id: self.workspace_id.clone(),
+                conversation_id: self.conversation_id.clone(),
+                bytes,
+            });
+        }
+    }
+}
+
+impl TurnObserver for TurnActivityRecorder {
+    fn on_event(&mut self, event: &NormalizedAgentEvent) {
+        use crate::agents::normalizer::ToolOutcome;
+        match event {
+            NormalizedAgentEvent::ToolCalled { tool, call_id } => {
+                self.record("TOOL", "STARTED", activity_call_ref(call_id), activity_label(tool));
+            }
+            NormalizedAgentEvent::ToolSettled { call_id, outcome } => {
+                let status = if *outcome == ToolOutcome::Succeeded { "SUCCEEDED" } else { "FAILED" };
+                self.record("TOOL", status, activity_call_ref(call_id), None);
+            }
+            NormalizedAgentEvent::PermissionAsked { permission_id } => {
+                self.record("PERMISSION", "ASKED", activity_call_ref(permission_id), None);
+            }
+            NormalizedAgentEvent::FileChanged { .. } => self.record("FILE", "UPDATED", None, None),
+            NormalizedAgentEvent::TodoUpdated { count } => {
+                self.record("TODO", "UPDATED", None, Some(count.min(&1000).to_string()));
+            }
+            NormalizedAgentEvent::StepStarted => self.record("STEP", "STARTED", None, None),
+            NormalizedAgentEvent::StepEnded => self.record("STEP", "ENDED", None, None),
+            // ToolProgress, text, reasoning and usage are not activity records: progress
+            // is noise against the per-attempt cap and the others have their own paths.
+            _ => {}
+        }
+    }
+
+    fn finish(&mut self) {}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,5 +462,62 @@ mod tests {
         let frames = drain(&mut rx);
         assert_eq!(frames[0]["type"], "turn.settled");
         assert_eq!(frames[0]["committed_message_id"], "msg-1");
+    }
+
+    #[test]
+    fn turn_activity_records_publish_frames_and_persist_reported_rows_without_content() {
+        use crate::agents::normalizer::ToolOutcome;
+        let bus = TransientFrameBus::new();
+        let mut rx = bus.subscribe();
+        let stored = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink_store = stored.clone();
+        let mut recorder = TurnActivityRecorder::new(
+            bus.clone(),
+            "ws",
+            "conv",
+            "turn",
+            1,
+            Box::new(move |record| {
+                sink_store.lock().unwrap().push(record);
+                true
+            }),
+        );
+        recorder.on_event(&NormalizedAgentEvent::ToolCalled { tool: "ba sh/../x".into(), call_id: "call-1".into() });
+        recorder.on_event(&NormalizedAgentEvent::ToolProgress { call_id: "call-1".into() });
+        recorder.on_event(&NormalizedAgentEvent::ToolSettled { call_id: "call-1".into(), outcome: ToolOutcome::Failed });
+        recorder.on_event(&NormalizedAgentEvent::FileChanged { path_present: true });
+        recorder.on_event(&NormalizedAgentEvent::TodoUpdated { count: 3 });
+        recorder.on_event(&NormalizedAgentEvent::PermissionAsked { permission_id: "perm-1".into() });
+        recorder.on_event(&NormalizedAgentEvent::TextDelta { text: "ignored".into() });
+
+        let frames = drain(&mut rx);
+        assert_eq!(frames.len(), 5, "progress and text are not activity");
+        for (index, frame) in frames.iter().enumerate() {
+            assert_eq!(frame["type"], "turn.activity");
+            assert_eq!(frame["retry_ordinal"], 1);
+            assert_eq!(frame["sequence"], index as u64 + 1);
+        }
+        assert_eq!(frames[0]["label"], "bash..x", "label keeps only safe characters");
+        assert_eq!(frames[1]["status"], "FAILED");
+        let rows = stored.lock().unwrap();
+        assert_eq!(rows.len(), 5);
+        assert_eq!(rows[3].kind, "TODO");
+        assert_eq!(rows[3].label.as_deref(), Some("3"));
+        assert!(rows.iter().all(|r| r.kind != "EFFECT"));
+    }
+
+    #[test]
+    fn turn_activity_records_are_bounded_and_a_failed_persist_publishes_nothing() {
+        let bus = TransientFrameBus::new();
+        let mut rx = bus.subscribe();
+        let mut refusing = TurnActivityRecorder::new(bus.clone(), "ws", "conv", "turn", 0, Box::new(|_| false));
+        refusing.on_event(&NormalizedAgentEvent::StepStarted);
+        assert!(drain(&mut rx).is_empty());
+
+        let mut capped = TurnActivityRecorder::new(bus.clone(), "ws", "conv", "turn", 0, Box::new(|_| true));
+        for _ in 0..(storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT + 20) {
+            capped.on_event(&NormalizedAgentEvent::StepStarted);
+        }
+        assert_eq!(drain(&mut rx).len(), storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT);
     }
 }
