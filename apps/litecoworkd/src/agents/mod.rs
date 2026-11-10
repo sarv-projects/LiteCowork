@@ -22,6 +22,7 @@ mod opencode_profile_probe;
 mod opencode_server;
 mod planning;
 pub(crate) mod supervisor;
+pub(crate) mod turn_coordinator;
 
 pub(crate) use supervisor::AgentSessionSupervisor;
 

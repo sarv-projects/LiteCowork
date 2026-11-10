@@ -1,6 +1,7 @@
 //! Authenticated local Conversation catalog lifecycle and turn routes (submit, retry,
 //! cancel). Submit commits the USER message, OPEN turn and dispatch intent atomically and
-//! then hands the turn to the `AgentSessionSupervisor`; without a supervisor the turn is
+//! returns 202; native work (today the OpenCode v2.0.32 adapter path only) starts through
+//! `AgentTurnCoordinator`, never directly from a handler. Without a supervisor the turn is
 //! settled FAILED and the Operator reports the dependency as unavailable.
 // Route handlers intentionally return full Axum Responses to preserve status, body, and headers.
 #![allow(clippy::result_large_err)]
@@ -561,24 +562,11 @@ async fn submit_conversation_turn(
     .map_err(map_store_error)?;
 
     if let Some(ref supervisor) = state.supervisor {
-        let supervisor = supervisor.clone();
         let turn = committed.turn.clone();
-        let pid = principal_id.clone();
-        let wid = workspace_id.clone();
-        let cid = conversation_id.clone();
         let tid = turn.turn_id.clone();
-        let tid_spawn = tid.clone();
         let cor = correlation_id.clone();
-        let cor_dispatch = cor.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = supervisor
-                .dispatch_turn(&pid, &wid, &cid, turn, &cor_dispatch)
-                .await
-            {
-                eprintln!("Supervisor dispatch_turn failed for turn {tid_spawn}: {e}");
-            }
-        });
+        crate::agents::turn_coordinator::AgentTurnCoordinator::new(supervisor.clone())
+            .dispatch_admitted_turn(&principal_id, &workspace_id, &conversation_id, turn, &cor);
 
         let receipt = ConversationTurnReceipt {
             turn_id: tid,
@@ -778,22 +766,14 @@ async fn retry_conversation_turn(
     .map_err(map_store_error)?;
 
     if let Some(ref supervisor) = state.supervisor {
-        let supervisor = supervisor.clone();
-        let turn_to_dispatch = updated_turn.clone();
-        let pid = state.principal_id.clone();
-        let wid = workspace_id.clone();
-        let cid = conversation_id.clone();
-        let tid = turn_id.clone();
-        let cor_dispatch = correlation_id.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = supervisor
-                .dispatch_turn(&pid, &wid, &cid, turn_to_dispatch, &cor_dispatch)
-                .await
-            {
-                eprintln!("Supervisor retry dispatch_turn failed for turn {tid}: {e}");
-            }
-        });
+        crate::agents::turn_coordinator::AgentTurnCoordinator::new(supervisor.clone())
+            .dispatch_admitted_turn(
+                &state.principal_id,
+                &workspace_id,
+                &conversation_id,
+                updated_turn.clone(),
+                &correlation_id,
+            );
     }
 
     let receipt = ConversationTurnReceipt {

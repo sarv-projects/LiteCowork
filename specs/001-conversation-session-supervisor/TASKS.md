@@ -365,7 +365,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T20 - Fix the stale Operator header and extract the shared dispatch admission path
 
-- **Status:** NOT STARTED - `conversation_operator.rs` lines 1-2 claim dispatch is absent; `submit_conversation_turn` and `retry_conversation_turn` each hold a copied `tokio::spawn` + `eprintln!` dispatch block, and no `AgentTurnCoordinator` exists (SPEC L-07 target).
+- **Status:** DONE - the module header now describes the OpenCode-only dispatch path; `agents/turn_coordinator.rs` adds `AgentTurnCoordinator::dispatch_admitted_turn`, the single entry both submit and retry use (no handler calls `dispatch_turn` or `tokio::spawn` directly). The coordinator drives the supervisor, which claims the durable intent (T10) before reserving a session; admission still commits first and the T08 sweep owns crash leftovers. The copied `eprintln!` blocks are replaced by `dispatch_diagnostic`, which emits only turn id, correlation id and a coarse error class (text before the first `:`, `{` or `(`, at most 48 safe characters). Evidence: `conversation_turn_dispatch_diagnostic_carries_ids_and_class_but_no_detail` and the 25 existing `conversation_turn*`/`conversation_stop*`/`conversation_retry*`/`conversation_cancel*` tests pass; `cargo clippy -p litecoworkd` reports no warnings in the touched modules (the crate-wide `-D warnings` run was not completed). Diagnostics are still plain `eprintln!`, not a structured logger; there is no log-capture harness.
 - **Depends on:** T10
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, Agent Runtime.
