@@ -80,12 +80,13 @@ Product and design, in order:
 Current truth and status:
 
 - [Current implementation and release status](docs/IMPLEMENTATION-STATUS.md)
+- [Next-agent handoff (environment, commands, baselines, per-task status, next tasks, pitfalls, deferrals)](docs/HANDOFF-NEXT-AGENT-2026-11.md)
 - [Contradiction and alignment register](docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md)
 - [Acceptance and E2E plan](docs/ACCEPTANCE-AND-E2E-PLAN.md)
 
 ## Release posture
 
-**Pre-release development. V1 is not release-qualified.** The application and daemon source are present in this repository. The current implementation boundary, the available evidence and the ordered blockers are maintained in [docs/IMPLEMENTATION-STATUS.md](docs/IMPLEMENTATION-STATUS.md). Do not treat any capability as Verified without the exact-build evidence recorded there.
+**Pre-release development. V1 is not release-qualified.** The application and daemon source are present in this repository. The current implementation boundary, the available evidence and the ordered blockers are maintained in [docs/IMPLEMENTATION-STATUS.md](docs/IMPLEMENTATION-STATUS.md). Do not treat any capability as Verified without the exact-build evidence recorded there. As of 2026-11-10 the Conversation supervisor (Feature 001), native-agent registry and ACP client (Feature 002), most of the Linux desktop-shell tasks (Feature 011) and the CI and release-machinery skeleton (Feature 019) exist at CODE or SERVED level, the storage layers of Features 014 (history lifecycle) and 012 (co-edit control) and the Linux workspace-root storage tests of Feature 003 exist, and nothing has been run against a live native agent or on a Windows machine. LiteSPM (Feature 013), Windows rows and release-dependent rows are deferred by the owner. The engineering handoff is [CURRENT-RUN.md](CURRENT-RUN.md).
 
 ## For contributors
 

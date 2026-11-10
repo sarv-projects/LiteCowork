@@ -257,6 +257,18 @@ Evidence class is CODE unless stated. None of this is QUALIFIED on any release r
 - **Update panel:** reducer, controller and component exist but are not mounted and their Tauri commands do not exist.
 - **Shell:** SettingsPage is deleted (one Settings surface), the sidebar now reaches Goals, Notifications, Ideas, Home and a new Dashboard page, a skip link and global focus-visible style exist, LibraryPage and a shared Operator-unavailable panel are extracted from App.tsx. The Dashboard shows Task counts, Automation counts and a Coworker roster count from served reads; Recent artifacts is UNAVAILABLE (no Workspace-wide artifact projection). No browser, keyboard-only or screen-reader run has happened.
 
+## Package implementation snapshot (2026-11-10, tip e9abe46)
+
+Evidence class is CODE or SERVED unless stated; nothing is INTEGRATED with a live agent run and nothing is QUALIFIED. The per-task detail is in each specs/NNN-*/TASKS.md and the index is in [CURRENT-RUN.md](../CURRENT-RUN.md) "Handoff status by package".
+
+- **Schema:** `SCHEMA_VERSION` 32. Wired: v28 delegation settings, v29 dispatch outbox and usage records, v30 REPORTED turn activity, v31 `conversation_history_state` side table (014-T03), v32 `conversation_control_events` and `conversation_owner_side_notes` (012-T05). Allocated, unwritten: v33 and v34 (002), v35 (003), v36 (005), v37 (007), v38 (009), v39 (013, DEFERRED), v40 (006), v41 (008), v42 (015), v43 (020), v44 (010), v45 (017), v46 (018). See [LITECOWORK-BUILD-TASKS.md](LITECOWORK-BUILD-TASKS.md) "Migration allocation".
+- **Feature 014 and 012 (storage only):** `ConversationHistoryStore` (rename, archive, status get and list) and `ConversationCoeditStore` (append-only control events, bounded owner side notes that are never Conversation messages) exist in `crates/storage-core/src/conversation.rs` and `crates/storage-sqlite/src/conversations.rs` with tests in `conversation_history_tests.rs` and `conversation_coedit_tests.rs`. No route, service, event, search index, purge or UI uses them; they are not user journeys.
+- **Feature 003:** Linux workspace root lifecycle storage tests only (`workspace_root_lifecycle_tests.rs`). Windows root tasks are DEFERRED to the owner's Windows laptop.
+- **Feature 013:** DEFERRED in full by the owner (LiteSPM). Discover still returns the truthful `LITESPM_PACKAGE_SERVICE_NOT_QUALIFIED` unavailable state.
+- **Runtime:** when the Operator endpoint fails after READY the daemon now records DEGRADED with blocker `OPERATOR_ENDPOINT_FAILED` before exiting nonzero (previously durable and local state stayed READY).
+- **Linux baselines:** `cargo test -p litecowork-storage-sqlite --lib` 624 pass; `cargo test -p litecoworkd --bin litecoworkd` 656 pass, 1 ignored; UI `pnpm test` 5 pre-existing failures. `src-tauri` is not buildable in the authoring sandbox (gdk-3.0 missing); toolchain 1.92.0 versus pinned 1.98.1; CI has never run on GitHub.
+- **Owner decisions (register A-62):** B-38, D-01, B-45, B-39, B-40, B-41, the B-31 follow-up class, CONNECTOR_EVENT and E2E-14 to E2E-17 accepted; all of 013, every Windows row and release-dependent rows (B-43, B-44, packaging, release-matrix qualification) deferred; B-42, the B-19 follow-up, P-38 and housekeeping open.
+
 ## Test and validation evidence
 
 Validation evidence from the connected Windows development machine:
@@ -267,13 +279,13 @@ Validation evidence from the connected Windows development machine:
 | `litecoworkd` unit target | **359 passed, 0 failed, 1 ignored** | Includes the six Windows WorkspaceRoot route tests and Windows local-filesystem locator/reopen tests |
 | `litecoworkd --test cli` | **4 passed, 0 failed** | Help and CLI behavior distinguish native Conversation dispatch from managed Task execution and Runtime lifecycle readiness |
 | Composed Operator route inventory | Passed; matches **178 served / 1 local-only / 53 target-only** | Registration only, not integration/qualification |
-| Architecture/schema validator | Passed active checks; one warning | 148 typed events, JSON Schemas, error codes, OpenAPI structure, SQLite, Gateway names, canonical concepts, product naming and active Markdown links pass. Optional `openapi-spec-validator` is not installed, so its external meta-schema pass was not run |
+| Architecture/schema validator | Passed active checks; one warning | 149 typed events, JSON Schemas, error codes, OpenAPI structure, SQLite, Gateway names, canonical concepts, product naming and active Markdown links pass. Optional `openapi-spec-validator` is not installed, so its external meta-schema pass was not run |
 | Cross-owner consistency guard | Passed **36 assertions** | Checks only the explicit design invariants encoded in the script |
 | V1 contract/route/UI audit | Passed **0 findings** | Structural crosswalk only |
 | Design-depth audit | Passed **0 structural findings** | Inventory and ownership structure only |
-| Feature package validator | Passed **12/12 packages** | SDD structure, not owner acceptance |
+| Feature package validator | Passed **20/20 packages** | SDD structure, not owner acceptance |
 | Markdown link audit | Passed; **0 broken relative links** | Limited literal Markdown-link parser; excludes archives, derived reading notes and reference repositories |
-| Active documentation corpus | **364 files / 72,682 lines** at the generated manifest | First-party Markdown/MDX inventory excluding archives, reading digests, repo_take, plan files and generated audit output; separate Markdown audit scanned 356 files / 72,285 lines and found 0 broken relative links |
+| Active documentation corpus | **367 files / 75,138 lines** at the generated manifest | First-party Markdown/MDX inventory excluding archives, reading digests, repo_take, plan files and generated audit output; separate Markdown audit scanned 364 files / 75,159 lines and found 0 broken relative links |
 | Frontend production build | Passed; API type check, TypeScript and Vite completed | Main JS bundle 1.05 MB minified / 287 KB gzip; Vite warns over 500 KB |
 | Focused Conversation + responsive tests | **24 passed, 0 failed** | Includes list cursor pagination, pending-create journal retry affordance, repeated-cursor protection, drawer semantics and responsive navigation/canvas assertions |
 | WorkspaceRoot route filter on Windows | **6 passed, 0 failed** | Real SQLite route fixture now uses canonical platform-specific locator and file identity data; no production locator validation was relaxed |
