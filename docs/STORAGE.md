@@ -1114,12 +1114,16 @@ Artifact reference becomes visible. Expired temporary chunks are garbage-collect
   WAITING_USER, WAITING_DEPENDENCY or CANCEL_REQUESTED. Triggers are used instead of a
   partial unique index so a database holding legacy duplicate nonterminal turns still
   migrates. OPEN turns without a session at migration time receive an UNCLAIMED intent.
+- migration 30 (`schemas/sqlite-v30.sql`, Feature 001 T25) adds `conversation_turn_activity_records`:
+  REPORTED-only (attribution is a CHECK-constrained constant), immutable, idempotent on
+  `(turn_id, retry_ordinal, sequence)`, with a closed kind and status set and bounded labels.
+  Rows are agent-reported observations, never Effects, receipts or grants.
 - each applied migration records a SHA-256 checksum of its exact embedded SQL bytes and
   the schema-object fingerprint at that migration boundary. Reopening verifies every
   recorded migration name/source checksum and compares the active schema version's
   fingerprint with the current non-internal `sqlite_master` objects; historical
   fingerprints are retained because later migrations intentionally add schema objects.
-  The current wired schema version is 29, so the v29 fingerprint is checked against the full
+  The current wired schema version is 30, so the v30 fingerprint is checked against the full
   current schema. Missing migration records, changed
   source checksums, or changed current schema fail closed.
 - a clean install applies migration 1, writes its migration row, and advances

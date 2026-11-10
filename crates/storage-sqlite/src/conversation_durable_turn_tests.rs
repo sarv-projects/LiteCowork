@@ -587,3 +587,49 @@ fn conversation_cancel_settles_cancelled_only_after_cancel_requested_and_keeps_r
     failed_commit.turn_status = ConversationTurnStatus::Failed;
     assert!(d.store.commit_conversation_agent_response(failed_commit).is_err());
 }
+
+#[test]
+fn turn_activity_records_are_reported_ordered_idempotent_scoped_and_immutable() {
+    use storage_core::conversation::ConversationActivityRecord;
+    let a = activated();
+    let record = |sequence: u32, kind: &str, status: &str, label: &str| ConversationActivityRecord {
+        turn_id: a.turn_id.clone(),
+        retry_ordinal: 0,
+        conversation_id: a.conversation_id.clone(),
+        sequence,
+        kind: kind.to_owned(),
+        status: status.to_owned(),
+        call_ref: Some(format!("call-{sequence}")),
+        label: Some(label.to_owned()),
+        created_at: NOW.to_owned(),
+    };
+    a.store.append_conversation_turn_activity(record(2, "TOOL", "SUCCEEDED", "bash")).expect("append second");
+    a.store.append_conversation_turn_activity(record(1, "TOOL", "STARTED", "bash")).expect("append first");
+    // An exact repeat of a sequence is a no-op, not a duplicate and not an error.
+    a.store.append_conversation_turn_activity(record(1, "TOOL", "STARTED", "bash")).expect("repeat is idempotent");
+
+    let listed = a
+        .store
+        .list_conversation_turn_activity(WORKSPACE_ID, &a.conversation_id, &a.turn_id, 0, 50)
+        .expect("list activity");
+    assert_eq!(listed.iter().map(|r| r.sequence).collect::<Vec<_>>(), [1, 2]);
+    assert_eq!(listed[0].status, "STARTED");
+
+    // Another Workspace and another retry ordinal see nothing.
+    assert!(a.store.list_conversation_turn_activity("other-workspace", &a.conversation_id, &a.turn_id, 0, 50).expect("scoped").is_empty());
+    assert!(a.store.list_conversation_turn_activity(WORKSPACE_ID, &a.conversation_id, &a.turn_id, 1, 50).expect("ordinal").is_empty());
+
+    // Always REPORTED, and rows cannot be rewritten into something else.
+    let attribution: String = a
+        .connection()
+        .query_row("SELECT attribution FROM conversation_turn_activity_records WHERE sequence=1", [], |row| row.get(0))
+        .expect("attribution");
+    assert_eq!(attribution, "REPORTED");
+    assert!(a.connection().execute("UPDATE conversation_turn_activity_records SET status='FAILED'", []).is_err());
+    assert!(a.connection().execute("UPDATE conversation_turn_activity_records SET attribution='EFFECT'", []).is_err());
+
+    // Invalid shapes are refused before any write.
+    assert!(a.store.append_conversation_turn_activity(record(0, "TOOL", "STARTED", "bash")).is_err());
+    assert!(a.store.append_conversation_turn_activity(record(1, "EFFECT", "STARTED", "bash")).is_err(), "closed kind set");
+    assert!(a.store.append_conversation_turn_activity(record(3, "TOOL", "STARTED", &"x".repeat(129))).is_err());
+}

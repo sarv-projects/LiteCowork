@@ -62,7 +62,10 @@ use storage_core::{
 use zeroize::Zeroizing;
 
 /// Removes the v28 and v29 objects and receipts so a fixture can return to the v27 boundary.
-pub(crate) const DOWNGRADE_V29_TO_V27_SQL: &str = "DROP TRIGGER IF EXISTS conversation_turn_single_flight_insert;
+pub(crate) const DOWNGRADE_V29_TO_V27_SQL: &str = "DROP TRIGGER IF EXISTS conversation_turn_activity_record_immutable_update;
+             DROP TABLE IF EXISTS conversation_turn_activity_records;
+             DELETE FROM schema_migrations WHERE version = 30;
+             DROP TRIGGER IF EXISTS conversation_turn_single_flight_insert;
              DROP TRIGGER IF EXISTS conversation_turn_single_flight_reopen;
              DROP TRIGGER IF EXISTS conversation_dispatch_intent_state_guard;
              DROP TRIGGER IF EXISTS conversation_dispatch_intent_no_delete;
@@ -1771,7 +1774,7 @@ fn upgrades_schema_v13_through_resource_index_registry_v19() {
     assert!(agent_registry_exists);
     assert!(!resource_index_exists);
 
-    migrate(&mut connection).expect("apply migrations v14 through v29 in order");
+    migrate(&mut connection).expect("apply migrations v14 through v30 in order");
 
     let version: i64 = connection
         .pragma_query_value(None, "user_version", |row| row.get(0))
@@ -1786,7 +1789,7 @@ fn upgrades_schema_v13_through_resource_index_registry_v19() {
         .expect("collect migration versions");
     assert_eq!(
         applied,
-        [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+        [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
     );
 }
 
@@ -1848,8 +1851,10 @@ fn v21_workspace_root_observation_migration_rolls_back_atomically_and_replays() 
         .expect("verify historical v27 migration receipt");
     verify_migration_record(&connection, 28, V28_MIGRATION_NAME, SQLITE_V28_DDL, false)
         .expect("verify historical v28 migration receipt");
-    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, true)
-        .expect("verify latest v29 migration receipt");
+    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, false)
+        .expect("verify historical v29 migration receipt");
+    verify_migration_record(&connection, 30, V30_MIGRATION_NAME, SQLITE_V30_DDL, true)
+        .expect("verify latest v30 migration receipt");
 }
 
 #[test]
@@ -2115,8 +2120,10 @@ fn v19_resource_index_migration_rolls_back_atomically_and_replays() {
         .expect("verify historical v27 migration receipt");
     verify_migration_record(&connection, 28, V28_MIGRATION_NAME, SQLITE_V28_DDL, false)
         .expect("verify historical v28 migration receipt");
-    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, true)
-        .expect("verify latest v29 migration receipt");
+    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, false)
+        .expect("verify historical v29 migration receipt");
+    verify_migration_record(&connection, 30, V30_MIGRATION_NAME, SQLITE_V30_DDL, true)
+        .expect("verify latest v30 migration receipt");
 
     let (registry_count, size_bytes, state, reference_count): (i64, i64, String, i64) = connection
         .query_row(
@@ -2964,15 +2971,18 @@ fn v27_test_run_migration_rolls_back_and_replays() {
     assert_eq!(version, SCHEMA_VERSION);
     verify_migration_record(&connection, 27, V27_MIGRATION_NAME, SQLITE_V27_DDL, false)
         .expect("verify replayed v27 receipt");
-    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, true)
-        .expect("verify latest v29 receipt");
+    verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, false)
+        .expect("verify historical v29 receipt");
+    verify_migration_record(&connection, 30, V30_MIGRATION_NAME, SQLITE_V30_DDL, true)
+        .expect("verify latest v30 receipt");
 }
 
 #[test]
-fn v28_and_v29_migrations_roll_back_and_replay() {
+fn v28_to_v30_migrations_roll_back_and_replay() {
     for (failpoint, expected_version, name) in [
         (Failpoint::DuringV28Migration, V27_SCHEMA_VERSION, "v28"),
         (Failpoint::DuringV29Migration, V28_SCHEMA_VERSION, "v29"),
+        (Failpoint::DuringV30Migration, V29_SCHEMA_VERSION, "v30"),
     ] {
         let directory = tempfile::tempdir().expect("temporary directory");
         let mut connection = Connection::open(directory.path().join("migration.sqlite3"))
@@ -3000,8 +3010,10 @@ fn v28_and_v29_migrations_roll_back_and_replay() {
         assert_eq!(version, SCHEMA_VERSION);
         verify_migration_record(&connection, 28, V28_MIGRATION_NAME, SQLITE_V28_DDL, false)
             .expect("verify v28 receipt");
-        verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, true)
+        verify_migration_record(&connection, 29, V29_MIGRATION_NAME, SQLITE_V29_DDL, false)
             .expect("verify v29 receipt");
+        verify_migration_record(&connection, 30, V30_MIGRATION_NAME, SQLITE_V30_DDL, true)
+            .expect("verify v30 receipt");
     }
 }
 

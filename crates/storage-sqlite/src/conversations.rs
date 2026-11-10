@@ -740,7 +740,7 @@ impl ConversationTurnStore for SqliteConversationStore {
                 "UPDATE conversation_dispatch_intents SET state='SETTLED', settled_at=?1, version=version+1 WHERE turn_id=?2 AND retry_ordinal=?3 AND state<>'SETTLED'",
                 params![next.settled_at, settlement.turn_id, i64::from(current.retry_ordinal)],
             ).map_err(map_database_error)?;
-            // B-10: one usage row per attempt. INSERT OR IGNORE keeps a replay or an
+            // B-10: one usage row per attempt. ON CONFLICT DO NOTHING keeps a replay or an
             // earlier row from failing the settlement.
             let (attribution, input_tokens, output_tokens) = match settlement.usage {
                 Some(usage) => (
@@ -754,7 +754,7 @@ impl ConversationTurnStore for SqliteConversationStore {
                 None => ("UNKNOWN", None, None),
             };
             tx.execute(
-                "INSERT OR IGNORE INTO conversation_turn_usage_records(usage_id,turn_id,retry_ordinal,conversation_id,attribution_source,input_tokens,output_tokens,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+                "INSERT INTO conversation_turn_usage_records(usage_id,turn_id,retry_ordinal,conversation_id,attribution_source,input_tokens,output_tokens,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT DO NOTHING",
                 params![
                     format!("usage-{}-{}", settlement.turn_id, current.retry_ordinal),
                     settlement.turn_id,
@@ -874,6 +874,90 @@ impl ConversationTurnStore for SqliteConversationStore {
                         created_at: row.get(6)?,
                     })
                 })
+                .map_err(map_database_error)?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(map_database_error)
+        })
+    }
+
+    fn append_conversation_turn_activity(
+        &self,
+        record: storage_core::conversation::ConversationActivityRecord,
+    ) -> Result<(), StoreError> {
+        let valid = |value: &str| {
+            !value.trim().is_empty() && value.len() <= 256 && !value.chars().any(char::is_control)
+        };
+        if !valid(&record.turn_id)
+            || !valid(&record.conversation_id)
+            || record.sequence == 0
+            || record.sequence as usize > storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT
+            || record.call_ref.as_deref().is_some_and(|v| !valid(v) || v.len() > 128)
+            || record.label.as_deref().is_some_and(|v| v.len() > 128 || v.chars().any(char::is_control))
+        {
+            return Err(StoreError::Invalid(
+                "Conversation activity record is invalid".to_owned(),
+            ));
+        }
+        self.run(move |connection| {
+            connection
+                .execute(
+                    "INSERT INTO conversation_turn_activity_records(activity_id,turn_id,retry_ordinal,conversation_id,sequence,kind,status,call_ref,label,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT DO NOTHING",
+                    params![
+                        format!("activity-{}-{}-{}", record.turn_id, record.retry_ordinal, record.sequence),
+                        record.turn_id,
+                        i64::from(record.retry_ordinal),
+                        record.conversation_id,
+                        i64::from(record.sequence),
+                        record.kind,
+                        record.status,
+                        record.call_ref,
+                        record.label,
+                        record.created_at,
+                    ],
+                )
+                .map_err(map_database_error)?;
+            Ok(())
+        })
+    }
+
+    fn list_conversation_turn_activity(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        retry_ordinal: u32,
+        limit: usize,
+    ) -> Result<Vec<storage_core::conversation::ConversationActivityRecord>, StoreError> {
+        if !(1..=storage_core::conversation::CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT).contains(&limit) {
+            return Err(StoreError::Invalid(
+                "Conversation activity page size is invalid".to_owned(),
+            ));
+        }
+        let workspace = workspace_id.to_owned();
+        let conversation = conversation_id.to_owned();
+        let turn = turn_id.to_owned();
+        self.run(move |connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT a.turn_id,a.retry_ordinal,a.conversation_id,a.sequence,a.kind,a.status,a.call_ref,a.label,a.created_at FROM conversation_turn_activity_records a JOIN conversations c ON c.conversation_id=a.conversation_id WHERE c.workspace_id=?1 AND a.conversation_id=?2 AND a.turn_id=?3 AND a.retry_ordinal=?4 ORDER BY a.sequence LIMIT ?5",
+                )
+                .map_err(map_database_error)?;
+            let rows = statement
+                .query_map(
+                    params![workspace, conversation, turn, i64::from(retry_ordinal), limit as i64],
+                    |row| {
+                        Ok(storage_core::conversation::ConversationActivityRecord {
+                            turn_id: row.get(0)?,
+                            retry_ordinal: u32::try_from(row.get::<_, i64>(1)?).unwrap_or(u32::MAX),
+                            conversation_id: row.get(2)?,
+                            sequence: u32::try_from(row.get::<_, i64>(3)?).unwrap_or(u32::MAX),
+                            kind: row.get(4)?,
+                            status: row.get(5)?,
+                            call_ref: row.get(6)?,
+                            label: row.get(7)?,
+                            created_at: row.get(8)?,
+                        })
+                    },
+                )
                 .map_err(map_database_error)?;
             rows.collect::<Result<Vec<_>, _>>().map_err(map_database_error)
         })

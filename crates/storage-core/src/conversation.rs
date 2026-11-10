@@ -309,6 +309,46 @@ pub trait ConversationTurnStore: Send + Sync {
         state: ConversationDispatchState,
         limit: usize,
     ) -> Result<Vec<ConversationDispatchIntent>, StoreError>;
+
+    /// Appends one REPORTED activity observation for a turn attempt (T25). Idempotent on
+    /// `(turn_id, retry_ordinal, sequence)`: an exact repeat is a no-op. The row records
+    /// what the native agent said it did; it is never an Effect, receipt or grant.
+    fn append_conversation_turn_activity(
+        &self,
+        record: ConversationActivityRecord,
+    ) -> Result<(), StoreError>;
+
+    /// Bounded, ordered read (sequence ascending) of one turn's activity observations,
+    /// scoped to the Workspace and Conversation. `retry_ordinal` selects one attempt.
+    fn list_conversation_turn_activity(
+        &self,
+        workspace_id: &str,
+        conversation_id: &str,
+        turn_id: &str,
+        retry_ordinal: u32,
+        limit: usize,
+    ) -> Result<Vec<ConversationActivityRecord>, StoreError>;
+}
+
+/// Maximum activity observations kept per turn attempt.
+pub const CONVERSATION_ACTIVITY_MAX_PER_ATTEMPT: usize = 200;
+
+/// A REPORTED activity observation. `label` is a bounded, sanitized display word (a tool
+/// name or fixed phrase), never a path, argument, output or reasoning text.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConversationActivityRecord {
+    pub turn_id: String,
+    pub retry_ordinal: u32,
+    pub conversation_id: String,
+    pub sequence: u32,
+    /// `TOOL`, `FILE`, `PERMISSION`, `TODO`, `STEP` or `CONTEXT`.
+    pub kind: String,
+    /// `STARTED`, `PROGRESS`, `SUCCEEDED`, `FAILED`, `ASKED`, `UPDATED`, `ENDED` or `REDUCED`.
+    pub status: String,
+    pub call_ref: Option<String>,
+    pub label: Option<String>,
+    pub created_at: String,
 }
 
 /// Terminal state the settled turn's AgentSession reaches (no final answer is committed).

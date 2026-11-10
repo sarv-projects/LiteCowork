@@ -449,7 +449,7 @@ Gaps to V1: Stop without quiescence, broken Retry, no outbox or startup sweep, n
 
 ## 001-T25 - Transient turn.activity frames and REPORTED activity records with UI cards (P-02)
 
-- **Status:** NOT STARTED - added by owner approval on 2026-11-09. Folds proposed task P-02 (audit C-1, C-2; findings R-04, R-07) into this LOCKED package.
+- **Status:** PARTIAL (storage layer only) - migration v30 adds `conversation_turn_activity_records` (REPORTED only, immutable, idempotent on turn/attempt/sequence, bounded labels) with `append_conversation_turn_activity` and `list_conversation_turn_activity`; test `turn_activity_records_are_reported_ordered_idempotent_scoped_and_immutable`. NOT done: the supervisor emitting `turn.activity` frames from the normalizer, the served read route, and the UI activity cards and plan checklist. Original note: added by owner approval on 2026-11-09. Folds proposed task P-02 (audit C-1, C-2; findings R-04, R-07) into this LOCKED package.
 - **Depends on:** T13, T24
 - **Cross-package prerequisites:** NONE
 - **Owner:** Agent Runtime, Conversation, UI.
