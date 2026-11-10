@@ -21,7 +21,7 @@ Gaps to V1: owner acceptance (B-40), validator drift, no producer, no chart or I
 
 ## 016-T01 - Owner acceptance of SPEC and blockers
 
-- **Status:** BLOCKED - pending owner acceptance of SPEC revision 0.1 and blocker B-40 (owner: repository owner, sarv-projects; Presentation Runtime, Product and Security prepare the decision).
+- **Status:** BLOCKED - B-40 accepted as proposed (2026-11-10); pending owner acceptance of SPEC revision 0.1 (owner: repository owner, sarv-projects; Presentation Runtime, Product and Security prepare the decision).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Product, Presentation Runtime, Security; decision by the repository owner.

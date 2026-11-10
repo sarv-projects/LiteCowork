@@ -2,7 +2,7 @@
 
 **Feature:** 014 | **Status:** IN_REVIEW - not owner-accepted; T01 blocks every task; tasks not started unless marked.
 **Spec revision:** 0.1 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
-**Owners:** domain owners named in SPEC.md. Blocker B-38 is PROPOSED, pending owner.
+**Owners:** domain owners named in SPEC.md. Blocker B-38 accepted as proposed 2026-11-10; whole-SPEC acceptance pending.
 
 ## Current baseline
 
@@ -18,7 +18,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T01 - Owner acceptance of SPEC and blockers
 
-- **Status:** BLOCKED - B-38 is PROPOSED; pending owner acceptance (repository owner, sarv-projects).
+- **Status:** BLOCKED - B-38 accepted as proposed (2026-11-10, sarv-projects); the whole-SPEC acceptance, O-02 and O-03 and the ACCEPTED/LOCKED flip remain pending.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE (orchestrator records B-38 in the register and review packet).
 - **Owner:** Product (repository owner); Conversation and Privacy reviewers.
@@ -26,7 +26,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 - **Contract:** SPEC sections 2, 3, 5, 17; AC-009, AC-020.
 - **Change intent:** owner accepts or amends B-38 (tombstone with immediate fenced purge, or the 30-day restore-window alternative) and answers O-02 and O-03. On acceptance set SPEC `**Status:** ACCEPTED/LOCKED`, revision 1.0, and WIRING `status: "ACCEPTED/LOCKED"`.
 - **Acceptance:**
-  - [ ] B-38 recorded ACCEPTED with date and owner, or amended text recorded.
+  - [x] B-38 recorded ACCEPTED as proposed (sarv-projects, 2026-11-10).
   - [ ] SPEC and WIRING statuses match; validator passes.
   - [ ] Negative: until this closes, no history-management control is enabled (AC-020).
 - **Command:** `python3 .specify/scripts/validate_feature_package.py`

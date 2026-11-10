@@ -10,7 +10,7 @@ Identities and lifecycles stay in the canonical owner documents. This file lists
 - Immutable version and content digest (`ArtifactVersionRecord`).
 - Provenance links and dependency edges.
 - Conversation origin (accepted target interface, not yet in source): nullable `source_conversation_id` and `source_message_id` on the Artifact, written only by the create transaction.
-- Export receipt (accepted target interface, not yet in source): `export_receipt_id`, `workspace_id`, `artifact_id`, `artifact_version`, `export_format`, `transformer_version`, `destination_class`, `exported_digest`, `actor`, `created_at`, idempotency key. No local path.
+- Export receipt (accepted target interface, not yet in source): `export_receipt_id`, `workspace_id`, `artifact_id`, `artifact_version`, `export_format`, `transformer_version`, `destination_class` (V1 value `LOCAL_OWNER_SELECTED_FILE`), `exported_digest`, `actor`, `created_at`, idempotency key. No local path.
 - Format capability matrix (accepted target interface, not yet in source): daemon-owned static table per media type (SPEC §5); not persisted per Artifact.
 
 ## Relations

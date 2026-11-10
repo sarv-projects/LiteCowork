@@ -26,11 +26,11 @@ Gaps: create (B-30), Markdown adapter (B-21), export receipt (B-31), declared ca
 - **Change intent:** Promote `CreateArtifact` (with `ConversationOrigin`), `ArtifactFormatAdapter`, `CommitArtifactExport`, `FormatCapability`, `FormatError` and `ArtifactError` into ARTIFACTS-EVIDENCE; add `POST /v1/artifacts`, the Markdown publish route, `POST /v1/artifacts/{artifact_id}/exports`, the capability read route and the `conversation_id` list filter to OpenAPI; register `artifact.exported.v1`; reconcile `UNSUPPORTED_FORMAT` (SPEC B-21 text) with the canonical `UNSUPPORTED_MEDIA_TYPE`; add `artifact_export_receipts` and nullable `source_conversation_id`/`source_message_id` columns; pin the Markdown engine (RESEARCH candidates) with exact version and license.
 - **Acceptance:**
   - [ ] Owner prose and machine schemas change in one reviewed change; one error code for unsupported media.
-  - [ ] Product records the local-export receipt destination class (B-31 caveat) before T06 starts.
+  - [x] Product recorded the local-export receipt destination class (B-31 caveat): `LOCAL_OWNER_SELECTED_FILE` (sarv-projects, 2026-11-10).
   - [ ] Migration is additive and immutable; upgrade from v28 test passes.
 - **Command:** `python3 .specify/scripts/validate_feature_package.py` and `python3 scripts/audit_v1_contracts.py` and `cargo test -p storage-sqlite --locked migration` (filter to be added by this task)
 - **Evidence:** promoted doc diffs; dependency pin in RESEARCH.md; migration test in CURRENT-RUN.md
-- **Stop:** no Product confirmation of the export destination class leaves T06 BLOCKED (owner: Product).
+- **Stop:** the destination class is confirmed (2026-11-10); T06 stays blocked only by its task dependencies.
 
 ## 007-T02 - Atomic Artifact create store (B-30)
 
@@ -106,7 +106,7 @@ Gaps: create (B-30), Markdown adapter (B-21), export receipt (B-31), declared ca
 
 ## 007-T06 - Export command and ArtifactExportReceipt (B-31)
 
-- **Status:** BLOCKED (needs the T01 Product confirmation of the local-export destination class; owner: Product). No export record, route or event exists.
+- **Status:** NOT STARTED. The Product gate is closed: destination class `LOCAL_OWNER_SELECTED_FILE` confirmed 2026-11-10. Still depends on T01, T03 and T05. No export record, route or event exists.
 - **Depends on:** T01, T03, T05
 - **Cross-package prerequisites:** NONE
 - **Owner:** Artifacts, Storage, Security

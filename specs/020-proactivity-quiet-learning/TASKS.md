@@ -20,7 +20,7 @@ Gaps to V1: no producer and no `propose`; no quiet-hours behavior; no learning p
 
 ## 020-T01 - Owner acceptance of SPEC, D-01 and blocker B-45
 
-- **Status:** BLOCKED (pending owner acceptance of SPEC revision 0.1, D-01 first Suggestion producers and B-45 first learning source and auto-commit policy; owner: repository owner, sarv-projects).
+- **Status:** BLOCKED (D-01 and B-45 accepted as proposed 2026-11-10; pending owner acceptance of SPEC revision 0.1; owner: repository owner, sarv-projects).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Product (repository owner), Responsibility domain, Security.

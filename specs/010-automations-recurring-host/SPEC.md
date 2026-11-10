@@ -294,7 +294,7 @@ Further gates after ACCEPTED/LOCKED are the cargo filters named in TASKS.md. The
 ## 18. Assumptions and open questions
 
 - Depends on Task execution from 005 for end-to-end execution (TASKS.md T08); occurrence identity can be tested first.
-- Event-trigger kind: revision 1.0 names CONNECTOR_EVENT because AUTOMATION.md already lists connector-event among the V1 providers and it needs no inbound port. It depends on a qualified Feature 006 Connection. The owner confirms this choice when T01 promotes the contract; if 006 is not qualified in time, T09 stays BLOCKED rather than substituting an unreviewed kind.
+- Event-trigger kind: revision 1.0 names CONNECTOR_EVENT because AUTOMATION.md already lists connector-event among the V1 providers and it needs no inbound port. It depends on a qualified Feature 006 Connection. The owner confirmed this choice (CONNECTOR_EVENT over LOCAL_POLL) on 2026-11-10; if 006 is not qualified in time, T09 stays BLOCKED rather than substituting an unreviewed kind.
 - Source conflict for T07: `record_automation_outcome_delivery` in `crates/storage-sqlite/src/notification.rs` documents that "a suppressed outcome never becomes a delivery row", while AC-007 requires a SUPPRESSED row. The accepted contract (AC-007) wins; T07 changes the producer.
 - Legacy docs/superpowers plans are not this package.
 

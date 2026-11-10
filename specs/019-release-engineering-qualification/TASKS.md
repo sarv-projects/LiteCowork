@@ -19,7 +19,7 @@ Gaps to V1: CI, both installers, signing, updater, licensing record, row-aware m
 
 ## 019-T01 - Owner acceptance of SPEC and blockers B-43, B-44
 
-- **Status:** BLOCKED (pending owner acceptance of SPEC revision 0.1, B-43 signing identity and update channel, B-44 licensing/packaging decision; owner: repository owner, sarv-projects).
+- **Status:** BLOCKED (B-43 and B-44 DEFERRED 2026-11-10 as release dependent; Windows rows deferred for later laptop testing; pending owner acceptance of SPEC revision 0.1, B-43 signing identity and update channel, B-44 licensing/packaging decision; owner: repository owner, sarv-projects).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Product (repository owner), Security, Release Engineering.

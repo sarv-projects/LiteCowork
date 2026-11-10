@@ -160,7 +160,7 @@ Gaps to V1: cron grammar and catch-up bound not pinned in the owner contract, no
 
 ## 010-T09 - Add the event-trigger kind after cron (CONNECTOR_EVENT over LOCAL_POLL)
 
-- **Status:** BLOCKED - needs a qualified Feature 006 Connection and the T01 owner confirmation of the kind (owners: Capability Fabric, Product). `TriggerDefinition::ConnectorEvent` exists; `locally_reconcilable_trigger` refuses it.
+- **Status:** BLOCKED - the kind is owner-confirmed (CONNECTOR_EVENT over LOCAL_POLL, sarv-projects, 2026-11-10); still needs a qualified Feature 006 Connection (owner: Capability Fabric). `TriggerDefinition::ConnectorEvent` exists; `locally_reconcilable_trigger` refuses it.
 - **Depends on:** T01, T03, T04
 - **Cross-package prerequisites:** Feature 006 Connection broker with a polling read for provider events.
 - **Owner:** Automation, Capability Fabric.
@@ -324,7 +324,7 @@ Gaps to V1: cron grammar and catch-up bound not pinned in the owner contract, no
 
 ## 010-T19 - Direct LiteCowork Coworker provider-graph authoring evaluation (deferred, not V1; formerly T06)
 
-- **Status:** BLOCKED - deferred; no implementation authorization until an owner ADR exists.
+- **Status:** BLOCKED - deferred; the owner confirmed on 2026-11-10 that it stays deferred and out of V1; no implementation authorization until an owner ADR exists.
 - **Depends on:** T18
 - **Cross-package prerequisites:** provider-specific workflow authoring API; explicit owner ADR.
 - **Owner:** Product, Capability Fabric, Trust, Automation.

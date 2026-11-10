@@ -20,7 +20,7 @@ Gaps to V1: no owner acceptance (B-39), no typed Task status, no pause/resume/st
 
 ## 015-T01 - Owner acceptance of SPEC and blockers
 
-- **Status:** BLOCKED - pending owner acceptance of this SPEC revision 0.1 and blocker B-39 (owner: repository owner, sarv-projects; Delegation and Product prepare the decision).
+- **Status:** BLOCKED - B-39 accepted as proposed (2026-11-10); pending owner acceptance of this SPEC revision 0.1 (owner: repository owner, sarv-projects; Delegation and Product prepare the decision).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 005 accepted (done 2026-11-09); Feature 005 B-35 decision is separate and does not block acceptance of this package.
 - **Owner:** Product, Delegation; decision by the repository owner.

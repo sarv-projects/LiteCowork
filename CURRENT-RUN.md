@@ -10,7 +10,7 @@ This file is the current engineering handoff. It records the active repository s
 
 ## Repository state
 
-The active checkout contains the Tauri/React desktop application, the Rust daemon and workspace crates, first-party docs and JSON contracts, 20 feature SDD packages (001-012 ACCEPTED/LOCKED, 013-020 IN_REVIEW), scripts and pinned reference repositories. The repository is not documentation-only.
+The active checkout contains the Tauri/React desktop application, the Rust daemon and workspace crates, first-party docs and JSON contracts, 20 feature SDD packages (001-012 ACCEPTED/LOCKED, 013-020 IN_REVIEW), scripts (on 2026-11-10 the owner accepted the Part 4 decisions B-38, B-39, B-40, B-41, B-45, D-01, the B-31 destination class, CONNECTOR_EVENT and E2E-14..E2E-17 as proposed, deferred LiteSPM, Windows and release-dependent rows, and left B-42 and the B-19 follow-up open; register A-62; packages 013-020 stay IN_REVIEW) and pinned reference repositories. The repository is not documentation-only.
 
 Primary application paths:
 

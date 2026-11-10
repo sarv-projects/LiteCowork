@@ -1,6 +1,6 @@
 # Tasks - LiteSPM Package Lifecycle Bridge
 
-**Feature:** 013 | **Status:** IN_REVIEW - not owner-accepted; T01 blocks every task; tasks not started unless marked.
+**Feature:** 013 | **Status:** IN_REVIEW - not owner-accepted; T01 blocks every task; tasks not started unless marked. DEFERRED by the owner on 2026-11-10: all LiteSPM parts (B-36, B-37 and every Feature 013 task, including the folded LiteSPM pin task); nothing here starts.
 **Spec revision:** 0.1 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
 **Owners:** domain owners named in SPEC.md. Blockers B-36 and B-37 are PROPOSED, pending owner.
 

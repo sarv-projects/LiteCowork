@@ -1,6 +1,6 @@
 # Tasks - Data Portability, Backup and Restore
 
-**Feature:** 017 | **Status:** IN_REVIEW - pending owner acceptance of SPEC and B-41; implementation not authorized; tasks not started unless marked.
+**Feature:** 017 | **Status:** IN_REVIEW - B-41 accepted as proposed 2026-11-10, SPEC acceptance pending; implementation not authorized; tasks not started unless marked.
 **Spec revision:** 0.1 | **Release target:** V1 (release matrix rows: Windows x64 + OpenCode v2.0.32 first; Linux x64 second)
 **Owners:** Storage, Operator/API, Desktop UI, Security/Trust, Runtime Lifecycle, Product (see SPEC.md). Delivery wave: Wave 6 (gate G).
 
@@ -18,7 +18,7 @@ Gaps to V1: no route, bridge or UI; snapshot not Workspace-filtered; no portable
 
 ## 017-T01 - Owner acceptance of SPEC and blockers
 
-- **Status:** BLOCKED - B-41 (backup scope, encryption at rest, restore-over-live policy) is PROPOSED, pending the repository owner (sarv-projects). The package is IN_REVIEW.
+- **Status:** BLOCKED - B-41 (backup scope, encryption at rest, restore-over-live policy) accepted as proposed (2026-11-10, sarv-projects); whole-SPEC acceptance and the ACCEPTED/LOCKED flip remain pending. The package is IN_REVIEW.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE (orchestrator records B-41 in docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md).
 - **Owner:** Product (repository owner), Storage, Security.
