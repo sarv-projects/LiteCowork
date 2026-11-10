@@ -5,6 +5,7 @@
 //! fields only after a scoped, side-effect-bounded handshake.
 
 pub(crate) mod acp_registry;
+pub(crate) mod acp_client;
 pub(crate) mod adapter;
 mod cline;
 mod codex;
