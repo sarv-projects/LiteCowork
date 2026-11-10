@@ -99,8 +99,10 @@ pub mod conversation;
 pub use conversation::{
     CommittedConversation, CommittedConversationTurn, ConversationMessageRecord, ConversationPage,
     ConversationRecord, ConversationStore, ConversationTurnReceipt, ConversationTurnStore,
-    CreateConversationCommit, CreateConversationTurnCommit, ResolvedConversationHost,
-    SetConversationAgentBinding,
+    AppendOwnerSideNote, ConversationCoeditStore, ConversationHistoryStore, ConversationStatus,
+    OwnerControlEventInsert, OwnerSideNoteRecord, CreateConversationCommit,
+    CreateConversationTurnCommit, RenameConversation, ResolvedConversationHost,
+    SetConversationAgentBinding, SetConversationArchived,
 };
 
 mod effect_evidence;

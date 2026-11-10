@@ -589,6 +589,7 @@ pub(crate) fn settle_attempt_failed(
     });
     conv_store
         .settle_conversation_turn(SettleConversationTurn {
+            control_event: None,
             principal_id: principal_id.to_owned(),
             workspace_id: workspace_id.to_owned(),
             conversation_id: conversation_id.to_owned(),
@@ -663,6 +664,7 @@ fn settle_attempt_cancelled(
     };
     conv_store
         .settle_conversation_turn(SettleConversationTurn {
+            control_event: None,
             principal_id: principal_id.to_owned(),
             workspace_id: workspace_id.to_owned(),
             conversation_id: conversation_id.to_owned(),

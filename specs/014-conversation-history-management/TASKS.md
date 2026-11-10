@@ -18,7 +18,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T01 - Owner acceptance of SPEC and blockers
 
-- **Status:** BLOCKED - B-38 accepted as proposed (2026-11-10, sarv-projects); the whole-SPEC acceptance, O-02 and O-03 and the ACCEPTED/LOCKED flip remain pending.
+- **Status:** PARTIAL - B-38 accepted as proposed (2026-11-10, sarv-projects) and treated as unblocking implementation by owner instruction; the whole-SPEC ACCEPTED/LOCKED flip, O-02 and O-03 remain pending, so SPEC and WIRING statuses are unchanged and this task is not DONE.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE (orchestrator records B-38 in the register and review packet).
 - **Owner:** Product (repository owner); Conversation and Privacy reviewers.
@@ -35,7 +35,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T02 - Promote accepted interfaces into owner docs and schemas
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** PARTIAL - `docs/schemas/sqlite-v31.sql` (side table `conversation_history_state`, deviation from the column-on-`conversations` wording, see docs/STORAGE.md) is wired and migration tests pass; STORAGE, EVENTS and BUILD-TASKS version text synced. NOT done: OpenAPI routes, `error-codes.schema.json` entries for `CONVERSATION_ARCHIVED`/`CONVERSATION_DELETED`/`CONVERSATION_NOT_QUIESCENT`, `domain-event.schema.json` entries for the renamed/archived/unarchived events, STATE-MACHINES lifecycle section, search index and purge tables (later migrations).
 - **Depends on:** T01
 - **Cross-package prerequisites:** Feature 001 contract promotion of `CONVERSATION_TURN_IN_PROGRESS` (001 T01); Feature 017 review of tombstone and manifest backup inclusion.
 - **Owner:** API, State Machines, Events, Storage owners.
@@ -52,7 +52,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T03 - Storage: Conversation status, rename and archive with CAS and idempotency
 
-- **Status:** BLOCKED (owner acceptance, T01). PARTIAL foundation: `SetConversationAgentBinding` pattern and `ConversationRecord.version` exist.
+- **Status:** PARTIAL - storage layer done (2026-11-10): `ConversationHistoryStore` (`rename_conversation`, `set_conversation_archived`, `get_conversation_status`, `list_conversations_by_status`) in `crates/storage-sqlite/src/conversations.rs`; CAS, request-dedup replay and changed-payload conflict, rename event carries `title_digest` only, archive refused with `CONVERSATION_NOT_QUIESCENT` while a turn is nonterminal, `create_conversation_turn` and the AgentBinding change reject a non-ACTIVE Conversation inside their own transactions. Tests `conversation_history_*` (5) pass. NOT done: `ConversationRecord` was not extended (status lives in the side table), the existing `list_conversations` still returns archived rows (callers must switch to `list_conversations_by_status`, T07), Operator routes (T07), event and error-code schema promotion (T02).
 - **Depends on:** T01, T02
 - **Cross-package prerequisites:** Feature 001 storage single-flight (001 T11) so "no nonterminal turn" is checkable in one query.
 - **Owner:** Storage, Conversation.
@@ -72,7 +72,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T04 - Storage: search index, in-transaction maintenance and resumable backfill
 
-- **Status:** BLOCKED (owner acceptance, T01). PARTIAL precedent: `resource_index.rs` tokenizer and HMAC term tokens.
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01). PARTIAL precedent: `resource_index.rs` tokenizer and HMAC term tokens.
 - **Depends on:** T01, T02, T03
 - **Cross-package prerequisites:** Feature 001 owners review the index hook added to `create_conversation_turn` and `commit_conversation_agent_response` (same file, 001 T02/T11 edit it).
 - **Owner:** Storage.
@@ -90,7 +90,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T05 - Storage: delete tombstone, sealed purge manifest and read fences
 
-- **Status:** BLOCKED (owner acceptance, T01; B-38). PARTIAL precedent: `context_document_purge.rs` `begin_context_document_purge`.
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01; B-38). PARTIAL precedent: `context_document_purge.rs` `begin_context_document_purge`.
 - **Depends on:** T01, T03, T04
 - **Cross-package prerequisites:** Feature 001 context loader (`load_conversation_context_for_turn`) and presentation readers accept the status check; Feature 006 provides the "unsettled Conversation-scoped invocation/grant/activation" query.
 - **Owner:** Storage, Privacy.
@@ -108,7 +108,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T06 - Conversation purge reconciler and startup resume
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T05
 - **Cross-package prerequisites:** Feature 011 Runtime startup recovery hook (`recover_and_persist_startup_blockers` in `apps/litecoworkd/src/runtime.rs`).
 - **Owner:** Storage, Runtime.
@@ -125,7 +125,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T07 - Operator routes: rename, archive, unarchive and status-aware existing routes
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Operator, Conversation.
@@ -142,7 +142,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T08 - Operator route: Conversation search
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T04, T07
 - **Cross-package prerequisites:** NONE
 - **Owner:** Operator.
@@ -159,7 +159,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T09 - Operator routes: deletion impact, delete and deletion status
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T05, T06, T07
 - **Cross-package prerequisites:** NONE
 - **Owner:** Operator, Privacy.
@@ -176,7 +176,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T10 - Tauri bridge commands for history management
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T07, T08, T09
 - **Cross-package prerequisites:** Feature 011 packaged sidecar and Windows named-pipe IPC.
 - **Owner:** Desktop bridge.
@@ -193,7 +193,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T11 - Sidebar search UI with accessible states
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T10
 - **Cross-package prerequisites:** Feature 011 app-wide keyboard and focus baseline and sidebar shell ownership.
 - **Owner:** Desktop UI.
@@ -210,7 +210,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T12 - Row menu and header actions: rename, archive, unarchive, delete
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T10, T11
 - **Cross-package prerequisites:** Feature 001 composer and header truthfulness work (001 T18) touches the same header; sequence edits.
 - **Owner:** Desktop UI.
@@ -227,7 +227,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T13 - Cross-package delete fences (retrieval, context, memory, artifacts, logs)
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T05, T09
 - **Cross-package prerequisites:** Feature 003 retrieval/context readers, Feature 007 Artifact association, Feature 009 Coworker memory sources, Feature 018 diagnostics bundle, Feature 005/007 Evidence redaction decision (O-02).
 - **Owner:** Conversation with each consuming owner.
@@ -244,7 +244,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T14 - Failure, race and canary matrix; create the canonical test target
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T06-T09
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, Storage, Testing.
@@ -261,7 +261,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T15 - Performance budget and list virtualization
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T04, T11
 - **Cross-package prerequisites:** Feature 019 soak harness (`scripts/v1_soak_harness.py`) and release-row hardware definition.
 - **Owner:** Storage, Desktop UI.
@@ -277,7 +277,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T16 - Cross-layer trace for each user-visible operation (AGENTS.md section 4)
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T12, T14
 - **Cross-package prerequisites:** NONE
 - **Owner:** Conversation, Desktop UI.
@@ -292,7 +292,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T17 - Qualification on the release rows
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T11-T16
 - **Cross-package prerequisites:** Feature 019 release matrix rows and evidence bundle; Feature 017 backup/restore for AC-019; Feature 001 Send qualified on the row (to create real history).
 - **Owner:** Product, Testing.
@@ -309,7 +309,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T18 - Documentation sync
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01, T17
 - **Cross-package prerequisites:** orchestrator owns register, specs/README.md and traceability index.
 - **Owner:** Documentation owners.
@@ -325,7 +325,7 @@ Gaps to V1: every goal in SPEC section 2, plus qualification on both rows.
 
 ## 014-T19 - Package VERIFIED for V1
 
-- **Status:** BLOCKED (owner acceptance, T01).
+- **Status:** NOT STARTED (unblocked by B-38 per owner instruction 2026-11-10; not reached in this slice; formerly BLOCKED on owner acceptance, T01).
 - **Depends on:** T01-T18
 - **Cross-package prerequisites:** Feature 019 release sign-off process.
 - **Owner:** Product (repository owner).

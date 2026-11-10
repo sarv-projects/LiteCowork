@@ -188,27 +188,28 @@ Folded tasks (owner-accepted 2026-11-09, register A-55) land in the wave of thei
 
 ## Migration allocation (provisional)
 
-The wired schema is v30 (v30 adds REPORTED turn activity records, 001-T25 storage layer): v28 (register A-40) and v29 (Feature 001 durable turn) are applied by `crates/storage-sqlite/src/lib.rs`. Many packages wrote "sqlite-v29.sql or the next free number" and Feature 012 named v30, so the numbers collide. This table assigns numbers in wave merge order. Rules: the first package to bump `SCHEMA_VERSION` also wires v28, because migrations apply in order; a package that merges out of order takes the next free number and updates this table in the same change; a merged migration is never renumbered or edited.
+The wired schema is v32 (v30 adds REPORTED turn activity records, 001-T25 storage layer; v31 adds Conversation history lifecycle state, 014-T03; v32 adds Conversation control events and owner side notes, 012-T05): v28 (register A-40) and v29 (Feature 001 durable turn) are applied by `crates/storage-sqlite/src/lib.rs`. Many packages wrote "sqlite-v29.sql or the next free number" and Feature 012 named v30, so the numbers collide. This table assigns numbers in wave merge order. Rules: the first package to bump `SCHEMA_VERSION` also wires v28, because migrations apply in order; a package that merges out of order takes the next free number and updates this table in the same change; a merged migration is never renumbered or edited.
 
 | Migration | Package and task | Content (from the package DATA-MODEL) |
 |---|---|---|
 | v28 (existing) | wired by 001 (done) | Workspace delegation settings revisions (A-40) |
 | v29 (wired) | 001 (W1, done) | Dispatch outbox, single-flight triggers, commit identity table, usage records |
-| v30, v31 | 002-T04, 002-T07 (W1) | Runtime-local descriptor store; auth observations |
-| v32 | 003-T09 (W1) | `context_attachments`, `retrieval_receipts` |
-| v33 | 014 (W1) | Conversation status columns, search index, deletion tombstone and purge manifest |
-| v34 | 012-T05 (W1, replaces the v30 named in 012) | Control events and side notes |
-| v35 | 005-T01 (W2) | Plan acceptance, Attempt admission and Effect records |
-| v36 | 007-T01 (W2) | `artifact_export_receipts`, source Conversation columns |
-| v37 | 009 (W2) | Conversation Coworker origin and memory fields |
-| v38 | 013 (W2/W3) | Package approvals and operation receipts |
-| v39 | 006-T01 (W3) | `connections` rebuild and Connection records |
-| v40 | 008-T01 (W3) | Browser session/lease/receipt and terminal session/receipt |
-| v41 | 015 (W4) | `task_control_requests`, `task_resume_packets` |
-| v42 | 020-T02 (W4) | `learning_candidates`, `coworker_learning_policies`, `memory_records` |
-| v43 | 010-T01 (W5) | Delivery lease and status transitions, SUPPRESSED rows |
-| v44 | 017 (W6) | `backup_operations` |
-| v45 (if needed) | 018 (W6) | Optional diagnostics table; the usage table comes from 001 |
+| v30 (wired) | 001-T25 (done) | REPORTED Conversation turn activity records |
+| v31 (wired) | 014-T03 (partial: storage only) | `conversation_history_state` side table (status, archived_at, deleted_at); search index and purge manifest are NOT in v31 and take a later number |
+| v32 (wired) | 012-T05 (partial: storage only) | `conversation_control_events`, `conversation_owner_side_notes` (replaces the v30 named in 012) |
+| v33, v34 | 002-T04, 002-T07 (W1) | Runtime-local descriptor store; auth observations (renumbered from v30, v31 on 2026-11-10 because those were taken) |
+| v35 | 003-T09 (W1) | `context_attachments`, `retrieval_receipts` (renumbered from v32) |
+| v36 | 005-T01 (W2) | Plan acceptance, Attempt admission and Effect records |
+| v37 | 007-T01 (W2) | `artifact_export_receipts`, source Conversation columns |
+| v38 | 009 (W2) | Conversation Coworker origin and memory fields |
+| v39 | 013 (W2/W3) | Package approvals and operation receipts |
+| v40 | 006-T01 (W3) | `connections` rebuild and Connection records |
+| v41 | 008-T01 (W3) | Browser session/lease/receipt and terminal session/receipt |
+| v42 | 015 (W4) | `task_control_requests`, `task_resume_packets` |
+| v43 | 020-T02 (W4) | `learning_candidates`, `coworker_learning_policies`, `memory_records` |
+| v44 | 010-T01 (W5) | Delivery lease and status transitions, SUPPRESSED rows |
+| v45 | 017 (W6) | `backup_operations` |
+| v46 (if needed) | 018 (W6) | Optional diagnostics table; the usage table comes from 001 |
 
 Packages 004, 011, 016 and 019 plan no migration.
 

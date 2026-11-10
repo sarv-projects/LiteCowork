@@ -11,7 +11,7 @@ use storage_core::conversation::CONVERSATION_TURN_IN_PROGRESS;
 
 const AT: &str = "2026-10-09T12:00:00Z";
 
-fn fixture() -> (
+pub(super) fn fixture() -> (
     tempfile::TempDir,
     SqliteWorkspaceStore,
     CreateConversationTurnCommit,

@@ -56,7 +56,7 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T03 - Implement Windows WorkspaceRoot add on the GA row
 
-- **Status:** NOT STARTED (Windows fallback of `create_workspace_root_from_native_selection` in `apps/litecoworkd/src/operator.rs` returns 503; Tauri `add_workspace_root` already has a `#[cfg(windows)]` path-encoding branch in `apps/litecowork-ui/src-tauri/src/lib.rs`)
+- **Status:** DEFERRED (Windows-only per owner instruction 2026-11-10; to be tested on the owner's Windows laptop later; nothing here is claimed done) - NOT STARTED (Windows fallback of `create_workspace_root_from_native_selection` in `apps/litecoworkd/src/operator.rs` returns 503; Tauri `add_workspace_root` already has a `#[cfg(windows)]` path-encoding branch in `apps/litecowork-ui/src-tauri/src/lib.rs`)
 - **Depends on:** T01, T02
 - **Cross-package prerequisites:** Feature 011 Windows named-pipe Operator IPC (Wave 0) for the end-to-end call; the handler itself is unit-testable without it.
 - **Owner:** Resource, Security/Trust
@@ -75,7 +75,7 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T04 - Windows startup identity revalidation for saved roots
 
-- **Status:** PARTIAL (`list_workspace_root_revalidation_candidates` and `commit_workspace_root_revalidation` exist in `crates/storage-core/src/lib.rs`; Windows identity comparison through `RawDirectoryIdentity::matches_binding` in `apps/litecoworkd/src/local_filesystem.rs` is compiled but not exercised by a Windows root; startup call sites in `apps/litecoworkd/src/runtime.rs`)
+- **Status:** Windows part DEFERRED (owner instruction 2026-11-10); Linux part not reached in this slice. PARTIAL (`list_workspace_root_revalidation_candidates` and `commit_workspace_root_revalidation` exist in `crates/storage-core/src/lib.rs`; Windows identity comparison through `RawDirectoryIdentity::matches_binding` in `apps/litecoworkd/src/local_filesystem.rs` is compiled but not exercised by a Windows root; startup call sites in `apps/litecoworkd/src/runtime.rs`)
 - **Depends on:** T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Resource
@@ -93,7 +93,7 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T05 - Implement the Windows bounded manual rescan
 
-- **Status:** NOT STARTED (non-Linux returns 501 `SCAN_UNSUPPORTED_PLATFORM` at `scan_workspace_root`; Linux census in `scan_linux_root`; `windows_directory_entry_is_traversable` and `WINDOWS_FILE_ATTRIBUTE_REPARSE_POINT` exist in `apps/litecoworkd/src/local_filesystem.rs`, whose comment states Windows traversal stays unsupported until a race-free handle-relative open API exists)
+- **Status:** DEFERRED (Windows-only per owner instruction 2026-11-10; to be tested on the owner's Windows laptop later; nothing here is claimed done) - NOT STARTED (non-Linux returns 501 `SCAN_UNSUPPORTED_PLATFORM` at `scan_workspace_root`; Linux census in `scan_linux_root`; `windows_directory_entry_is_traversable` and `WINDOWS_FILE_ATTRIBUTE_REPARSE_POINT` exist in `apps/litecoworkd/src/local_filesystem.rs`, whose comment states Windows traversal stays unsupported until a race-free handle-relative open API exists)
 - **Depends on:** T03
 - **Cross-package prerequisites:** NONE
 - **Owner:** Resource
@@ -112,7 +112,7 @@ Gaps: Windows add/scan (GA row), Windows path-identity tests, root content inges
 
 ## 003-T06 - Symlink, reparse-point and path-identity denial matrix
 
-- **Status:** NOT STARTED
+- **Status:** DEFERRED (Windows-only per owner instruction 2026-11-10; to be tested on the owner's Windows laptop later; nothing here is claimed done) - NOT STARTED
 - **Depends on:** T03, T05
 - **Cross-package prerequisites:** NONE
 - **Owner:** Security/Trust, Resource

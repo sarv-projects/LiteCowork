@@ -100,6 +100,144 @@ pub trait ConversationStore: Send + Sync {
     ) -> Result<Vec<ConversationRecord>, StoreError>;
 }
 
+/// Lifecycle status of a Conversation in the history list (spec 014). A Conversation
+/// with no `conversation_history_state` row is `Active`.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ConversationStatus {
+    Active,
+    Archived,
+    DeletionPending,
+    Deleted,
+}
+
+impl ConversationStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "ACTIVE",
+            Self::Archived => "ARCHIVED",
+            Self::DeletionPending => "DELETION_PENDING",
+            Self::Deleted => "DELETED",
+        }
+    }
+}
+
+/// Stable codes for history-management refusals (014 T03). Surface as HTTP 409.
+pub const CONVERSATION_ARCHIVED: &str = "CONVERSATION_ARCHIVED";
+pub const CONVERSATION_DELETED: &str = "CONVERSATION_DELETED";
+pub const CONVERSATION_NOT_QUIESCENT: &str = "CONVERSATION_NOT_QUIESCENT";
+
+/// Version-fenced, idempotent Conversation rename. The event carries `title_digest`
+/// only, never the title.
+#[derive(Clone, Debug)]
+pub struct RenameConversation {
+    pub request: WorkspaceCreateRequest,
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub expected_version: u64,
+    pub title: String,
+    pub event: EventDraft,
+}
+
+/// Version-fenced, idempotent archive (`archived = true`) or unarchive.
+#[derive(Clone, Debug)]
+pub struct SetConversationArchived {
+    pub request: WorkspaceCreateRequest,
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub expected_version: u64,
+    pub archived: bool,
+    pub event: EventDraft,
+}
+
+pub trait ConversationHistoryStore: Send + Sync {
+    fn rename_conversation(
+        &self,
+        commit: RenameConversation,
+    ) -> Result<CommittedConversation, StoreError>;
+
+    fn set_conversation_archived(
+        &self,
+        commit: SetConversationArchived,
+    ) -> Result<CommittedConversation, StoreError>;
+
+    fn get_conversation_status(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        conversation_id: &str,
+    ) -> Result<Option<ConversationStatus>, StoreError>;
+
+    /// Lists Conversations with exactly the requested status, newest first, using the
+    /// same `(created_at, conversation_id)` cursor as `list_conversations`.
+    fn list_conversations_by_status(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        status: ConversationStatus,
+        after_created_at: Option<&str>,
+        after_conversation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ConversationRecord>, StoreError>;
+}
+
+/// Maximum characters of an owner side note body (012 AC-006).
+pub const OWNER_SIDE_NOTE_MAX_CHARS: usize = 4_000;
+/// Side note refused because its correlated turn is already terminal (012 AC-005).
+pub const SIDE_NOTE_TURN_TERMINAL: &str = "SIDE_NOTE_TURN_TERMINAL";
+/// Side note body is empty or over the character limit (012 AC-006).
+pub const SIDE_NOTE_OVER_BUDGET: &str = "SIDE_NOTE_OVER_BUDGET";
+
+/// Immutable provenance row appended in the same transaction that settles a turn
+/// CANCELLED after an owner take-over.
+#[derive(Clone, Debug)]
+pub struct OwnerControlEventInsert {
+    pub control_event_id: String,
+    pub occurred_at: String,
+}
+
+/// A bounded owner side note correlated to a non-terminal turn. Never a
+/// `conversation_messages` row, so it can never enter a native prompt.
+#[derive(Clone, Debug)]
+pub struct AppendOwnerSideNote {
+    pub request: WorkspaceCreateRequest,
+    pub principal_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub correlated_turn_id: String,
+    pub side_note_id: String,
+    pub body: String,
+    pub created_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct OwnerSideNoteRecord {
+    pub side_note_id: String,
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub correlated_turn_id: String,
+    pub body: String,
+    pub created_at: String,
+}
+
+pub trait ConversationCoeditStore: Send + Sync {
+    /// Idempotent. Fails with `SIDE_NOTE_TURN_TERMINAL`, `SIDE_NOTE_OVER_BUDGET` or
+    /// `NotFound` (foreign owner, Workspace or cross-Conversation turn) and writes nothing.
+    fn append_owner_side_note(
+        &self,
+        commit: AppendOwnerSideNote,
+    ) -> Result<OwnerSideNoteRecord, StoreError>;
+
+    fn list_owner_side_notes(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        conversation_id: &str,
+        correlated_turn_id: &str,
+    ) -> Result<Vec<OwnerSideNoteRecord>, StoreError>;
+}
+
 /// A USER message committed with its OPEN turn. JSON values retain the public
 /// PrincipalRef, MessageContentBlock, ResourceRef, and channel reference shapes.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -387,6 +525,9 @@ pub struct SettleConversationTurn {
     /// Whatever usage was observed for this attempt (B-10); `None` records UNKNOWN. A
     /// missing or rejected usage row never blocks the settlement.
     pub usage: Option<ConversationTurnUsage>,
+    /// When set (take-control), an `OWNER_TOOK_CONTROL` event is appended in the same
+    /// transaction. Only valid with `TurnCommand::SettleCancelled`.
+    pub control_event: Option<OwnerControlEventInsert>,
 }
 
 #[derive(Clone, Debug)]

@@ -381,6 +381,7 @@ impl Activated {
         };
         let from = if turn_version == 3 { "CANCEL_REQUESTED" } else { "RUNNING" };
         self.store.settle_conversation_turn(SettleConversationTurn {
+            control_event: None,
             principal_id: OWNER_ID.to_owned(),
             workspace_id: WORKSPACE_ID.to_owned(),
             conversation_id: self.conversation_id.clone(),

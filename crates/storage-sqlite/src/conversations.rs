@@ -235,6 +235,7 @@ impl ConversationStore for SqliteConversationStore {
             let Some((title, actual_version, created_at, previous_binding_id)) = current else {
                 return Err(StoreError::NotFound);
             };
+            require_conversation_active(&tx, &commit.conversation_id)?;
             let actual_version = u64::try_from(actual_version)
                 .map_err(|_| StoreError::Integrity("Conversation version is invalid".to_owned()))?;
             if actual_version != commit.expected_version {
@@ -454,6 +455,7 @@ impl ConversationTurnStore for SqliteConversationStore {
             let Some((title, version, created_at, conversation_binding)) = conversation else {
                 return Err(StoreError::NotFound);
             };
+            require_conversation_active(&tx, &commit.turn.conversation_id)?;
             // Strict single-flight lane (B-01): the receipt lookup above already replayed an
             // exact repeat, so any nonterminal turn here belongs to a different request.
             let turn_in_flight: bool = tx
@@ -766,6 +768,24 @@ impl ConversationTurnStore for SqliteConversationStore {
                     next.settled_at,
                 ],
             ).map_err(map_database_error)?;
+            if let Some(control) = settlement.control_event.as_ref() {
+                if !matches!(settlement.command, TurnCommand::SettleCancelled { .. }) {
+                    return Err(StoreError::Invalid(
+                        "a control event requires a CANCELLED settlement".to_owned(),
+                    ));
+                }
+                tx.execute(
+                    "INSERT INTO conversation_control_events(control_event_id,workspace_id,conversation_id,turn_id,kind,occurred_at) VALUES(?1,?2,?3,?4,'OWNER_TOOK_CONTROL',?5)",
+                    params![
+                        control.control_event_id,
+                        settlement.workspace_id,
+                        settlement.conversation_id,
+                        settlement.turn_id,
+                        control.occurred_at,
+                    ],
+                )
+                .map_err(map_database_error)?;
+            }
             insert_domain_event(&tx, &settlement.turn_event, &state_ref)?;
             if let (Some(end), Some(session)) = (settlement.session.as_ref(), ended_session.as_ref()) {
                 let session_bytes = canonical_json(session)?;
@@ -2358,4 +2378,611 @@ pub(super) fn load_turn(
         },
     )
     .transpose()
+}
+
+impl ConversationHistoryStore for SqliteConversationStore {
+    fn rename_conversation(
+        &self,
+        commit: RenameConversation,
+    ) -> Result<CommittedConversation, StoreError> {
+        let title = commit.title.clone();
+        let payload = commit.request.request_payload.clone();
+        if title.trim().is_empty()
+            || title.chars().count() > 160
+            || title.chars().any(char::is_control)
+            || payload.get("operation").and_then(Value::as_str)
+                != Some("conversation.rename.v1")
+            || payload.get("title").and_then(Value::as_str) != Some(title.as_str())
+            || commit.event.event_type != "conversation.renamed.v1"
+        {
+            return Err(StoreError::Invalid(
+                "Conversation rename is inconsistent".to_owned(),
+            ));
+        }
+        let title_digest = digest(title.as_bytes());
+        history_mutation(
+            self,
+            &commit.request,
+            &commit.principal_id,
+            &commit.workspace_id,
+            &commit.conversation_id,
+            commit.expected_version,
+            commit.event,
+            HistoryMutation::Rename { title, title_digest },
+        )
+    }
+
+    fn set_conversation_archived(
+        &self,
+        commit: SetConversationArchived,
+    ) -> Result<CommittedConversation, StoreError> {
+        let expected_event = if commit.archived {
+            "conversation.archived.v1"
+        } else {
+            "conversation.unarchived.v1"
+        };
+        let expected_operation = if commit.archived {
+            "conversation.archive.v1"
+        } else {
+            "conversation.unarchive.v1"
+        };
+        if commit.request.request_payload.get("operation").and_then(Value::as_str)
+            != Some(expected_operation)
+            || commit.event.event_type != expected_event
+        {
+            return Err(StoreError::Invalid(
+                "Conversation archive mutation is inconsistent".to_owned(),
+            ));
+        }
+        history_mutation(
+            self,
+            &commit.request,
+            &commit.principal_id,
+            &commit.workspace_id,
+            &commit.conversation_id,
+            commit.expected_version,
+            commit.event,
+            HistoryMutation::Archive(commit.archived),
+        )
+    }
+
+    fn get_conversation_status(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        conversation_id: &str,
+    ) -> Result<Option<ConversationStatus>, StoreError> {
+        if principal_id.trim().is_empty()
+            || workspace_id.trim().is_empty()
+            || conversation_id.trim().is_empty()
+        {
+            return Err(StoreError::Invalid(
+                "Conversation lookup is invalid".to_owned(),
+            ));
+        }
+        let (principal, workspace, id) = (
+            principal_id.to_owned(),
+            workspace_id.to_owned(),
+            conversation_id.to_owned(),
+        );
+        self.run(move |connection| {
+            let allowed: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2)",
+                    params![workspace, principal],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !allowed {
+                return Err(StoreError::NotFound);
+            }
+            let exists: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversations WHERE workspace_id=?1 AND conversation_id=?2)",
+                    params![workspace, id],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !exists {
+                return Ok(None);
+            }
+            Ok(Some(read_conversation_status(connection, &id)?))
+        })
+    }
+
+    fn list_conversations_by_status(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        status: ConversationStatus,
+        after_created_at: Option<&str>,
+        after_conversation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ConversationRecord>, StoreError> {
+        if principal_id.trim().is_empty()
+            || workspace_id.trim().is_empty()
+            || !(1..=101).contains(&limit)
+            || after_created_at.is_some() != after_conversation_id.is_some()
+        {
+            return Err(StoreError::Invalid(
+                "Conversation page query is invalid".to_owned(),
+            ));
+        }
+        let principal = principal_id.to_owned();
+        let workspace = workspace_id.to_owned();
+        let after_at = after_created_at.map(str::to_owned);
+        let after_id = after_conversation_id.map(str::to_owned);
+        let status = status.as_str();
+        self.run(move |connection| {
+            let allowed: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2)",
+                    params![workspace, principal],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !allowed {
+                return Err(StoreError::NotFound);
+            }
+            let mut statement = connection
+                .prepare(
+                    "SELECT c.conversation_id,c.workspace_id,c.title,c.active_agent_binding_id,c.version,c.created_at \
+                     FROM conversations c LEFT JOIN conversation_history_state h ON h.conversation_id=c.conversation_id \
+                     WHERE c.workspace_id=?1 AND COALESCE(h.status,'ACTIVE')=?5 \
+                     AND (?2 IS NULL OR (c.created_at,c.conversation_id)<(?2,?3)) \
+                     ORDER BY c.created_at DESC,c.conversation_id DESC LIMIT ?4",
+                )
+                .map_err(map_database_error)?;
+            statement
+                .query_map(params![workspace, after_at, after_id, limit as i64, status], |row| {
+                    Ok(ConversationRecord {
+                        conversation_id: row.get(0)?,
+                        workspace_id: row.get(1)?,
+                        title: row.get(2)?,
+                        active_agent_binding_id: row.get(3)?,
+                        version: row.get::<_, i64>(4)? as u64,
+                        created_at: row.get(5)?,
+                    })
+                })
+                .map_err(map_database_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(map_database_error)
+        })
+    }
+}
+
+enum HistoryMutation {
+    Rename { title: String, title_digest: String },
+    Archive(bool),
+}
+
+fn read_conversation_status(
+    connection: &Connection,
+    conversation_id: &str,
+) -> Result<ConversationStatus, StoreError> {
+    let status: Option<String> = connection
+        .query_row(
+            "SELECT status FROM conversation_history_state WHERE conversation_id=?1",
+            [conversation_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(map_database_error)?;
+    match status.as_deref() {
+        None | Some("ACTIVE") => Ok(ConversationStatus::Active),
+        Some("ARCHIVED") => Ok(ConversationStatus::Archived),
+        Some("DELETION_PENDING") => Ok(ConversationStatus::DeletionPending),
+        Some("DELETED") => Ok(ConversationStatus::Deleted),
+        Some(_) => Err(StoreError::Integrity(
+            "Conversation history status is invalid".to_owned(),
+        )),
+    }
+}
+
+/// Rejects a write against a Conversation that is not ACTIVE. Called inside the
+/// caller's own IMMEDIATE transaction so the check cannot race an archive.
+fn require_conversation_active(
+    connection: &Connection,
+    conversation_id: &str,
+) -> Result<(), StoreError> {
+    match read_conversation_status(connection, conversation_id)? {
+        ConversationStatus::Active => Ok(()),
+        ConversationStatus::Archived => {
+            Err(StoreError::Invalid(CONVERSATION_ARCHIVED.to_owned()))
+        }
+        ConversationStatus::DeletionPending | ConversationStatus::Deleted => {
+            Err(StoreError::Invalid(CONVERSATION_DELETED.to_owned()))
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn history_mutation(
+    store: &SqliteConversationStore,
+    request: &WorkspaceCreateRequest,
+    principal_id: &str,
+    workspace_id: &str,
+    conversation_id: &str,
+    expected_version: u64,
+    event: EventDraft,
+    mutation: HistoryMutation,
+) -> Result<CommittedConversation, StoreError> {
+    let next_version = expected_version
+        .checked_add(1)
+        .filter(|version| *version <= i64::MAX as u64)
+        .ok_or_else(|| StoreError::Invalid("Conversation version exhausted".to_owned()))?;
+    let payload = &request.request_payload;
+    if principal_id.trim().is_empty()
+        || request.principal_id != principal_id
+        || !super::valid_shared_idempotency_key(&request.request_id)
+        || workspace_id.trim().is_empty()
+        || conversation_id.trim().is_empty()
+        || expected_version == 0
+        || payload.get("workspace_id").and_then(Value::as_str) != Some(workspace_id)
+        || payload.get("conversation_id").and_then(Value::as_str) != Some(conversation_id)
+        || payload.get("expected_version").and_then(Value::as_u64) != Some(expected_version)
+        || event.workspace_id != workspace_id
+        || event.entity_type != "Conversation"
+        || event.entity_id != conversation_id
+        || event.entity_revision != next_version
+        || event.schema_version != 1
+    {
+        return Err(StoreError::Invalid(
+            "Conversation history mutation is inconsistent".to_owned(),
+        ));
+    }
+    let request_digest = digest(&canonical_json(payload)?);
+    let blobs = Arc::clone(&store.store.inner.blobs);
+    let principal_id = principal_id.to_owned();
+    let workspace_id = workspace_id.to_owned();
+    let conversation_id = conversation_id.to_owned();
+    let request_id = request.request_id.clone();
+    store.run(move |connection| {
+        let tx = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(map_database_error)?;
+        if let Some(replay) = verify_request_receipt::<CommittedConversation>(
+            &tx,
+            &principal_id,
+            &request_id,
+            &request_digest,
+        )? {
+            tx.commit().map_err(map_database_error)?;
+            return Ok(replay);
+        }
+        let workspace_status: Option<String> = tx
+            .query_row(
+                "SELECT status FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2",
+                params![workspace_id, principal_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(map_database_error)?;
+        match workspace_status.as_deref() {
+            None => return Err(StoreError::NotFound),
+            Some("ACTIVE") => {}
+            Some(_) => return Err(StoreError::Invalid("WORKSPACE_ARCHIVED".to_owned())),
+        }
+        let current: Option<(Option<String>, i64, String, Option<String>)> = tx
+            .query_row(
+                "SELECT title,version,created_at,active_agent_binding_id FROM conversations WHERE workspace_id=?1 AND conversation_id=?2",
+                params![workspace_id, conversation_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .optional()
+            .map_err(map_database_error)?;
+        let Some((title, actual_version, created_at, binding)) = current else {
+            return Err(StoreError::NotFound);
+        };
+        let actual_version = u64::try_from(actual_version)
+            .map_err(|_| StoreError::Integrity("Conversation version is invalid".to_owned()))?;
+        if actual_version != expected_version {
+            return Err(StoreError::Conflict {
+                expected: Some(expected_version),
+                actual: Some(actual_version),
+            });
+        }
+        let status = read_conversation_status(&tx, &conversation_id)?;
+        let mut event_draft = event;
+        let mut new_title = title.clone();
+        match &mutation {
+            HistoryMutation::Rename { title, title_digest } => {
+                require_conversation_active(&tx, &conversation_id)?;
+                new_title = Some(title.clone());
+                event_draft.payload = serde_json::json!({
+                    "workspace_id": workspace_id,
+                    "conversation_id": conversation_id,
+                    "title_digest": title_digest,
+                    "changed_by": {"kind":"USER","principal_id":principal_id},
+                    "aggregate_version": next_version,
+                });
+            }
+            HistoryMutation::Archive(true) => {
+                require_conversation_active(&tx, &conversation_id)?;
+                let in_flight: bool = tx
+                    .query_row(
+                        "SELECT EXISTS(SELECT 1 FROM conversation_turns WHERE conversation_id=?1 AND status IN ('OPEN','RUNNING','WAITING_USER','WAITING_DEPENDENCY','CANCEL_REQUESTED'))",
+                        params![conversation_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(map_database_error)?;
+                if in_flight {
+                    return Err(StoreError::Invalid(CONVERSATION_NOT_QUIESCENT.to_owned()));
+                }
+                event_draft.payload = serde_json::json!({
+                    "workspace_id": workspace_id,
+                    "conversation_id": conversation_id,
+                    "changed_by": {"kind":"USER","principal_id":principal_id},
+                    "aggregate_version": next_version,
+                });
+            }
+            HistoryMutation::Archive(false) => {
+                match status {
+                    ConversationStatus::Archived => {}
+                    ConversationStatus::Active => {
+                        return Err(StoreError::Conflict {
+                            expected: Some(expected_version),
+                            actual: Some(actual_version),
+                        });
+                    }
+                    _ => return Err(StoreError::Invalid(CONVERSATION_DELETED.to_owned())),
+                }
+                event_draft.payload = serde_json::json!({
+                    "workspace_id": workspace_id,
+                    "conversation_id": conversation_id,
+                    "changed_by": {"kind":"USER","principal_id":principal_id},
+                    "aggregate_version": next_version,
+                });
+            }
+        }
+        let conversation = ConversationRecord {
+            conversation_id: conversation_id.clone(),
+            workspace_id: workspace_id.clone(),
+            title: new_title,
+            active_agent_binding_id: binding,
+            version: next_version,
+            created_at,
+        };
+        validate_conversation_record(&conversation)?;
+        let changed = tx
+            .execute(
+                "UPDATE conversations SET title=?1,version=?2 WHERE workspace_id=?3 AND conversation_id=?4 AND version=?5",
+                params![conversation.title, next_version as i64, workspace_id, conversation_id, expected_version as i64],
+            )
+            .map_err(map_database_error)?;
+        if changed != 1 {
+            return Err(StoreError::Conflict {
+                expected: Some(expected_version),
+                actual: None,
+            });
+        }
+        if let HistoryMutation::Archive(archived) = &mutation {
+            let at = event_draft.recorded_at.clone();
+            if *archived {
+                tx.execute(
+                    "INSERT INTO conversation_history_state(conversation_id,workspace_id,status,archived_at,deleted_at,updated_at) VALUES(?1,?2,'ARCHIVED',?3,NULL,?3) ON CONFLICT(conversation_id) DO UPDATE SET status='ARCHIVED',archived_at=?3,updated_at=?3",
+                    params![conversation_id, workspace_id, at],
+                )
+            } else {
+                tx.execute(
+                    "UPDATE conversation_history_state SET status='ACTIVE',archived_at=NULL,updated_at=?2 WHERE conversation_id=?1",
+                    params![conversation_id, at],
+                )
+            }
+            .map_err(map_database_error)?;
+        }
+        let state_bytes = canonical_json(&conversation)?;
+        let state_blob = blobs.put(
+            &workspace_id,
+            BlobPurpose::AggregateState,
+            &state_bytes,
+            super::STATE_MEDIA_TYPE,
+        )?;
+        if state_blob.size_bytes != state_bytes.len() as u64
+            || blobs.get(&workspace_id, BlobPurpose::AggregateState, &state_blob)? != state_bytes
+        {
+            return Err(StoreError::Integrity(
+                "Conversation aggregate state failed BlobStore verification".to_owned(),
+            ));
+        }
+        let state_ref = AggregateStateRef {
+            blob: state_blob,
+            entity_revision: next_version,
+            record_schema_version: 1,
+        };
+        let event = insert_domain_event(&tx, &event_draft, &state_ref)?;
+        let accepted = CommittedConversation { conversation, event };
+        let response_json = String::from_utf8(canonical_json(&accepted)?)
+            .map_err(|error| StoreError::Invalid(error.to_string()))?;
+        tx.execute(
+            "INSERT INTO request_dedup(principal_id,request_id,request_digest,response_json,response_digest,created_at,expires_at) VALUES(?1,?2,?3,?4,?5,?6,NULL)",
+            params![
+                principal_id,
+                request_id,
+                request_digest,
+                response_json,
+                digest(response_json.as_bytes()),
+                accepted.event.recorded_at,
+            ],
+        )
+        .map_err(map_database_error)?;
+        tx.commit().map_err(map_database_error)?;
+        Ok(accepted)
+    })
+}
+
+impl ConversationCoeditStore for SqliteConversationStore {
+    fn append_owner_side_note(
+        &self,
+        commit: AppendOwnerSideNote,
+    ) -> Result<OwnerSideNoteRecord, StoreError> {
+        let valid = |value: &str| {
+            !value.trim().is_empty() && value.len() <= 256 && !value.chars().any(char::is_control)
+        };
+        let payload = &commit.request.request_payload;
+        if !valid(&commit.principal_id)
+            || commit.request.principal_id != commit.principal_id
+            || !super::valid_shared_idempotency_key(&commit.request.request_id)
+            || !valid(&commit.workspace_id)
+            || !valid(&commit.conversation_id)
+            || !valid(&commit.correlated_turn_id)
+            || !valid(&commit.side_note_id)
+            || payload.get("operation").and_then(Value::as_str)
+                != Some("conversation.side_note.append.v1")
+            || payload.get("workspace_id").and_then(Value::as_str)
+                != Some(commit.workspace_id.as_str())
+            || payload.get("conversation_id").and_then(Value::as_str)
+                != Some(commit.conversation_id.as_str())
+            || payload.get("correlated_turn_id").and_then(Value::as_str)
+                != Some(commit.correlated_turn_id.as_str())
+            || payload.get("body").and_then(Value::as_str) != Some(commit.body.as_str())
+        {
+            return Err(StoreError::Invalid(
+                "owner side note request is inconsistent".to_owned(),
+            ));
+        }
+        if commit.body.trim().is_empty()
+            || commit.body.chars().count() > OWNER_SIDE_NOTE_MAX_CHARS
+        {
+            return Err(StoreError::Invalid(SIDE_NOTE_OVER_BUDGET.to_owned()));
+        }
+        let created_at = canonicalize_utc_timestamp(&commit.created_at)?;
+        let request_digest = digest(&canonical_json(payload)?);
+        self.run(move |connection| {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(map_database_error)?;
+            if let Some(replay) = verify_request_receipt::<OwnerSideNoteRecord>(
+                &tx,
+                &commit.principal_id,
+                &commit.request.request_id,
+                &request_digest,
+            )? {
+                tx.commit().map_err(map_database_error)?;
+                return Ok(replay);
+            }
+            let allowed: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2 AND status='ACTIVE')",
+                    params![commit.workspace_id, commit.principal_id],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !allowed {
+                return Err(StoreError::NotFound);
+            }
+            let conversation_exists: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversations WHERE workspace_id=?1 AND conversation_id=?2)",
+                    params![commit.workspace_id, commit.conversation_id],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !conversation_exists {
+                return Err(StoreError::NotFound);
+            }
+            require_conversation_active(&tx, &commit.conversation_id)?;
+            let turn = load_turn(
+                &tx,
+                &commit.workspace_id,
+                &commit.conversation_id,
+                &commit.correlated_turn_id,
+            )?
+            .ok_or(StoreError::NotFound)?;
+            if turn.status.is_terminal() {
+                return Err(StoreError::Invalid(SIDE_NOTE_TURN_TERMINAL.to_owned()));
+            }
+            tx.execute(
+                "INSERT INTO conversation_owner_side_notes(side_note_id,workspace_id,conversation_id,correlated_turn_id,body,created_at) VALUES(?1,?2,?3,?4,?5,?6)",
+                params![
+                    commit.side_note_id,
+                    commit.workspace_id,
+                    commit.conversation_id,
+                    commit.correlated_turn_id,
+                    commit.body,
+                    created_at,
+                ],
+            )
+            .map_err(map_database_error)?;
+            let record = OwnerSideNoteRecord {
+                side_note_id: commit.side_note_id,
+                workspace_id: commit.workspace_id,
+                conversation_id: commit.conversation_id,
+                correlated_turn_id: commit.correlated_turn_id,
+                body: commit.body,
+                created_at: created_at.clone(),
+            };
+            let response_json = String::from_utf8(canonical_json(&record)?)
+                .map_err(|error| StoreError::Invalid(error.to_string()))?;
+            tx.execute(
+                "INSERT INTO request_dedup(principal_id,request_id,request_digest,response_json,response_digest,created_at,expires_at) VALUES(?1,?2,?3,?4,?5,?6,NULL)",
+                params![
+                    commit.principal_id,
+                    commit.request.request_id,
+                    request_digest,
+                    response_json,
+                    digest(response_json.as_bytes()),
+                    created_at,
+                ],
+            )
+            .map_err(map_database_error)?;
+            tx.commit().map_err(map_database_error)?;
+            Ok(record)
+        })
+    }
+
+    fn list_owner_side_notes(
+        &self,
+        principal_id: &str,
+        workspace_id: &str,
+        conversation_id: &str,
+        correlated_turn_id: &str,
+    ) -> Result<Vec<OwnerSideNoteRecord>, StoreError> {
+        if principal_id.trim().is_empty()
+            || workspace_id.trim().is_empty()
+            || conversation_id.trim().is_empty()
+            || correlated_turn_id.trim().is_empty()
+        {
+            return Err(StoreError::Invalid(
+                "owner side note lookup is invalid".to_owned(),
+            ));
+        }
+        let (principal, workspace, conversation, turn) = (
+            principal_id.to_owned(),
+            workspace_id.to_owned(),
+            conversation_id.to_owned(),
+            correlated_turn_id.to_owned(),
+        );
+        self.run(move |connection| {
+            let allowed: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM workspaces WHERE workspace_id=?1 AND owner_principal_id=?2)",
+                    params![workspace, principal],
+                    |row| row.get(0),
+                )
+                .map_err(map_database_error)?;
+            if !allowed {
+                return Err(StoreError::NotFound);
+            }
+            let mut statement = connection
+                .prepare(
+                    "SELECT side_note_id,workspace_id,conversation_id,correlated_turn_id,body,created_at FROM conversation_owner_side_notes WHERE workspace_id=?1 AND conversation_id=?2 AND correlated_turn_id=?3 ORDER BY created_at,side_note_id",
+                )
+                .map_err(map_database_error)?;
+            statement
+                .query_map(params![workspace, conversation, turn], |row| {
+                    Ok(OwnerSideNoteRecord {
+                        side_note_id: row.get(0)?,
+                        workspace_id: row.get(1)?,
+                        conversation_id: row.get(2)?,
+                        correlated_turn_id: row.get(3)?,
+                        body: row.get(4)?,
+                        created_at: row.get(5)?,
+                    })
+                })
+                .map_err(map_database_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(map_database_error)
+        })
+    }
 }

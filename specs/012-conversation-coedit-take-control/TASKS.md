@@ -35,7 +35,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T05 - Add control-event and side-note storage with CAS and idempotency
 
-- **Status:** BLOCKED - waits on Feature 001 effective Stop/quiescence (B-34 caveat; owner Agent Runtime); no record or table exists.
+- **Status:** PARTIAL - storage layer done (2026-11-10): `docs/schemas/sqlite-v32.sql` (`conversation_control_events` append-only, `conversation_owner_side_notes`), `ConversationCoeditStore::{append_owner_side_note, list_owner_side_notes}`, and `SettleConversationTurn.control_event` which appends `OWNER_TOOK_CONTROL` in the same transaction as the `SettleCancelled` settlement. Tests `conversation_coedit_*` (4) pass: replay, changed-payload refusal, `SIDE_NOTE_TURN_TERMINAL`, `SIDE_NOTE_OVER_BUDGET`, foreign owner NotFound, side note absent from the context package, atomic rollback when the control-event insert fails. NOT done: no new domain events for side notes or control events (so no EVENTS.md or `domain-event.schema.json` change yet), `CrossWorkspace` is returned as NotFound, no `OWNER_RELEASED_CONTROL` writer, T01 contract promotion.
 - **Depends on:** T01
 - **Cross-package prerequisites:** Feature 001 single-flight storage task (T11 in that package) and its migration.
 - **Owner:** Storage, Conversation.
@@ -54,7 +54,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T02 - Implement take-control over a running turn
 
-- **Status:** BLOCKED - waits on Feature 001 effective Stop with observed quiescence (A-25; owner Agent Runtime).
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: waits on Feature 001 effective Stop with observed quiescence (A-25; owner Agent Runtime).
 - **Depends on:** T01, T05
 - **Cross-package prerequisites:** Feature 001 task T07 (effective Stop and quiescence).
 - **Owner:** Agent Runtime, Conversation.
@@ -74,7 +74,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T03 - Implement correlated side-chat and exclude it from the native prompt
 
-- **Status:** BLOCKED - waits on Feature 001 effective Stop/quiescence (B-34 caveat; owner Agent Runtime).
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: waits on Feature 001 effective Stop/quiescence (B-34 caveat; owner Agent Runtime).
 - **Depends on:** T01, T05
 - **Cross-package prerequisites:** NONE beyond the package-level sequencing above.
 - **Owner:** Conversation.
@@ -92,7 +92,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T04 - Project and render the truthful driver indicator
 
-- **Status:** BLOCKED - depends on T02 and T03 (and therefore on Feature 001 Stop/quiescence).
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: depends on T02 and T03 (and therefore on Feature 001 Stop/quiescence).
 - **Depends on:** T02-T03
 - **Cross-package prerequisites:** Feature 001 projected active-turn version (its T16).
 - **Owner:** Presentation Operator, Desktop UI.
@@ -109,7 +109,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T06 - Add Tauri commands and the take-control and side-chat composer controls
 
-- **Status:** BLOCKED - depends on T02-T04.
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: depends on T02-T04.
 - **Depends on:** T02-T04
 - **Cross-package prerequisites:** Feature 001 composer fencing (its T18).
 - **Owner:** Desktop bridge, Desktop UI.
@@ -127,7 +127,7 @@ Verified against the checkout on branch `docs/audit-competitor-superset` (after 
 
 ## 012-T07 - Prove crash, restart, replay and timeout recovery
 
-- **Status:** BLOCKED - depends on T02 and T03.
+- **Status:** NOT STARTED - unblocked: Feature 001 T07 (effective Stop with observed quiescence) and T11 are DONE and the T05 storage layer has landed; not reached in this slice. Original blocker text: depends on T02 and T03.
 - **Depends on:** T02-T03
 - **Cross-package prerequisites:** Feature 001 restart and orphan recovery sweep (its T08).
 - **Owner:** Conversation, Agent Runtime.

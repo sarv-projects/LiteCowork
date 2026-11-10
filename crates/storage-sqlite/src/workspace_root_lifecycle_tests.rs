@@ -155,11 +155,7 @@ fn workspace_root_lifecycle_same_key_replays_and_foreign_principal_is_not_found(
     // Changed payload (different action) under the same key must not replay.
     assert!(
         service
-            .change_root_status(change(
-                WorkspaceRootStatusAction::Revoke,
-                "pause-replay",
-                1
-            ))
+            .change_root_status(change(WorkspaceRootStatusAction::Revoke, "pause-replay", 1))
             .is_err()
     );
     let mut foreign = change(WorkspaceRootStatusAction::Pause, "foreign-pause", 2);

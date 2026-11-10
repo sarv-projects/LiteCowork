@@ -1118,12 +1118,22 @@ Artifact reference becomes visible. Expired temporary chunks are garbage-collect
   REPORTED-only (attribution is a CHECK-constrained constant), immutable, idempotent on
   `(turn_id, retry_ordinal, sequence)`, with a closed kind and status set and bounded labels.
   Rows are agent-reported observations, never Effects, receipts or grants.
+- migration 31 (`schemas/sqlite-v31.sql`, Feature 014 T02/T03) adds `conversation_history_state`, a side
+  table holding the lifecycle status (`ACTIVE`, `ARCHIVED`, `DELETION_PENDING`, `DELETED`) and
+  `archived_at`/`deleted_at`. A Conversation with no row is `ACTIVE`; the v1 `conversations` table and
+  existing aggregate snapshots are unchanged. This is a deliberate deviation from the 014 TASKS text
+  that named columns on `conversations`: a side table is additive, droppable in the downgrade fixture
+  and keeps the immutable v1 table untouched. Search index and purge tables are not part of v31.
+- migration 32 (`schemas/sqlite-v32.sql`, Feature 012 T05) adds `conversation_control_events`
+  (append-only `OWNER_TOOK_CONTROL`/`OWNER_RELEASED_CONTROL` provenance, unique per turn and kind) and
+  `conversation_owner_side_notes` (bounded owner notes correlated to a turn, never message rows, so they
+  cannot enter a native prompt).
 - each applied migration records a SHA-256 checksum of its exact embedded SQL bytes and
   the schema-object fingerprint at that migration boundary. Reopening verifies every
   recorded migration name/source checksum and compares the active schema version's
   fingerprint with the current non-internal `sqlite_master` objects; historical
   fingerprints are retained because later migrations intentionally add schema objects.
-  The current wired schema version is 30, so the v30 fingerprint is checked against the full
+  The current wired schema version is 32, so the v32 fingerprint is checked against the full
   current schema. Missing migration records, changed
   source checksums, or changed current schema fail closed.
 - a clean install applies migration 1, writes its migration row, and advances
