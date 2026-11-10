@@ -63,9 +63,16 @@ def main() -> int:
             f"unclassified={len(set(openapi)-(served|target))}, "
             f"unknown={len((served|target)-set(openapi))}"
         )
+    # The counts below are a drift alarm, not a target: a change must be explained here and
+    # in the commit. `served` counts only operations that are both served and present in the
+    # OpenAPI document, so a served-but-unpublished route moves only the second number. It is
+    # 4 since Feature 014 added PATCH /v1/conversations/{id}, POST .../archive and
+    # POST .../unarchive (apps/litecoworkd/src/conversation_operator.rs) beside the
+    # pre-existing POST /v1/stream; those four are recorded served-but-not-yet-in-OpenAPI
+    # debt, and the inventory is generated from source by scripts/audit_served_routes.py.
     counts = (len(inventory.get("served", [])), len(outside), len(inventory.get("target_only", [])))
-    if counts != (178, 1, 53):
-        errors.append(f"Route inventory count drift: {counts}; expected (178, 1, 53)")
+    if counts != (178, 4, 53):
+        errors.append(f"Route inventory count drift: {counts}; expected (178, 4, 53)")
     if inventory.get("version") != 3:
         errors.append(f"Unexpected route inventory version: {inventory.get('version')}")
 
