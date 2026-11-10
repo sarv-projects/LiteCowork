@@ -87,10 +87,14 @@ use tokio::sync::oneshot as tokio_oneshot;
 use tokio::{task::JoinSet, time::timeout};
 use tower::ServiceExt;
 
+#[path = "agent_auth_operator.rs"]
+mod agent_auth_operator;
 #[path = "agent_control_operator.rs"]
 mod agent_control_operator;
 #[path = "agent_credentials_routes.rs"]
 mod agent_credentials_routes;
+#[path = "agent_native_config_operator.rs"]
+mod agent_native_config_operator;
 #[path = "agent_quota_observation_operator.rs"]
 mod agent_quota_observation_operator;
 #[path = "agent_registry_operator.rs"]
@@ -1546,6 +1550,8 @@ fn build_operator_router(state: ApiState) -> Router {
         .merge(capability_invocations_operator::routes())
         .merge(agent_quota_observation_operator::routes())
         .merge(agent_control_operator::routes())
+        .merge(agent_auth_operator::routes())
+        .merge(agent_native_config_operator::routes())
         .merge(agent_credentials_routes::routes())
         .merge(approval_operator::routes())
         .merge(agent_registry_operator::routes())

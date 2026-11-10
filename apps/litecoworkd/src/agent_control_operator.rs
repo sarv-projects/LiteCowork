@@ -26,7 +26,7 @@ use std::sync::Arc;
 use storage_core::AgentCatalogStore;
 
 #[derive(Clone)]
-struct AgentControlApiState {
+pub(super) struct AgentControlApiState {
     store: super::SqliteWorkspaceStore,
     principal_id: String,
     runtime_id: String,
@@ -42,6 +42,23 @@ impl FromRef<ApiState> for AgentControlApiState {
             runtime_id: state.runtime_id.clone(),
             local_incarnation_id: state.local_incarnation_id.clone(),
             service: AgentDescriptorService::shared(),
+        }
+    }
+}
+
+impl AgentControlApiState {
+    #[cfg(test)]
+    pub(super) fn for_test(
+        store: super::SqliteWorkspaceStore,
+        principal_id: String,
+        service: Arc<AgentDescriptorService>,
+    ) -> Self {
+        Self {
+            store,
+            principal_id,
+            runtime_id: "agent-control-runtime".to_owned(),
+            local_incarnation_id: "agent-control-incarnation".to_owned(),
+            service,
         }
     }
 }
@@ -168,7 +185,7 @@ async fn refresh_control_descriptor(
 
 /// Validates the path, authorizes the Workspace owner, and resolves the profile's
 /// trusted module from the stored provider identity (None when it has no module).
-async fn resolve_module(
+pub(super) async fn resolve_module(
     state: &AgentControlApiState,
     headers: &HeaderMap,
     agent_profile_id: &str,
@@ -206,7 +223,38 @@ async fn resolve_module(
     }
 }
 
-fn validate_profile_id(value: &str) -> Result<(), Response> {
+/// The profile's current unexpired module descriptor, or the exact error response.
+/// Shared by the sign-in and native-configuration routes so neither can act on a
+/// stale or manufactured descriptor.
+pub(super) async fn fresh_descriptor(
+    state: &AgentControlApiState,
+    headers: &HeaderMap,
+    agent_profile_id: &str,
+) -> Result<crate::agents::control_descriptor::AgentControlDescriptor, Response> {
+    let (module, now) = resolve_module(state, headers, agent_profile_id).await?;
+    let Some(module) = module else {
+        return Err(unavailable_descriptor());
+    };
+    let service = state.service.clone();
+    let store = state.store.clone();
+    let runtime_id = state.runtime_id.clone();
+    let incarnation_id = state.local_incarnation_id.clone();
+    let current = tokio::task::spawn_blocking(move || {
+        service.current(&store, &module, &runtime_id, &incarnation_id, &now)
+    })
+    .await;
+    match current {
+        Ok(Ok(Some(descriptor))) => Ok(descriptor),
+        Ok(Ok(None)) => Err(unavailable_descriptor()),
+        Ok(Err(error)) => Err(map_agent_store_error(
+            error,
+            "Agent control descriptor is unavailable",
+        )),
+        Err(_) => Err(unavailable()),
+    }
+}
+
+pub(super) fn validate_profile_id(value: &str) -> Result<(), Response> {
     if value.trim().is_empty()
         || value.len() > 256
         || value.chars().any(char::is_control)
@@ -221,7 +269,7 @@ fn validate_profile_id(value: &str) -> Result<(), Response> {
     Ok(())
 }
 
-async fn no_store_middleware(request: Request<Body>, next: Next) -> Response {
+pub(super) async fn no_store_middleware(request: Request<Body>, next: Next) -> Response {
     let mut response = next.run(request).await;
     response.headers_mut().insert(
         header::CACHE_CONTROL,
@@ -498,6 +546,102 @@ mod tests {
             )),
         ));
         test_router_with(store, OWNER.to_owned(), service)
+    }
+
+    async fn refresh_opencode(router: &Router) {
+        let response = post(router, "/v1/agent-profiles/profile-opencode/refresh").await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    async fn error_code(response: Response) -> String {
+        let body = to_bytes(response.into_body(), 8192).await.expect("body");
+        let value: serde_json::Value = serde_json::from_slice(&body).expect("JSON error");
+        value["code"].as_str().unwrap_or_default().to_owned()
+    }
+
+    fn opencode_service() -> Arc<AgentDescriptorService> {
+        Arc::new(AgentDescriptorService::new(
+            crate::agents::modules::default_module_registry(),
+            Arc::new(crate::agents::descriptor_service::tests::FixtureProbe(
+                Some("2.0.32"),
+            )),
+        ))
+    }
+
+    #[tokio::test]
+    async fn agent_auth_begin_rejects_an_undeclared_method_and_never_launches() {
+        let (_directory, store) = fixture();
+        seed_runtime(&store);
+        seed_opencode_profile(&store);
+        let control = opencode_router(store.clone(), Some("2.0.32"));
+        refresh_opencode(&control).await;
+        let router = super::super::agent_auth_operator::test_router(
+            AgentControlApiState::for_test(store, OWNER.to_owned(), opencode_service()),
+        );
+        let response = post(
+            &router,
+            "/v1/agent-profiles/profile-opencode/auth/native-login/begin",
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(error_code(response).await, "INVALID_ARGUMENT");
+    }
+
+    #[tokio::test]
+    async fn agent_auth_begin_without_a_fresh_descriptor_or_module_is_unavailable() {
+        let (_directory, store) = fixture();
+        seed_runtime(&store);
+        seed_opencode_profile(&store);
+        seed_profile(&store);
+        let router = super::super::agent_auth_operator::test_router(
+            AgentControlApiState::for_test(store, OWNER.to_owned(), opencode_service()),
+        );
+        // No refresh yet: stale or missing descriptor never authorises a launch.
+        let missing = post(
+            &router,
+            "/v1/agent-profiles/profile-opencode/auth/native-login/begin",
+        )
+        .await;
+        assert_eq!(missing.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let codex = post(
+            &router,
+            "/v1/agent-profiles/profile-control/auth/native-login/begin",
+        )
+        .await;
+        assert_eq!(codex.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let bad = post(
+            &router,
+            "/v1/agent-profiles/profile-opencode/auth/%00/begin",
+        )
+        .await;
+        assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn native_config_open_rejects_undeclared_targets_and_caller_paths() {
+        let (_directory, store) = fixture();
+        seed_runtime(&store);
+        seed_opencode_profile(&store);
+        let control = opencode_router(store.clone(), Some("2.0.32"));
+        refresh_opencode(&control).await;
+        let router = super::super::agent_native_config_operator::test_router(
+            AgentControlApiState::for_test(store, OWNER.to_owned(), opencode_service()),
+        );
+        // OpenCode declares no native configuration target in V1.
+        let undeclared = post(
+            &router,
+            "/v1/agent-profiles/profile-opencode/native-config/settings/open",
+        )
+        .await;
+        assert_eq!(undeclared.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(error_code(undeclared).await, "INVALID_ARGUMENT");
+        let traversal = post(
+            &router,
+            "/v1/agent-profiles/profile-opencode/native-config/..%2Fetc/open",
+        )
+        .await;
+        assert_eq!(traversal.status(), StatusCode::BAD_REQUEST);
     }
 
     async fn post(router: &Router, path: &str) -> Response {

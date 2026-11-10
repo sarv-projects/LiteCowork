@@ -4,9 +4,10 @@
 //! evidence of authentication or session readiness. Protocol adapters fill those
 //! fields only after a scoped, side-effect-bounded handshake.
 
-pub(crate) mod acp_registry;
 pub(crate) mod acp_client;
+pub(crate) mod acp_registry;
 pub(crate) mod adapter;
+pub(crate) mod auth_service;
 mod cline;
 mod codex;
 mod codex_app_server;

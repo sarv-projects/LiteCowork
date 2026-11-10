@@ -75,6 +75,7 @@ pub(crate) struct AgentDescriptorService {
     registry: AgentModuleRegistry,
     probe: Arc<dyn DescriptorProbe>,
     budget: ProbeBudget,
+    auth: Arc<crate::agents::auth_service::AgentAuthService>,
 }
 
 impl AgentDescriptorService {
@@ -83,6 +84,7 @@ impl AgentDescriptorService {
             registry,
             probe,
             budget: ProbeBudget::default(),
+            auth: crate::agents::auth_service::AgentAuthService::shared(),
         }
     }
 
@@ -166,7 +168,7 @@ impl AgentDescriptorService {
             return Err(RefreshError::Throttled);
         }
         let probe = self.probe.probe().ok_or(RefreshError::Unavailable)?;
-        let descriptor = opencode::build_descriptor(
+        let mut descriptor = opencode::build_descriptor(
             &probe,
             runtime_id,
             runtime_incarnation_id,
@@ -174,6 +176,10 @@ impl AgentDescriptorService {
             manifest.descriptor_ttl_seconds,
         )
         .map_err(|_| RefreshError::Unavailable)?;
+        // Auth state comes only from the module-reported observation (T07).
+        self.auth
+            .overlay(&mut descriptor, now.unix_timestamp())
+            .map_err(|_| RefreshError::Unavailable)?;
         let gate = Self::gate(manifest, runtime_id, runtime_incarnation_id);
         let prior = store
             .latest_agent_control_descriptor(&gate)
