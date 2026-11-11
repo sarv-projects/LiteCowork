@@ -1,8 +1,8 @@
 # 004 - Agent Relay on One Conversation
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
-**Revision:** 1.0 | **Updated:** 2026-11-09
-**Implementation state (2026-11-10):** Not implemented. Some tasks carry PARTIAL pre-existing foundations (see TASKS.md); no 2026-11-10 work.
+**Revision:** 1.0 | **Updated:** 2026-11-11
+**Implementation state (2026-11-11):** Partial CODE only. Desktop message parsing/rendering preserves producer binding/session identity; the picker filters providers with no dispatch arm. Portable context carries producer identity, bounds history, excludes SYSTEM_NOTICE/native handles, and has an A→B→A storage regression test. Feature 001 also materializes eligible text ResourceRefs at dispatch; binary/root resources and Feature 004's adapter-budget/truncation receipt remain open. There is no qualified second provider, fresh descriptor/auth readiness gate, SQLite-to-desktop A→B→A journey, or recovery qualification. See TASKS.md and docs/IMPLEMENTATION-STATUS.md.
 **Owners:** Conversation, Agent Runtime, Product. Accepted by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
 
 ## User outcome
@@ -11,7 +11,7 @@ On one Conversation the owner runs a committed turn on agent A, a later turn on 
 
 ## Current truth
 
-The active checkout contains the Rust daemon, Tauri desktop application and shared crates. B-15 and B-16 are owner-accepted (2026-11-09) and implementation is authorized. Today the supervisor has one dispatch arm (OpenCode), no Claude Code arm, and the desktop drops producer identity in `parseConversationSnapshot`; there is no selectable A→B→A pair (SPEC §4). The implementation boundary is mapped in docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
+The active checkout contains the Rust daemon, Tauri desktop application and shared crates. B-15 and B-16 are owner-accepted (2026-11-09) and implementation is authorized. Today the supervisor has one dispatch arm (OpenCode), no Claude Code arm, and the desktop retains producer identity in `parseConversationSnapshot` and renders it on committed AGENT messages; a portable-context unit test now proves A→B→A producer attribution and excludes native session handles. There is still no selectable, qualified A→B→A provider pair (SPEC §4). The implementation boundary is mapped in docs/IMPLEMENTATION-STATUS.md; do not infer qualification from a matching route, type or screen.
 
 ## Lifecycle, scope and dependencies
 

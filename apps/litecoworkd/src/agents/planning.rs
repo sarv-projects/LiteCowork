@@ -23,6 +23,7 @@ pub(crate) enum PlanningDispatchBlocker {
     PlanningContextResourceUnavailable,
     SessionSettlementUnavailable,
     ProviderUnsupported,
+    WindowsEnvironmentProviderUnavailable,
 }
 
 /// Safe projection of a preflight, without model input or native configuration.

@@ -3,6 +3,8 @@
 **Checked:** 2026-11-06 against the active Tauri/React mount path and source files.
 **Purpose:** source-backed inventory of what the owner can actually see and invoke; this is not the target Settings design.
 
+**Historical snapshot:** several General controls and shortcut rows changed after this audit (preferences now apply/persist locally and shortcuts come from the registry). Do not use the per-control state below as current without rechecking `SettingsView.tsx`; current repository status is in `CURRENT-RUN.md` and `docs/IMPLEMENTATION-STATUS.md`.
+
 ## 1. Authority and active render path
 
 - The active Settings page branch in `apps/litecowork-ui/src/App.tsx` renders `<SettingsView ... />` from `apps/litecowork-ui/src/settings/SettingsView.tsx`.

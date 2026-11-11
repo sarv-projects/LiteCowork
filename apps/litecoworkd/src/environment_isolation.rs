@@ -19,11 +19,14 @@
 //!    only produced from an observed launch; a probe alone yields `UNKNOWN` and the
 //!    admission check therefore fails closed.
 
+use linux_process_scope::LocalProviderProbe;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
+use std::fs::File;
 use std::{
     collections::BTreeMap,
-    fs::{self, File},
+    fs,
     io::Write,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -35,27 +38,7 @@ use std::{
 /// provider state the Runtime has not re-checked.
 pub const MAX_ATTESTATION_TTL_MS: i64 = 15 * 60 * 1000;
 
-/// Observed enforcement of one isolation dimension.
-///
-/// `NOT_ENFORCED` is an observed rejection and `UNKNOWN` preserves uncertainty.
-/// Neither is ever coerced into success.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum EnforcementStatus {
-    /// The provider demonstrated the restriction and the Runtime observed it.
-    Enforced,
-    /// The provider demonstrated that the restriction is not in place.
-    NotEnforced,
-    /// Support could not be established. This never means "probably fine".
-    Unknown,
-}
-
-impl EnforcementStatus {
-    /// Only a positive observation may satisfy an admission requirement.
-    pub fn is_enforced(self) -> bool {
-        matches!(self, Self::Enforced)
-    }
-}
+use domain_environment::environment::EnforcementStatus;
 
 /// The digests a prepared Environment root contributes to an attestation.
 ///
@@ -578,85 +561,13 @@ fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-/// Capabilities a provider advertises through `probe`.
-///
-/// `probe` reports explicit feature flags and limits. Unknown support is unavailable,
-/// not assumed. These flags describe what the provider *can* do; they are never
-/// enforcement evidence.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct LocalProviderCapabilities {
-    pub provider_kind: String,
-    pub provider_version: String,
-    pub operating_system: String,
-    pub operating_system_build: String,
-    pub bubblewrap_present: bool,
-    pub bubblewrap_trusted: bool,
-    pub cgroup_v2_available: bool,
-    pub systemd_available: bool,
-    pub supports_network_isolation: bool,
-    pub supports_resource_limits: bool,
-    pub supports_read_write_no_delete: bool,
-    pub notes: Vec<String>,
-}
-
 /// Probe the local provider on this host.
 ///
 /// The probe is deliberately conservative. It reports what the host exposes, and it
 /// never claims that an enforcement dimension is active: only an observed launch can
 /// produce an attestation.
-pub fn probe_local_provider() -> LocalProviderCapabilities {
-    let mut notes = Vec::new();
-    let operating_system = std::env::consts::OS.to_owned();
-    let operating_system_build = operating_system_build();
-
-    let mut bubblewrap_present = false;
-    let mut bubblewrap_trusted = false;
-    #[cfg(target_os = "linux")]
-    {
-        for candidate in ["/usr/bin/bwrap", "/bin/bwrap", "/usr/local/bin/bwrap"] {
-            let path = Path::new(candidate);
-            if path.exists() {
-                bubblewrap_present = true;
-                if linux_process_scope::bubblewrap_binary_is_trusted(path) {
-                    bubblewrap_trusted = true;
-                    break;
-                }
-            }
-        }
-        if bubblewrap_present && !bubblewrap_trusted {
-            notes.push(
-                "bubblewrap is present but not a root-owned non-group/world-writable binary"
-                    .to_owned(),
-            );
-        }
-    }
-    if !bubblewrap_present {
-        notes.push("no qualified bubblewrap binary was found on this host".to_owned());
-    }
-
-    let cgroup_v2_available = cgroup_v2_available();
-    let systemd_available = systemd_available();
-    if !cgroup_v2_available {
-        notes.push("cgroup v2 delegation is not available on this host".to_owned());
-    }
-    if !systemd_available {
-        notes.push("the systemd user manager is not available on this host".to_owned());
-    }
-
-    LocalProviderCapabilities {
-        provider_kind: "local-bubblewrap".to_owned(),
-        provider_version: "1".to_owned(),
-        operating_system,
-        operating_system_build,
-        bubblewrap_present,
-        bubblewrap_trusted,
-        cgroup_v2_available,
-        systemd_available,
-        supports_network_isolation: bubblewrap_trusted,
-        supports_resource_limits: cgroup_v2_available,
-        supports_read_write_no_delete: false,
-        notes,
-    }
+pub fn probe_local_provider() -> LocalProviderProbe {
+    linux_process_scope::probe_local_provider()
 }
 
 /// Convert a provider probe into observed enforcement facts.
@@ -664,10 +575,10 @@ pub fn probe_local_provider() -> LocalProviderCapabilities {
 /// A probe cannot prove that a restriction was enforced at run time, so every
 /// dimension is reported as `Unknown`. The resulting attestation is refused by
 /// [`evaluate_isolation_admission`], which is the intended fail-closed behaviour.
-pub fn facts_from_probe(capabilities: &LocalProviderCapabilities) -> ProviderIsolationFacts {
+pub fn facts_from_probe(capabilities: &LocalProviderProbe) -> ProviderIsolationFacts {
     ProviderIsolationFacts {
-        provider_kind: capabilities.provider_kind.clone(),
-        provider_version: capabilities.provider_version.clone(),
+        provider_kind: "local-bubblewrap".to_owned(),
+        provider_version: "1".to_owned(),
         operating_system: capabilities.operating_system.clone(),
         operating_system_build: capabilities.operating_system_build.clone(),
         filesystem_enforcement: EnforcementStatus::Unknown,
@@ -779,33 +690,6 @@ pub fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as i64)
         .unwrap_or_default()
-}
-
-/// The operating system build the Runtime is running on.
-///
-/// An unavailable build string is reported as such; it is never replaced by a guess
-/// that would make two different hosts look identical in an attestation.
-pub fn operating_system_build() -> String {
-    #[cfg(target_os = "linux")]
-    {
-        if let Ok(build) = fs::read_to_string("/proc/sys/kernel/osrelease") {
-            let trimmed = build.trim();
-            if !trimmed.is_empty() {
-                return trimmed.to_owned();
-            }
-        }
-    }
-    "unavailable".to_owned()
-}
-
-/// Whether this host exposes a delegated cgroup v2 hierarchy.
-pub fn cgroup_v2_available() -> bool {
-    Path::new("/sys/fs/cgroup/cgroup.controllers").is_file()
-}
-
-/// Whether this host has a systemd user manager.
-pub fn systemd_available() -> bool {
-    Path::new("/run/systemd/system").is_dir()
 }
 
 /// Build the digest of a private execution identity.
@@ -1276,7 +1160,6 @@ mod tests {
     #[test]
     fn the_local_provider_probe_is_truthful_about_what_it_cannot_observe() {
         let capabilities = probe_local_provider();
-        assert!(!capabilities.supports_read_write_no_delete);
         assert!(!capabilities.operating_system.is_empty());
         let facts = facts_from_probe(&capabilities);
         assert_eq!(facts.filesystem_enforcement, EnforcementStatus::Unknown);

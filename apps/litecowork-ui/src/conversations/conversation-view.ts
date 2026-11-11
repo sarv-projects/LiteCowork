@@ -21,6 +21,9 @@ export type PendingConversationCreate = {
 export type ConversationMessageView = {
   message_id: string;
   role: "USER" | "AGENT" | "SYSTEM_NOTICE" | "CHANNEL";
+  /** LiteCowork product identities for attribution; provider-native handles stay private. */
+  agent_binding_id?: string | null;
+  agent_session_id?: string | null;
   created_at: string;
   content: Array<{ kind: "TEXT"; text: string } | { kind: "RESOURCE" }>;
   rich_presentation: RichPresentationRefView | null;
@@ -238,7 +241,10 @@ export function appendConversationPage(
 }
 
 function sameCommittedMessage(left: ConversationMessageView, right: ConversationMessageView): boolean {
-  if (left.role !== right.role || left.created_at !== right.created_at || left.content.length !== right.content.length) {
+  if (left.role !== right.role || left.created_at !== right.created_at
+    || (left.agent_binding_id ?? null) !== (right.agent_binding_id ?? null)
+    || (left.agent_session_id ?? null) !== (right.agent_session_id ?? null)
+    || left.content.length !== right.content.length) {
     return false;
   }
   return left.content.every((block, index) => {
@@ -348,6 +354,8 @@ export function parseConversationSnapshot(value: unknown, workspaceId: string, c
     const message = entry.message;
     if (message.conversation_id !== conversationId || !boundedText(message.message_id)
       || !["USER", "AGENT", "SYSTEM_NOTICE", "CHANNEL"].includes(String(message.role))
+      || !(message.agent_binding_id === undefined || message.agent_binding_id === null || boundedText(message.agent_binding_id))
+      || !(message.agent_session_id === undefined || message.agent_session_id === null || boundedText(message.agent_session_id))
       || !boundedText(message.created_at, 64) || !Array.isArray(message.content) || message.content.length > 128) {
       throw new Error("Conversation history contains an invalid message.");
     }
@@ -360,6 +368,8 @@ export function parseConversationSnapshot(value: unknown, workspaceId: string, c
     return {
       message_id: message.message_id,
       role: message.role as ConversationMessageView["role"],
+      agent_binding_id: typeof message.agent_binding_id === "string" ? message.agent_binding_id : null,
+      agent_session_id: typeof message.agent_session_id === "string" ? message.agent_session_id : null,
       created_at: message.created_at,
       content,
       rich_presentation: parseRichPresentationRef(entry.rich_presentation, message.message_id),

@@ -90,7 +90,7 @@ test("rendered indexed search advances across an empty page and stops at the ter
       const timeout = setTimeout(() => {
         pendingCommands.delete(id);
         rejectResponse(new Error(`Chrome DevTools timed out on ${method}`));
-      }, 8000);
+      }, method === "Page.navigate" ? 30_000 : 8000);
       pendingCommands.set(id, message => {
         clearTimeout(timeout);
         message.error ? rejectResponse(new Error(`${method}: ${message.error.message}`)) : resolveResponse(message.result);
@@ -125,8 +125,8 @@ test("rendered indexed search advances across an empty page and stops at the ter
 
   const clickNavigationItem = async label => {
     const clicked = await evaluate(`(() => {
-      const button = [...document.querySelectorAll(".nav-list .nav-item")]
-        .find(candidate => candidate.querySelector("span:last-child")?.textContent.trim() === ${JSON.stringify(label)});
+      const button = [...document.querySelectorAll(".sidebar-nav-list .sidebar-nav-btn")]
+        .find(candidate => candidate.querySelector(".sidebar-nav-text")?.textContent.trim() === ${JSON.stringify(label)});
       if (!button) return false;
       button.click();
       return true;
@@ -152,7 +152,8 @@ test("rendered indexed search advances across an empty page and stops at the ter
           server.middlewares.use("/tests/browser/harness.html", async (_request, response, next) => {
             try {
               response.setHeader("content-type", "text/html");
-              response.end(await server.transformIndexHtml("/tests/browser/harness.html", harnessHtml));
+              const transformed = await server.transformIndexHtml("/tests/browser/harness.html", harnessHtml);
+              response.end(transformed.replace(/<script type="module" src="\/@vite\/client"><\/script>/, ""));
             } catch (error) { next(error); }
           });
         },
@@ -167,6 +168,8 @@ test("rendered indexed search advances across an empty page and stops at the ter
     assert.ok(address && typeof address === "object", "the Vite middleware server is listening");
     const harnessResponse = await fetch(`http://127.0.0.1:${address.port}/tests/browser/harness.html`);
     assert.equal(harnessResponse.status, 200, `Vite serves the existing browser harness: ${await harnessResponse.text()}`);
+    const harnessModuleResponse = await fetch(`http://127.0.0.1:${address.port}/tests/browser/harness.tsx`);
+    assert.equal(harnessModuleResponse.status, 200, `Vite transforms the production browser harness: ${await harnessModuleResponse.text()}`);
 
     chromeProcess = spawn(chrome, [
       "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
@@ -255,7 +258,7 @@ test("rendered indexed search advances across an empty page and stops at the ter
       return true;
     })()`);
     await evaluate(`window.litecoworkHarness.mountProductionApp("first-use-conversation")`);
-    await until(() => evaluate("Boolean(document.querySelector('.workspace-switcher'))"), "production App Workspace shell");
+    await until(() => evaluate("Boolean(document.querySelector('.sidebar-workspace-switcher'))"), "production App Workspace shell");
     await clickNavigationItem("Library");
     await until(() => evaluate("Boolean(document.querySelector('#resource-search'))"), "Library search controls");
 

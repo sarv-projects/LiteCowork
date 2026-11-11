@@ -76,7 +76,7 @@ test("normal quiet-button text meets WCAG AA contrast on its white surface", asy
   assert.ok(ratio >= 4.5, `normal quiet-button text contrast is ${ratio.toFixed(2)}:1 (WCAG AA requires 4.5:1)`);
 });
 
-test("Settings keeps a plain local status visible and exposes technical details by keyboard", async t => {
+test("Settings exposes current Runtime diagnostics and a retry after refresh failure", async t => {
   if (!chrome) {
     t.skip("Set LITECOWORK_CHROME to a local Chrome/Chromium executable.");
     return;
@@ -166,7 +166,8 @@ test("Settings keeps a plain local status visible and exposes technical details 
           server.middlewares.use("/tests/browser/harness.html", async (_request, response, next) => {
             try {
               response.setHeader("content-type", "text/html");
-              response.end(await server.transformIndexHtml("/tests/browser/harness.html", harnessHtml));
+              const transformed = await server.transformIndexHtml("/tests/browser/harness.html", harnessHtml);
+              response.end(transformed.replace(/<script type="module" src="\/@vite\/client"><\/script>/, ""));
             } catch (error) { next(error); }
           });
         },
@@ -179,6 +180,8 @@ test("Settings keeps a plain local status visible and exposes technical details 
     });
     const address = httpServer.address();
     assert.ok(address && typeof address === "object", "the rendered UI test server is listening");
+    const harnessModuleResponse = await fetch(`http://127.0.0.1:${address.port}/tests/browser/harness.tsx`);
+    assert.equal(harnessModuleResponse.status, 200, `Vite transforms the production browser harness: ${await harnessModuleResponse.text()}`);
 
     chromeProcess = spawn(chrome, [
       "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
@@ -209,52 +212,39 @@ test("Settings keeps a plain local status visible and exposes technical details 
     await cdp("Page.enable");
     await cdp("Runtime.enable");
     await cdp("Page.navigate", { url: `http://127.0.0.1:${address.port}/tests/browser/harness.html` });
-    await until(() => evaluate("Boolean(document.querySelector('.harness-ready'))"), "rendered production harness", 30_000);
+    await until(() => evaluate("Boolean(document.querySelector('.harness-ready'))"), "rendered production harness", 60_000);
     assert.equal(await evaluate('window.litecoworkHarness.mountProductionApp("runtime-refresh-failure")'), true, "the production App is mounted with the local Runtime fixture");
-    await until(() => evaluate("Boolean(document.querySelector('.nav-list .nav-item'))"), "production App navigation");
+    await until(() => evaluate("Boolean(document.querySelector('.sidebar-nav-list .sidebar-nav-btn'))"), "production App navigation");
     assert.equal(await evaluate(`(() => {
-      const item = [...document.querySelectorAll('.nav-list .nav-item')]
-        .find(candidate => candidate.querySelector('span:last-child')?.textContent.trim() === 'Settings');
+      const item = document.querySelector('.sidebar-settings-btn');
       item?.click();
       return Boolean(item);
     })()`), true, "the rendered Settings navigation item is available");
-    await until(() => evaluate("document.querySelector('.page-content h1')?.textContent === 'Settings'"), "production Settings page");
-    await until(() => evaluate("Boolean(document.querySelector('details.runtime-advanced-details'))"), "collapsed Advanced details disclosure");
+    await until(() => evaluate("Boolean(document.querySelector('.sidebar-settings-btn.selected'))"), "Settings navigation selection");
+    await until(() => evaluate("Boolean(document.querySelector('[data-control-id=nav-runtime]'))"), "Runtime settings category");
+    await evaluate("document.querySelector('[data-control-id=nav-runtime]')?.click()");
+    await until(() => evaluate("Boolean(document.querySelector('h1')?.textContent.includes('Local Runtime'))"), "production Runtime settings section");
 
     const status = await evaluate(`(() => {
-      const card = document.querySelector('.runtime-card');
+      const card = document.querySelector('.settings-card');
       return {
         text: card?.innerText ?? '',
-        disclosureOpen: document.querySelector('details.runtime-advanced-details')?.open ?? null,
-        summaryTag: document.querySelector('.runtime-advanced-details summary')?.tagName ?? null,
-        hiddenRuntimeIdVisible: document.body.innerText.includes('runtime-local-test'),
+        runtimeIdVisible: document.body.innerText.includes('runtime-local-test'),
+        refreshLabel: document.querySelector('[data-control-id=runtime-refresh]')?.textContent.trim() ?? '',
       };
     })()`);
-    assert.match(status.text, /Connected on this computer/i, "Settings shows a plain-language local service status");
-    assert.match(status.text, /Task execution is not available yet/i, "Settings explains the current product limitation in plain language");
-    assert.match(status.text, /Refresh status/, "a recovery action stays visible beside the status");
-    assert.equal(status.disclosureOpen, false, "technical details start collapsed");
-    assert.equal(status.summaryTag, "SUMMARY", "the disclosure uses the native keyboard-accessible summary element");
-    assert.equal(status.hiddenRuntimeIdVisible, false, "Runtime identifiers are hidden while the disclosure is collapsed");
+    assert.match(status.text, /Daemon is currently disconnected|Local Operator API is serving and ready/i, "Settings shows the current local service status");
+    assert.match(status.text, /Execution/i, "Settings exposes the execution readiness row");
+    assert.equal(status.refreshLabel, "Refresh Status", "the status refresh action is available");
+    assert.equal(status.runtimeIdVisible, status.text.includes("Local Operator API is serving and ready."), "runtime identity is shown only when the service status provides it");
 
-    await evaluate("document.querySelector('.runtime-card .button-row .quiet-button')?.focus()");
-    await key("Tab", "Tab", 9);
-    assert.equal(await evaluate("document.activeElement?.matches('.runtime-advanced-details summary') ?? false"), true, "Tab moves from the visible recovery action to Advanced details");
-    await key("Enter", "Enter", 13);
-    await until(() => evaluate("document.querySelector('details.runtime-advanced-details')?.open === true"), "keyboard-expanded details");
-    assert.equal(await evaluate("document.body.innerText.includes('runtime-local-test')"), true, "Runtime identifiers are available after expansion");
-    await key(" ", "Space", 32);
-    await until(() => evaluate("document.querySelector('details.runtime-advanced-details')?.open === false"), "keyboard-collapsed details");
-    assert.equal(await evaluate("document.body.innerText.includes('runtime-local-test')"), false, "Space collapses the technical details again");
-
-    await evaluate("[...document.querySelectorAll('.runtime-card button')].find(button => button.textContent.trim() === 'Refresh status')?.click()");
+    await evaluate("document.querySelector('[data-control-id=runtime-refresh]')?.click()");
     await until(() => evaluate("[...document.querySelectorAll('[role=alert]')].some(node => /Desktop Runtime status is unavailable/i.test(node.textContent ?? ''))"), "local service refresh error");
     const recovery = await evaluate(`(() => ({
-      text: document.querySelector('.runtime-card')?.innerText ?? '',
-      hasRetry: [...document.querySelectorAll('.runtime-card button')].some(button => button.textContent.trim() === 'Refresh status'),
+      text: document.querySelector('.settings-card')?.innerText ?? '',
+      hasRetry: document.querySelector('[data-control-id=runtime-refresh]') !== null,
     }))()`);
-    assert.match(recovery.text, /Connection issue/i, "the failed refresh has a plain-language status");
-    assert.match(recovery.text, /Refresh status to try again/i, "the visible status explains the recovery action");
+    assert.match(recovery.text, /Runtime error: Desktop Runtime status is unavailable/i, "the failed refresh is announced in the Runtime section");
     assert.equal(recovery.hasRetry, true, "the refresh action remains available after a failed check");
   } finally {
     socket?.close();

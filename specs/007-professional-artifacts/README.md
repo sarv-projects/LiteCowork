@@ -1,8 +1,8 @@
 # 007 - Professional Artifacts One Format
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
-**Revision:** 1.0 | **Updated:** 2026-11-09
-**Implementation state (2026-11-10):** Not implemented. T12 BLOCKED for the Task-generated class; migration v37 allocated.
+**Revision:** 1.0 | **Updated:** 2026-11-11
+**Implementation state (2026-11-11):** Partial foundations only. Existing Artifact read/version/Library routes, bounded `text/plain` append editing and native Save As remain. Comrak 0.59.0 is pinned, but no Markdown format adapter/editor, production Artifact creation/provenance route, durable export receipt, Task-generated source, or packaged authoring/export journey exists. T12 remains blocked for Task-generated Artifacts; migration v37 is allocated and unwritten. See TASKS.md and docs/IMPLEMENTATION-STATUS.md.
 **Owners:** Artifacts, Presentation, Storage, Desktop UI.
 **Owner acceptance:** repository owner (sarv-projects), 2026-11-09, via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). Accepted: B-21 Markdown (`text/markdown`) first with no Office engine, B-30 `POST /v1/artifacts` create, B-31 `ArtifactExportReceipt` distinct from native Save As.
 **Release target:** V1 release matrix rows Windows 11/10 `x86_64-pc-windows-msvc` first; Linux x86_64 desktop second.

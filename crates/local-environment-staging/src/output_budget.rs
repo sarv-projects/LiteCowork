@@ -13,26 +13,9 @@
 //! [`crate::EnforcementStatus`].
 
 use crate::StagingError;
+pub use domain_environment::environment::EnforcementStatus;
 use std::fs;
 use std::path::Path;
-
-/// Observed enforcement of one isolation dimension.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EnforcementStatus {
-    /// The provider demonstrated the restriction and the Runtime observed it.
-    Enforced,
-    /// The provider demonstrated that the restriction is not in place.
-    NotEnforced,
-    /// Support could not be established. This never means "probably fine".
-    Unknown,
-}
-
-impl EnforcementStatus {
-    /// Only a positive observation may satisfy an admission requirement.
-    pub fn is_enforced(self) -> bool {
-        matches!(self, Self::Enforced)
-    }
-}
 
 /// Host-enforced file-root mode requested for a consumer-visible root.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

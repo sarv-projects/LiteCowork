@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useId, useRef, useState, type Ref } from "react";
 import "./workbench-panel.css";
 
 export type WorkbenchResource = {
@@ -11,6 +11,7 @@ export type WorkbenchResource = {
 export type WorkbenchTab = "launcher" | "files" | "terminal" | "browser" | "diffs" | "activity";
 
 export type WorkbenchPanelProps = {
+  initialTab?: WorkbenchTab;
   panelRef: Ref<HTMLElement>;
   modal: boolean;
   workspaceId: string;
@@ -119,9 +120,10 @@ export function UnavailableNotice({
   blockers: string[];
   availableNow?: string;
 }) {
+  const titleId = useId();
   return (
-    <div className="workbench-unavailable" role="status">
-      <h3 className="workbench-unavailable-title">{title}</h3>
+    <div className="workbench-unavailable" role="status" aria-labelledby={titleId} tabIndex={0}>
+      <h3 id={titleId} className="workbench-unavailable-title">{title}</h3>
       <p className="workbench-unavailable-detail">{detail}</p>
       <p className="workbench-unavailable-label">Not available in this build:</p>
       <ul className="workbench-unavailable-list">
@@ -163,7 +165,8 @@ function getFileBadgeClass(ext: string): string {
   }
 }
 
-export function TerminalPane() {
+export function TerminalPane({ platform }: { platform: string }) {
+  const windows = /win/i.test(platform);
   return (
     <section className="workbench-tab-content workbench-terminal-view" aria-label="Terminal">
       <div className="terminal-header-bar">
@@ -177,12 +180,32 @@ export function TerminalPane() {
         detail="Nothing is executed from this pane and no process output is shown, because no shell runtime is served by this build."
         blockers={[
           "a daemon-hosted terminal session service",
-          "an approved Environment to run the session in",
+          windows ? "a qualified Windows Environment provider" : "an admitted Environment for this session",
           "a live activity record that reports real progress and exit status",
         ]}
         availableNow="Workbench → Files lists the resources this Workspace has actually indexed."
       />
     </section>
+  );
+}
+
+export function ActivityPane() {
+  return (
+    <section className="workbench-tab-content workbench-activity-view" aria-label="Activity">
+      <UnavailableNotice
+        title="No recorded activity source is served by this build"
+        detail="This build does not serve an Activity record source, so no live or historical process activity is shown."
+        blockers={["a durable Activity read backed by committed records"]}
+      />
+    </section>
+  );
+}
+
+export function ComputerStatusNotice() {
+  return (
+    <p className="workbench-computer-status" role="status" aria-label="Computer use availability">
+      Computer use is unavailable in this build.
+    </p>
   );
 }
 
@@ -208,6 +231,7 @@ export function ReviewPane() {
 }
 
 export function WorkbenchPanel({
+  initialTab = "launcher",
   panelRef,
   modal,
   workspaceId,
@@ -235,7 +259,7 @@ export function WorkbenchPanel({
   onPreviewResource,
   onClosePreview: _onClosePreview,
 }: WorkbenchPanelProps) {
-  const [activeTab, setActiveTab] = useState<WorkbenchTab>("launcher");
+  const [activeTab, setActiveTab] = useState<WorkbenchTab>(initialTab);
   const [omnibarInput, setOmnibarInput] = useState("");
   const [fileFilter, setFileFilter] = useState("");
   const [copiedPreview, setCopiedPreview] = useState(false);
@@ -343,6 +367,9 @@ export function WorkbenchPanel({
             <button className={`workbench-tool-pill ${activeTab === "browser" ? "active" : ""}`} onClick={() => setActiveTab("browser")}>
               Browser
             </button>
+            <button className={`workbench-tool-pill ${activeTab === "activity" ? "active" : ""}`} onClick={() => setActiveTab("activity")}>
+              Activity
+            </button>
           </nav>
         )}
 
@@ -426,6 +453,11 @@ export function WorkbenchPanel({
               <span className="workbench-launcher-icon"><BrowserIcon /></span>
               <span className="workbench-launcher-text">Browser</span>
             </button>
+            <button className="workbench-launcher-row" type="button" onClick={() => setActiveTab("activity")}>
+              <span className="workbench-launcher-icon"><ReviewIcon /></span>
+              <span className="workbench-launcher-text">Activity</span>
+            </button>
+            <ComputerStatusNotice />
           </div>
         </div>
       ) : activeTab === "files" ? (
@@ -522,7 +554,9 @@ export function WorkbenchPanel({
           )}
         </section>
       ) : activeTab === "terminal" ? (
-        <TerminalPane />
+        <TerminalPane platform={typeof navigator === "undefined" ? "unknown" : navigator.platform} />
+      ) : activeTab === "activity" ? (
+        <ActivityPane />
       ) : activeTab === "browser" ? (
         <section className="workbench-tab-content workbench-browser-view" aria-label="Embedded page preview">
           <div className="browser-chrome-bar">

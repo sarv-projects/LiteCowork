@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   isTaskPlanningReadinessFor,
+  planningBlockerLabel,
   planningReadinessNoBlockersMessage,
   type TaskPlanningReadinessExpectation,
   type TaskPlanningReadinessView,
@@ -26,6 +27,18 @@ const readiness: TaskPlanningReadinessView = {
 
 test("accepts a read-only readiness projection for the currently visible Task", () => {
   assert.equal(isTaskPlanningReadinessFor(readiness, expected), true);
+});
+
+test("accepts and explains the Windows Environment provider blocker", () => {
+  const windowsReadiness = {
+    ...readiness,
+    blockers: ["WINDOWS_ENVIRONMENT_PROVIDER_UNAVAILABLE"],
+  };
+  assert.equal(isTaskPlanningReadinessFor(windowsReadiness, expected), true);
+  assert.equal(
+    planningBlockerLabel("WINDOWS_ENVIRONMENT_PROVIDER_UNAVAILABLE"),
+    "Task execution is not available on Windows yet: no qualified Windows Environment provider.",
+  );
 });
 
 for (const [field, value] of [

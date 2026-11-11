@@ -49,6 +49,63 @@ test("Conversation snapshots preserve their bounded pagination cursor", () => {
   assert.throws(() => parseConversationSnapshot({ ...snapshot, next_cursor: "../foreign" }, "workspace-1", "conversation-1"), /pagination cursor/);
 });
 
+test("Conversation snapshots preserve producer identity and reject malformed identity fields", () => {
+  const message = {
+    message_id: "message-agent-1", conversation_id: "conversation-1", role: "AGENT",
+    agent_binding_id: "binding-opencode", agent_session_id: "session-product-1",
+    created_at: "2026-10-09T12:00:00Z", content: [{ kind: "TEXT", text: "Saved answer" }],
+  };
+  const snapshot = {
+    workspace_id: "workspace-1", conversation_id: "conversation-1", projection_revision: 1,
+    stream_cursor: "conversation:conversation-1:1", origin_sequence: "0",
+    items: [{ message, rich_presentation: null, linked_items: [] }], next_cursor: null, active_turn: null,
+  };
+  const parsed = parseConversationSnapshot(snapshot, "workspace-1", "conversation-1");
+  assert.equal(parsed.messages[0]?.agent_binding_id, "binding-opencode");
+  assert.equal(parsed.messages[0]?.agent_session_id, "session-product-1");
+  assert.throws(() => parseConversationSnapshot({
+    ...snapshot,
+    items: [{ ...snapshot.items[0]!, message: { ...message, agent_binding_id: "binding-\n-forged" } }],
+  }, "workspace-1", "conversation-1"), /invalid message/);
+  const legacyMessage = { ...message, agent_binding_id: null, agent_session_id: null };
+  const legacyParsed = parseConversationSnapshot({
+    ...snapshot,
+    items: [{ ...snapshot.items[0]!, message: legacyMessage }],
+  }, "workspace-1", "conversation-1");
+  assert.equal(legacyParsed.messages[0]?.agent_binding_id, null);
+  assert.equal(legacyParsed.messages[0]?.agent_session_id, null);
+  const userParsed = parseConversationSnapshot({
+    ...snapshot,
+    items: [{ ...snapshot.items[0]!, message: { ...legacyMessage, role: "USER" } }],
+  }, "workspace-1", "conversation-1");
+  assert.equal(userParsed.messages[0]?.agent_binding_id, null);
+  assert.equal(userParsed.messages[0]?.agent_session_id, null);
+});
+
+test("loading an older Conversation page preserves each message's producer identities", () => {
+  const makeSnapshot = (messages: Array<Record<string, unknown>>, nextCursor: string | null) => ({
+    workspace_id: "workspace-1", conversation_id: "conversation-1", projection_revision: 1,
+    stream_cursor: "conversation:conversation-1:1", origin_sequence: "0",
+    items: messages.map(message => ({ message, rich_presentation: null, linked_items: [] })),
+    next_cursor: nextCursor, active_turn: null,
+  });
+  const newer = parseConversationSnapshot(makeSnapshot([{
+    message_id: "message-b", conversation_id: "conversation-1", role: "AGENT",
+    agent_binding_id: "binding-b", agent_session_id: "session-b",
+    created_at: "2026-10-09T12:00:02Z", content: [{ kind: "TEXT", text: "B" }],
+  }], "message-b"), "workspace-1", "conversation-1");
+  const older = parseConversationSnapshot(makeSnapshot([{
+    message_id: "message-a", conversation_id: "conversation-1", role: "AGENT",
+    agent_binding_id: "binding-a", agent_session_id: "session-a",
+    created_at: "2026-10-09T12:00:01Z", content: [{ kind: "TEXT", text: "A" }],
+  }], null), "workspace-1", "conversation-1");
+  const appended = appendConversationPage(newer, older);
+  assert.deepEqual(appended.messages.map(message => [message.message_id, message.agent_binding_id, message.agent_session_id]), [
+    ["message-b", "binding-b", "session-b"],
+    ["message-a", "binding-a", "session-a"],
+  ]);
+});
+
 test("Conversation snapshots preserve a decimal source frontier separately from pagination", () => {
   const message = { message_id: "message-1", conversation_id: "conversation-1", role: "AGENT", created_at: "2026-10-09T12:00:00Z", content: [{ kind: "TEXT", text: "Saved answer" }] };
   const snapshot = {
@@ -116,6 +173,20 @@ test("live snapshot rejects changed content for a committed Message ID without a
   assert.equal(merged.messages[0]?.content[0]?.kind === "TEXT" ? merged.messages[0].content[0].text : null, "Original semantic answer");
   assert.equal(merged.stream_cursor, "accepted-cursor");
   assert.equal(merged.next_cursor, "message-1");
+});
+
+test("live Conversation refresh rejects changed producer identity for a committed Message ID", () => {
+  const message = (bindingId: string) => ({
+    message_id: "message-1", role: "AGENT" as const, agent_binding_id: bindingId,
+    agent_session_id: "session-1", created_at: "2026-10-09T12:00:00Z",
+    content: [{ kind: "TEXT" as const, text: "Stable answer" }], rich_presentation: null,
+  });
+  const current = {
+    workspace_id: "workspace-1", conversation_id: "conversation-1", stream_cursor: "accepted-cursor",
+    messages: [message("binding-a")], next_cursor: "message-1", active_turn: null,
+  };
+  const live = { ...current, stream_cursor: "inconsistent-cursor", messages: [message("binding-b")] };
+  assert.equal(mergeConversationStreamSnapshot(current, live, "workspace-1", "conversation-1"), current);
 });
 
 test("live Conversation refresh keeps an exhausted history exhausted", () => {

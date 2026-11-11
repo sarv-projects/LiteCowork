@@ -15,7 +15,12 @@ const vite = await createServer({
   appType: "custom",
 });
 const { AgentControlDescriptorPanel, UnavailableControlsNotice, DescriptorSummary } = await vite.ssrLoadModule("/src/agents/AgentControlDescriptorPanel.tsx");
-const { parseAgentControlDescriptor, parseAgentControlReadError } = await vite.ssrLoadModule("/src/agents/agent-control-api.ts");
+const {
+  parseAgentControlDescriptor,
+  parseAgentControlReadError,
+  parseAgentAuthChallenge,
+  parseNativeConfigOpenReceipt,
+} = await vite.ssrLoadModule("/src/agents/agent-control-api.ts");
 after(async () => vite.close());
 
 function descriptor() {
@@ -91,6 +96,26 @@ test("descriptor errors preserve the typed unavailable code and reference", () =
   assert.equal(error.code, "DEPENDENCY_UNAVAILABLE");
   assert.equal(error.retryable, false);
   assert.equal(error.reference, "ref-123");
+});
+
+test("agent action responses are bounded and correlated to the requested descriptor item", () => {
+  assert.deepEqual(parseAgentAuthChallenge({
+    kind: "NATIVE_FLOW_STARTED", auth_method_id: "native-login", expires_at: null,
+    secret: "must-not-cross-the-desktop-bridge",
+  }, "native-login"), {
+    kind: "NATIVE_FLOW_STARTED", auth_method_id: "native-login", expires_at: null,
+  });
+  assert.throws(() => parseAgentAuthChallenge({
+    kind: "SECRET_REQUIRED", auth_method_id: "another-method", secret: "hidden",
+  }, "native-login"));
+  assert.deepEqual(parseNativeConfigOpenReceipt({
+    agent_profile_id: "profile-1", target_id: "settings", opened: true, path: "must-not-cross",
+  }, "profile-1", "settings"), {
+    agent_profile_id: "profile-1", target_id: "settings", opened: true,
+  });
+  assert.throws(() => parseNativeConfigOpenReceipt({
+    agent_profile_id: "profile-1", target_id: "other", opened: true,
+  }, "profile-1", "settings"));
 });
 
 test("settings panel clearly states that reading controls does not enable send", () => {

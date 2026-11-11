@@ -116,3 +116,18 @@ The active Rust and Tauri source trees are apps/ and crates/. Do not describe th
 - Do not execute arbitrary model-supplied HTML/JavaScript in the chat WebView.
 - No force-push or history rewrite. No commit or push unless explicitly requested.
 - Preserve unrelated user work and stage only explicitly intended files.
+
+## 9. Next-agent onboarding
+
+Start with the current checkout, not a prior chat summary:
+
+1. Read this file, `CURRENT-RUN.md`, and `docs/IMPLEMENTATION-STATUS.md` for operating rules, exact branch/tree state, evidence and remaining work.
+2. Read `ARCHITECTURE.md`, `docs/PRODUCT.md`, `docs/V1-PRODUCT-RELEASE-CONTRACT.md`, `docs/V1-UI-SCREEN-CONTRACT.md`, `docs/V1-UI-ACTION-STATE-LEDGER.md`, and `docs/ACCEPTANCE-AND-E2E-PLAN.md` before making cross-layer or UI changes.
+3. Read `docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md`, the owner domain contract and accepted ADRs for the semantic decision, then the full relevant `specs/NNN-*/` package (README, SPEC, PLAN, TASKS, DATA-MODEL, RESEARCH, WIRING and contracts).
+4. Treat `CURRENT-RUN.md` and the active feature TASKS as current code evidence. `docs/archive/`, `docs/HANDOFF-NEXT-AGENT-2026-11.md`, the dated implementation snapshots in `docs/V1-FEATURE-SDD-REGISTER.md` and `docs/IMPLEMENTATION-STATUS.md`, and `repo_take/` are historical/reference material, not current truth.
+5. Before edits, inspect `git status --short --branch`, HEAD, remotes, worktrees and ignored/untracked data. Preserve `audit-output/`, archives, stashes, `.agents/`, and `repo_take/`; never stage them unless specifically authorized. Never reset, clean, force-push or rewrite history.
+6. Trace each user action through screen/control → typed UI action → authenticated Tauri/Operator route → authorization → owning service → transaction/version/fence → record/event/receipt → projection/recovery → evidence. Update the owner contract, schemas, UI ledgers, wiring, traceability, tests and current status together where applicable.
+7. Use evidence labels exactly: TARGET, CODE, SERVED, INTEGRATED and QUALIFIED. A green unit suite or mounted route does not prove a provider journey. V1 remains pre-release and unqualified; Windows/Task/platform deferrals and open owner decisions are listed in `CURRENT-RUN.md`.
+8. Run focused tests and validators for changed layers, record exact command/results in `CURRENT-RUN.md`, inspect the full diff, and stage only reviewed intended paths. Do not claim more than the tested evidence supports.
+
+For an implementation task, first confirm its exact TASKS item is authorized and not BLOCKED/DEFERRED. Start from the current master plan and feature dependency graph; do not infer authorization from a package being ACCEPTED/LOCKED alone.

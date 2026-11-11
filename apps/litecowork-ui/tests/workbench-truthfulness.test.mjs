@@ -19,7 +19,7 @@ const vite = await createServer({
   server: { middlewareMode: true, hmr: false, ws: false },
   appType: "custom",
 });
-const { WorkbenchPanel, TerminalPane, ReviewPane } = await vite.ssrLoadModule(panelPath);
+const { WorkbenchPanel, TerminalPane, ReviewPane, ActivityPane } = await vite.ssrLoadModule(panelPath);
 after(async () => vite.close());
 
 const render = node => renderToStaticMarkup(createElement(Fragment, null, node));
@@ -70,7 +70,7 @@ function panelProps(overrides = {}) {
 }
 
 test("the terminal pane executes nothing and states that plainly", () => {
-  const html = render(createElement(TerminalPane));
+  const html = render(createElement(TerminalPane, { platform: "Linux x86_64" }));
   assert.match(html, /Terminal execution is unavailable/);
   assert.match(html, /No terminal runtime served/);
   assert.ok(
@@ -80,6 +80,42 @@ test("the terminal pane executes nothing and states that plainly", () => {
   for (const claim of FABRICATED_PROCESS_CLAIMS) {
     assert.ok(!html.includes(claim), `terminal pane must not claim ${JSON.stringify(claim)}`);
   }
+});
+
+test("terminal availability names the platform-specific Environment gap", () => {
+  const windows = render(createElement(TerminalPane, { platform: "Win32" }));
+  const linux = render(createElement(TerminalPane, { platform: "Linux x86_64" }));
+  assert.match(windows, /qualified Windows Environment provider/);
+  assert.match(linux, /admitted Environment for this session/);
+});
+
+test("activity has its own empty state", () => {
+  const html = render(createElement(ActivityPane));
+  assert.match(html, /No recorded activity source is served by this build/);
+  assert.match(html, /Activity/);
+  assert.doesNotMatch(html, /Nothing to review yet/);
+});
+
+test("the activity tab renders its own empty state instead of the review pane", () => {
+  const html = render(createElement(WorkbenchPanel, panelProps({ initialTab: "activity" })));
+  assert.match(html, /No recorded activity source is served by this build/);
+  assert.doesNotMatch(html, /Nothing to review yet/);
+  assert.match(html, /role="status" aria-labelledby="[^"]+" tabindex="0"/);
+});
+
+test("computer use is status-only", () => {
+  const html = render(createElement(WorkbenchPanel, panelProps()));
+  assert.match(html, /Computer use is unavailable in this build/);
+  assert.match(html, /role="status" aria-label="Computer use availability"/);
+  assert.doesNotMatch(html, /Computer use[^<]*(button|action)/i);
+});
+
+test("narrow Workbench supports Escape close and ordered keyboard navigation", async () => {
+  const source = await readFile(join(packageRoot, "src/App.tsx"), "utf8");
+  assert.match(source, /event\.key === "Escape"\)[\s\S]{0,100}closeWorkbench\(\)/);
+  assert.match(source, /querySelectorAll<HTMLElement>\([\s\S]{0,180}\[tabindex\]:not\(\[tabindex="-1"\]\)/);
+  const html = render(createElement(WorkbenchPanel, panelProps({ initialTab: "activity" })));
+  assert.ok(html.indexOf("workbench-tools-nav") < html.indexOf("workbench-activity-view"));
 });
 
 test("the review pane renders no diff and no change statistics", () => {

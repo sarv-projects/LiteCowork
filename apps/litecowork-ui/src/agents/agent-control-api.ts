@@ -2,6 +2,18 @@ import type { components } from "../api/operator-api";
 
 export type AgentControlDescriptor = components["schemas"]["AgentControlDescriptor"];
 
+export type AgentAuthChallenge = {
+  kind: "NATIVE_FLOW_STARTED" | "SECRET_REQUIRED" | "NATIVE_CONFIG_REQUIRED";
+  auth_method_id: string;
+  expires_at?: string | null;
+};
+
+export type NativeConfigOpenReceipt = {
+  agent_profile_id: string;
+  target_id: string;
+  opened: true;
+};
+
 export type AgentControlReadError = Error & {
   code?: string;
   retryable?: boolean;
@@ -11,6 +23,11 @@ export type AgentControlReadError = Error & {
 export interface AgentControlDescriptorApi {
   get(workspaceId: string, profileId: string): Promise<AgentControlDescriptor>;
   refresh(workspaceId: string, profileId: string): Promise<AgentControlDescriptor>;
+}
+
+export interface AgentControlActionsApi {
+  beginAuth(workspaceId: string, profileId: string, methodId: string): Promise<AgentAuthChallenge>;
+  openNativeConfig(workspaceId: string, profileId: string, targetId: string): Promise<NativeConfigOpenReceipt>;
 }
 
 const validId = (value: unknown): value is string =>
@@ -112,6 +129,30 @@ export function parseAgentControlDescriptor(value: unknown): AgentControlDescrip
     throw new Error("Agent control descriptor is incomplete or outside its bounds");
   }
   return value as AgentControlDescriptor;
+}
+
+export function parseAgentAuthChallenge(value: unknown, expectedMethodId: string): AgentAuthChallenge {
+  if (!isRecord(value)
+    || !["NATIVE_FLOW_STARTED", "SECRET_REQUIRED", "NATIVE_CONFIG_REQUIRED"].includes(String(value.kind))
+    || value.auth_method_id !== expectedMethodId
+    || (value.expires_at != null && (typeof value.expires_at !== "string" || !validTimestamp(value.expires_at)))) {
+    throw new Error("Agent authentication returned an unsupported result");
+  }
+  return {
+    kind: value.kind as AgentAuthChallenge["kind"],
+    auth_method_id: expectedMethodId,
+    ...(value.expires_at === undefined ? {} : { expires_at: value.expires_at as string | null }),
+  };
+}
+
+export function parseNativeConfigOpenReceipt(value: unknown, profileId: string, targetId: string): NativeConfigOpenReceipt {
+  if (!isRecord(value)
+    || value.agent_profile_id !== profileId
+    || value.target_id !== targetId
+    || value.opened !== true) {
+    throw new Error("Native configuration returned an unsupported result");
+  }
+  return { agent_profile_id: profileId, target_id: targetId, opened: true };
 }
 
 export function parseAgentControlReadError(error: unknown): AgentControlReadError {

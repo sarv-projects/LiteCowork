@@ -1,0 +1,22 @@
+# Audit evidence commands — 2026-11-08
+
+git rev-parse --show-toplevel
+git branch --show-current  # master
+git rev-parse HEAD         # 2e85f037bfa653b642b8c4a9b7fee5c80c438b2b
+git status -sb             # clean
+
+uv run --locked python scripts/audit_v1_contracts.py
+# V1_CONTRACT_AUDIT errors=0 openapi=229 served=173 outside=1 target=56
+
+cd apps/litecowork-ui && node --test tests/workbench-truthfulness.test.mjs
+# 6 pass, 0 fail
+
+CARGO_BUILD_JOBS=2 cargo test -p storage-sqlite --locked -- --test-threads=4
+# exit 0, ~41 min on WSL2 (output truncated by `tail -15` in the shell command;
+# captured tail: lib tests ok, 1 ignored; windows_credential_manager 0 tests on Linux)
+
+# FAILED (harness): `pnpm test tests/workbench-truthfulness.test.mjs tests/planning-readiness.test.ts`
+#   — package.json `test` script ignores file args and runs ALL tests; ~9 min; browser CDP/Vite failures on WSL2.
+# Follow-up (targeted):
+node --experimental-transform-types --test tests/planning-readiness.test.ts  # 12 pass
+# (workbench-truthfulness: 6 pass — see above)

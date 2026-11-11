@@ -48,7 +48,7 @@ Never translate a unit pass, mocked UI, schema, catalog row, successful process 
 | E2E-05 | Connect app → read → approve one write → reconcile → revoke | Scopes and SecretRef custody verified; no blind retries; later invocation fenced |
 | E2E-06 | Discover native package → preview/adopt or install through LiteSPM → grant/use | LiteSPM-owned plan/apply receipt; Core-owned grant/effect; native config preserved |
 | E2E-07 | Create Artifact → edit/version/export/reopen | Immutable versions, correct format fidelity and source provenance |
-| E2E-08 | Browser/terminal Workbench → takeover/return → cancel | Real provider, explicit consent and epochs; stale handles cannot act |
+| E2E-08 | Browser/terminal Workbench → browser-lease takeover/return; Conversation Take control → Stop/quiescence → owner continuation; cancel/restart recovery | Real provider and explicit consent; browser epoch fencing and stale-handle rejection; Conversation turn settles only after native quiescence; continuation is a separate turn |
 | E2E-09 | Optional Coworker → chat → scoped context → revoke → restart | No cross-Coworker or cross-Workspace leakage |
 | E2E-10 | Scheduled and event Automation → occurrence → Task → notification | Exactly-once occurrence identity, timezone/misfire handling, recovery and truthful delivery |
 | E2E-11 | Rich UI response with presentation disabled | Semantic message remains complete; rendered controls cannot forge or settle host state |

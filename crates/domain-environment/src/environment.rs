@@ -9,6 +9,25 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Observed enforcement of one isolation dimension.
+///
+/// A positive value means the provider demonstrated the restriction and the Runtime
+/// observed it. `Unknown` never satisfies an admission requirement.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EnforcementStatus {
+    Enforced,
+    NotEnforced,
+    Unknown,
+}
+
+impl EnforcementStatus {
+    /// Only a positive observation may satisfy an admission requirement.
+    pub fn is_enforced(self) -> bool {
+        matches!(self, Self::Enforced)
+    }
+}
+
 /// Validation failure of a canonical Environment vocabulary value. The message is the
 /// exact durable failure description; storage adapters map it onto their own invalid-
 /// input error without rewriting it.

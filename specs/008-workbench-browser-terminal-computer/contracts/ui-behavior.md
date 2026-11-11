@@ -15,14 +15,14 @@ Behavior, not pixels. Screen inventory: [V1-UI-SCREEN-CONTRACT.md](../../../docs
 - Diffs show actual content/revision or VCS comparison, exact source IDs/digests and true added/removed counts. Activity shows committed event/Attempt/Effect/process observations only, or is deferred to Work/Task detail by the screen contract.
 - Computer use is only shown when a real provider and OS permission exists. Otherwise the UI states unavailable/unsupported with a reason; it never animates a phantom cursor or claims screen capture/input injection.
 
-## Current implementation crosswalk (re-checked 2026-11-09)
+## Current implementation crosswalk (re-checked 2026-11-11)
 
-- `WorkbenchPanel` is a React right pane with launcher, Files, Terminal, Browser and Review (`diffs`) paths. `WorkbenchTab` declares `activity` but no navigation or Activity render branch exists; the final `else` renders `ReviewPane`.
+- `WorkbenchPanel` is a React right pane with launcher, Files, Terminal, Browser, Review (`diffs`) and Activity paths. Activity has its own launcher/tab and status-only empty state; it does not fall through to Review.
 - Files is a list/filter of the Workspace Resource catalog; preview is fetched for an exact ResourceRevision. It is not a native filesystem tree or Environment browser.
 - Browser is a URL input and iframe preview labelled "Embedded page preview". `browserUrl` starts empty (register A-51); there is no default endpoint and no containment claim. It is not a Chrome process/provider, managed profile, persistent session, browser agent or CDP/Playwright controller.
 - Terminal (`TerminalPane`) renders "Terminal execution is unavailable" with the missing prerequisites. It has no input, executes nothing and shows no exit code, ConPTY, Job Object or KILL_ON_CLOSE label (register A-51; `tests/workbench-truthfulness.test.mjs`).
 - Review (`ReviewPane`) renders "Nothing to review yet" and states that changes are never inferred from document text. No diff producer exists.
-- Computer-use source has policy/consent helpers only; there is no Computer status surface in the Workbench.
+- Computer-use source has policy/consent helpers only; the Workbench shows a status-only UNAVAILABLE message with no action control.
 
 ## Accepted V1 state table (2026-11-09)
 
@@ -49,3 +49,12 @@ Every unavailable state is a focusable status region with an accessible name and
 ## Validation
 
 Source-level policy helper tests do not qualify a browser provider, terminal process, or computer-use backend. Qualification requires the actual OS provider and USER flows on the declared GA OS/build, with event-backed receipts and crash/restart tests.
+
+## Accepted observation and takeover interaction
+
+The repository owner requested a visible, low-overhead view and an immediate manual takeover path on 2026-11-11. Resolve this within accepted B-22/B-32 boundaries:
+
+- When the real managed-browser provider is available, show only that browser tab's viewport in Workbench using ephemeral frames, a bounded latest-frame queue, and stale-frame labeling. Do not persist frames into Conversation or Activity by default. Label it **Browser view**; it is not a share of the laptop desktop. Whole-desktop capture/input remains unavailable under B-32.
+- While a live browser lease is AGENT-owned, show a persistent, non-modal banner with session/tab identity and **Take over**. The command fences new agent inputs, resolves or cancels queued old-epoch inputs, reaches a bounded safe point for dispatched input, then atomically advances the lease epoch to USER. Report USER control only after the provider confirms the epoch and rejects old-epoch input. Reconcile a dispatched action that may already have taken effect; unresolved outcomes remain pending/unknown. Move focus to the browser after confirmed transfer.
+- Browser **Take over** transfers browser input authority only. It does not stop Conversation generation, cancel a Task, or close the browser. Conversation **Take control** is a separate action owned by Feature 012: cancel the active Conversation turn through Feature 001 Stop, wait for observed quiescence, settle `CANCELLED` and record `OWNER_TOOK_CONTROL`; only then does the owner continue by hand. Sending a message is a separate subsequent turn, never an implicit takeover side effect.
+- Without a served provider-backed lease, show status only. Returning control is separate and explicit: confirm, advance the epoch, obtain a fresh observation, and resume only from that observation. Never replay stale queued inputs or auto-submit a user-edited form.

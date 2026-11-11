@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
   parseAgentControlReadError,
+  type AgentControlActionsApi,
   type AgentControlDescriptor,
   type AgentControlDescriptorApi,
 } from "./agent-control-api";
-import { desktopAgentControlDescriptorApi } from "./desktop-agent-control-api";
+import { desktopAgentControlActionsApi, desktopAgentControlDescriptorApi } from "./desktop-agent-control-api";
 import "./agent-control-descriptor-panel.css";
 
 type PanelState =
@@ -18,6 +19,7 @@ export type AgentControlDescriptorPanelProps = {
   profileId: string;
   displayName: string;
   api?: AgentControlDescriptorApi;
+  actionApi?: AgentControlActionsApi;
 };
 
 export function AgentControlDescriptorPanel({
@@ -25,15 +27,20 @@ export function AgentControlDescriptorPanel({
   profileId,
   displayName,
   api = desktopAgentControlDescriptorApi,
+  actionApi = desktopAgentControlActionsApi,
 }: AgentControlDescriptorPanelProps) {
   const key = `${workspaceId}\u0000${profileId}`;
   const generation = useRef(0);
+  const actionGeneration = useRef(0);
   const [state, setState] = useState<PanelState>({ key, status: "LOADING" });
+  const [actionState, setActionState] = useState<{ key: string; status: "BUSY" | "INFO" | "ERROR"; message: string; reference?: string } | null>(null);
 
   useEffect(() => {
     const request = ++generation.current;
     let active = true;
     setState({ key, status: "LOADING" });
+    actionGeneration.current += 1;
+    setActionState(null);
     void api.get(workspaceId, profileId).then(
       (descriptor) => {
         if (active && request === generation.current) setState({ key, status: "READY", descriptor });
@@ -45,11 +52,52 @@ export function AgentControlDescriptorPanel({
     return () => {
       active = false;
       generation.current += 1;
+      actionGeneration.current += 1;
     };
   }, [api, key, profileId, workspaceId]);
 
+  const visible = state.key === key ? state : { key, status: "LOADING" as const };
+
+  const runAction = (action: "AUTH" | "CONFIG", id: string) => {
+    if (visible.status !== "READY" || !workspaceId) return;
+    const request = ++actionGeneration.current;
+    setActionState({ key, status: "BUSY", message: action === "AUTH" ? "Starting the declared sign-in flow…" : "Opening the declared native configuration…" });
+    const task = action === "AUTH"
+      ? actionApi.beginAuth(workspaceId, profileId, id).then((challenge) => {
+        if (challenge.kind === "NATIVE_FLOW_STARTED") {
+          return "The agent reports that its sign-in flow started. Complete sign-in in the agent’s own window, then refresh controls to recheck the reported state. LiteCowork does not receive credential values.";
+        }
+        if (challenge.kind === "SECRET_REQUIRED") {
+          return "This agent requested a credential, but secure credential submission is unavailable. No secret was sent.";
+        }
+        return "The agent reports that native configuration is required. No credential was sent.";
+      })
+      : actionApi.openNativeConfig(workspaceId, profileId, id).then(() =>
+        "The declared native configuration target was opened.");
+    void task.then(
+      (message) => {
+        if (request === actionGeneration.current) setActionState({ key, status: "INFO", message });
+      },
+      (error: unknown) => {
+        if (request !== actionGeneration.current) return;
+        const parsed = parseAgentControlReadError(error);
+        const unavailable = parsed.code === "DEPENDENCY_UNAVAILABLE";
+        setActionState({
+          key,
+          status: "ERROR",
+          message: action === "AUTH"
+            ? unavailable ? "No qualified sign-in launcher is available for this agent. Nothing was launched and no credentials were sent." : "Sign-in could not start. Refresh the descriptor and try again. No credentials were sent."
+            : unavailable ? "No qualified native configuration opener is available. Nothing was opened." : "The native configuration request could not be completed. Refresh the descriptor and try again.",
+          reference: parsed.reference,
+        });
+      },
+    );
+  };
+
   const refresh = () => {
     const request = ++generation.current;
+    actionGeneration.current += 1;
+    setActionState(null);
     setState({ key, status: "LOADING" });
     void api.refresh(workspaceId, profileId).then(
       (descriptor) => {
@@ -61,7 +109,6 @@ export function AgentControlDescriptorPanel({
     );
   };
 
-  const visible = state.key === key ? state : { key, status: "LOADING" as const };
   return (
     <section className="agent-control-panel" aria-labelledby={`agent-controls-${safeId(profileId)}`}>
       <div className="agent-control-panel__heading">
@@ -69,7 +116,7 @@ export function AgentControlDescriptorPanel({
           <h4 id={`agent-controls-${safeId(profileId)}`}>Native controls</h4>
           <p>Verified controls for {displayName}. Reading these does not start or authorize a conversation.</p>
         </div>
-        <button type="button" onClick={refresh} disabled={visible.status === "LOADING"}>
+        <button type="button" onClick={refresh} disabled={visible.status === "LOADING" || actionState?.status === "BUSY"}>
           {visible.status === "LOADING" ? "Checking…" : "Refresh controls"}
         </button>
       </div>
@@ -84,7 +131,21 @@ export function AgentControlDescriptorPanel({
           {visible.reference && <small>Reference: {visible.reference}</small>}
         </div>
       )}
-      {visible.status === "READY" && <DescriptorSummary descriptor={visible.descriptor} />}
+      {visible.status === "READY" && <DescriptorSummary
+        descriptor={visible.descriptor}
+        actions={{
+          onBeginAuth: (methodId) => runAction("AUTH", methodId),
+          onOpenNativeConfig: (targetId) => runAction("CONFIG", targetId),
+        }}
+        actionBusy={actionState?.status === "BUSY"}
+      />}
+      {actionState?.key === key && actionState.status !== "BUSY" && (
+        <div className="agent-control-panel__notice" role={actionState.status === "ERROR" ? "alert" : "status"} aria-live="polite">
+          <strong>{actionState.status === "ERROR" ? "Agent action unavailable" : "Agent action status"}</strong>
+          <p>{actionState.message}</p>
+          {actionState.reference && <small>Reference: {actionState.reference}</small>}
+        </div>
+      )}
     </section>
   );
 }
@@ -116,7 +177,7 @@ const AUTH_TEXT: Record<AgentControlDescriptor["auth"]["state"], string> = {
   ERROR: "Sign-in failed or was denied.",
 };
 
-export function DescriptorSummary({ descriptor, actions = {} }: { descriptor: AgentControlDescriptor; actions?: DescriptorActions }) {
+export function DescriptorSummary({ descriptor, actions = {}, actionBusy = false }: { descriptor: AgentControlDescriptor; actions?: DescriptorActions; actionBusy?: boolean }) {
   const nativeFlows = descriptor.auth.methods.filter((method) => method.kind === "NATIVE_FLOW");
   const targets = descriptor.configuration.native_config_targets;
   return (
@@ -152,7 +213,7 @@ export function DescriptorSummary({ descriptor, actions = {} }: { descriptor: Ag
           <button
             key={method.auth_method_id}
             type="button"
-            disabled={!actions.onBeginAuth || descriptor.auth.state === "AUTHENTICATING"}
+            disabled={!actions.onBeginAuth || actionBusy || descriptor.auth.state === "AUTHENTICATING"}
             onClick={() => actions.onBeginAuth?.(method.auth_method_id)}
           >
             {descriptor.auth.state === "AUTHENTICATING" ? "Authenticating…" : `Sign in: ${method.display_name}`}
@@ -164,7 +225,7 @@ export function DescriptorSummary({ descriptor, actions = {} }: { descriptor: Ag
           <button
             key={target.target_id}
             type="button"
-            disabled={!actions.onOpenNativeConfig}
+            disabled={!actions.onOpenNativeConfig || actionBusy}
             onClick={() => actions.onOpenNativeConfig?.(target.target_id)}
           >
             Open native config: {target.display_name}

@@ -900,6 +900,97 @@ mod conversation_context_tests {
     }
 
     #[test]
+    fn relay_context_preserves_each_producer_across_a_to_b_to_a() {
+        let messages = [
+            message(
+                "user-1",
+                "relay-chat",
+                "USER",
+                "First request",
+                "2026-01-01T00:00:01Z",
+                None,
+                None,
+            ),
+            message(
+                "agent-a-1",
+                "relay-chat",
+                "AGENT",
+                "A response",
+                "2026-01-01T00:00:02Z",
+                Some("binding-a"),
+                Some("private-session-a1"),
+            ),
+            message(
+                "user-2",
+                "relay-chat",
+                "USER",
+                "Now ask B",
+                "2026-01-01T00:00:03Z",
+                None,
+                None,
+            ),
+            message(
+                "agent-b-1",
+                "relay-chat",
+                "AGENT",
+                "B response",
+                "2026-01-01T00:00:04Z",
+                Some("binding-b"),
+                Some("private-session-b1"),
+            ),
+            message(
+                "user-3",
+                "relay-chat",
+                "USER",
+                "Return to A",
+                "2026-01-01T00:00:05Z",
+                None,
+                None,
+            ),
+            message(
+                "agent-a-2",
+                "relay-chat",
+                "AGENT",
+                "A response after relay",
+                "2026-01-01T00:00:06Z",
+                Some("binding-a"),
+                Some("private-session-a2"),
+            ),
+            message(
+                "user-4",
+                "relay-chat",
+                "USER",
+                "Continue with B",
+                "2026-01-01T00:00:07Z",
+                None,
+                None,
+            ),
+        ];
+
+        let sources = ordered(&messages);
+        let context =
+            build_conversation_context_package("relay-chat", "binding-b", "user-4", &sources)
+                .expect(
+                    "relay context keeps the committed transcript through the latest user turn",
+                );
+
+        let agent_producers = context
+            .messages
+            .iter()
+            .filter(|message| message.role == "AGENT")
+            .map(|message| message.source_agent_binding_id.as_deref())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            agent_producers,
+            [Some("binding-a"), Some("binding-b"), Some("binding-a")]
+        );
+        let encoded = serde_json::to_string(&context).expect("serialize portable relay context");
+        assert!(!encoded.contains("private-session-a1"));
+        assert!(!encoded.contains("private-session-b1"));
+        assert!(!encoded.contains("private-session-a2"));
+    }
+
+    #[test]
     fn context_rejects_a_boundary_or_message_from_another_conversation() {
         let messages = vec![message(
             "m-user",

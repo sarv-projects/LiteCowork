@@ -54,7 +54,7 @@ Are all the capabilities covered or not, and if not, why? The single, capability
 
 - [V1 product feature coverage](docs/V1-PRODUCT-FEATURE-COVERAGE.md)
 
-In short: all 17 capabilities are owned by an accepted or in-review package; none is unowned. The remaining gaps are depth (exact qualification) and a few deliberately deferred surfaces, not missing scope. The native-agent adapter is defined as an Agent Client Protocol (ACP) client with a per-provider launch catalog, which delivers chat, bring-your-own-agent, the coding cockpit and the Needs You inbox through one qualified path.
+In short: all 17 capabilities are owned by an accepted or in-review package; none is unowned. The remaining work includes implementation depth, integration, exact qualification, and deliberately deferred surfaces. ACP is the selected native-agent adapter direction with a per-provider launch catalog; it is not yet a qualified path and does not currently deliver those capabilities end to end.
 
 ## Product principles
 
@@ -80,13 +80,13 @@ Product and design, in order:
 Current truth and status:
 
 - [Current implementation and release status](docs/IMPLEMENTATION-STATUS.md)
-- [Next-agent handoff (environment, commands, baselines, per-task status, next tasks, pitfalls, deferrals)](docs/HANDOFF-NEXT-AGENT-2026-11.md)
+- [Current engineering handoff (environment, commands, baselines, per-task status, next tasks, pitfalls, deferrals)](CURRENT-RUN.md)
 - [Contradiction and alignment register](docs/CONTRADICTION-AND-ALIGNMENT-REGISTER.md)
 - [Acceptance and E2E plan](docs/ACCEPTANCE-AND-E2E-PLAN.md)
 
 ## Release posture
 
-**Pre-release development. V1 is not release-qualified.** The application and daemon source are present in this repository. The current implementation boundary, the available evidence and the ordered blockers are maintained in [docs/IMPLEMENTATION-STATUS.md](docs/IMPLEMENTATION-STATUS.md). Do not treat any capability as Verified without the exact-build evidence recorded there. As of 2026-11-10 the Conversation supervisor (Feature 001), native-agent registry and ACP client (Feature 002), most of the Linux desktop-shell tasks (Feature 011) and the CI and release-machinery skeleton (Feature 019) exist at CODE or SERVED level, the storage layers of Features 014 (history lifecycle) and 012 (co-edit control) and the Linux workspace-root storage tests of Feature 003 exist, and nothing has been run against a live native agent or on a Windows machine. LiteSPM (Feature 013), Windows rows and release-dependent rows are deferred by the owner. The engineering handoff is [CURRENT-RUN.md](CURRENT-RUN.md).
+**Pre-release development. V1 is not release-qualified.** The application and daemon source are present in this repository. The current implementation boundary, evidence and ordered blockers are maintained in [docs/IMPLEMENTATION-STATUS.md](docs/IMPLEMENTATION-STATUS.md). Do not treat any capability as Verified without exact-build evidence. As of 2026-11-11, Conversation (001), native-agent controls (002), relay attribution (004), Windows Task-readiness honesty (005-T14), truthful Workbench availability (008-T02), much of the desktop shell (011), and release machinery (019) have partial CODE or SERVED evidence; features 012, 014 and 003 also have storage or selected route slices. Focused Windows Rust/TypeScript checks have run, but there is no packaged desktop qualification or live native-agent Conversation journey. Task execution, browser/terminal providers, Artifact authoring/export and rich-presentation publication remain incomplete. LiteSPM (013) is owner-deferred; Windows Task execution remains unavailable pending the B-35 decision/provider. See [docs/IMPLEMENTATION-STATUS.md](docs/IMPLEMENTATION-STATUS.md) and the current [engineering handoff](CURRENT-RUN.md).
 
 ## For contributors
 

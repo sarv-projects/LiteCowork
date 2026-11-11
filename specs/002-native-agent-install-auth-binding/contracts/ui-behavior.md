@@ -64,14 +64,14 @@ The current desktop surface is `AgentCatalogSettings`:
 - Codex App Server observations exist; OpenCode probe records incompatible offer/capabilities false.
 - Observed profiles show Runtime-offer compatibility/readiness, expiry, diagnostics and Workspace binding state.
 - Workspace bindings can be created disabled and enabled/disabled through versioned actions; Workspace default lead and worker-profile controls exist.
-- Descriptor panel reads served routes: the OpenCode module returns a validated descriptor; module-less profiles still return 503 DEPENDENCY_UNAVAILABLE.
+- Descriptor panel reads and refreshes through served routes and ID-only Tauri commands. No V1 AgentModule currently provides a qualified descriptor, so the active profiles fail closed with 503 DEPENDENCY_UNAVAILABLE.
 - No install/update action or usage projection is served here; Install and Update are shown as unavailable in V1. Sign-in and native-config routes are served but fail closed (see the trace below).
 
 Source/UI mismatches:
 - OpenCode is blocked from new binding by its incompatible profile offer even though Feature 001 contains an OpenCode dispatch path.
 - Codex can be bound despite the current Conversation supervisor not dispatching Codex. A binding is not proof Send works.
 - Backend enable currently checks a fresh compatible Runtime offer but not the AC-004 fresh AgentControlDescriptor.
-- Credential submission validates then returns 503 (no durable replay receipt); auth-begin and native-config-open are served but refuse every method or target because no V1 module declares one.
+- Credential submission validates then returns 503 (no durable replay receipt); auth-begin and native-config-open are served through authenticated ID-only Tauri commands but refuse every method or target because no V1 module declares one.
 - ACP registry entries are metadata and do not become install or execution authority.
 
 ## Failure and accessibility contract
@@ -88,7 +88,7 @@ Empty, stale, offline, denied, unsupported OS, unsupported version, cancelled au
 - The selected provider model identifier and descriptor revision are carried into the next admission. The adapter validates again. A change applies to future admissions/new sessions, not to an active Conversation/Attempt or provider-wide native config.
 - On stale/unavailable descriptor or model removal, disable the stale choice, preserve the previous committed choice and current draft, and offer only a real refresh action.
 - Task composer selection remains separate: choose Coworker/eligible AgentBinding first; model/effort selection is subordinate to that binding.
-- Current descriptor reads/refresh return 503 and provider send routes remain unqualified. Therefore the model picker is a target design and must not be presented as active until the exact end-to-end path works.
+- Descriptor GET/refresh is wired through authenticated Tauri commands but returns fail-closed unavailable when no qualified AgentModule producer exists. Provider send routes remain unqualified. Therefore the model picker is a target design and must not be presented as active until the exact end-to-end path works.
 
 ## Cross-layer trace for every 002 user-visible operation (T14)
 
@@ -104,4 +104,4 @@ Chain: control -> Tauri command -> Operator route -> authorization -> service ->
 | Select model or effort | model popover view-model `deriveModelPicker` | none yet | `getAgentSessionOptions` is still target-only | none: no daemon admission consumes `{optionId, providerModelId, descriptorRevision}` yet | none | not applicable | `conversation-model-picker.test.ts` (view-model only) |
 | Open native config | "Open native config: <target>" only for a declared target | none yet | `POST /v1/agent-profiles/{id}/native-config/{targetId}/open`, `open_native_configuration` (`agent_native_config_operator.rs`) | declared-target check, then `NativeConfigOpener` (V1: `UnqualifiedOpener`) | `NativeConfigOpenReceipt` | stateless | `native_config_open_rejects_undeclared_targets_and_caller_paths` |
 
-Breaks found by this trace, left open in the owning task: (1) Sign in, Open native config and the model picker have no Tauri command, so the UI cannot call a served route (T07, T10); (2) `getAgentSessionOptions` and `getAgentHarnessCapabilities` are still target-only (T05, T09); (3) no qualified launcher or opener exists, so the served routes refuse every declared method (T07, T10). Served routes with no UI path by design in V1: none other than these two.
+Breaks found by this trace, left open in the owning task: (1) Sign in and Open native config now have authenticated ID-only Tauri commands and descriptor-driven UI controls (T07, T10); the model picker still has no Tauri command because its options route is target-only (T09); (2) `getAgentSessionOptions` and `getAgentHarnessCapabilities` are still target-only (T05, T09); (3) no qualified launcher or opener exists, so the served routes refuse every declared method (T07, T10). The native action controls remain unavailable for current V1 modules because no auth method or native-config target is declared and the daemon launcher/opener fail closed.

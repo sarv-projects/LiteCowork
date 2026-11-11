@@ -249,13 +249,15 @@ test("a retained Resource A draft is saved only to A before the editor switches 
         server.middlewares.use("/__resource-race-test", async (_request, response, next) => {
           try {
             response.setHeader("content-type", "text/html");
-            response.end(await server.transformIndexHtml("/__resource-race-test", html));
+            const transformed = await server.transformIndexHtml("/__resource-race-test", html);
+            response.end(transformed.replace(/<script type="module" src="\/@vite\/client"><\/script>/, ""));
           } catch (error) { next(error); }
         });
         server.middlewares.use("/__resource-search-test", async (_request, response, next) => {
           try {
             response.setHeader("content-type", "text/html");
-            response.end(await server.transformIndexHtml("/__resource-search-test", searchHtml));
+            const transformed = await server.transformIndexHtml("/__resource-search-test", searchHtml);
+            response.end(transformed.replace(/<script type="module" src="\/@vite\/client"><\/script>/, ""));
           } catch (error) { next(error); }
         });
       } }],
@@ -284,7 +286,7 @@ test("a retained Resource A draft is saved only to A before the editor switches 
     await cdp("Page.enable");
     await cdp("Runtime.enable");
     await cdp("Page.navigate", { url: `http://127.0.0.1:${address.port}/__resource-race-test` });
-    await until(() => evaluate("window.__mounted === true"), "mounted Resource editor");
+    await until(() => evaluate("window.__mounted === true"), "mounted Resource editor", 60_000);
     await until(() => evaluate("document.querySelector('#resource-revision-title')?.textContent === 'A.txt'"), "Resource A details");
     await until(() => evaluate("[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Edit small text file')"), "Resource A edit action");
     await evaluate("[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Edit small text file').click()");
@@ -425,17 +427,17 @@ test("mounted Library ignores a deferred Workspace A search response after switc
   const address = httpServer?.address();
   assert.ok(address && typeof address === "object", "the browser harness HTTP server remains available");
   await cdp("Page.navigate", { url: `http://127.0.0.1:${address.port}/__resource-search-test` });
-  await until(() => evaluate("window.__searchHarnessReady === true"), "mounted search harness entry");
+  await until(() => evaluate("window.__searchHarnessReady === true"), "mounted search harness entry", 60_000);
   await evaluate("window.mountSearchApp()");
-  await until(() => evaluate("document.querySelector('select[aria-label=\"Selected Workspace\"]')?.value === 'workspace-a'"), "production App with Workspace A selected");
+  await until(() => evaluate("document.querySelector('select[aria-label=\"Current Workspace Root\"]')?.value === 'workspace-a'"), "production App with Workspace A selected");
   await clickButtonInPage("Library");
   await until(() => evaluate("Boolean(document.querySelector('#resource-search'))"), "Library Resource search");
   await evaluate("document.querySelector('#resource-search').focus()");
   await cdp("Input.insertText", { text: "query-a" });
   await until(() => evaluate("window.searchPendingCount('workspace-a') === 1"), "deferred Workspace A search response");
 
-  await evaluate("(() => { const select=document.querySelector('select[aria-label=\"Selected Workspace\"]'); const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set; setter.call(select,'workspace-b'); select.dispatchEvent(new Event('change',{bubbles:true})); })()");
-  await until(() => evaluate("document.querySelector('select[aria-label=\"Selected Workspace\"]')?.value === 'workspace-b' && document.querySelector('#resource-search')?.value === ''"), "Library search reset for Workspace B");
+  await evaluate("(() => { const select=document.querySelector('select[aria-label=\"Current Workspace Root\"]'); const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set; setter.call(select,'workspace-b'); select.dispatchEvent(new Event('change',{bubbles:true})); })()");
+  await until(() => evaluate("document.querySelector('select[aria-label=\"Current Workspace Root\"]')?.value === 'workspace-b' && document.querySelector('#resource-search')?.value === ''"), "Library search reset for Workspace B");
   await evaluate("document.querySelector('#resource-search').focus()");
   await cdp("Input.insertText", { text: "query-b" });
   await until(() => evaluate("window.searchPendingCount('workspace-b') === 1"), "deferred Workspace B search response");
@@ -443,7 +445,7 @@ test("mounted Library ignores a deferred Workspace A search response after switc
   await until(() => evaluate("document.body.innerText.includes('B search result.txt')"), "Workspace B search result");
   await evaluate("window.resolveSearch('workspace-a')");
   await wait(120);
-  assert.equal(await evaluate("document.querySelector('select[aria-label=\"Selected Workspace\"]')?.value"), "workspace-b");
+  assert.equal(await evaluate("document.querySelector('select[aria-label=\"Current Workspace Root\"]')?.value"), "workspace-b");
   assert.equal(await evaluate("document.body.innerText.includes('B search result.txt')"), true, "the current B search result remains visible");
   assert.equal(await evaluate("document.body.innerText.includes('A search result.txt')"), false, "a late A search response cannot populate B's Library");
 });

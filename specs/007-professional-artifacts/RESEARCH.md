@@ -59,15 +59,17 @@ No Open Cowork code is imported; it is a UX/skill reference read at the pinned S
 - `apps/litecowork-ui/src-tauri/src/resource_save_bridge.rs` (`resource_save_as`) and `artifact_bridge.rs` (`artifact_save_as`) are the two native Save As paths (10 MiB bound, SAVED/CANCELLED only).
 - `apps/litecoworkd/src/environment_office_qualification.rs` (`OfficeFormat`, `qualify_office_provider`, `probe_office_providers`) observes readiness only.
 
-## B-21 engine candidates (to be pinned in TASKS T01)
+## B-21 engine candidates and pin
 
-The accepted B-21 decision requires a deterministic in-process serializer and validator. These Rust candidates are named for evaluation only; neither is a dependency today and the exact version, license file and SHA are pinned in T01 before use.
+The accepted B-21 decision requires a deterministic in-process serializer and validator. The pin below selects the daemon dependency; it is not an implementation or support claim.
 
-| Candidate | License (to verify at pin) | Role | Verdict |
+| Candidate | License | Role | Verdict |
 |---|---|---|---|
-| `pulldown-cmark` | MIT | CommonMark + GFM tables pull parser for validation | Prototype as the validator; it does not serialize back to Markdown by itself |
-| `comrak` | BSD-2-Clause | CommonMark + GFM AST with a CommonMark formatter, usable for parse -> AST -> re-serialize canonical form | Prototype as the canonical round-trip engine |
+| `pulldown-cmark` | MIT | CommonMark + GFM tables pull parser for validation | Not selected: it does not serialize back to Markdown by itself |
+| `comrak` 0.59.0 | BSD-2-Clause | CommonMark + GFM AST with a CommonMark formatter, usable for parse -> AST -> re-serialize canonical form | Selected pin for B-21; exact upstream tag `v0.59.0`, commit `ac9d2081fe21b151ad3b3e42fea0e870e6272999`; Rust MSRV 1.89. Enable with Cargo `default-features = false` to omit CLI, syntax highlighting and optional `bon`; first adapter task must verify the approved CommonMark + GFM table profile, inert raw HTML behavior, and byte-stable round-trip with fixtures before publishing support. |
 | `similar` | Apache-2.0 | Myers line diff for daemon-side version compare | Optional for T11 if compare moves server-side |
+
+Pinned source evidence: [Comrak v0.59.0 release](https://github.com/kivikakk/comrak/releases/tag/v0.59.0), [tagged Cargo.toml](https://github.com/kivikakk/comrak/blob/v0.59.0/Cargo.toml). The upstream manifest records version 0.59.0, license BSD-2-Clause and Rust MSRV 1.89. Release notes also identify a quadratic HTML table rendering fix in v0.58.0; the selected v0.59.0 includes that release. This pin selects a candidate engine only; it does not claim a completed or qualified Artifact adapter.
 
 ## Alternatives and decisions
 
@@ -84,4 +86,4 @@ The accepted B-21 decision requires a deterministic in-process serializer and va
 
 ## Unresolved questions
 
-B-21, B-30 and B-31 are accepted. Remaining implementation questions: the exact Markdown engine pin (T01), the Product confirmation of the local-export receipt destination class under the B-31 caveat (T01), and whether a sandboxed read-only PDF view qualifies for V1 (T10).
+B-21, B-30 and B-31 are accepted. Remaining implementation questions: Product confirmation of the local-export receipt destination class under the B-31 caveat (recorded in T01), and whether a sandboxed read-only PDF view qualifies for V1 (T10). The Markdown engine version/license pin is recorded above; implementation conformance remains open in T03.

@@ -20,9 +20,9 @@ test('accepts stable Node 22.20.0 and above', () => {
 
 test('approves only the lock-pinned esbuild build script', () => {
   const workspace = readFileSync(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8');
-  const allowBuilds = workspace.match(/^allowBuilds:\n((?:  .+\n?)+)/m)?.[1];
+  const allowBuilds = workspace.match(/^allowBuilds:\r?\n((?:  .+\r?\n?)+)/m)?.[1];
 
   assert.ok(allowBuilds, 'an explicit dependency build allowlist is required');
-  assert.deepEqual(allowBuilds.trim().split('\n'), ["'esbuild@0.25.12': true"]);
+  assert.deepEqual(allowBuilds.trim().split(/\r?\n/), ["'esbuild@0.25.12': true"]);
   assert.doesNotMatch(workspace, /^dangerouslyAllowAllBuilds:\s*true$/m);
 });

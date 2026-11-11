@@ -1,8 +1,8 @@
 # 003 - Workspace Roots and Context Ingestion
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
-**Revision:** 1.0 | **Updated:** 2026-11-09
-**Implementation state (2026-11-10):** Storage tests only. T02 PARTIAL (Linux workspace root lifecycle storage tests, `workspace_root_lifecycle_tests.rs`). DEFERRED by the owner (Windows-only, test later on the owner's laptop): T03, T04 (Windows part), T05, T06. T08 PARTIAL (Persistent folders section and status labels, pre-existing UI). Everything else NOT STARTED; migration v35 is allocated and not written.
+**Revision:** 1.0 | **Updated:** 2026-11-11
+**Implementation state (2026-11-11):** Selected CODE/SERVED foundations only. WorkspaceRoot list/pause/resume/revoke/scan and paginated metadata-observation routes exist; Linux root lifecycle storage tests pass. Native folder add is supported on Linux/macOS but fails closed on Windows; metadata scan is Linux-only and does not read/index content. Grounded lexical retrieval is served, but Send does not call it and no durable ContextAttachment/retrieval receipt or “Context Used” projection exists. T08 is PARTIAL; T02 is PARTIAL; ingestion, indexing, attachment/retrieval integration, Context Debugger and qualification remain open. Windows root operations require native Windows testing; migration v35 remains allocated and unwritten. See TASKS.md and docs/IMPLEMENTATION-STATUS.md.
 **Owners:** Resource, Conversation, Storage, Security/Trust, Desktop UI.
 **Owner acceptance:** repository owner (sarv-projects), 2026-11-09, via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md). B-13 (UTF-8 lexical text set first) and B-14 (manual rescan, no V1 watcher) are accepted.
 **Release target:** V1 release matrix rows Windows 11/10 `x86_64-pc-windows-msvc` with OpenCode v2.0.32 first; Linux x86_64 desktop second.

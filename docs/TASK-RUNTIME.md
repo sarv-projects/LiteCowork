@@ -172,6 +172,12 @@ preflight blockers is not evidence that the separate planning-admission contract
 qualified or enabled. A stale Task version returns a conflict and requires a fresh Task
 read before another check.
 
+On the Windows release row, an eligible Task also reports the typed blocker
+`WINDOWS_ENVIRONMENT_PROVIDER_UNAVAILABLE` until the B-35 provider is accepted and
+qualified. The reason is visible even when no current lead endpoint can be resolved, so
+the UI does not mistake another preflight result for Windows execution support. This
+diagnostic does not disable Task creation or specification edits.
+
 ## CreateTaskRequest
 
 ```text

@@ -2777,7 +2777,7 @@ mod workspace_root_locator_tests {
         MAX_DECODED_LOCATOR_PATH_BYTES, URL_SAFE_NO_PAD, decode_workspace_root_locator_path,
     };
     use base64::Engine as _;
-    #[cfg(unix)]
+    #[cfg(any(unix, target_os = "windows"))]
     use std::path::PathBuf;
 
     #[cfg(unix)]

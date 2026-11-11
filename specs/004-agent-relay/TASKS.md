@@ -5,7 +5,7 @@
 
 ## Current baseline
 
-Verified against source on 2026-11-09. Served: `PATCH /v1/conversations/{conversation_id}/agent-binding` (`setConversationAgentBinding`) in `apps/litecoworkd/src/conversation_operator.rs`, Tauri `set_conversation_agent_binding` in `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs`, and `conversation.turn.created.v2` pinning `agent_binding_id`. CODE: `build_conversation_context_package` and `CONVERSATION_CONTEXT_MAX_BYTES` in `crates/storage-core/src/conversation.rs`, read by `load_conversation_context_for_turn` in `crates/storage-sqlite/src/conversations.rs`; `encode_conversation_context_prompt` in `apps/litecoworkd/src/agents/conversation_prompt.rs` (256 KiB, rejects resources with `ResourceMaterializationRequired`); `AgentSessionSupervisor` and `execute_agent_turn` in `apps/litecoworkd/src/agents/supervisor.rs` with a single `"opencode"` arm. Desktop: `ConversationsPage.tsx` picker via `buildConversationAgentChoices`; `deriveConversationAgentSurface` in `conversation-agent-surface.ts` has no production caller; `ConversationMessageView` and `parseConversationSnapshot` in `conversation-view.ts` drop `agent_binding_id`/`agent_session_id`. Gaps: no Claude Code arm (B-16); the existing arm is unreachable from a probe-created profile (`OPENCODE` vs `opencode`, Feature 002 SPEC §4a); no producer label; no truncation receipt; no `CONVERSATION_TURN_IN_PROGRESS` single-flight error in source (owned by Feature 001); picker not gated on dispatchability or descriptor freshness.
+Verified against source on 2026-11-11. Served: `PATCH /v1/conversations/{conversation_id}/agent-binding` (`setConversationAgentBinding`) in `apps/litecoworkd/src/conversation_operator.rs`, Tauri `set_conversation_agent_binding` in `apps/litecowork-ui/src-tauri/src/conversation_bridge.rs`, and `conversation.turn.created.v2` pinning `agent_binding_id`. CODE: `build_conversation_context_package` and `CONVERSATION_CONTEXT_MAX_BYTES` in `crates/storage-core/src/conversation.rs`, read by `load_conversation_context_for_turn` in `crates/storage-sqlite/src/conversations.rs`; `AgentSessionSupervisor` calls Feature 001's `materialize_conversation_resources` before `encode_conversation_context_prompt` (256 KiB; the encoder rejects unmaterialized refs); the supervisor has a single `"opencode"` arm. Desktop: `ConversationsPage.tsx` picker via `buildConversationAgentChoices`; picker filters profiles to the currently implemented OpenCode dispatch key but does not require a fresh descriptor or auth/offer qualification; `deriveConversationAgentSurface` has no production caller; message parsing/rendering retains and displays producer identity. Gaps: no Claude Code arm (B-16); no relay truncation receipt/bounded-query evidence; no descriptor-freshness gate; no A→B→A provider or recovery qualification.
 
 ## 004-T01 - Promote portable-context bounds, truncation receipt and relay errors
 
@@ -26,7 +26,7 @@ Verified against source on 2026-11-09. Served: `PATCH /v1/conversations/{convers
 
 ## 004-T02 - Preserve producer identity through the desktop message types
 
-- **Status:** PARTIAL (Operator and OpenAPI `ConversationMessage` carry nullable `agent_binding_id` and `agent_session_id`; the Tauri bridge forwards the JSON unchanged; `parseConversationSnapshot` drops both).
+- **Status:** PARTIAL (desktop type/parser, malformed-field rejection, legacy null producer, older-page attribution retention and immutable-stream producer drift are covered by `conversation-view.test.ts`; A→B→A transcript, storage pass-through evidence and native provider handles exclusion remain open).
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE (no new contract; can run in Wave 1).
 - **Owner:** Desktop UI, Conversation.
@@ -44,20 +44,20 @@ Verified against source on 2026-11-09. Served: `PATCH /v1/conversations/{convers
 
 ## 004-T03 - Portable relay export with filtering, bounds and truncation receipt
 
-- **Status:** PARTIAL (`build_conversation_context_package` orders by event revision, excludes `SYSTEM_NOTICE`, carries `source_agent_binding_id`, enforces 1,024 messages / 4 MiB; no truncation receipt, no cross-Workspace reference check, no adapter-budget input).
+- **Status:** PARTIAL (2026-11-11 CODE: `build_conversation_context_package` orders by event revision, excludes `SYSTEM_NOTICE`, carries `source_agent_binding_id`, and enforces 1,024 messages / 4 MiB. New `relay_context_preserves_each_producer_across_a_to_b_to_a` test proves portable A→B→A attribution and excludes native session handles. Feature 001 T14 reauthorizes ResourceRefs against the selected Workspace and materializes eligible text; relay still lacks a durable truncation receipt, adapter-budget input and bounded end-to-end query evidence.)
 - **Depends on:** T01
-- **Cross-package prerequisites:** Feature 003 Resource materializer for non-empty `resource_refs` (until then refs stay refused with `ResourceMaterializationRequired`).
+- **Cross-package prerequisites:** Feature 001 T14 owns eligible text ResourceRef authorization/materialization before dispatch. Feature 003 is still required for WorkspaceRoot content ingestion; relay T03 must not duplicate the materializer or treat binary/root refs as supported.
 - **Owner:** Conversation, Storage.
 - **Allowed paths:** `crates/storage-core/src/conversation.rs`, `crates/storage-sqlite/src/conversations.rs` (`load_conversation_context_for_turn`), `apps/litecoworkd/src/agents/conversation_prompt.rs`, related unit tests in those files.
 - **Contract:** SPEC §5 B-15, §7, §10, AC-002, AC-007, AC-008, AC-011.
-- **Change intent:** Implement `PortableContextMaterializer::export_for_relay` over the existing builder: take the target adapter text budget as input, select the most recent contiguous committed prefix within the smaller bound, and either refuse with `OverBudget` or emit a truncation receipt naming the first included revision; reject any reference whose Workspace differs (`CrossWorkspaceRef`); assert no private field is present (`PrivateFieldPresent`). Read the prefix with one bounded, index-ordered query capped at 1,024 rows instead of loading full history.
+- **Change intent:** Implement `PortableContextMaterializer::export_for_relay` over the existing builder: take the target adapter text budget as input, select the most recent contiguous committed prefix within the smaller bound, and either refuse with `OverBudget` or emit a truncation receipt naming the first included revision; preserve the existing Feature 001 same-Workspace ResourceRef authorization/materialization boundary and map its refusal to the canonical relay error; assert no private field is present (`PrivateFieldPresent`). Read the prefix with one bounded, index-ordered query capped at 1,024 rows instead of loading full history.
 - **Acceptance:**
   - [ ] AC-002: the export for B contains committed messages and allowed refs only; no A session id, native handle or transcript.
   - [ ] AC-007: an over-budget history returns a truncation receipt or a refusal, never a silent drop.
-  - [ ] AC-008: a cross-Workspace ref is rejected; credentials and handles never reach the encoder.
+  - [ ] AC-008: reusing Feature 001's materializer rejects cross-Workspace refs; credentials and handles never reach the encoder.
   - [ ] AC-011: building over a 10,000-message Conversation reads at most 1,024 rows (query-count assertion).
 - **Command:** `cargo test -p storage-core --locked conversation_context` ; `cargo test -p storage-sqlite --locked portable_context_export` (filter to be added by this task) ; `cargo test -p litecoworkd --locked conversation_prompt`
-- **Evidence:** test names in CURRENT-RUN.md.
+- **Evidence:** `cargo test -p storage-core --locked relay_context_preserves_each_producer_across_a_to_b_to_a` (1 passed, 115 filtered); test name and CODE limits in CURRENT-RUN.md.
 - **Stop:** stop if the export would need any field from a native session record.
 
 ## 004-T04 - Relay admission: fresh revalidation, no fallback, single-flight, no Task writes
@@ -101,7 +101,7 @@ Verified against source on 2026-11-09. Served: `PATCH /v1/conversations/{convers
 
 ## 004-T06 - Picker gated on dispatchability and descriptor freshness
 
-- **Status:** PARTIAL (`buildConversationAgentChoices` filters Workspace, enabled and lead-eligible; `deriveConversationAgentSurface` exists with tests and no production caller).
+- **Status:** PARTIAL (`buildConversationAgentChoices` also filters provider keys to the current OpenCode supervisor arm and has an unsupported-provider regression case; no fresh-descriptor/current-offer/auth gating, and `deriveConversationAgentSurface` still has no production caller).
 - **Depends on:** T05
 - **Cross-package prerequisites:** Feature 002 descriptor producer and composer option projection (shared picker gating).
 - **Owner:** Desktop UI, Agent Runtime.
@@ -118,7 +118,7 @@ Verified against source on 2026-11-09. Served: `PATCH /v1/conversations/{convers
 
 ## 004-T07 - Relay UI states and producer label
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL (committed AGENT messages now render a label resolved from their stored binding, with an unknown-agent fallback; the existing binding-save notice already explains that a running reply keeps its agent. Full picker states, rendered accessibility checks and acceptance tests remain open).
 - **Depends on:** T02, T06
 - **Cross-package prerequisites:** Feature 011 app-wide keyboard and focus baseline.
 - **Owner:** Desktop UI.
@@ -226,7 +226,7 @@ Cross-package task numbers are being re-authored in parallel, so this table name
 | This task | Other package (outcome) | Reason |
 |---|---|---|
 | T01 | Feature 001 (context dispatch contract, B-07 budget) | The relay reuses 001's package bounds. |
-| T03 | Feature 003 (Resource materializer) | Non-empty `resource_refs` stay refused until materialized. |
+| T03 | Feature 001 (dispatch-time text ResourceRef materializer); Feature 003 (WorkspaceRoot ingestion) | Reuse 001's authorization/materialization and cross-Workspace denial; 003 is needed only for root-file admission/indexing, not to create a duplicate Resource materializer. |
 | T04 | Feature 001 (single-flight, outbox), Feature 002 (fresh-descriptor gate) | Admission semantics are owned there. |
 | T05 | Feature 002 (OpenCode binding fix, `NativeProviderKey`, Claude Code module), Feature 001 (final-response commit, stop/quiescence) | The arm needs a pinned module and a durable commit path. |
 | T06 | Feature 002 (descriptor projection, composer option gating) | Shared picker gating. |

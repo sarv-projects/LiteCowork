@@ -1,8 +1,8 @@
 # 008 - Workbench Browser Terminal and Computer
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
-**Revision:** 1.0 | **Updated:** 2026-11-09 | **Owner acceptance:** repository owner, 2026-11-09, via [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)
-**Implementation state (2026-11-10):** Not implemented. T09 BLOCKED on a Feature 005 Linux Environment, T12 BLOCKED on B-35 (Windows); migration v41 allocated.
+**Revision:** 1.0 | **Updated:** 2026-11-11 | **Owner acceptance:** repository owner, 2026-11-09, via [OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md)
+**Implementation state (2026-11-11):** Partial CODE only. T02 truthfulness slice is partial: Activity has an explicit empty state, Computer is status-only UNAVAILABLE, and Terminal names the Windows/Linux Environment blocker; the full UI suite passed 633/633. No BrowserSession, browser stream/provider, PTY, real Activity source, or Diff provider is served. T09 is BLOCKED on a Feature 005 Linux Environment; T12 is BLOCKED on B-35 (Windows); migration v41 is allocated. The owner-requested observation/takeover refinement is now recorded: ephemeral managed-browser viewport only, browser-lease Take over is separate from Conversation Take control, and whole-desktop capture remains deferred under B-32. No route/provider/UI control exists; this decision is not implementation or qualification evidence.
 **Component owners:** Desktop shell, Environments, Browser provider, Trust, Desktop UI.
 
 ## User outcome
@@ -11,7 +11,7 @@ The owner uses the right Workbench to finish real browser and terminal work, tak
 
 ## Current truth
 
-The active Workbench Files pane is a Resource projection/preview, not a live filesystem. Browser is an empty-by-default embedded iframe preview labelled as such, not Chrome or a browser-control provider. After register A-51 the Terminal pane (`TerminalPane`) and Review pane (`ReviewPane`) in `apps/litecowork-ui/src/workbench/WorkbenchPanel.tsx` render honest unavailable notices with no fabricated output, exit codes or containment labels. Activity has no rendered branch (the `activity` tab value falls through to Review); Computer capture/input is unavailable and has no status surface. No BrowserSession, PTY, Activity, Diff or Computer route/provider exists.
+The active Workbench Files pane is a Resource projection/preview, not a live filesystem. Browser is an empty-by-default embedded iframe preview labelled as such, not Chrome or a browser-control provider. After register A-51 the Terminal pane (`TerminalPane`) and Review pane (`ReviewPane`) in `apps/litecowork-ui/src/workbench/WorkbenchPanel.tsx` render honest unavailable notices with no fabricated output, exit codes or containment labels. Activity now has a dedicated empty state and tab; Computer capture/input remains unavailable and the Workbench presents status text only. No BrowserSession, PTY, Activity, Diff or Computer route/provider exists.
 
 Accepted decisions (2026-11-09): B-22 `MANAGED_CHROMIUM` with an isolated profile, ambient-CDP discovery and default-profile copy disabled; B-23 one daemon-owned PTY/ConPTY per tab under an admitted Environment with ordered receipts and timeout-as-receipt, qualifying on the Linux x64 row first and visibly UNAVAILABLE on Windows until Feature 005 B-35; B-32 Computer use deferred and explicitly UNAVAILABLE. Revision 1.0 adds the Workbench Activity view and exact-revision/VCS Diffs to scope. The V1 plan is in [TASKS.md](TASKS.md).
 

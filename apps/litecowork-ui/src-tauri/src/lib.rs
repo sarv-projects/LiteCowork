@@ -18,6 +18,7 @@ use std::{
 use tauri::{AppHandle, Manager};
 
 mod artifact_bridge;
+mod agent_binding_bridge;
 mod agent_control_bridge;
 mod agent_quota_bridge;
 mod agent_registry_bridge;
@@ -5443,6 +5444,8 @@ pub fn run() {
             list_agent_installations,
             agent_control_bridge::get_agent_control_descriptor,
             agent_control_bridge::refresh_agent_control_descriptor,
+            agent_control_bridge::begin_agent_authentication,
+            agent_binding_bridge::open_agent_native_configuration,
             agent_quota_bridge::get_agent_quota_observation,
             discover_bridge::discover_request,
             agent_registry_bridge::list_agent_registry,

@@ -38,6 +38,25 @@ function semanticText(message: ConversationMessageView): string {
   return message.content.filter((block): block is { kind: "TEXT"; text: string } => block.kind === "TEXT").map(block => block.text).join("\n");
 }
 
+function ConversationProducerLabel({
+  message,
+  bindings,
+  profiles,
+}: {
+  message: ConversationMessageView;
+  bindings: readonly ConversationAgentBindingOption[];
+  profiles: readonly ConversationAgentProfileOption[];
+}) {
+  if (message.role !== "AGENT") return null;
+  if (!message.agent_binding_id) {
+    return <span className="conversation-producer-label">Unknown agent</span>;
+  }
+  const binding = bindings.find(candidate => candidate.agentBindingId === message.agent_binding_id);
+  const profile = binding && profiles.find(candidate => candidate.agentProfileId === binding.agentProfileId);
+  const label = profile?.displayName.trim() || `Unknown agent · ${message.agent_binding_id}`;
+  return <span className="conversation-producer-label" aria-label={`Response from ${label}`}>{label}</span>;
+}
+
 function ConversationMessageContent({ workspaceId, conversationId, message, autoLoadRich, presentationEpoch }: {
   workspaceId: string;
   conversationId: string;
@@ -811,6 +830,8 @@ export function ConversationsPage({
     const optimisticMessage: ConversationMessageView = {
       message_id: `user-msg-${Date.now()}`,
       role: "USER",
+      agent_binding_id: null,
+      agent_session_id: null,
       content: [{ kind: "TEXT", text }],
       created_at: new Date().toISOString(),
       rich_presentation: null,
@@ -1025,6 +1046,7 @@ export function ConversationsPage({
                     </div>
                   ) : (
                     <div className="message-assistant-wrap">
+                      <ConversationProducerLabel message={message} bindings={agentBindings} profiles={agentProfiles} />
                       <div className="message-assistant-body">
                         <ConversationMessageContent
                           workspaceId={workspaceId}

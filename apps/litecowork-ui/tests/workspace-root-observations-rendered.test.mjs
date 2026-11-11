@@ -140,6 +140,8 @@ test("rendered Library observed files search, paginate, and discard a response a
     assert.ok(address && typeof address === "object");
     const harnessResponse = await fetch(`http://127.0.0.1:${address.port}/tests/browser/harness.html`);
     assert.equal(harnessResponse.status, 200);
+    const harnessModuleResponse = await fetch(`http://127.0.0.1:${address.port}/tests/browser/harness.tsx`);
+    assert.equal(harnessModuleResponse.status, 200, `Vite transforms the production browser harness: ${await harnessModuleResponse.text()}`);
 
     chromeProcess = spawn(chrome, [
       "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
@@ -234,8 +236,8 @@ test("rendered Library observed files search, paginate, and discard a response a
       return true;
     })()`);
     await evaluate(`window.litecoworkHarness.mountProductionApp("workspace-root-scan-unsupported")`);
-    await until(() => evaluate("Boolean(document.querySelector('.workspace-switcher'))"), "production Workspace shell");
-    const libraryClicked = await evaluate(`(() => { const item=[...document.querySelectorAll('.nav-list .nav-item')].find(node=>node.textContent.trim().includes('Library')); if(!item)return false; item.click(); return true; })()`);
+    await until(() => evaluate("Boolean(document.querySelector('.sidebar-workspace-switcher'))"), "production Workspace shell");
+    const libraryClicked = await evaluate(`(() => { const item=[...document.querySelectorAll('.sidebar-nav-list .sidebar-nav-btn')].find(node=>node.querySelector('.sidebar-nav-text')?.textContent.trim()==='Library'); if(!item)return false; item.click(); return true; })()`);
     assert.equal(libraryClicked, true, "Library navigation item exists");
     await until(() => evaluate("Boolean(document.querySelector('.workspace-root-observations'))"), "observed-files panel mounted from Library root fixture");
     await click(".workspace-root-observations-toggle", "Browse observed files");

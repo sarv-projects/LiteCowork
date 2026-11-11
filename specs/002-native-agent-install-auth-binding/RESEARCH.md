@@ -48,7 +48,7 @@ Reject:
 - `AgentCatalogSettings` currently lists 15 curated candidates and ACP registry entries; registry results are read-only and map to NO_ADAPTER.
 - Local inventory probes version/path metadata for a bounded candidate set; auth UNKNOWN, readiness NOT_PROBED. No actual AgentModule install/update action exists.
 - Profile probe supports Codex/OpenCode only, Runtime enrollment required. Codex App Server initialize/account/model-list is observed; OpenCode is recorded incompatible. Neither guarantees an end-to-end Conversation session.
-- Descriptor read/refresh and credential submission return 503 DEPENDENCY_UNAVAILABLE; auth-begin and native-config-open are target-only.
+- Descriptor read/refresh and credential submission return 503 DEPENDENCY_UNAVAILABLE; auth-begin and native-config-open are served and wired through authenticated ID-only Tauri commands, but fail closed because no V1 module declares a qualified method or target.
 - Binding list/create/enable/disable/default actions are served; enable currently lacks required fresh AgentControlDescriptor gate.
 - Conversation supervisor dispatches OpenCode only, but current OpenCode profile probe is incompatible; Codex can be bound but is not dispatched by the active supervisor.
 - UI currently has no Install/Update or native sign-in flow; usage detail/projection is not served.
@@ -101,3 +101,7 @@ Plugin-architecture lessons (see [plugin study](../../docs/DEEPSEEK-HARNESS-PLUG
   - Capability seam: Definition, Provider, Consumer (ADR P-20): [docs/capability-seams.md](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/docs/capability-seams.md). Class **ADAPT**. Applies to the agent install and auth binding seam; ADR is proposed, not accepted. Reuse: pattern only, reimplement; no upstream code imported.
   - Env scrubbing by execution mode (relevant to the open P-38 conflict): [packages/boot/plugin-manager/src/operations.ts](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/boot/plugin-manager/src/operations.ts). Class **ADAPT**. A captured subprocess uses a scrubbed parent environment; only an interactive CLI run inherits the real one. Reuse: pattern only, reimplement; no upstream code imported.
 
+
+## Windows host CLI observation (2026-11-11, local evidence)
+
+Commands: `claude --version`, `claude --help`, and `claude auth --help`; all exited 0. The installed version is `2.1.310 (Claude Code)`. Its help describes interactive mode by default and `--print` for non-interactive output; input/output formats include `stream-json`, with optional partial-message chunks. It lists `auth login`, `auth logout`, and `auth status`; it does not establish the underlying native auth method or credential validity. For background sessions it documents a session ID and `claude stop|kill`; no foreground cancellation guarantee was found. No prompt was submitted, no sign-in was started, and no credentials or account details were read. This advances T12 from “CLI unavailable” to local advertised-transport evidence only; an actual redacted stream fixture and safe-stop/auth verification remain mandatory.

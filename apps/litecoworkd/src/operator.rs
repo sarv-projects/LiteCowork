@@ -4724,6 +4724,13 @@ fn task_planning_readiness_projection(
         }
     }
 
+    #[cfg(target_os = "windows")]
+    if task.task.current_plan_revision.is_none()
+        && matches!(task.task.status.as_str(), "READY" | "RUNNING")
+    {
+        blockers.push(PlanningDispatchBlocker::WindowsEnvironmentProviderUnavailable);
+    }
+
     let response = TaskPlanningReadinessResponse {
         task_id: task.task.task_id,
         task_version: task.task.version,
@@ -9593,10 +9600,10 @@ mod task_planning_readiness_tests {
         assert_eq!(body["planning_started"], false);
         assert_eq!(body["agent_session_started"], false);
         assert_eq!(body["plan_created"], false);
-        assert_eq!(
-            body["blockers"],
-            json!([PlanningDispatchBlocker::CurrentLeadOrEndpointUnavailable])
-        );
+        let mut expected_blockers = vec![PlanningDispatchBlocker::CurrentLeadOrEndpointUnavailable];
+        #[cfg(target_os = "windows")]
+        expected_blockers.push(PlanningDispatchBlocker::WindowsEnvironmentProviderUnavailable);
+        assert_eq!(body["blockers"], json!(expected_blockers));
         assert!(body.get("planning_packet").is_none());
         assert!(body.get("endpoint_id").is_none());
         assert_eq!(row_counts(&fixture.database), before);

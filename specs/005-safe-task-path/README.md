@@ -1,8 +1,8 @@
 # 005 - Safe Task Path
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
-**Revision:** 1.0 | **Updated:** 2026-11-09
-**Implementation state (2026-11-10):** Not implemented. T16 (B-35), T17, T18 BLOCKED and Windows-only; migration v36 allocated. Pre-existing partial foundations are listed in TASKS.md.
+**Revision:** 1.0 | **Updated:** 2026-11-11
+**Implementation state (2026-11-11):** Partial foundations are served for Task create/read, plan acceptance storage, planning readiness and presentation. T02 now consolidates shared Environment types and trust-checked Bubblewrap discovery (Windows CODE evidence only). A complete admitted Task execution path is not implemented. T14 has a partial Windows UNAVAILABLE implementation; T16 (B-35), T17 and T18 remain owner-blocked/deferred. See TASKS.md and docs/IMPLEMENTATION-STATUS.md.
 **Owners:** Task Runtime, Environments, Trust, Storage, Desktop UI. Accepted by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
 
 ## User outcome

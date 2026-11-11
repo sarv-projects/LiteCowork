@@ -5,10 +5,10 @@
 
 ## Current baseline
 
-Verified in source on 2026-11-09 (branch `docs/audit-competitor-superset`):
+Verified in source on 2026-11-11 (current uncommitted worktree):
 
 - `apps/litecowork-ui/src/workbench/WorkbenchPanel.tsx` (608 lines) is mounted by `App.tsx` as the right pane. After register A-51, `TerminalPane` renders an "unavailable" notice with no input or output, `ReviewPane` renders "Nothing to review yet", and the Browser iframe starts with an empty `browserUrl` labelled "Embedded page preview". `apps/litecowork-ui/tests/workbench-truthfulness.test.mjs` guards against the strings `exit code`, `ConPTY`, `Job Object`, `KILL_ON_CLOSE`, `pwsh` and `DACL`.
-- `WorkbenchTab` still declares `"activity"` with no launcher row, pill or render branch; the final `else` renders `ReviewPane`. There is no Computer status surface.
+- Activity now has a launcher/tab and its own status-only empty state; Computer use is shown as status-only UNAVAILABLE with no action control.
 - `apps/litecoworkd/src/browser_consent.rs` (`create_managed_profile`, `is_default_chrome_user_data_directory`, `decide_existing_chrome_attach`, `authorize_observation`) and `apps/litecoworkd/src/browser_control_service.rs` (`admit_action`, `request_takeover`, `return_to_agent`, `BrowserControlLease`, `BrowserControlError`) are pure policy code compiled under `#[allow(dead_code)]` in `apps/litecoworkd/src/main.rs`; only their unit tests call them.
 - `apps/litecoworkd/src/environment_computer_use.rs` `probe_computer_provider()` never reports READY; every capture/input request is refused; also `#[allow(dead_code)]`.
 - `crates/windows-local-security/src/lib.rs` has `spawn_kill_on_drop_job`, `ContainedChild::kill_tree` and `wait_for_job_quiescence` (process lifetime only). No `openpty`, `CreatePseudoConsole`, TerminalSessionService, terminal route or Tauri terminal bridge exists. `apps/litecoworkd/src/environment_isolation.rs` probes for bubblewrap but is not wired to Task admission.
@@ -37,7 +37,7 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 
 ## 008-T02 - Finish Workbench truthfulness: Activity fallthrough, Computer UNAVAILABLE, per-row reasons
 
-- **Status:** PARTIAL (register A-51 done: `TerminalPane`, `ReviewPane` and empty Browser default in `apps/litecowork-ui/src/workbench/WorkbenchPanel.tsx`, guarded by `apps/litecowork-ui/tests/workbench-truthfulness.test.mjs`; remaining: `activity` falls through to `ReviewPane`, no Computer status, no platform-specific terminal reason)
+- **Status:** PARTIAL (2026-11-11 CODE: Activity has an explicit status-only empty state and tab branch; Computer use is status-only; TerminalPane names the distinct Windows/Linux Environment blocker. Focused Workbench tests passed 11/11, `pnpm exec tsc --noEmit` passed, and `pnpm run build` passed after confirming generated API output matches the schema. Full UI suite now passes **633/633** (`node --experimental-transform-types --test --test-concurrency=1 --test-reporter=tap "tests/*.test.ts" "tests/*.test.mjs"`) after correcting stale Workspace/Runtime selectors and warming Vite's production harness module before browser startup. Static accessibility checks cover notice names/focusability, Activity order and the existing narrow-pane Escape handler; no axe browser audit was run. Still open: a rendered accessibility audit.)
 - **Depends on:** NONE
 - **Cross-package prerequisites:** NONE
 - **Owner:** Desktop UI
@@ -122,10 +122,12 @@ Gaps: every provider, store, route, bridge and real view listed in SPEC §7.2; t
 - **Owner:** Desktop UI
 - **Allowed paths:** `apps/litecowork-ui/src/workbench/BrowserPane.tsx` (new), `apps/litecowork-ui/src/workbench/WorkbenchPanel.tsx`, `apps/litecowork-ui/src/workbench/browser-session-api.ts` (new), `apps/litecowork-ui/src/workbench/workbench-panel.css`, `apps/litecowork-ui/tests/workbench-browser-session.test.mjs` (new)
 - **Contract:** contracts/ui-behavior.md state table; CHROME-BROWSER-LLD UI; AC-001, AC-003, AC-011
-- **Change intent:** Render the provider-backed browser view (LIVE_INTERACTIVE or OBSERVATION_FRAMES) separately from the existing "Embedded page preview" iframe, which keeps its label and gains no agent badge. Show mode, engine/version, control owner and epoch. Consent dialog before the first agent action; Take control and Return buttons enabled only for a live lease; Return asks for confirmation. States: starting, NEEDS_SETUP, UNAVAILABLE, OFFLINE, provider error with repair, consent denied, stale epoch.
+- **Change intent:** Render the provider-backed browser view (LIVE_INTERACTIVE or OBSERVATION_FRAMES) separately from the existing "Embedded page preview" iframe, which keeps its label and gains no agent badge. For the accepted observation mode, show only the managed browser tab viewport as ephemeral frames with bounded latest-frame backpressure and stale-frame labeling; never describe it as laptop/desktop sharing. Show mode, engine/version, control owner and epoch. Consent dialog before the first agent action. While a live lease is AGENT-owned, show a persistent, non-modal **Take over** banner. Its UI reports USER control only after the provider confirms the new epoch and old-epoch inputs are fenced; reconcile dispatched actions before showing a settled result. This browser takeover does not stop Conversation generation or a Task. Feature 012 Conversation Take control remains a separate cancel/quiescence action. Return is a separate confirmation and starts from a fresh observation. States: starting, NEEDS_SETUP, UNAVAILABLE, OFFLINE, provider error with repair, consent denied, stale epoch.
 - **Acceptance:**
   - [ ] With no provider, the view shows UNAVAILABLE and never the word Chrome (AC-001).
   - [ ] Take control disables agent input only after the Operator confirms the new epoch (AC-003).
+  - [ ] Browser takeover is visible only for an AGENT-owned live browser lease and does not imply that Conversation generation or a Task stopped (Feature 012 Take control is distinct).
+  - [ ] No whole-desktop/laptop capture control is shown under accepted B-32; without a served browser provider, show status only.
   - [ ] All controls have accessible names; status changes are announced through a live region (AC-011).
   - [ ] Closing the pane does not close the browser session or stop a Task.
 - **Command:** `pnpm --dir apps/litecowork-ui test` and `pnpm --dir apps/litecowork-ui run build`

@@ -10,16 +10,16 @@ const bindings = [
 ];
 
 const profiles = [
-  { agentProfileId: "profile-a", displayName: "Claude Code" },
-  { agentProfileId: "profile-b", displayName: "Disabled Agent" },
-  { agentProfileId: "profile-c", displayName: "Subagent Only" },
-  { agentProfileId: "profile-d", displayName: "Other Workspace Agent" },
+  { agentProfileId: "profile-a", displayName: "OpenCode", providerKey: "OPENCODE" },
+  { agentProfileId: "profile-b", displayName: "Disabled Agent", providerKey: "OPENCODE" },
+  { agentProfileId: "profile-c", displayName: "Subagent Only", providerKey: "OPENCODE" },
+  { agentProfileId: "profile-d", displayName: "Other Workspace Agent", providerKey: "OPENCODE" },
 ];
 
 test("Conversation choices include only enabled lead bindings from this Workspace", () => {
   assert.deepEqual(
     buildConversationAgentChoices("workspace-a", bindings, profiles, null),
-    [{ agentBindingId: "binding-eligible", label: "Claude Code", selectable: true }],
+    [{ agentBindingId: "binding-eligible", label: "OpenCode", selectable: true }],
   );
 });
 
@@ -27,7 +27,7 @@ test("a stale current override remains visible only so the user can clear it", (
   assert.deepEqual(
     buildConversationAgentChoices("workspace-a", bindings, profiles, "binding-disabled"),
     [
-      { agentBindingId: "binding-eligible", label: "Claude Code", selectable: true },
+      { agentBindingId: "binding-eligible", label: "OpenCode", selectable: true },
       { agentBindingId: "binding-disabled", label: "Unavailable selected agent", selectable: false },
     ],
   );
@@ -45,8 +45,20 @@ test("duplicate profile names are disambiguated by binding identity", () => {
       null,
     ),
     [
-      { agentBindingId: "binding-eligible", label: "Claude Code \u00b7 binding-eligible", selectable: true },
-      { agentBindingId: "binding-eligible-2", label: "Claude Code \u00b7 binding-eligible-2", selectable: true },
+      { agentBindingId: "binding-eligible", label: "OpenCode \u00b7 binding-eligible", selectable: true },
+      { agentBindingId: "binding-eligible-2", label: "OpenCode \u00b7 binding-eligible-2", selectable: true },
     ],
+  );
+});
+
+test("profiles without a Conversation dispatch arm are not selectable", () => {
+  assert.deepEqual(
+    buildConversationAgentChoices(
+      "workspace-a",
+      [bindings[0]!],
+      [{ agentProfileId: "profile-a", displayName: "Codex", providerKey: "CODEX" }],
+      null,
+    ),
+    [],
   );
 });

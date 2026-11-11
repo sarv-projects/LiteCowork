@@ -1,8 +1,8 @@
 # 002 - Native Agent Install, Auth and Binding
 
 **Status:** ACCEPTED/LOCKED - owner-accepted 2026-11-09; authorizes implementation; not a claim of implementation or qualification.
-**Revision:** 1.0 | **Updated:** 2026-11-09
-**Implementation state (2026-11-10):** CODE and SERVED, fail-closed, no live agent run. T01 (sync), T03, T04 CODE-COMPLETE; PARTIAL: T02, T05, T06, T07, T09, T10, T11, T13, T14, T16, T17 (ACP client), T18 (Matchmaker). BLOCKED: T08 (needs migration v33 for the credential receipt), T12 (needs an installed Claude Code CLI). DEFERRED: T15 (release matrix, Windows laptop). NOT STARTED: T19. Allocated migrations v33 (T04 store) and v34 (T07 observations) are not wired yet.
+**Revision:** 1.0 | **Updated:** 2026-11-11
+**Implementation state (2026-11-11):** CODE and SERVED, fail-closed, no live agent run; the new authenticated ID-only Tauri sign-in/native-config commands and descriptor-driven UI actions have passing focused Windows Rust/TypeScript checks, while production launch/open remain fail-closed. T01 (sync), T03, T04 CODE-COMPLETE; PARTIAL: T02, T05, T06, T07, T09, T10, T11, T12 (Claude Code 2.1.310 help advertises print/stream-json and auth commands; actual stream frames, auth mode and safe cancellation remain unverified), T13, T14, T16, T17 (ACP client), T18 (Matchmaker). BLOCKED: T08 (credential receipt migration and durability). DEFERRED: T15 (release matrix, Windows laptop). NOT STARTED: T19. Allocated migrations v33 (T04 store) and v34 (T07 observations) are not wired yet.
 **Owners:** Agent Runtime, Security/Trust, Desktop UI, Product, Conversation Runtime. Accepted by the repository owner via [docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md](../../docs/OWNER-ACCEPTANCE-REVIEW-PACKET.md).
 
 ## User outcome
@@ -11,7 +11,7 @@ The owner discovers and inspects a native agent, establishes a module-qualified 
 
 ## Current truth
 
-The active checkout has 15 curated candidates plus read-only ACP metadata and bounded version/path observations; auth remains UNKNOWN and readiness NOT_PROBED. Profile probes are limited to Codex and OpenCode: Codex observations do not imply Conversation dispatch, while OpenCode's current profile offer is incompatible. Install/update/repair and native sign-in are absent; descriptor/credential routes return 503; binding enable does not enforce the fresh AC-004 descriptor gate. Model/effort selection and Usage are not qualified. Feature 001 remains the authority for Conversation execution. The OpenCode binding break is traced to exact symbols in SPEC §4a and is fixed first by TASKS 002-T01. Do not infer qualification from a catalogue row, model list, installed binary, profile probe or enabled binding.
+The active checkout has 15 curated candidates plus read-only ACP metadata and bounded version/path observations; authentication remains UNKNOWN and readiness NOT_PROBED. Profile probes are limited to Codex and OpenCode: Codex observations do not imply Conversation dispatch, while OpenCode's current profile offer is incompatible. Auth-begin and native-config-open are served and wired to authenticated ID-only Tauri commands, but fail closed because no V1 module declares a qualified method or target. Descriptor read/refresh and credential submission still return 503; credential submission lacks its durable replay receipt. Binding enable does not yet enforce the fresh AC-004 descriptor gate. Install/update/repair, model/effort qualification, and Usage are incomplete. Feature 001 remains the authority for Conversation execution. Do not infer qualification from a catalogue row, model list, installed binary, profile probe or enabled binding. See the current task-by-task evidence in TASKS.md and docs/IMPLEMENTATION-STATUS.md.
 
 ## V1 design
 

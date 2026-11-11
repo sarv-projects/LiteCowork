@@ -17,7 +17,7 @@ Gaps: create (B-30), Markdown adapter (B-21), export receipt (B-31), declared ca
 
 ## 007-T01 - Promote accepted 007 contracts into owner docs and machine schemas
 
-- **Status:** NOT STARTED
+- **Status:** PARTIAL - selected and pinned Comrak 0.59.0 (`=0.59.0`, BSD-2-Clause, upstream commit `ac9d2081fe21b151ad3b3e42fea0e870e6272999`, MSRV 1.89) in `apps/litecoworkd/Cargo.toml` with default features disabled; research records the upstream release and the remaining adapter conformance checks. Owner/API/event/migration promotion is not complete.
 - **Depends on:** NONE
 - **Cross-package prerequisites:** Feature 001 committed-message identity (message id used by `ConversationOrigin`); orchestrator assigns the next free migration number.
 - **Owner:** Artifacts, Storage, Product (B-31 caveat)

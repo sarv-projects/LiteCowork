@@ -63,8 +63,8 @@ import { TaskAttentionPage } from "./needs-you/TaskAttentionPage";
 import { maybeDesktopSuggestionApi } from "./suggestions/desktop-suggestion-api";
 import {
   isTaskPlanningReadinessFor,
+  planningBlockerLabel,
   planningReadinessNoBlockersMessage,
-  type PlanningBlocker,
   type TaskPlanningReadinessView,
 } from "./tasks/planning-readiness";
 import { canOfferLocalRuntimeStart } from "./runtime/runtime-start-readiness";
@@ -479,22 +479,6 @@ function stepStatusLabel(status: string): string {
     CANCEL_REQUESTED: "Stopping", CANCELLED: "Cancelled", SUPERSEDED: "Replaced",
   };
   return labels[status] ?? "Status unavailable";
-}
-
-function planningBlockerLabel(blocker: PlanningBlocker): string {
-  const labels: Record<PlanningBlocker, string> = {
-    TASK_STATE_NOT_ELIGIBLE: "The Task state is not eligible for planning.",
-    PLAN_ALREADY_ACCEPTED: "A plan is already saved for this Task.",
-    CURRENT_LEAD_OR_ENDPOINT_UNAVAILABLE: "The selected lead or a fresh compatible local endpoint is unavailable.",
-    TASK_ISOLATION_UNAVAILABLE: "Task-specific execution isolation is not available.",
-    NATIVE_CAPABILITIES_UNMEDIATED: "The agent's native capabilities are not yet mediated by LiteCowork.",
-    PROTOCOL_UNQUALIFIED: "The planning protocol has not been qualified for this setup.",
-    PROCESS_CONTAINMENT_UNQUALIFIED: "Process containment has not been qualified for this setup.",
-    PLANNING_CONTEXT_RESOURCE_UNAVAILABLE: "Required planning context is unavailable.",
-    SESSION_SETTLEMENT_UNAVAILABLE: "Safe planning-session settlement is not available.",
-    PROVIDER_UNSUPPORTED: "This provider is not supported for local planning.",
-  };
-  return labels[blocker];
 }
 
 function formatTaskTime(value: string): string {

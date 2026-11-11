@@ -187,21 +187,21 @@ The Workbench is a contextual panel over actual authorized objects. It is not a 
 |---|---|---|
 | Start | Surface available providers and entry points with truthful health | Launcher tiles do not imply service availability |
 | Files | Workspace resource tree/details and exact-revision preview; edits use a qualified mutation path | Current list/preview is not a general filesystem editor |
-| Browser | Real browser Environment, profile/session identity, navigation, screenshots, DOM/network capabilities, policy, takeover and return | Current iframe is only a WebView preview; not Chrome/CDP automation |
-| Computer | Real screen/control provider with lease, OS capabilities, consent and human takeover | No qualified computer-use provider is connected |
-| Terminal | Real daemon-owned PTY/ConPTY, process identity, stream, resize, bounded scrollback, detach/reattach, stop and recovery | Current terminal is simulated and must not report a command exit or Job Object containment |
-| Diffs | Actual VCS or revision-to-revision diff with file identity, hunks and provenance | Current sample/generated diffs are not actual changes |
-| Activity | Persisted events, provider reports and verified records with assurance level | Do not render synthetic token/process traces |
+| Browser | Real managed-browser session, isolated profile, navigation, authorized observations, lease takeover and return | Current pane is an empty-by-default embedded-page preview, not a Chrome/CDP browser session. Approved target observation is the managed tab viewport only; whole-desktop sharing stays unavailable under B-32. |
+| Computer | Real screen/control provider with lease, OS capabilities, consent and human takeover | No qualified computer-use provider is connected; status only under accepted B-32. |
+| Terminal | Real daemon-owned PTY/ConPTY, process identity, stream, resize, bounded scrollback, detach/reattach, stop and recovery | Current pane is explicitly unavailable and runs no shell or command. |
+| Diffs | Actual VCS or revision-to-revision diff with file identity, hunks and provenance | Current pane states that no change set is served; it shows no synthetic diff. |
+| Activity | Persisted events, provider reports and verified records with assurance level | Current pane states that no Activity source is served; it shows no synthetic token/process traces. |
 | Artifact preview/edit | Format-specific renderer/editor and revision commit | Only enable features proven by that Artifact handler |
 | Inspector | Redacted execution, authorization and recovery detail | No secrets, native handles or unverified state |
 
 A terminal session belongs to the daemon Environment, not the React component. Switching tabs detaches the view; it does not kill the process. Runtime restart marks an old PTY lost and never silently reruns the command. Bounded output retention, backpressure and explicit termination are mandatory.
 
-A Browser iframe preview must not be labeled a sandboxed agent browser or used as evidence of browser control. A true browser controller has its own OS process/profile, egress policy, session identity and takeover contract.
+A Browser iframe preview must not be labeled a sandboxed agent browser or used as evidence of browser control. A true browser controller has its own OS process/profile, egress policy, session identity and takeover contract. The approved target viewport is a bounded ephemeral stream of the managed browser tab, not the laptop desktop. Browser Take over transfers browser-input authority only through the provider-confirmed epoch fence; Conversation Take control separately stops the active turn through Feature 001 quiescence before owner continuation (Feature 012 B-34).
 
 ### Current Workbench source boundary
 
-The Files view is a Resource projection/preview, not a live filesystem browser. Browser is a sandboxed iframe with local React URL state, not Chrome/CDP and not a managed browser session. Terminal is React-local simulation: no process spawn or Tauri IPC; arbitrary commands print a fabricated exit code 0 while the UI claims pwsh/ConPTY and Job Object containment without a process receipt. Diffs use a fixed modulo pattern or static sample patch with hard-coded counts, not VCS or exact revision comparison. `WorkbenchTab` includes an Activity type but no navigation or render branch; it falls through to Diffs. Computer-use has no capture/input provider or live UI. The terminal's fake-success/containment claims are a visible truthfulness defect to remove, not a feature to qualify by adding a backend later. See Feature 008 SPEC/RESEARCH and `docs/IMPLEMENTATION-STATUS.md`.
+**Source re-check 2026-11-11:** The Files view is a Workspace Resource projection/preview, not a live filesystem browser. Browser is an empty-by-default embedded-page iframe, not Chrome/CDP and not a managed browser session. Terminal and Review are status-only unavailable/empty views; there is no shell process, fabricated exit status, or synthetic diff. Activity has its own status-only empty view and does not fall through to Review. Computer use is status-only UNAVAILABLE with no capture/input provider. No BrowserSession, terminal, Activity, Diff or Computer provider route is served. The owner-requested browser observation/takeover UX refinement is recorded in Feature 008 and `docs/CHROME-BROWSER-LLD.md`; it remains target design only. See `docs/IMPLEMENTATION-STATUS.md` for exact CODE/SERVED/evidence levels.
 
 ## 10. Intelligent UI and presentation
 

@@ -11,11 +11,11 @@ Stale Conversation versions, idempotency-key reuse with a different payload, dis
 ## Current gaps
 
 - The active supervisor has no second-provider dispatch branch. Unsupported provider keys fail closed; no B turn can currently be executed by Codex through the Conversation supervisor.
-- Feature 002's descriptor route currently returns 503, and the desktop descriptor-aware composer helper is not integrated into the production picker/send path.
+- Feature 002's descriptor GET/refresh commands are wired through Tauri but still fail closed with 503 when no qualified producer exists; the desktop descriptor-aware composer helper is not integrated into the production picker/send path.
 - The current OpenCode offer is incompatible for new binding creation in the Agent Catalog; the only supervisor dispatch branch is therefore not a complete selectable end-to-end path.
 - Resource/artifact refs are not materialized into the native text prompt; the encoder returns `ResourceMaterializationRequired` for nonempty refs/RESOURCE blocks.
 - Feature 001 has unresolved dispatch durability, retry ordering and native cancellation/quiescence gaps. These must be closed before relay recovery can be called reliable.
-- The UI does not render stored producer identity and the add-context control is inert; a successful API projection cannot be treated as a completed user-visible relay.
+- The UI renders stored producer identity and supports text ResourceRef attachment, but no successful A→B→A provider relay, general resource materialization or Context Used receipt is connected.
 
 ## Qualification gate
 

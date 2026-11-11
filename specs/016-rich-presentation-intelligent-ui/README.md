@@ -1,8 +1,8 @@
 # 016 - Rich Presentation, Intelligent UI and Generated Media
 
 - **Status:** IN_REVIEW - authored complete for owner review; does not authorize implementation until the owner accepts the SPEC and blocker B-40.
-- **Revision:** 0.1 | **Updated:** 2026-11-09 | **Decision:** B-40 (first Intelligent UI component and Interactive Artifact Runtime V1 posture) ACCEPTED as proposed 2026-11-10 (A-62); whole-SPEC acceptance pending, package stays IN_REVIEW.
-- **Implementation state (2026-11-10):** Not implemented beyond pre-existing partial foundations; plans no migration.
+- **Revision:** 0.1 | **Updated:** 2026-11-11 | **Decision:** B-40 (first Intelligent UI component and Interactive Artifact Runtime V1 posture) ACCEPTED as proposed 2026-11-10 (A-62); whole-SPEC acceptance pending, package stays IN_REVIEW.
+- **Implementation state (2026-11-11):** Partial CODE/SERVED foundations. Desktop and storage validators now agree on five block kinds and a 512 KiB cap; semantic fallback and a read path exist. No production publisher, preference/fallback control, chart/calculation renderer, generated-media provenance flow, or Interactive Artifact Runtime is wired. Package remains IN_REVIEW; implementation beyond previously authorized owner-approved work remains gated on whole-SPEC acceptance. See TASKS.md and docs/IMPLEMENTATION-STATUS.md.
 - **Owners:** Presentation Runtime, Conversation, Artifacts, Storage, Operator/API, Desktop UI, Security, Accessibility and Product.
 - **Release rows:** Windows x64 with OpenCode v2.0.32 first, Linux x64 second. No Environment provider is needed.
 

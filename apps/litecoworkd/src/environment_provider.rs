@@ -15,25 +15,10 @@
 //! * Sharing scope is not an authorization grant, and a private worktree and a
 //!   retained browser have different reuse semantics.
 
+use domain_environment::environment::{
+    BudgetEnforcement, BudgetEnforcementPolicy, EnvironmentLifetime, EnvironmentSharingScope,
+};
 use serde::{Deserialize, Serialize};
-
-/// The lifetime of an Environment substrate.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EnvironmentLifetime {
-    Attempt,
-    TaskRetained,
-    WorkspacePersistent,
-}
-
-/// Who may reuse an Environment.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EnvironmentSharingScope {
-    AttemptPrivate,
-    TaskShared,
-    CoworkerPrivate,
-    WorkspaceShared,
-    UserShared,
-}
 
 /// How an Environment may be reused.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -68,21 +53,6 @@ pub fn reuse_boundary(
             }
         }
     }
-}
-
-/// Whether the provider enforces a limit itself or only observes it.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum BudgetEnforcement {
-    ProviderEnforced,
-    HostMonitored,
-    Unavailable,
-}
-
-/// Whether a limit must be provider enforced.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum BudgetEnforcementPolicy {
-    RequireProviderEnforced,
-    AllowHostMonitored,
 }
 
 /// The cumulative usage of a persistent Environment.
@@ -298,29 +268,26 @@ impl EnvironmentProviderCapabilities {
 /// implemented here is reported as unsupported rather than advertised.
 pub fn probe_environment_provider() -> EnvironmentProviderCapabilities {
     let mut notes = Vec::new();
+    #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
     let mut classes = Vec::new();
+    #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
     let mut supports_attempt_lifetime = false;
+    #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
     let mut supports_task_retained_lifetime = false;
     let supports_workspace_persistent_lifetime = false;
     let supports_checkpoint = false;
     let supports_restore = false;
+    let local_probe = linux_process_scope::probe_local_provider();
 
     #[cfg(target_os = "linux")]
     {
-        let bubblewrap_present = ["/usr/bin/bwrap", "/bin/bwrap", "/usr/local/bin/bwrap"]
-            .iter()
-            .any(|candidate| std::path::Path::new(candidate).exists());
-        if bubblewrap_present {
+        notes.extend(local_probe.reasons.iter().cloned());
+        if has_trusted_bubblewrap(&local_probe) {
             classes.push(LocalProviderClass::LocalWorkspace);
             supports_attempt_lifetime = true;
             supports_task_retained_lifetime = true;
             notes.push(
                 "the local workspace provider is available but its isolation enforcement is not qualified on this host"
-                    .to_owned(),
-            );
-        } else {
-            notes.push(
-                "no qualified bubblewrap binary is present, so no local workspace substrate can be offered"
                     .to_owned(),
             );
         }
@@ -331,11 +298,12 @@ pub fn probe_environment_provider() -> EnvironmentProviderCapabilities {
 
     #[cfg(target_os = "windows")]
     {
-        classes.push(LocalProviderClass::LocalWorkspace);
-        supports_attempt_lifetime = true;
-        supports_task_retained_lifetime = true;
         notes.push(
-            "the Windows local workspace provider is available with Job Object process-tree isolation and KILL_ON_CLOSE active"
+            "Windows Task execution is unavailable because this build has no qualified Windows Environment provider"
+                .to_owned(),
+        );
+        notes.push(
+            "Job Object support manages process lifetime only; it does not enforce filesystem, network, or credential isolation"
                 .to_owned(),
         );
         notes.push(
@@ -352,7 +320,7 @@ pub fn probe_environment_provider() -> EnvironmentProviderCapabilities {
         provider_kind: "local-environment".to_owned(),
         provider_version: "1".to_owned(),
         operating_system: std::env::consts::OS.to_owned(),
-        operating_system_build: crate::environment_isolation::operating_system_build(),
+        operating_system_build: local_probe.operating_system_build,
         classes,
         supports_attempt_lifetime,
         supports_task_retained_lifetime,
@@ -363,6 +331,11 @@ pub fn probe_environment_provider() -> EnvironmentProviderCapabilities {
         max_members: 16,
         notes,
     }
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn has_trusted_bubblewrap(probe: &linux_process_scope::LocalProviderProbe) -> bool {
+    probe.trusted_bubblewrap.is_some()
 }
 
 /// A provider request identity, used to make provisioning idempotent.
@@ -417,6 +390,27 @@ pub fn classify_provisioning_response(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_untrusted_bubblewrap_candidate_does_not_make_a_local_workspace_available() {
+        let probe = linux_process_scope::LocalProviderProbe {
+            operating_system: "linux".to_owned(),
+            operating_system_build: "test-build".to_owned(),
+            bubblewrap_candidates: vec![linux_process_scope::BubblewrapCandidate {
+                path: std::path::PathBuf::from("/usr/bin/bwrap"),
+                present: true,
+                trusted: false,
+            }],
+            trusted_bubblewrap: None,
+            cgroup_v2: true,
+            cgroup_path: Some("/test".to_owned()),
+            systemd_available: true,
+            user_namespaces_available: true,
+            reasons: vec!["bubblewrap is not trusted".to_owned()],
+        };
+
+        assert!(!has_trusted_bubblewrap(&probe));
+    }
 
     fn budget() -> EnvironmentBudget {
         EnvironmentBudget {
@@ -588,6 +582,36 @@ mod tests {
             capabilities.budget_enforcement,
             BudgetEnforcement::Unavailable
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_probe_does_not_advertise_task_environment_support_from_a_job_object() {
+        let capabilities = probe_environment_provider();
+        assert!(
+            !capabilities
+                .classes
+                .contains(&LocalProviderClass::LocalWorkspace)
+        );
+        assert!(!capabilities.supports_attempt_lifetime);
+        assert!(!capabilities.supports_task_retained_lifetime);
+        assert!(!capabilities.supports_workspace_persistent_lifetime);
+        assert!(
+            capabilities
+                .notes
+                .iter()
+                .any(|note| { note.contains("no qualified Windows Environment provider") })
+        );
+        assert!(
+            capabilities
+                .notes
+                .iter()
+                .any(|note| { note.contains("Job Object support manages process lifetime only") })
+        );
+        assert!(capabilities.notes.iter().all(|note| {
+            !note.contains("Job Object process-tree isolation")
+                && !note.to_ascii_lowercase().contains("sandbox")
+        }));
     }
 
     #[test]

@@ -9,6 +9,7 @@ export type ConversationAgentBindingOption = {
 export type ConversationAgentProfileOption = {
   agentProfileId: string;
   displayName: string;
+  providerKey: string;
 };
 
 export type ConversationAgentChoice = {
@@ -28,11 +29,18 @@ export function buildConversationAgentChoices(
     profile.agentProfileId,
     profile.displayName.trim(),
   ]));
+  // The current Conversation supervisor has a native dispatch arm only for
+  // OpenCode. Catalog presence or a lead-eligible binding alone is not proof
+  // that this Runtime can execute a turn.
+  const dispatchableProfileIds = new Set(profiles
+    .filter(profile => profile.providerKey.trim().toUpperCase() === "OPENCODE")
+    .map(profile => profile.agentProfileId));
   const seenBindingIds = new Set<string>();
   const eligible = bindings.filter(binding => {
     if (binding.workspaceId !== workspaceId
       || !binding.enabled
       || !binding.leadEligible
+      || !dispatchableProfileIds.has(binding.agentProfileId)
       || !binding.agentBindingId
       || seenBindingIds.has(binding.agentBindingId)) return false;
     seenBindingIds.add(binding.agentBindingId);

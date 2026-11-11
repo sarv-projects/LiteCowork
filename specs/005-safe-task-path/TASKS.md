@@ -7,7 +7,7 @@ Task execution follows the B-17 rider: it qualifies first on the Linux x64 row. 
 
 ## Current baseline
 
-Source checked 2026-11-09 on branch `docs/audit-competitor-superset`.
+Source baseline originally checked 2026-11-09; refreshed against `main` at `c892a567` plus the current working tree on 2026-11-11. The Environment consolidation evidence below reflects the current tree; the other baseline statements remain source observations unless their task status says otherwise.
 
 - **Served Task envelope:** `create_task` in `apps/litecoworkd/src/operator.rs` commits Task + TaskSpecRevision + idempotency receipt. `validate_task_create_commit` in `crates/storage-sqlite/src/lib.rs` refuses any `conversation_id` or `source_message_refs` ("Conversation-origin Task creation is unavailable until its ConversationMessage can be appended atomically"). Home "New task" (`HomePage`, form `aria-label="Save a Task"` in `apps/litecowork-ui/src/App.tsx`) calls the Tauri `create_task` command in `apps/litecowork-ui/src-tauri/src/lib.rs`. `ConversationsPage.tsx` has no promotion control.
 - **Planning is closed at two layers:** `apps/litecoworkd/src/agents/planning.rs` `prepare_local_task_planning` hardcodes `dispatch_available: false` with six `PlanningDispatchBlocker` values, and `LocalPlanningPreflight::require_dispatch()` is `#[allow(dead_code)]` and always returns an error. In storage, `require_task_planning_isolation_admission()` always returns `TASK_PLANNING_ISOLATION_UNAVAILABLE`, which closes `start_task_planning_session`.
@@ -17,7 +17,7 @@ Source checked 2026-11-09 on branch `docs/audit-competitor-superset`.
 - **Linux substrate:** `crates/linux-process-scope/src/bubblewrap.rs` `spawn_bubblewrapped` / `prepare_bubblewrap_command` already unshares user/pid/net/ipc/uts, mounts inputs read-only and one output root writable, under a systemd transient scope (`ManagedScope`). It has no attestation, egress broker or aggregate quota. `crates/local-environment-staging` stages pinned inputs (`stage_task_spec_inputs`, `PreparedEnvironment`) and measures output (`measure_output_root`, `check_output_quota`).
 - **Windows substrate:** `crates/windows-local-security` has `spawn_kill_on_drop_job` (Job Object) and `replace_file_write_through`; no AppContainer, restricted token or WFP code.
 - **Effects and verification:** `domain-effects` (`EffectRecord::transition`, `authorize_retry`, `EvidenceRecord`) and `crates/storage-sqlite/src/effect_evidence.rs` (`propose_effect`, `transition_effect`, `append_evidence`) exist with no Attempt caller. `verification_runs_operator.rs` serves list only.
-- **Duplication found while grounding (optimization input):** the daemon redefines `EnforcementStatus` (also in `local-environment-staging/src/output_budget.rs`), `EnvironmentLifetime` and `BudgetEnforcement` (also in `domain-environment/src/environment.rs`) and `probe_local_provider` / `operating_system_build` / `cgroup_v2_available` (also in `linux-process-scope/src/provider_probe.rs`). Three bubblewrap candidate lists disagree, and `probe_environment_provider` checks presence without the root-owned trust check. `apps/litecoworkd/Cargo.toml` does not depend on `domain-environment` or `local-environment-staging`.
+- **Environment consolidation status after 2026-11-11:** `EnforcementStatus` now has one definition in `domain-environment::environment` and is re-exported by `local-environment-staging`; `EnvironmentLifetime`, `EnvironmentSharingScope`, `BudgetEnforcement` and `BudgetEnforcementPolicy` are imported from the domain owner. The daemon uses `linux-process-scope::probe_local_provider` for both capability and isolation probes, and only a trusted Bubblewrap candidate permits the LocalWorkspace class. The daemon now depends on the owner crates. T01 remains NOT STARTED; this code slice does not promote the execution contracts or authorize an admitted Task write.
 
 Gaps to V1: Conversation promotion, planning dispatch, plan acceptance route, a real Linux provider and attestation, Attempt admission, the B-18 write, Trust/grant/approval for that write, reconciliation, verification, cancel/restart recovery, Work execution UI, the Windows-row UNAVAILABLE posture, B-35, and qualification evidence.
 
@@ -27,7 +27,7 @@ Gaps to V1: Conversation promotion, planning dispatch, plan acceptance route, a 
 - **Depends on:** NONE
 - **Cross-package prerequisites:** 011 IPC and served-route conventions (Wave 0); coordinate the next migration number with the orchestrator because several packages promote migrations in parallel.
 - **Owner:** Task Runtime with Environments, Trust, Storage and the schema owner
-- **Allowed paths:** `docs/TASK-RUNTIME.md`, `docs/ENVIRONMENTS.md`, `docs/TRUST.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/STORAGE.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/domain-event.schema.json`, `docs/schemas/sqlite-v29.sql` (new, or the next unused number at implementation time), `specs/005-safe-task-path/`
+- **Allowed paths:** `docs/TASK-RUNTIME.md`, `docs/ENVIRONMENTS.md`, `docs/TRUST.md`, `docs/EVENTS.md`, `docs/SCHEMAS.md`, `docs/STORAGE.md`, `docs/schemas/operator-api.openapi.yaml`, `docs/schemas/error-codes.schema.json`, `docs/schemas/domain-event.schema.json`, `docs/schemas/sqlite-v36.sql` (allocated in `docs/LITECOWORK-BUILD-TASKS.md`; if another package merges first, use the next free number and update the allocation table), `specs/005-safe-task-path/`
 - **Contract:** SPEC §5 (B-17, B-18 accepted; B-35 PROPOSED), §7.2, §13; AC-004, AC-005, AC-008, AC-009, AC-013
 - **Change intent:** Promote the accepted target interfaces in one reviewed change: `AdmitFileWriteAttempt`, `ApprovedFileReplacement`, `FileWriteGrant`, `FileWriteVerifier`, `AttemptAdmissionError` and `FileWriteError` into TASK-RUNTIME/ENVIRONMENTS/TRUST prose; the Attempt admission, Effect list, `cancelTask` and `recoverStep` operations already present in the OpenAPI as target are confirmed with exact request/response bodies; error codes for attestation-not-enforced, path escape, over-bound and environment-provider-unavailable reuse existing codes where they fit (`DEPENDENCY_UNAVAILABLE`, `INTEGRITY_FAILURE`, `STALE_FENCE`) and add only what is missing; pin the bubblewrap minimum version and launch profile; record the Conversation-origin rule for `createTask` (`conversation_id` + `source_message_refs` admitted atomically with the origin message reference). The migration adds only columns/tables required for file-write grants, the Attempt-to-Environment link and the attestation digest reference; it never stores host paths or native handles.
 - **Acceptance:**
@@ -41,18 +41,18 @@ Gaps to V1: Conversation promotion, planning dispatch, plan acceptance route, a 
 
 ## 005-T02 - Consolidate Environment types and provider probes into the owning crates (Rust)
 
-- **Status:** NOT STARTED (duplicates confirmed in source, see Current baseline)
+- **Status:** PARTIAL 2026-11-11 (CODE; T01 owner-contract promotion still precedes integration). Canonical Environment enums and enforcement status are reused; the daemon discovery path delegates to the trust-checked `linux-process-scope` probe. The untrusted-candidate negative test passes.
 - **Depends on:** T01
 - **Cross-package prerequisites:** NONE
 - **Owner:** Environments
 - **Allowed paths:** `apps/litecoworkd/Cargo.toml`, `apps/litecoworkd/src/environment_isolation.rs`, `apps/litecoworkd/src/environment_provider.rs`, `crates/domain-environment/src/environment.rs`, `crates/domain-environment/src/lib.rs`, `crates/linux-process-scope/src/provider_probe.rs`, `crates/local-environment-staging/src/output_budget.rs`
 - **Contract:** SPEC §4 additional facts, §6 ownership; ENVIRONMENTS; AC-015
-- **Change intent:** Make one definition per concept before wiring attestation: keep `EnforcementStatus` in one crate (prefer `domain-environment`) and re-export it; replace the daemon copies of `EnvironmentLifetime` and `BudgetEnforcement` with the `domain-environment` types; make `linux_process_scope::probe_local_provider` and `BUBBLEWRAP_CANDIDATES` the only bubblewrap discovery path, so `probe_environment_provider` uses the trust-checked candidate set; remove the duplicate `operating_system_build` and `cgroup_v2_available`. Pure Rust refactor with no behavior change except that an untrusted bwrap binary no longer reports a LocalWorkspace class.
+- **Change intent:** Make one definition per concept before wiring attestation: keep `EnforcementStatus` in one crate (prefer `domain-environment`) and re-export it; replace the daemon copies of `EnvironmentLifetime`, `EnvironmentSharingScope`, `BudgetEnforcement` and `BudgetEnforcementPolicy` with the `domain-environment` types; make `linux_process_scope::probe_local_provider` and `BUBBLEWRAP_CANDIDATES` the only bubblewrap discovery path, so `probe_environment_provider` uses the trust-checked candidate set; remove the duplicate `operating_system_build` and `cgroup_v2_available`. Pure Rust refactor with no behavior change except that an untrusted bwrap binary no longer reports a LocalWorkspace class.
 - **Acceptance:**
-  - [ ] `grep` finds one `enum EnforcementStatus`, one `enum EnvironmentLifetime`, one bubblewrap candidate list.
-  - [ ] A bwrap binary that is group- or world-writable or not root-owned yields no LocalWorkspace class (negative test).
-  - [ ] Existing `environment_isolation` and `linux-process-scope` tests still pass unchanged in meaning.
-- **Command:** `cargo test -p domain-environment --locked`; `cargo test -p linux-process-scope --locked provider_probe`; `cargo test -p litecoworkd --locked environment_` (existing filters)
+  - [x] `rg` finds one `enum EnforcementStatus`, one `enum EnvironmentLifetime`, and one Bubblewrap candidate list (2026-11-11).
+  - [x] An injected untrusted probe candidate yields no LocalWorkspace availability (daemon negative test). The Linux permission-mode predicate still requires execution on Linux for OS-level evidence.
+  - [x] Existing environment-isolation, provider-probe, domain-environment and staging tests pass unchanged in meaning on Windows. Linux live Bubblewrap/systemd/cgroup qualification remains open.
+- **Command:** `cargo test -p domain-environment --locked` (22 unit tests, plus 23 browser-control and 9 browser-pointer integration tests); `cargo test -p linux-process-scope --locked provider_probe` (5 passed); `cargo test -p litecoworkd --locked environment_` (64 passed); `cargo test -p local-environment-staging --locked` (24 passed). `cargo check -p litecoworkd --locked` passes with unrelated existing warnings.
 - **Evidence:** test output in CURRENT-RUN.md; diff reviewed for zero semantic change.
 - **Stop:** stop if consolidation changes any serialized enum spelling used by a schema.
 
@@ -81,7 +81,7 @@ Gaps to V1: Conversation promotion, planning dispatch, plan acceptance route, a 
 - **Depends on:** T02
 - **Cross-package prerequisites:** 011 Runtime incarnation identity and Linux 0600/0700 socket row (B-28 second row)
 - **Owner:** Environments, Security
-- **Allowed paths:** `crates/linux-process-scope/src/bubblewrap.rs`, `crates/linux-process-scope/src/lib.rs`, `crates/local-environment-staging/src/lib.rs`, `crates/local-environment-staging/src/output_budget.rs`, `apps/litecoworkd/src/environment_isolation.rs`, `apps/litecoworkd/src/environment_provider.rs`, `apps/litecoworkd/src/linux_environment_provider.rs` (new), `apps/litecoworkd/src/main.rs`
+- **Allowed paths:** `crates/linux-process-scope/src/bubblewrap.rs`, `crates/linux-process-scope/src/lib.rs`, `crates/local-environment-staging/src/lib.rs`, `crates/local-environment-staging/Cargo.toml`, `crates/local-environment-staging/src/output_budget.rs`, `apps/litecoworkd/src/environment_isolation.rs`, `apps/litecoworkd/src/environment_provider.rs`, `apps/litecoworkd/src/linux_environment_provider.rs` (new), `apps/litecoworkd/src/main.rs`
 - **Contract:** SPEC §5 B-17 (accepted, with rider), §10; ENVIRONMENTS provision/attest; AC-008, AC-015
 - **Change intent:** Add a `LinuxBubblewrapProvider` that implements the `domain-environment` `EnvironmentLifecycle` provision/destroy for the LocalWorkspace class. After launch it runs observed probes inside the sandbox and fills `IsolationAttestation`: filesystem = write outside the output root denied and inputs read-only (observed); process-tree = systemd transient scope with recursive `populated 0` quiescence (observed via `ManagedScope`); network = `--unshare-net` plus failed connect to host loopback and to a public address (observed); resource-limit = cgroup v2 memory/pids/cpu limits read back from the scope plus `check_output_quota` on the output root. Bind to the current `runtime_incarnation_id` and the `digest_root_set` / `digest_pinned_inputs` digests. Store through `RuntimeLocalIsolationStore`. Remove `#[allow(dead_code)]` from `environment_isolation` once callers exist. The Runtime never sees a host path, only digests.
 - **Acceptance:**
@@ -264,7 +264,7 @@ Gaps to V1: Conversation promotion, planning dispatch, plan acceptance route, a 
 
 ## 005-T14 - Windows row: Task execution visibly UNAVAILABLE until B-35 qualifies
 
-- **Status:** NOT STARTED (`probe_environment_provider` in `apps/litecoworkd/src/environment_provider.rs` reports a Windows LocalWorkspace class with the note "Job Object process-tree isolation and KILL_ON_CLOSE active", which reads as an isolation claim)
+- **Status:** PARTIAL (2026-11-11 CODE: the Windows provider probe now advertises no `LocalWorkspace` class or supported Task lifetime and explains that Job Objects manage process lifetime only; the planning-readiness contract carries `WINDOWS_ENVIRONMENT_PROVIDER_UNAVAILABLE` and the Work diagnostic has a plain-language B-35 label. Windows provider tests now pass (10/10), and the typed blocker is represented in the generated UI contract; a packaged Work screenshot/projection record remains to close this task.)
 - **Depends on:** T05, T13
 - **Cross-package prerequisites:** 019 release matrix row definitions; 008 shares the same UNAVAILABLE reason for the daemon-owned terminal
 - **Owner:** Environments, Desktop UI
@@ -437,4 +437,4 @@ For each task record, in the table below and in CURRENT-RUN.md: git revision, ex
 
 | Task | Revision | Command | Result | Row / OS build | Harness | Level | Reviewer | Date |
 |---|---|---|---|---|---|---|---|---|
-| (none yet) | | | | | | | | |
+| T02 | c892a567 + working-tree | `cargo check -p litecoworkd --locked`; `cargo test -p litecoworkd --locked environment_`; `cargo test -p local-environment-staging --locked`; `cargo test -p domain-environment --locked`; `cargo test -p linux-process-scope --locked provider_probe` | check passed; 64 + 24 + 22/23/9 + 5 tests passed | Windows 11 Home Single Language build 26300 x64 | None | CODE | No owner review recorded | 2026-11-11 |

@@ -179,3 +179,15 @@ All protocol methods must be tested against the pinned Chrome binary because CDP
 ## Canonical transport and route qualification note (2026-10-12 audit)
 
 Browser commands above use `requestId` as a logical idempotency handle in pseudocode. When exposed through the Operator, use the existing `Idempotency-Key` header and map it to domain RequestId; the local IPC `request_id` is only request/response correlation. Also enforce `If-Match` and `X-Workspace-ID` per docs/API.md. Browser route paths in V1-FUNCTION-FILE-CATALOG.md are **candidates**, not existing Operator endpoints: reconcile with current API/OpenAPI, assign a single owner and implement every handler, ACL, event and migration before presenting browser controls as working.
+
+## Accepted observation and takeover UX refinement (owner request, 2026-11-11)
+
+The Workbench live surface is the authorized **managed browser tab viewport**, streamed as ephemeral Chromium frames through a bounded latest-frame queue with backpressure. Frames carry session, tab-generation and control-epoch identity, are dropped when stale, and are not persisted into Conversation or Activity by default. The UI labels this **Browser view**, never a share of the whole laptop. This refines accepted B-22 without changing its provider or consent boundary.
+
+Whole-desktop capture/input is Computer use and remains UNAVAILABLE under accepted B-32. Do not add a laptop-wide screen-share toggle, capture consent flow, or desktop input takeover under this refinement.
+
+While a live browser lease is AGENT-owned, the UI shows a persistent, non-modal banner naming the session/tab and offering **Take over**. The command fences new agent input, cancels queued old-epoch input, reaches a bounded safe point for already-dispatched input, and atomically advances the lease epoch to USER. The UI reports USER control only after provider acknowledgment and confirmation that old-epoch input is rejected. Reconcile any action that may already have taken effect; unresolved results remain pending/unknown. Focus moves to the browser after confirmed transfer. Browser Take over transfers browser input only; it does not stop Conversation generation, cancel a Task, or close the browser.
+
+Conversation **Take control** remains distinct and follows Feature 012 B-34: invoke Feature 001 Stop, wait for observed native quiescence, settle the turn `CANCELLED`, record `OWNER_TOOK_CONTROL`, then allow owner-authored continuation as a new ordinary turn. It never sends the next message implicitly. This separation avoids implying that switching browser input also stopped model generation, or that stopping a Conversation grants control over the browser lease.
+
+Returning browser control requires separate explicit confirmation, a new epoch, and a fresh observation from which any later agent plan starts. Never replay queued inputs or stale clicks; a user-edited form is not submitted on return.

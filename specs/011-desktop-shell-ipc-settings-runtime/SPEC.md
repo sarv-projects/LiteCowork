@@ -145,7 +145,7 @@ Observed in the active source; existence is CODE evidence, not SYSTEM/USER quali
 
 - Served reads: `getLocalOperatorReadiness`, `getLocalRuntimeLifecycle`; Workspace selection/create/instruction-revision/archive; Feature 002 catalogue/probe/binding operations. Event: `runtime.availability.changed.v1`.
 - Target-only: `enrollLocalRuntimeInWorkspace`, `previewLocalRuntimeStop`, `requestLocalRuntimeStop`; Runtime stop route stays absent until Task/Effect/lease/local-service settlement exists.
-- UI reality: the mounted `SettingsView.tsx` exposes four categories (General, Workspaces, Agents, Runtime). General appearance controls are inert component state; shortcut labels are display-only; the exported `SettingsPage` is unmounted.
+- UI reality: the mounted `SettingsView.tsx` exposes four categories (General, Workspaces, Agents, Runtime). General appearance preferences now apply and persist locally; shortcut rows come from the registry; the exported `SettingsPage` is unmounted. The full target Settings IA remains unimplemented.
 
 ### 7.2 Accepted target signatures (not yet in source)
 
