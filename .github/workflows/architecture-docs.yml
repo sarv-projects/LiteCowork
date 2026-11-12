@@ -32,7 +32,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libdbus-1-dev pkg-config bubblewrap
-      - run: scripts/check.sh
+      - run: bash scripts/check.sh
       - name: Secret scan of tracked source
         run: uv run --locked python scripts/v1_secret_scan.py --source --json
 
@@ -50,6 +50,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: apps/litecowork-ui/.node-version
+      - run: corepack enable
       - run: corepack pnpm@12.10.1 install --frozen-lockfile
       - run: corepack pnpm@12.10.1 test
       - run: corepack pnpm@12.10.1 build
